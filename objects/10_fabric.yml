@@ -12,6 +12,7 @@ spec:
       mgmt_gateway: "10.255.0.1"
       asn_pool: "Fabric-A-ASN-Pool"
       node_id_pool: "Fabric-A-NodeID-Pool"
+      mgmt_pool: "Fabric-A-Mgmt-Pool"
       member_of_groups: ["fabrics"]
       children:
         kind: NetworkPod
@@ -36,6 +37,7 @@ spec:
       mgmt_gateway: "10.255.1.1"
       asn_pool: "Fabric-B-ASN-Pool"
       node_id_pool: "Fabric-B-NodeID-Pool"
+      mgmt_pool: "Fabric-B-Mgmt-Pool"
       children:
         kind: NetworkPod
         data:
