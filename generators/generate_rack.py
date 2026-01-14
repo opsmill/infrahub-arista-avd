@@ -117,7 +117,7 @@ class RackGenerator(InfrahubGenerator):
                 "loopback_ip": self.loopback_pool,
                 "index": index,
                 "role": "leaf",
-                "member_of_groups": ["devices"],
+                "member_of_groups": ["avd_devices"],
             }
 
             # Allocate from ASN and Node ID pools if available

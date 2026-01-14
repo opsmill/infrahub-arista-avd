@@ -63,7 +63,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
                 "loopback_ip": self.loopback_pool,
                 "role": "super_spine",
                 "pod": fabric_pod,
-                "member_of_groups": ["devices"],
+                "member_of_groups": ["avd_devices"],
             }
 
             # Allocate from ASN and Node ID pools if available

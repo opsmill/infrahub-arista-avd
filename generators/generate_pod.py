@@ -121,7 +121,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 "pod": {"id": self.pod_id},
                 "loopback_ip": self.loopback_pool,
                 "role": "spine",
-                "member_of_groups": ["devices"],
+                "member_of_groups": ["avd_devices"],
             }
 
             # Allocate from ASN and Node ID pools if available
