@@ -83,13 +83,13 @@ generator_definitions:
     execute_after_merge: false
 
   # AVD Generator - populates device.avd_inputs and device.avd_structured_config
-  - name: generate-avd
-    file_path: "./generators/generate_avd.py"
+  - name: generate-avd-device-structured-config
+    file_path: "./generators/generate_avd_device_structured_config.py"
     query: generate_avd
     targets: fabrics
     parameters:
       fabric_name: name__value
-    class_name: AvdGenerator
+    class_name: AvdDeviceStructuredConfigGenerator
     convert_query_response: false
     execute_in_proposed_change: false
     execute_after_merge: false

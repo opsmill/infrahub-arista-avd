@@ -15,7 +15,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 
 
-class AvdGenerator(InfrahubGenerator):
+class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
     """Builds AVD inputs and structured config for all devices in a fabric."""
 
     logger = logging.getLogger("infrahub.tasks")
