@@ -2,6 +2,29 @@
 ---
 version: "1.0"
 generics:
+  - name: GenericDevice
+    namespace: Network
+    description: Generic Device object.
+    label: Device
+    icon: mdi:server
+    human_friendly_id:
+      - hostname__value
+    order_by:
+      - hostname__value
+    display_label: hostname__value
+    attributes:
+      - name: hostname
+        kind: Text
+        unique: true
+        order_weight: 1000
+    relationships:
+      - name: interfaces
+        peer: NetworkInterface
+        optional: true
+        cardinality: many
+        identifier: device__interface
+        kind: Component
+
   - name: Endpoint
     namespace: Network
     include_in_menu: false
@@ -65,15 +88,13 @@ nodes:
     generate_template: true
     inherit_from:
       - CoreArtifactTarget
+      - NetworkGenericDevice
     display_label: hostname__value
     include_in_menu: false
     attributes:
       - name: index
         kind: Number
         optional: true
-      - name: hostname
-        kind: Text
-        unique: true
       - name: role
         kind: Dropdown
         choices:
@@ -91,30 +112,6 @@ nodes:
         label: Node ID
         kind: Number
         optional: true
-      - name: avd_inputs
-        label: AVD Inputs (hostvars)
-        kind: JSON
-        optional: true
-        description: "Per-device pyAVD hostvars input structure"
-      - name: avd_structured_config
-        label: AVD Structured Config
-        kind: URL
-        optional: true
-        read_only: true
-        description: "Device structured configuration from pyAVD"
-        computed_attribute:
-          kind: Jinja2
-          jinja2_template: "http://localhost:8000/api/storage/object/{{ avd_file_identifier__value }}"
-      - name: avd_file_identifier
-        label: AVD File Identifier
-        kind: Text
-        optional: true
-        description: "Identifier for the uploaded AVD structured config file"
-      - name: avd_file_checksum
-        label: AVD File Checksum
-        kind: Text
-        optional: true
-        description: "Checksum of the uploaded AVD structured config file"
     relationships:
       - name: device_type
         kind: Attribute
@@ -226,7 +223,7 @@ nodes:
         order_weight: 20000
     relationships:
       - name: device
-        peer: NetworkDevice
+        peer: NetworkGenericDevice
         kind: Parent
         optional: false
         cardinality: one

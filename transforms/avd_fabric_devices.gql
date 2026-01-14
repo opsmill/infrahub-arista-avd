@@ -16,12 +16,6 @@ query AvdFabricDevicesQuery($name: String!) {
         hostname {
           value
         }
-        avd_inputs {
-          value
-        }
-        avd_structured_config {
-          value
-        }
         pod {
           node {
             id
