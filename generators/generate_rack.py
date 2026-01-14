@@ -9,7 +9,7 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumb
 from solution_ai_dc import sorting as solution_ai_dc_sorting
 from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
 from solution_ai_dc.cabling import build_rack_cabling_plan, connect_interface_maps
-from solution_ai_dc.protocols import NetworkDevice, NetworkInterface
+from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkPod
 
 from .rack_generator_query import RackGeneratorQuery
 
@@ -61,6 +61,11 @@ class RackGenerator(InfrahubGenerator):
         self.pod_index: int = data.location_rack.edges[0].node.pod.node.index.value
         self.pod_name: str = data.location_rack.edges[0].node.pod.node.name.value.lower()
         self.pod_amount_of_spines: int = data.location_rack.edges[0].node.pod.node.amount_of_spines.value
+        self.pod: NetworkPod = await self.client.get(kind=NetworkPod, id=self.pod_id)
+        await self.pod.parent.fetch()
+        self.fabric: NetworkFabric = self.pod.parent.peer
+        self.fabric.avd_hostvars_ready = False
+        await self.fabric.save(allow_upsert=True)
 
         self.loopback_pool_id: str = data.location_rack.edges[0].node.pod.node.loopback_pool.node.id
         self.prefix_pool_id: str = data.location_rack.edges[0].node.pod.node.prefix_pool.node.id

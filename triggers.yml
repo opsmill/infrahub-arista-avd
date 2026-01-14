@@ -8,6 +8,8 @@ spec:
       generator: generate-pod
     - name: run-rack-generator
       generator: generate-rack
+    - name: run-avd-device-structured-config-generator
+      generator: generate-avd-device-structured-config
 
 ---
 apiVersion: infrahub.app/v1
@@ -92,3 +94,15 @@ spec:
         data:
           - attribute_name: rack_type
             value_match: any
+
+    - name: trigger-avd-structured-config-generator-update-avd-hostvars-ready
+      branch_scope: "other_branches"
+      node_kind: NetworkFabric
+      mutation_action: "updated"
+      action: run-avd-device-structured-config-generator
+      matches:
+        kind: CoreNodeTriggerAttributeMatch
+        data:
+          - attribute_name: avd_hostvars_ready
+            value: "True"
+            value_previous: "False"

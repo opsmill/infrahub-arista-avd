@@ -64,6 +64,10 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
             0
         ].node.parent.node.amount_of_super_spines.value
 
+        self.fabric = await self.client.get("NetworkFabric", id=self.fabric_id)
+        self.fabric.avd_hostvars_ready = False
+        await self.fabric.save(allow_upsert=True)
+
         self.spine_switches = []
 
         if self.pod_role in EXCLUDED_POD_ROLES:

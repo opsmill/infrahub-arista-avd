@@ -36,7 +36,6 @@ nodes:
         default_value: 4
         branch: aware
         order_weight: 1000
-
       - name: fabric_interface_sorting_method
         kind: Dropdown
         branch: aware
@@ -73,6 +72,10 @@ nodes:
         optional: true
         order_weight: 9001
         branch: aware
+      - name: avd_hostvars_ready
+        kind: Boolean
+        optional: true
+        default_value: false
     relationships:
       - name: super_spine_switch_template
         branch: aware
