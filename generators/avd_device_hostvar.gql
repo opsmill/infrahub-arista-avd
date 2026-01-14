@@ -48,7 +48,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                     value
                   }
                   mgmt_routes1 {
-                    value 
+                    value
                   }
                   avd_evpn {
                     node {
@@ -92,8 +92,10 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                               hostname {
                                 value
                               }
-                              role {
-                                value
+                              ... on NetworkDevice {
+                                role {
+                                  value
+                                }
                               }
                             }
                           }
