@@ -85,7 +85,7 @@ spec:
   data:
     - name: Fabric-A-Mgmt-Pool
       default_address_type: IpamIPAddress
-      default_prefix_length: 32
+      default_prefix_length: 24
       ip_namespace: default
       resources:
         - "10.255.0.0/24"
@@ -107,7 +107,7 @@ spec:
   data:
     - name: Fabric-B-Mgmt-Pool
       default_address_type: IpamIPAddress
-      default_prefix_length: 32
+      default_prefix_length: 24
       ip_namespace: default
       resources:
         - "10.255.1.0/24"

@@ -6,8 +6,12 @@ query AvdDeviceConfigQuery($name: String!) {
         hostname {
           value
         }
-        avd_structured_config {
-          value
+        avd_artifact {
+          node {
+            structured_config_identifier {
+              value
+            }
+          }
         }
       }
     }

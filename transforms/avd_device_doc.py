@@ -3,6 +3,7 @@
 Generates device documentation from stored structured config.
 """
 
+import json
 from typing import Any
 
 import pyavd
@@ -23,14 +24,14 @@ class AvdDeviceDocTransform(InfrahubTransform):
 
         device = device_edges[0]["node"]
         hostname = device["hostname"]["value"]
-        structured_config = device.get("avd_structured_config", {})
-        structured_config_value = structured_config.get("value") if structured_config else None
+        structured_config_peer = device.get("avd_artifact", {}).get("node", {}).get("structured_config_identifier", {})
+        structured_config_id = structured_config_peer.get("value") if structured_config_peer else None
 
-        if not structured_config_value:
+        structured_config = await self.client.object_store.get(identifier=structured_config_id) if structured_config_id else None
+        if not structured_config:
             return f"# No structured config available for {hostname}"
 
-        # Ensure hostname is set in structured config
-        structured_config_value["hostname"] = hostname
+        structured_config_value = json.loads(structured_config)
 
         # Generate device documentation from stored structured config
         return pyavd.get_device_doc(structured_config_value)

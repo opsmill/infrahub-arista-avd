@@ -62,6 +62,17 @@ nodes:
         kind: Text
         optional: true
         order_weight: 5000
+      - name: mgmt_routes
+        label: Management Route
+        kind: List
+        optional: true
+        order_weight: 9000
+      - name: mgmt_routes1
+        label: Management Route 1
+        kind: List
+        optional: true
+        order_weight: 9001
+        branch: aware
     relationships:
       - name: super_spine_switch_template
         branch: aware
@@ -97,6 +108,11 @@ nodes:
         optional: true
         identifier: "fabric__mgmt_pool"
         order_weight: 8000
+      - name: avd_evpn
+        label: AVD EVPN Settings
+        peer: AvdEvpn
+        kind: Attribute
+        cardinality: one
 
   - name: Pod
     namespace: Network

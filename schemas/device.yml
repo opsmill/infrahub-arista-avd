@@ -153,6 +153,11 @@ nodes:
         cardinality: many
         optional: true
         identifier: "device__interface"
+      - name: avd_artifact
+        peer: AvdArtifact
+        kind: Attribute
+        cardinality: one
+        optional: true
 
   - name: Interface
     namespace: Network

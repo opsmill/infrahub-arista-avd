@@ -1,0 +1,28 @@
+---
+version: "1.0"
+
+nodes:
+  - name: Evpn
+    namespace: Avd
+    display_label: name__value
+    include_in_menu: false
+    attributes:
+      - name: name
+        kind: Text
+        order_weight: 100
+      - name: ebgp_multihop
+        label: eBGP Multihop
+        kind: Number
+        optional: true
+        order_weight: 1000
+      - name: overlay_bgp_rtc
+        label: Overlay BGP RTC
+        kind: Boolean
+        optional: true
+        default_value: false
+        order_weight: 2000
+    relationships:
+      - name: fabric
+        peer: NetworkFabric
+        kind: Attribute
+        cardinality: many

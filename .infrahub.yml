@@ -6,6 +6,8 @@ menus:
   - menus/menu.yml
 
 queries:
+  - name: avd_device_hostvar
+    file_path: "./generators/avd_device_hostvar.gql"
   - name: generate_fabric
     file_path: "./generators/generate_fabric.gql"
 
@@ -37,6 +39,16 @@ queries:
 
 
 generator_definitions:
+  - name: generate-avd-device-hostvar
+    file_path: "./generators/generate_avd_device_hostvar.py"
+    query: avd_device_hostvar
+    targets: avd_devices
+    parameters:
+      hostname: hostname__value
+    class_name: GenerateAVDDeviceHostvar
+    convert_query_response: false
+    execute_in_proposed_change: false
+    execute_after_merge: false
   - name: generate-fabric
     file_path: "./generators/generate_fabric.py"
     query: generate_fabric
@@ -125,7 +137,7 @@ artifact_definitions:
     parameters:
       name: "hostname__value"
     content_type: "text/plain"
-    targets: "devices"
+    targets: "avd_devices"
     transformation: "avd_eos_config"
   - name: "avd_fabric_documentation"
     artifact_name: "AVD Fabric Documentation"
@@ -139,5 +151,5 @@ artifact_definitions:
     parameters:
       name: "hostname__value"
     content_type: "text/markdown"
-    targets: "devices"
+    targets: "avd_devices"
     transformation: "avd_device_doc"
