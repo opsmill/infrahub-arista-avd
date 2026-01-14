@@ -31,6 +31,14 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
             }
           }
         }
+        vtep_ip {
+          node {
+            id
+            address {
+              value
+            }
+          }
+        }
         pod {
           node {
             id
@@ -48,7 +56,22 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                     value
                   }
                   mgmt_routes1 {
-                    value 
+                    value
+                  }
+                  vtep_pool {
+                    node {
+                      resources {
+                        edges {
+                          node {
+                            ... on IpamIPPrefix {
+                              prefix {
+                                value
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                   avd_evpn {
                     node {

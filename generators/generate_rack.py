@@ -43,6 +43,7 @@ class RackGenerator(InfrahubGenerator):
     asn_pool: CoreNumberPool | None
     node_id_pool: CoreNumberPool | None
     mgmt_pool: CoreIPAddressPool | None
+    vtep_pool: CoreIPAddressPool | None
 
     logger = logging.getLogger("infrahub.tasks")
 
@@ -92,6 +93,7 @@ class RackGenerator(InfrahubGenerator):
         self.asn_pool = None
         self.node_id_pool = None
         self.mgmt_pool = None
+        self.vtep_pool = None
 
         pod_node = data.location_rack.edges[0].node.pod.node
         if pod_node.parent and pod_node.parent.node:
@@ -102,6 +104,8 @@ class RackGenerator(InfrahubGenerator):
                 self.node_id_pool = await self.client.get(kind=CoreNumberPool, id=fabric_node.node_id_pool.node.id)
             if hasattr(fabric_node, "mgmt_pool") and fabric_node.mgmt_pool and fabric_node.mgmt_pool.node:
                 self.mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=fabric_node.mgmt_pool.node.id)
+            if hasattr(fabric_node, "vtep_pool") and fabric_node.vtep_pool and fabric_node.vtep_pool.node:
+                self.vtep_pool = await self.client.get(kind=CoreIPAddressPool, id=fabric_node.vtep_pool.node.id)
 
         await self.create_leaf_switches()
 
@@ -127,6 +131,8 @@ class RackGenerator(InfrahubGenerator):
                 device_kwargs["node_id"] = self.node_id_pool
             if self.mgmt_pool:
                 device_kwargs["mgmt_ip"] = self.mgmt_pool
+            if self.vtep_pool:
+                device_kwargs["vtep_ip"] = self.vtep_pool
 
             leaf_switch = await self.client.create(NetworkDevice, **device_kwargs)
             await leaf_switch.save(allow_upsert=True)

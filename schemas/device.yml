@@ -153,6 +153,12 @@ nodes:
         cardinality: many
         optional: true
         identifier: "device__interface"
+      - name: vtep_ip
+        peer: IpamIPAddress
+        kind: Attribute
+        cardinality: one
+        optional: true
+        identifier: "device__vtep_ip_address"
       - name: avd_artifact
         peer: AvdArtifact
         kind: Attribute

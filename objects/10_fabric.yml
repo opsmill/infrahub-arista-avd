@@ -13,6 +13,7 @@ spec:
       asn_pool: "Fabric-A-ASN-Pool"
       node_id_pool: "Fabric-A-NodeID-Pool"
       mgmt_pool: "Fabric-A-Mgmt-Pool"
+      vtep_pool: "Fabric-A-VTEP-Pool"
       member_of_groups: ["fabrics"]
       children:
         kind: NetworkPod
@@ -38,6 +39,7 @@ spec:
       asn_pool: "Fabric-B-ASN-Pool"
       node_id_pool: "Fabric-B-NodeID-Pool"
       mgmt_pool: "Fabric-B-Mgmt-Pool"
+      vtep_pool: "Fabric-B-VTEP-Pool"
       children:
         kind: NetworkPod
         data:

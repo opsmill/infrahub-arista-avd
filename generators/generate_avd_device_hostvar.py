@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from infrahub_sdk.generator import InfrahubGenerator
 
-from pyavd._eos_designs.schema import EosDesigns
-
 # Mapping from Infrahub device roles to AVD types
 ROLE_TO_AVD_TYPE: dict[str, str] = {
     "super_spine": "super-spine",
@@ -93,6 +91,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if device.get("mgmt_ip") and device["mgmt_ip"].get("node"):
             mgmt_ip = device["mgmt_ip"]["node"]["address"]["value"]
 
+        vtep_ip = None
+        if device.get("vtep_ip") and device["vtep_ip"].get("node"):
+            vtep_ip = device["vtep_ip"]["node"]["address"]["value"]
+            # Strip CIDR notation if present
+            if "/" in vtep_ip:
+                vtep_ip = vtep_ip.split("/")[0]
+
         # Extract fabric info
         fabric_name = fabric["name"]["value"]
         mgmt_gateway = fabric.get("mgmt_gateway", {}).get("value") if fabric.get("mgmt_gateway") else None
@@ -128,9 +133,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["loopback_ipv4_pool"] = "10.255.0.0/24"
         if mgmt_ip:
             node_config["mgmt_ip"] = mgmt_ip
+        if vtep_ip:
+            node_config["vtep_loopback_ipv4_address"] = vtep_ip
 
         node_config["uplink_ipv4_pool"] = "10.250.0.0/16"
-        node_config["vtep_loopback_ipv4_pool"] = "10.251.0.0/24" # Move to auto generated when creating devices
+        node_config["vtep_loopback_ipv4_pool"] = fabric["vtep_pool"]["node"]["resources"]["edges"][0]["node"]["prefix"][
+            "value"
+        ]
 
         # Add uplink configuration for spine and leaf devices
         if uplinks["uplink_interfaces"]:
@@ -158,16 +167,21 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         print(f"Role: {role} -> AVD type: {avd_type}")
         print(f"Node type key: {node_type_key}")
 
-        print(f"\nNode config:")
+        print("\nNode config:")
         for key, value in node_config.items():
             print(f"  {key}: {value}")
 
-        print(f"\nFull hostvars structure:")
+        print("\nFull hostvars structure:")
         import json
+
         print(json.dumps(hostvars, indent=2))
 
         response = await self.client.object_store.upload(content=json.dumps(hostvars))
-        avd_artifact = await self.client.create(kind="AvdArtifact", name=hostname, hostvar_checksum=response['checksum'], hostvar_identifier=response['identifier'], device=device_id)
+        avd_artifact = await self.client.create(
+            kind="AvdArtifact",
+            name=hostname,
+            hostvar_checksum=response["checksum"],
+            hostvar_identifier=response["identifier"],
+            device=device_id,
+        )
         await avd_artifact.save(allow_upsert=True)
-
-        

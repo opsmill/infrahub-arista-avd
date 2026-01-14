@@ -30,6 +30,8 @@ nodes:
             label: Pod Leaf Spine
           - name: management
             label: Management
+          - name: vtep
+            label: VTEP
   - name: IPAddress
     namespace: Ipam
     inherit_from:

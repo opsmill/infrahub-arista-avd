@@ -132,6 +132,7 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNode(BaseModel):
     asn_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool | None = None
     node_id_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool | None = None
     mgmt_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool | None = None
+    vtep_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool | None = None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool(BaseModel):

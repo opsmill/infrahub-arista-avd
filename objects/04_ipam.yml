@@ -76,6 +76,8 @@ spec:
   data:
     - prefix: 10.255.0.0/24
       role: management
+    - prefix: 10.42.0.0/24
+      role: vtep
 ---
 # Management IP Pool for Fabric-A
 apiVersion: infrahub.app/v1
@@ -89,6 +91,12 @@ spec:
       ip_namespace: default
       resources:
         - "10.255.0.0/24"
+    - name: Fabric-A-VTEP-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 24
+      ip_namespace: default
+      resources:
+        - "10.42.0.0/24"
 ---
 # Management IP Prefix for Fabric-B
 apiVersion: infrahub.app/v1
@@ -98,6 +106,8 @@ spec:
   data:
     - prefix: 10.255.1.0/24
       role: management
+    - prefix: 10.42.1.0/24
+      role: vtep
 ---
 # Management IP Pool for Fabric-B
 apiVersion: infrahub.app/v1
@@ -111,3 +121,9 @@ spec:
       ip_namespace: default
       resources:
         - "10.255.1.0/24"
+    - name: Fabric-B-VTEP-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 24
+      ip_namespace: default
+      resources:
+        - "10.42.1.0/24"

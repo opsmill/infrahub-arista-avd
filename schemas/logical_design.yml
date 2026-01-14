@@ -108,6 +108,15 @@ nodes:
         optional: true
         identifier: "fabric__mgmt_pool"
         order_weight: 8000
+      - name: vtep_pool
+        label: VTEP IP Pool
+        peer: CoreIPAddressPool
+        branch: aware
+        kind: Attribute
+        cardinality: one
+        optional: true
+        identifier: "fabric__vtep_pool"
+        order_weight: 8000
       - name: avd_evpn
         label: AVD EVPN Settings
         peer: AvdEvpn
