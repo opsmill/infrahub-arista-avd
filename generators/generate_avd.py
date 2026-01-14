@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import logging
 from typing import Any
+import json
 
 import pyavd
 from infrahub_sdk.generator import InfrahubGenerator
@@ -137,8 +138,10 @@ class AvdGenerator(InfrahubGenerator):
 
             # Store both avd_inputs and avd_structured_config
             device_obj = await self.client.get(kind="NetworkDevice", id=device_id)
-            device_obj.avd_inputs.value = {} 
-            device_obj.avd_structured_config.value = structured_config
+            device_obj.avd_inputs.value = {}
+            response = await self.client.object_store.upload(content=json.dumps(structured_config))
+            device_obj.avd_file_identifier = response['identifier']
+            device_obj.avd_file_checksum = response['checksum']
             await device_obj.save()
 
             self.logger.info(f"Stored AVD config for device: {hostname}")

@@ -98,9 +98,23 @@ nodes:
         description: "Per-device pyAVD hostvars input structure"
       - name: avd_structured_config
         label: AVD Structured Config
-        kind: JSON
+        kind: URL
         optional: true
+        read_only: true
         description: "Device structured configuration from pyAVD"
+        computed_attribute:
+          kind: Jinja2
+          jinja2_template: "http://localhost:8000/api/storage/object/{{ avd_file_identifier__value }}"
+      - name: avd_file_identifier
+        label: AVD File Identifier
+        kind: Text
+        optional: true
+        description: "Identifier for the uploaded AVD structured config file"
+      - name: avd_file_checksum
+        label: AVD File Checksum
+        kind: Text
+        optional: true
+        description: "Checksum of the uploaded AVD structured config file"
     relationships:
       - name: device_type
         kind: Attribute
