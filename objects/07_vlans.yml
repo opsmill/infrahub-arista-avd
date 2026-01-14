@@ -1,0 +1,65 @@
+---
+# L2 Domain for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamL2Domain
+  data:
+    - name: Fabric-A-L2Domain
+---
+# VLANs for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVLAN
+  data:
+    - name: MGMT
+      vlan_id: 100
+      status: active
+      role: management
+      l2domain: Fabric-A-L2Domain
+    - name: Users
+      vlan_id: 200
+      status: active
+      role: user
+      l2domain: Fabric-A-L2Domain
+    - name: Servers
+      vlan_id: 300
+      status: active
+      role: server
+      l2domain: Fabric-A-L2Domain
+    - name: Storage
+      vlan_id: 400
+      status: active
+      role: server
+      l2domain: Fabric-A-L2Domain
+    - name: Backup
+      vlan_id: 500
+      status: active
+      role: server
+      l2domain: Fabric-A-L2Domain
+    - name: DMZ
+      vlan_id: 600
+      status: active
+      role: server
+      l2domain: Fabric-A-L2Domain
+    - name: Guest
+      vlan_id: 700
+      status: active
+      role: user
+      l2domain: Fabric-A-L2Domain
+    - name: VoIP
+      vlan_id: 800
+      status: active
+      role: user
+      l2domain: Fabric-A-L2Domain
+    - name: Provisioning
+      vlan_id: 900
+      status: provisioning
+      role: server
+      l2domain: Fabric-A-L2Domain
+    - name: Legacy
+      vlan_id: 999
+      status: drained
+      role: server
+      l2domain: Fabric-A-L2Domain
