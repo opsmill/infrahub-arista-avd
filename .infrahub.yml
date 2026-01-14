@@ -24,12 +24,9 @@ queries:
   - name: cabling_plan
     file_path: "./transforms/cabling_plan.gql"
 
-  # AVD Generator queries
-  - name: generate_avd_inputs
-    file_path: "./generators/generate_avd_inputs.gql"
-
-  - name: generate_avd_structured_config
-    file_path: "./generators/generate_avd_structured_config.gql"
+  # AVD Generator query
+  - name: generate_avd
+    file_path: "./generators/generate_avd.gql"
 
   # AVD Transform queries
   - name: avd_device_config
@@ -73,26 +70,14 @@ generator_definitions:
     execute_in_proposed_change: false
     execute_after_merge: false
 
-  # AVD Input Builder - populates device.avd_inputs
-  - name: generate-avd-inputs
-    file_path: "./generators/generate_avd_inputs.py"
-    query: generate_avd_inputs
+  # AVD Generator - populates device.avd_inputs and device.avd_structured_config
+  - name: generate-avd
+    file_path: "./generators/generate_avd.py"
+    query: generate_avd
     targets: fabrics
     parameters:
       fabric_name: name__value
-    class_name: AvdInputsGenerator
-    convert_query_response: false
-    execute_in_proposed_change: false
-    execute_after_merge: false
-
-  # AVD Structured Config - populates device.avd_structured_config
-  - name: generate-avd-structured-config
-    file_path: "./generators/generate_avd_structured_config.py"
-    query: generate_avd_structured_config
-    targets: fabrics
-    parameters:
-      fabric_name: name__value
-    class_name: AvdStructuredConfigGenerator
+    class_name: AvdGenerator
     convert_query_response: false
     execute_in_proposed_change: false
     execute_after_merge: false
@@ -116,6 +101,9 @@ python_transforms:
   - name: avd_fabric_doc
     class_name: AvdFabricDocTransform
     file_path: "./transforms/avd_fabric_doc.py"
+  - name: avd_device_doc
+    class_name: AvdDeviceDocTransform
+    file_path: "./transforms/avd_device_doc.py"
 
 artifact_definitions:
   - name: "startup_configuration"
@@ -146,3 +134,10 @@ artifact_definitions:
     content_type: "text/markdown"
     targets: "fabrics"
     transformation: "avd_fabric_doc"
+  - name: "avd_device_documentation"
+    artifact_name: "AVD Device Documentation"
+    parameters:
+      name: "hostname__value"
+    content_type: "text/markdown"
+    targets: "devices"
+    transformation: "avd_device_doc"
