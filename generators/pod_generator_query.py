@@ -89,6 +89,9 @@ class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabric(BaseModel):
     spine_interface_sorting_method: (
         PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricSpineInterfaceSortingMethod | None
     )
+    asn_pool: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricPool | None = None
+    node_id_pool: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricPool | None = None
+    mgmt_pool: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricPool | None = None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricName(BaseModel):
@@ -105,6 +108,14 @@ class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricInterface
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricSpineInterfaceSortingMethod(BaseModel):
     value: str | None
+
+
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricPool(BaseModel):
+    node: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricPoolNode | None
+
+
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricPoolNode(BaseModel):
+    id: str | None
 
 
 PodGeneratorQuery.model_rebuild()

@@ -1,0 +1,15 @@
+query AvdDeviceConfigQuery($name: String!) {
+  NetworkDevice(hostname__value: $name) {
+    edges {
+      node {
+        id
+        hostname {
+          value
+        }
+        avd_structured_config {
+          value
+        }
+      }
+    }
+  }
+}

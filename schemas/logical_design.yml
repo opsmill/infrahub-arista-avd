@@ -57,6 +57,11 @@ nodes:
             color: "#004E64"
         default_value: create_sorted_device_interface_map
         order_weight: 3000
+      - name: mgmt_gateway
+        label: Management Gateway
+        kind: Text
+        optional: true
+        order_weight: 5000
     relationships:
       - name: super_spine_switch_template
         branch: aware
@@ -65,6 +70,33 @@ nodes:
         cardinality: one
         identifier: "fabric__super_spine_template"
         order_weight: 4000
+      - name: asn_pool
+        label: BGP ASN Pool
+        peer: CoreNumberPool
+        branch: aware
+        kind: Attribute
+        cardinality: one
+        optional: true
+        identifier: "fabric__asn_pool"
+        order_weight: 6000
+      - name: node_id_pool
+        label: Node ID Pool
+        peer: CoreNumberPool
+        branch: aware
+        kind: Attribute
+        cardinality: one
+        optional: true
+        identifier: "fabric__node_id_pool"
+        order_weight: 7000
+      - name: mgmt_pool
+        label: Management IP Pool
+        peer: CoreIPAddressPool
+        branch: aware
+        kind: Attribute
+        cardinality: one
+        optional: true
+        identifier: "fabric__mgmt_pool"
+        order_weight: 8000
 
   - name: Pod
     namespace: Network

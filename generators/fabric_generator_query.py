@@ -22,6 +22,10 @@ class FabricGeneratorQueryNetworkFabricEdgesNode(BaseModel):
     name: FabricGeneratorQueryNetworkFabricEdgesNodeName | None
     amount_of_super_spines: FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines | None
     super_spine_switch_template: FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate
+    mgmt_gateway: FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway | None = None
+    asn_pool: FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool | None = None
+    node_id_pool: FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool | None = None
+    mgmt_pool: FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool | None = None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeName(BaseModel):
@@ -41,8 +45,31 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode(Bas
     id: str | None
 
 
+class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway(BaseModel):
+    value: str | None
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool(BaseModel):
+    node: FabricGeneratorQueryNetworkFabricEdgesNodePoolNode | None
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool(BaseModel):
+    node: FabricGeneratorQueryNetworkFabricEdgesNodePoolNode | None
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool(BaseModel):
+    node: FabricGeneratorQueryNetworkFabricEdgesNodePoolNode | None
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodePoolNode(BaseModel):
+    id: str | None
+
+
 FabricGeneratorQuery.model_rebuild()
 FabricGeneratorQueryNetworkFabric.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdges.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNode.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool.model_rebuild()

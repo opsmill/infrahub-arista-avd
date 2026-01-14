@@ -1,0 +1,104 @@
+query GenerateAvdInputsQuery($fabric_name: String!) {
+  NetworkFabric(name__value: $fabric_name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        mgmt_gateway {
+          value
+        }
+      }
+    }
+  }
+  NetworkDevice {
+    edges {
+      node {
+        id
+        hostname {
+          value
+        }
+        role {
+          value
+        }
+        bgp_asn {
+          value
+        }
+        node_id {
+          value
+        }
+        loopback_ip {
+          node {
+            id
+            address {
+              value
+            }
+          }
+        }
+        mgmt_ip {
+          node {
+            id
+            address {
+              value
+            }
+          }
+        }
+        pod {
+          node {
+            id
+            name {
+              value
+            }
+            parent {
+              node {
+                id
+                name {
+                  value
+                }
+              }
+            }
+          }
+        }
+        interfaces {
+          edges {
+            node {
+              id
+              name {
+                value
+              }
+              role {
+                value
+              }
+              link {
+                node {
+                  id
+                  endpoints {
+                    edges {
+                      node {
+                        id
+                        ... on NetworkInterface {
+                          name {
+                            value
+                          }
+                          device {
+                            node {
+                              id
+                              hostname {
+                                value
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

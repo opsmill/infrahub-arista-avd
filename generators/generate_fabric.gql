@@ -15,6 +15,24 @@ query FabricGeneratorQuery($fabric_name: String!) {
             id
           }
         }
+        mgmt_gateway {
+          value
+        }
+        asn_pool {
+          node {
+            id
+          }
+        }
+        node_id_pool {
+          node {
+            id
+          }
+        }
+        mgmt_pool {
+          node {
+            id
+          }
+        }
       }
     }
   }

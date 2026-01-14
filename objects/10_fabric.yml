@@ -9,6 +9,9 @@ spec:
       amount_of_super_spines: 6
       super_spine_switch_template: "super-spine-switch"
       fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
+      mgmt_gateway: "10.255.0.1"
+      asn_pool: "Fabric-A-ASN-Pool"
+      node_id_pool: "Fabric-A-NodeID-Pool"
       member_of_groups: ["fabrics"]
       children:
         kind: NetworkPod
@@ -30,6 +33,9 @@ spec:
       member_of_groups: ["fabrics"]
       super_spine_switch_template: "dell-z9864f-on-super-spine-switch"
       amount_of_super_spines: 4
+      mgmt_gateway: "10.255.1.1"
+      asn_pool: "Fabric-B-ASN-Pool"
+      node_id_pool: "Fabric-B-NodeID-Pool"
       children:
         kind: NetworkPod
         data:

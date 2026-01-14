@@ -63,6 +63,27 @@ query RackGeneratorQuery($rack_name: String!) {
 						spine_interface_sorting_method {
 							value
 						}
+						parent {
+							node {
+								... on NetworkFabric {
+									asn_pool {
+										node {
+											id
+										}
+									}
+									node_id_pool {
+										node {
+											id
+										}
+									}
+									mgmt_pool {
+										node {
+											id
+										}
+									}
+								}
+							}
+						}
 					}
 				}
       }

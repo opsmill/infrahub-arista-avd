@@ -19,3 +19,51 @@ spec:
       ip_namespace: "default"
       resources:
         - "10.0.0.0/8"
+---
+# ASN Pool for Fabric-A (private ASN range)
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: Fabric-A-ASN-Pool
+      node: NetworkDevice
+      node_attribute: bgp_asn
+      start_range: 65000
+      end_range: 65999
+---
+# Node ID Pool for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: Fabric-A-NodeID-Pool
+      node: NetworkDevice
+      node_attribute: node_id
+      start_range: 1
+      end_range: 9999
+---
+# ASN Pool for Fabric-B (separate range)
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: Fabric-B-ASN-Pool
+      node: NetworkDevice
+      node_attribute: bgp_asn
+      start_range: 65100
+      end_range: 65199
+---
+# Node ID Pool for Fabric-B
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: Fabric-B-NodeID-Pool
+      node: NetworkDevice
+      node_attribute: node_id
+      start_range: 1
+      end_range: 9999

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from infrahub_sdk.generator import InfrahubGenerator
-from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool
+from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_ai_dc.generator import GeneratorMixin
 from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkPod
@@ -17,6 +17,9 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
     fabric_super_spine_switch_template: str
 
     loopback_pool: CoreIPAddressPool
+    asn_pool: CoreNumberPool | None
+    node_id_pool: CoreNumberPool | None
+    mgmt_pool: CoreIPAddressPool | None
 
     log = logging.getLogger("infrahub.tasks")
 
@@ -28,6 +31,22 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric_super_spine_switch_template = data.network_fabric.edges[0].node.super_spine_switch_template.node.id
         self.amount_of_super_spines = data.network_fabric.edges[0].node.amount_of_super_spines.value
 
+        # Get AVD-related pool references
+        asn_pool_node = data.network_fabric.edges[0].node.asn_pool
+        node_id_pool_node = data.network_fabric.edges[0].node.node_id_pool
+        mgmt_pool_node = data.network_fabric.edges[0].node.mgmt_pool
+
+        self.asn_pool = None
+        self.node_id_pool = None
+        self.mgmt_pool = None
+
+        if asn_pool_node and asn_pool_node.node:
+            self.asn_pool = await self.client.get(kind=CoreNumberPool, id=asn_pool_node.node.id)
+        if node_id_pool_node and node_id_pool_node.node:
+            self.node_id_pool = await self.client.get(kind=CoreNumberPool, id=node_id_pool_node.node.id)
+        if mgmt_pool_node and mgmt_pool_node.node:
+            self.mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=mgmt_pool_node.node.id)
+
         await self.allocate_resource_pools()
 
         await self.create_super_spine_switches()
@@ -38,15 +57,24 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
 
         for idx in range(1, self.amount_of_super_spines + 1):
-            device = await self.client.create(
-                NetworkDevice,
-                hostname=f"ss-{self.fabric_name}-{idx}",
-                object_template={"id": self.fabric_super_spine_switch_template},
-                loopback_ip=self.loopback_pool,
-                role="super_spine",
-                pod=fabric_pod,
-                member_of_groups=["devices"],
-            )
+            device_kwargs = {
+                "hostname": f"ss-{self.fabric_name}-{idx}",
+                "object_template": {"id": self.fabric_super_spine_switch_template},
+                "loopback_ip": self.loopback_pool,
+                "role": "super_spine",
+                "pod": fabric_pod,
+                "member_of_groups": ["devices"],
+            }
+
+            # Allocate from ASN and Node ID pools if available
+            if self.asn_pool:
+                device_kwargs["bgp_asn"] = self.asn_pool
+            if self.node_id_pool:
+                device_kwargs["node_id"] = self.node_id_pool
+            if self.mgmt_pool:
+                device_kwargs["mgmt_ip"] = self.mgmt_pool
+
+            device = await self.client.create(NetworkDevice, **device_kwargs)
             await device.save(allow_upsert=True)
 
             # FIX: seems the id of a related node assigned from a pool is not immediately accessible

@@ -83,6 +83,24 @@ nodes:
             label: Spine
           - name: leaf
             label: Leaf
+      - name: bgp_asn
+        label: BGP ASN
+        kind: Number
+        optional: true
+      - name: node_id
+        label: Node ID
+        kind: Number
+        optional: true
+      - name: avd_inputs
+        label: AVD Inputs (hostvars)
+        kind: JSON
+        optional: true
+        description: "Per-device pyAVD hostvars input structure"
+      - name: avd_structured_config
+        label: AVD Structured Config
+        kind: JSON
+        optional: true
+        description: "Device structured configuration from pyAVD"
     relationships:
       - name: device_type
         kind: Attribute
@@ -96,6 +114,13 @@ nodes:
         cardinality: one
         optional: true
         identifier: "device__ip_address"
+      - name: mgmt_ip
+        label: Management IP
+        peer: IpamIPAddress
+        kind: Attribute
+        cardinality: one
+        optional: true
+        identifier: "device__mgmt_ip"
       - name: rack
         peer: LocationRack
         kind: Attribute

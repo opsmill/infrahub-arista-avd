@@ -24,6 +24,20 @@ queries:
   - name: cabling_plan
     file_path: "./transforms/cabling_plan.gql"
 
+  # AVD Generator queries
+  - name: generate_avd_inputs
+    file_path: "./generators/generate_avd_inputs.gql"
+
+  - name: generate_avd_structured_config
+    file_path: "./generators/generate_avd_structured_config.gql"
+
+  # AVD Transform queries
+  - name: avd_device_config
+    file_path: "./transforms/avd_device_config.gql"
+
+  - name: avd_fabric_devices
+    file_path: "./transforms/avd_fabric_devices.gql"
+
 
 generator_definitions:
   - name: generate-fabric
@@ -59,6 +73,30 @@ generator_definitions:
     execute_in_proposed_change: false
     execute_after_merge: false
 
+  # AVD Input Builder - populates device.avd_inputs
+  - name: generate-avd-inputs
+    file_path: "./generators/generate_avd_inputs.py"
+    query: generate_avd_inputs
+    targets: fabrics
+    parameters:
+      fabric_name: name__value
+    class_name: AvdInputsGenerator
+    convert_query_response: false
+    execute_in_proposed_change: false
+    execute_after_merge: false
+
+  # AVD Structured Config - populates device.avd_structured_config
+  - name: generate-avd-structured-config
+    file_path: "./generators/generate_avd_structured_config.py"
+    query: generate_avd_structured_config
+    targets: fabrics
+    parameters:
+      fabric_name: name__value
+    class_name: AvdStructuredConfigGenerator
+    convert_query_response: false
+    execute_in_proposed_change: false
+    execute_after_merge: false
+
 jinja2_transforms:
   - name: device_startup_config
     description: "device config transform"
@@ -72,6 +110,12 @@ python_transforms:
   - name: cabling_plan
     class_name: CablingPlan
     file_path: "./transforms/cabling_plan.py"
+  - name: avd_eos_config
+    class_name: AvdEosConfigTransform
+    file_path: "./transforms/avd_eos_config.py"
+  - name: avd_fabric_doc
+    class_name: AvdFabricDocTransform
+    file_path: "./transforms/avd_fabric_doc.py"
 
 artifact_definitions:
   - name: "startup_configuration"
@@ -88,3 +132,17 @@ artifact_definitions:
     content_type: "text/csv"
     targets: "fabrics"
     transformation: "cabling_plan"
+  - name: "avd_eos_configuration"
+    artifact_name: "AVD EOS Configuration"
+    parameters:
+      name: "hostname__value"
+    content_type: "text/plain"
+    targets: "devices"
+    transformation: "avd_eos_config"
+  - name: "avd_fabric_documentation"
+    artifact_name: "AVD Fabric Documentation"
+    parameters:
+      name: "name__value"
+    content_type: "text/markdown"
+    targets: "fabrics"
+    transformation: "avd_fabric_doc"

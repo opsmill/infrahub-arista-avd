@@ -28,6 +28,8 @@ nodes:
             label: Pod Super Spine Spine
           - name: pod_leaf_spine
             label: Pod Leaf Spine
+          - name: management
+            label: Management
   - name: IPAddress
     namespace: Ipam
     inherit_from:

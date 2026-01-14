@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from infrahub_sdk.generator import InfrahubGenerator
-from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool
+from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_ai_dc import sorting as solution_ai_dc_sorting
 from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
@@ -38,6 +38,10 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
     pod_prefix_pool: CoreIPPrefixPool
     spine_switches: list[NetworkDevice]
     super_spine_switches: list[NetworkDevice]
+
+    asn_pool: CoreNumberPool | None
+    node_id_pool: CoreNumberPool | None
+    mgmt_pool: CoreIPAddressPool | None
 
     logger = logging.getLogger("infrahub.tasks")
 
@@ -86,6 +90,19 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric_interface_sorting_function = getattr(solution_ai_dc_sorting, fabric_interface_sorting_method)
         self.spine_interface_sorting_function = getattr(solution_ai_dc_sorting, spine_interface_sorting_method)
 
+        # Get AVD-related pool references from parent fabric
+        parent_node = data.network_pod.edges[0].node.parent.node
+        self.asn_pool = None
+        self.node_id_pool = None
+        self.mgmt_pool = None
+
+        if hasattr(parent_node, "asn_pool") and parent_node.asn_pool and parent_node.asn_pool.node:
+            self.asn_pool = await self.client.get(kind=CoreNumberPool, id=parent_node.asn_pool.node.id)
+        if hasattr(parent_node, "node_id_pool") and parent_node.node_id_pool and parent_node.node_id_pool.node:
+            self.node_id_pool = await self.client.get(kind=CoreNumberPool, id=parent_node.node_id_pool.node.id)
+        if hasattr(parent_node, "mgmt_pool") and parent_node.mgmt_pool and parent_node.mgmt_pool.node:
+            self.mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=parent_node.mgmt_pool.node.id)
+
         await self.allocate_resource_pools()
 
         await self.create_spine_switches()
@@ -98,15 +115,24 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         """Create the spine switches"""
 
         for idx in range(1, self.amount_of_spines + 1):
-            device = await self.client.create(
-                NetworkDevice,
-                hostname=f"spine-{self.pod_name}-{idx}",
-                object_template={"id": self.pod_spine_switch_template},
-                pod={"id": self.pod_id},
-                loopback_ip=self.loopback_pool,
-                role="spine",
-                member_of_groups=["devices"],
-            )
+            device_kwargs = {
+                "hostname": f"spine-{self.pod_name}-{idx}",
+                "object_template": {"id": self.pod_spine_switch_template},
+                "pod": {"id": self.pod_id},
+                "loopback_ip": self.loopback_pool,
+                "role": "spine",
+                "member_of_groups": ["devices"],
+            }
+
+            # Allocate from ASN and Node ID pools if available
+            if self.asn_pool:
+                device_kwargs["bgp_asn"] = self.asn_pool
+            if self.node_id_pool:
+                device_kwargs["node_id"] = self.node_id_pool
+            if self.mgmt_pool:
+                device_kwargs["mgmt_ip"] = self.mgmt_pool
+
+            device = await self.client.create(NetworkDevice, **device_kwargs)
             await device.save(allow_upsert=True)
 
             # FIX: seems the id of a related node assigned from a pool is not immediately accessible

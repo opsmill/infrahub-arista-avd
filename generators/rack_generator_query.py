@@ -85,6 +85,7 @@ class RackGeneratorQueryLocationRackEdgesNodePodNode(BaseModel):
     amount_of_spines: RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines | None
     leaf_interface_sorting_method: RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod | None
     spine_interface_sorting_method: RackGeneratorQueryLocationRackEdgesNodePodNodeSpineInterfaceSortingMethod | None
+    parent: RackGeneratorQueryLocationRackEdgesNodePodNodeParent | None = None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeName(BaseModel):
@@ -121,6 +122,24 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod(B
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeSpineInterfaceSortingMethod(BaseModel):
     value: str | None
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParent(BaseModel):
+    node: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNode | None
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNode(BaseModel):
+    asn_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool | None = None
+    node_id_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool | None = None
+    mgmt_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool | None = None
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePool(BaseModel):
+    node: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePoolNode | None
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodePoolNode(BaseModel):
+    id: str | None
 
 
 RackGeneratorQuery.model_rebuild()

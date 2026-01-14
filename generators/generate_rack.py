@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from infrahub_sdk.generator import InfrahubGenerator
-from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool
+from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_ai_dc import sorting as solution_ai_dc_sorting
 from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
@@ -39,6 +39,10 @@ class RackGenerator(InfrahubGenerator):
 
     loopback_pool: CoreIPAddressPool
     prefix_pool: CoreIPPrefixPool
+
+    asn_pool: CoreNumberPool | None
+    node_id_pool: CoreNumberPool | None
+    mgmt_pool: CoreIPAddressPool | None
 
     logger = logging.getLogger("infrahub.tasks")
 
@@ -84,23 +88,47 @@ class RackGenerator(InfrahubGenerator):
         self.leaf_interface_sorting_function = getattr(solution_ai_dc_sorting, leaf_interface_sorting_method)
         self.spine_interface_sorting_function = getattr(solution_ai_dc_sorting, spine_interface_sorting_method)
 
+        # Get AVD-related pool references from parent fabric (via pod)
+        self.asn_pool = None
+        self.node_id_pool = None
+        self.mgmt_pool = None
+
+        pod_node = data.location_rack.edges[0].node.pod.node
+        if pod_node.parent and pod_node.parent.node:
+            fabric_node = pod_node.parent.node
+            if hasattr(fabric_node, "asn_pool") and fabric_node.asn_pool and fabric_node.asn_pool.node:
+                self.asn_pool = await self.client.get(kind=CoreNumberPool, id=fabric_node.asn_pool.node.id)
+            if hasattr(fabric_node, "node_id_pool") and fabric_node.node_id_pool and fabric_node.node_id_pool.node:
+                self.node_id_pool = await self.client.get(kind=CoreNumberPool, id=fabric_node.node_id_pool.node.id)
+            if hasattr(fabric_node, "mgmt_pool") and fabric_node.mgmt_pool and fabric_node.mgmt_pool.node:
+                self.mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=fabric_node.mgmt_pool.node.id)
+
         await self.create_leaf_switches()
 
         await self.connect_leafs_to_spine()
 
     async def create_leaf_switches(self) -> None:
         for index in range(1, self.rack_amount_of_leafs + 1):
-            leaf_switch = await self.client.create(
-                NetworkDevice,
-                hostname=f"leaf-{self.pod_name}-{self.rack_index}-{index}",
-                object_template={"id": self.rack_leaf_switch_template},
-                pod={"id": self.pod_id},
-                rack={"id": self.rack_id},
-                loopback_ip=self.loopback_pool,
-                index=index,
-                role="leaf",
-                member_of_groups=["devices"],
-            )
+            device_kwargs = {
+                "hostname": f"leaf-{self.pod_name}-{self.rack_index}-{index}",
+                "object_template": {"id": self.rack_leaf_switch_template},
+                "pod": {"id": self.pod_id},
+                "rack": {"id": self.rack_id},
+                "loopback_ip": self.loopback_pool,
+                "index": index,
+                "role": "leaf",
+                "member_of_groups": ["devices"],
+            }
+
+            # Allocate from ASN and Node ID pools if available
+            if self.asn_pool:
+                device_kwargs["bgp_asn"] = self.asn_pool
+            if self.node_id_pool:
+                device_kwargs["node_id"] = self.node_id_pool
+            if self.mgmt_pool:
+                device_kwargs["mgmt_ip"] = self.mgmt_pool
+
+            leaf_switch = await self.client.create(NetworkDevice, **device_kwargs)
             await leaf_switch.save(allow_upsert=True)
             self.leaf_switches.append(leaf_switch)
 
