@@ -157,6 +157,3 @@ class AvdGenerator(InfrahubGenerator):
             except Exception as e:
                 print(f"    ❌ Failed: {e}")
                 continue
-
-
-        breakpoint()
