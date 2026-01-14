@@ -75,6 +75,28 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
               role {
                 value
               }
+              tagged_vlan {
+                edges {
+                  node {
+                    vlan_id {
+                      value
+                    }
+                    status {
+                      value
+                    }
+                  }
+                }
+              }
+              untagged_vlan {
+                node {
+                  vlan_id {
+                    value
+                  }
+                  status {
+                    value
+                  }
+                }
+              }
               link {
                 node {
                   id

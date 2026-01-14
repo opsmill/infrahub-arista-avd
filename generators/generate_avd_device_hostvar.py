@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from netutils.vlan import vlanlist_to_config
+
 from infrahub_sdk.generator import InfrahubGenerator
 
 from pyavd._eos_designs.schema import EosDesigns
@@ -68,6 +70,95 @@ def extract_uplinks_from_dict(
     }
 
 
+def extract_connected_endpoints(
+    interfaces: list[dict],
+    hostname: str,
+) -> list[dict]:
+    """Extract connected endpoints (servers) from device interfaces.
+
+    Args:
+        interfaces: List of interface edge dicts from GraphQL response
+        hostname: Current device hostname (for switch_ports reference)
+
+    Returns:
+        List of server endpoint configs for pyAVD
+    """
+    servers: dict[str, dict] = {}  # Group by remote device name
+
+    for edge in interfaces:
+        interface = edge["node"]
+        iface_role = interface.get("role", {})
+        if not iface_role or iface_role.get("value") != "server":
+            continue
+
+        # Get the remote endpoint from the link
+        link = interface.get("link", {}).get("node")
+        if not link:
+            continue
+
+        # Extract VLAN information (only active VLANs)
+        tagged_vlans: list[int] = []
+        tagged_vlan_edges = interface.get("tagged_vlan", {}).get("edges", [])
+        for vlan_edge in tagged_vlan_edges:
+            vlan_node = vlan_edge.get("node", {})
+            status = vlan_node.get("status", {}).get("value")
+            if status != "active":
+                continue
+            vlan_id = vlan_node.get("vlan_id", {}).get("value")
+            if vlan_id:
+                tagged_vlans.append(vlan_id)
+
+        untagged_vlan = None
+        untagged_vlan_node = interface.get("untagged_vlan", {}).get("node")
+        if untagged_vlan_node:
+            status = untagged_vlan_node.get("status", {}).get("value")
+            if status == "active":
+                untagged_vlan = untagged_vlan_node.get("vlan_id", {}).get("value")
+
+        endpoints = link.get("endpoints", {}).get("edges", [])
+        for ep_edge in endpoints:
+            endpoint = ep_edge.get("node")
+            if not endpoint:
+                continue
+            # Skip this interface, find the remote one
+            if endpoint.get("id") != interface["id"]:
+                remote_device = endpoint.get("device", {}).get("node")
+                if remote_device:
+                    server_name = remote_device["hostname"]["value"]
+                    endpoint_port = endpoint["name"]["value"]
+                    switch_port = interface["name"]["value"]
+
+                    # Group adapters by server
+                    if server_name not in servers:
+                        servers[server_name] = {
+                            "name": server_name,
+                            "adapters": [],
+                        }
+
+                    # Build adapter config
+                    adapter: dict = {
+                        "endpoint_ports": [endpoint_port],
+                        "switch_ports": [switch_port],
+                        "switches": [hostname],
+                    }
+
+                    # Determine mode and add VLAN config
+                    if tagged_vlans:
+                        adapter["mode"] = "trunk"
+                        # Use netutils to convert VLAN list to config string
+                        vlan_str = vlanlist_to_config(sorted(tagged_vlans))[0]
+                        adapter["vlans"] = vlan_str
+                        if untagged_vlan:
+                            adapter["native_vlan"] = untagged_vlan
+                    elif untagged_vlan:
+                        adapter["mode"] = "access"
+                        adapter["vlans"] = str(untagged_vlan)
+
+                    servers[server_name]["adapters"].append(adapter)
+
+    return list(servers.values())
+
+
 class GenerateAVDDeviceHostvar(InfrahubGenerator):
     async def generate(self, data: dict) -> None:
         device = data["NetworkDevice"]["edges"][0]["node"]
@@ -111,6 +202,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             device_id,
         )
 
+        # Extract connected endpoints (servers)
+        connected_endpoints = extract_connected_endpoints(
+            device["interfaces"]["edges"],
+            hostname,
+        )
+
         # Map role to AVD type (node_type_key)
         avd_type = ROLE_TO_AVD_TYPE.get(role, role)
         # AVD uses different keys: super_spine (underscore) for the key, but "super-spine" for type value
@@ -151,6 +248,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         hostvars[node_type_key] = {
             "nodes": [node_config],
         }
+
+        # Add connected endpoints (servers) if any
+        if connected_endpoints:
+            hostvars["servers"] = connected_endpoints
 
         # Print for debugging
         print(f"\n=== AVD Device Hostvar for {hostname} ===")
