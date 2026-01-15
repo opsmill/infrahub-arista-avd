@@ -1,93 +1,111 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 
 class ComputedInterfaceDescriptionQuery(BaseModel):
-    network_interface: ComputedInterfaceDescriptionQueryNetworkInterface = Field(alias="NetworkInterface")
+    network_interface: "ComputedInterfaceDescriptionQueryNetworkInterface" = Field(
+        alias="NetworkInterface"
+    )
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterface(BaseModel):
-    edges: list[ComputedInterfaceDescriptionQueryNetworkInterfaceEdges]
+    edges: list["ComputedInterfaceDescriptionQueryNetworkInterfaceEdges"]
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdges(BaseModel):
-    node: ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNode | None
+    node: Optional["ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNode"]
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNode(BaseModel):
     id: str
-    link: ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLink
+    link: "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLink"
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLink(BaseModel):
-    node: ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNode | None
+    node: Optional["ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNode"]
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNode(BaseModel):
     id: str
-    endpoints: ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints
+    endpoints: (
+        "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints"
+    )
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints(BaseModel):
-    edges: list[ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges] | None
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges"
+        ]
+    ]
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges(BaseModel):
-    node: (
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges(
+    BaseModel
+):
+    node: Optional[
         Annotated[
-            ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkEndpoint
-            | ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterface,
+            Union[
+                "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkEndpoint",
+                "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterface",
+            ],
             Field(discriminator="typename__"),
         ]
-        | None
-    )
+    ]
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkEndpoint(BaseModel):
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkEndpoint(
+    BaseModel
+):
     typename__: Literal["NetworkEndpoint"] = Field(alias="__typename")
-    id: str | None
+    id: Optional[str]
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterface(BaseModel):
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterface(
+    BaseModel
+):
     typename__: Literal["NetworkInterface"] = Field(alias="__typename")
     id: str
-    name: (
-        ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceName | None
-    )
-    device: ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDevice
+    name: Optional[
+        "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceName"
+    ]
+    device: "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDevice"
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceName(
     BaseModel
 ):
-    value: str | None
+    value: Optional[str]
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDevice(
     BaseModel
 ):
-    node: (
-        ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNode
-        | None
-    )
+    node: Optional[
+        "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNode"
+    ]
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNode(
     BaseModel
 ):
-    hostname: (
-        ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNodeHostname
-        | None
-    )
+    typename__: Literal[
+        "ComputePhysicalServer", "NetworkDevice", "NetworkGenericDevice"
+    ] = Field(alias="__typename")
+    hostname: Optional[
+        "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNodeHostname"
+    ]
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNodeHostname(
     BaseModel
 ):
-    value: str | None
+    value: Optional[str]
 
 
 ComputedInterfaceDescriptionQuery.model_rebuild()

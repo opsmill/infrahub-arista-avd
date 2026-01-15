@@ -1,68 +1,84 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class FabricGeneratorQuery(BaseModel):
-    network_fabric: FabricGeneratorQueryNetworkFabric = Field(alias="NetworkFabric")
+    network_fabric: "FabricGeneratorQueryNetworkFabric" = Field(alias="NetworkFabric")
 
 
 class FabricGeneratorQueryNetworkFabric(BaseModel):
-    edges: list[FabricGeneratorQueryNetworkFabricEdges]
+    edges: list["FabricGeneratorQueryNetworkFabricEdges"]
 
 
 class FabricGeneratorQueryNetworkFabricEdges(BaseModel):
-    node: FabricGeneratorQueryNetworkFabricEdgesNode | None
+    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNode"]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNode(BaseModel):
     id: str
-    name: FabricGeneratorQueryNetworkFabricEdgesNodeName | None
-    amount_of_super_spines: FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines | None
-    super_spine_switch_template: FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate
-    mgmt_gateway: FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway | None = None
-    asn_pool: FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool | None = None
-    node_id_pool: FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool | None = None
-    mgmt_pool: FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool | None = None
+    name: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeName"]
+    amount_of_super_spines: Optional[
+        "FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines"
+    ]
+    super_spine_switch_template: (
+        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate"
+    )
+    mgmt_gateway: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway"]
+    asn_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool"
+    node_id_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool"
+    mgmt_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool"
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeName(BaseModel):
-    value: str | None
+    value: Optional[str]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines(BaseModel):
-    value: Any | None
+    value: Optional[Any]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate(BaseModel):
-    node: FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode | None
+    node: Optional[
+        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode"
+    ]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode(BaseModel):
-    typename__: Literal["CoreObjectTemplate", "TemplateNetworkDevice"] = Field(alias="__typename")
-    id: str | None
+    typename__: Literal["CoreObjectTemplate", "TemplateNetworkDevice"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway(BaseModel):
-    value: str | None
+    value: Optional[str]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool(BaseModel):
-    node: FabricGeneratorQueryNetworkFabricEdgesNodePoolNode | None
+    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeAsnPoolNode"]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeAsnPoolNode(BaseModel):
+    id: str
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool(BaseModel):
-    node: FabricGeneratorQueryNetworkFabricEdgesNodePoolNode | None
+    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPoolNode"]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPoolNode(BaseModel):
+    id: str
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool(BaseModel):
-    node: FabricGeneratorQueryNetworkFabricEdgesNodePoolNode | None
+    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPoolNode"]
 
 
-class FabricGeneratorQueryNetworkFabricEdgesNodePoolNode(BaseModel):
-    id: str | None
+class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPoolNode(BaseModel):
+    id: str
 
 
 FabricGeneratorQuery.model_rebuild()

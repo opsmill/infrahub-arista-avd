@@ -2,6 +2,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
   NetworkDevice(hostname__value: $hostname) {
     edges {
       node {
+        __typename
         id
         hostname {
           value
@@ -17,6 +18,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
         }
         loopback_ip {
           node {
+            __typename
             id
             address {
               value
@@ -25,6 +27,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
         }
         mgmt_ip {
           node {
+            __typename
             id
             address {
               value
@@ -39,6 +42,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
             }
             parent {
               node {
+                __typename
                 id
                 name {
                   value
@@ -52,6 +56,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                   }
                   avd_evpn {
                     node {
+                      __typename
                       ebgp_multihop {
                         value
                       }
@@ -68,6 +73,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
         interfaces {
           edges {
             node {
+              __typename
               id
               name {
                 value
@@ -78,6 +84,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
               tagged_vlan {
                 edges {
                   node {
+                    __typename
                     vlan_id {
                       value
                     }
@@ -89,6 +96,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
               }
               untagged_vlan {
                 node {
+                  __typename
                   vlan_id {
                     value
                   }
@@ -99,10 +107,12 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
               }
               link {
                 node {
+                  __typename
                   id
                   endpoints {
                     edges {
                       node {
+                        __typename
                         id
                         ... on NetworkInterface {
                           name {
@@ -110,6 +120,7 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                           }
                           device {
                             node {
+                              __typename
                               id
                               hostname {
                                 value
