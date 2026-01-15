@@ -13,14 +13,15 @@ from typing import Any
 import pyavd
 from infrahub_sdk.generator import InfrahubGenerator
 from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
-
+from .generate_avd_inputs_query import GenerateAvdInputsQuery
+from solution_ai_dc.protocols import AvdArtifact
 
 class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
     """Builds AVD inputs and structured config for all devices in a fabric."""
 
     logger = logging.getLogger("infrahub.tasks")
 
-    def _extract_devices_from_fabric(self, data: dict) -> list[dict[str, Any]]:
+    def _extract_devices_from_fabric(self, data: GenerateAvdInputsQuery) -> list[dict[str, Any]]:
         """Extract all devices from the nested fabric structure.
 
         Traverses: NetworkFabric -> children (pods) -> devices + racks -> devices
@@ -30,47 +31,47 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         """
         devices: dict[str, dict[str, Any]] = {}  # Use dict to dedupe by hostname
 
-        fabric_edges = data.get("NetworkFabric", {}).get("edges", [])
+        fabric_edges = data.network_fabric.edges
         if not fabric_edges:
             return []
 
-        fabric_node = fabric_edges[0]["node"]
+        fabric_node = fabric_edges[0].node
 
         # Traverse children (pods)
-        children_edges = fabric_node.get("children", {}).get("edges", [])
+        children_edges = fabric_node.children.edges
         for child_edge in children_edges:
-            child_node = child_edge["node"]
+            child_node = child_edge.node
 
             # Get devices directly under pod
-            for device_edge in child_node.get("devices", {}).get("edges", []):
-                device = device_edge["node"]
-                hostname = device["hostname"]["value"]
+            for device_edge in child_node.devices.edges:
+                device = device_edge.node
+                hostname = device.hostname.value
                 hostvar_id = None
 
-                avd_artifact = device.get("avd_artifact", {}).get("node")
+                avd_artifact = device.avd_artifact.node
                 if avd_artifact:
-                    hostvar_id = avd_artifact.get("hostvar_identifier", {}).get("value")
+                    hostvar_id = avd_artifact.hostvar_identifier.value
 
                 devices[hostname] = {
-                    "id": device["id"],
+                    "id": device.id,
                     "hostname": hostname,
                     "hostvar_identifier": hostvar_id,
                 }
 
             # Get devices from racks
-            for rack_edge in child_node.get("racks", {}).get("edges", []):
-                rack_node = rack_edge["node"]
-                for device_edge in rack_node.get("devices", {}).get("edges", []):
-                    device = device_edge["node"]
-                    hostname = device["hostname"]["value"]
+            for rack_edge in child_node.racks.edges:
+                rack_node = rack_edge.node
+                for device_edge in rack_node.devices.edges:
+                    device = device_edge.node
+                    hostname = device.hostname.value
                     hostvar_id = None
 
-                    avd_artifact = device.get("avd_artifact", {}).get("node")
+                    avd_artifact = device.avd_artifact.node
                     if avd_artifact:
-                        hostvar_id = avd_artifact.get("hostvar_identifier", {}).get("value")
+                        hostvar_id = avd_artifact.hostvar_identifier.value
 
                     devices[hostname] = {
-                        "id": device["id"],
+                        "id": device.id,
                         "hostname": hostname,
                         "hostvar_identifier": hostvar_id,
                     }
@@ -105,8 +106,9 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
         return result
 
-    async def generate(self, data: dict) -> None:
+    async def generate(self, data: GenerateAvdInputsQuery) -> None:
         """Generate AVD inputs and structured config for all devices."""
+        data: GenerateAvdInputsQuery = GenerateAvdInputsQuery(**data)
         # Extract all devices from nested fabric structure
         devices = self._extract_devices_from_fabric(data)
 
@@ -151,7 +153,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     avd_facts=avd_facts
                 )
                 response = await self.client.object_store.upload(content=json.dumps(structured_config))
-                avd_artifact = await self.client.create(kind="AvdArtifact", name=hostname, structured_config_checksum=response['checksum'], structured_config_identifier=response['identifier'], device=device_mapping[hostname])
+                avd_artifact = await self.client.create(AvdArtifact, name=hostname, structured_config_checksum=response['checksum'], structured_config_identifier=response['identifier'], device=device_mapping[hostname])
                 await avd_artifact.save(allow_upsert=True)
                 print(f"    ✓ Generated structured config with {len(structured_config)} top-level keys")
             except Exception as e:

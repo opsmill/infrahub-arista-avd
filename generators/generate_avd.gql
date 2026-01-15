@@ -2,6 +2,7 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
   NetworkFabric(name__value: $fabric_name) {
     edges {
       node {
+        __typename
         id
         name {
           value
@@ -9,19 +10,24 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
         children {
           edges {
             node {
+              __typename
               ... on NetworkPod {
+                __typename
                 racks {
                   edges {
                     node {
+                      __typename
                       devices {
                         edges {
                           node {
+                            __typename
                             id
                             hostname {
                               value
                             }
                             avd_artifact {
                               node {
+                                __typename
                                 hostvar_identifier {
                                   value
                                 }
@@ -36,12 +42,14 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
                 devices {
                   edges {
                     node {
+                      __typename
                       id
                       hostname {
                         value
                       }
                       avd_artifact {
                         node {
+                          __typename
                           hostvar_identifier {
                             value
                           }

@@ -1,99 +1,128 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 
 class FabricCablingPlanQuery(BaseModel):
-    network_fabric: FabricCablingPlanQueryNetworkFabric = Field(alias="NetworkFabric")
+    network_fabric: "FabricCablingPlanQueryNetworkFabric" = Field(alias="NetworkFabric")
 
 
 class FabricCablingPlanQueryNetworkFabric(BaseModel):
-    edges: list[FabricCablingPlanQueryNetworkFabricEdges]
+    edges: list["FabricCablingPlanQueryNetworkFabricEdges"]
 
 
 class FabricCablingPlanQueryNetworkFabricEdges(BaseModel):
-    node: FabricCablingPlanQueryNetworkFabricEdgesNode | None
+    node: Optional["FabricCablingPlanQueryNetworkFabricEdgesNode"]
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNode(BaseModel):
-    children: FabricCablingPlanQueryNetworkFabricEdgesNodeChildren
+    children: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildren"
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildren(BaseModel):
-    edges: list[FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdges] | None
+    edges: Optional[list["FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdges"]]
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdges(BaseModel):
-    node: (
+    node: Optional[
         Annotated[
-            FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock
-            | FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod,
+            Union[
+                "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock",
+                "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod",
+            ],
             Field(discriminator="typename__"),
         ]
-        | None
+    ]
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock(
+    BaseModel
+):
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric"] = Field(
+        alias="__typename"
     )
+    id: Optional[str]
 
 
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock(BaseModel):
-    typename__: Literal["NetworkBuildingBlock", "NetworkFabric"] = Field(alias="__typename")
-    id: str | None
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod(BaseModel):
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod(
+    BaseModel
+):
     typename__: Literal["NetworkPod"] = Field(alias="__typename")
     id: str
-    devices: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices(BaseModel):
-    edges: list[FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges]
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(BaseModel):
-    node: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode | None
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode(BaseModel):
-    id: str
-    rack: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRack
-    interfaces: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfaces
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRack(BaseModel):
-    node: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRackNode | None
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRackNode(BaseModel):
-    id: str
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfaces(BaseModel):
-    edges: list[FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdges]
-
-
-class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdges(BaseModel):
-    node: (
-        FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNode
-        | None
+    devices: (
+        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices"
     )
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices(
+    BaseModel
+):
+    edges: list[
+        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges"
+    ]
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(
+    BaseModel
+):
+    node: Optional[
+        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode"
+    ]
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode(
+    BaseModel
+):
+    id: str
+    rack: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRack"
+    interfaces: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfaces"
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRack(
+    BaseModel
+):
+    node: Optional[
+        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRackNode"
+    ]
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRackNode(
+    BaseModel
+):
+    id: str
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfaces(
+    BaseModel
+):
+    edges: list[
+        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdges"
+    ]
+
+
+class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdges(
+    BaseModel
+):
+    node: Optional[
+        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNode"
+    ]
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNode(
     BaseModel
 ):
     id: str
-    link: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeLink
+    link: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeLink"
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeLink(
     BaseModel
 ):
-    node: (
-        FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeLinkNode
-        | None
-    )
+    node: Optional[
+        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeLinkNode"
+    ]
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeLinkNode(

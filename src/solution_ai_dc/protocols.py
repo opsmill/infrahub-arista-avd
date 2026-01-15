@@ -4,98 +4,718 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from infrahub_sdk.protocols import (
-    BuiltinIPAddress,
-    BuiltinIPPrefix,
-    CoreArtifactTarget,
-    CoreNode,
-)
+from infrahub_sdk.protocols import CoreNode, BuiltinIPAddress, BuiltinIPAddressSync, BuiltinIPNamespace, BuiltinIPNamespaceSync, BuiltinIPPrefix, BuiltinIPPrefixSync, BuiltinTag, BuiltinTagSync, CoreAccount, CoreAccountGroup, CoreAccountGroupSync, CoreAccountRole, CoreAccountRoleSync, CoreAccountSync, CoreAction, CoreActionSync, CoreArtifact, CoreArtifactCheck, CoreArtifactCheckSync, CoreArtifactDefinition, CoreArtifactDefinitionSync, CoreArtifactSync, CoreArtifactTarget, CoreArtifactTargetSync, CoreArtifactThread, CoreArtifactThreadSync, CoreArtifactValidator, CoreArtifactValidatorSync, CoreBasePermission, CoreBasePermissionSync, CoreChangeComment, CoreChangeCommentSync, CoreChangeThread, CoreChangeThreadSync, CoreCheck, CoreCheckDefinition, CoreCheckDefinitionSync, CoreCheckSync, CoreComment, CoreCommentSync, CoreCredential, CoreCredentialSync, CoreCustomWebhook, CoreCustomWebhookSync, CoreDataCheck, CoreDataCheckSync, CoreDataValidator, CoreDataValidatorSync, CoreFileCheck, CoreFileCheckSync, CoreFileThread, CoreFileThreadSync, CoreGeneratorAction, CoreGeneratorActionSync, CoreGeneratorAwareGroup, CoreGeneratorAwareGroupSync, CoreGeneratorCheck, CoreGeneratorCheckSync, CoreGeneratorDefinition, CoreGeneratorDefinitionSync, CoreGeneratorGroup, CoreGeneratorGroupSync, CoreGeneratorInstance, CoreGeneratorInstanceSync, CoreGeneratorValidator, CoreGeneratorValidatorSync, CoreGenericAccount, CoreGenericAccountSync, CoreGenericRepository, CoreGenericRepositorySync, CoreGlobalPermission, CoreGlobalPermissionSync, CoreGraphQLQuery, CoreGraphQLQueryGroup, CoreGraphQLQueryGroupSync, CoreGraphQLQuerySync, CoreGroup, CoreGroupAction, CoreGroupActionSync, CoreGroupSync, CoreGroupTriggerRule, CoreGroupTriggerRuleSync, CoreIPAddressPool, CoreIPAddressPoolSync, CoreIPPrefixPool, CoreIPPrefixPoolSync, CoreMenu, CoreMenuItem, CoreMenuItemSync, CoreMenuSync, CoreNodeSync, CoreNodeTriggerAttributeMatch, CoreNodeTriggerAttributeMatchSync, CoreNodeTriggerMatch, CoreNodeTriggerMatchSync, CoreNodeTriggerRelationshipMatch, CoreNodeTriggerRelationshipMatchSync, CoreNodeTriggerRule, CoreNodeTriggerRuleSync, CoreNumberPool, CoreNumberPoolSync, CoreObjectComponentTemplate, CoreObjectComponentTemplateSync, CoreObjectPermission, CoreObjectPermissionSync, CoreObjectTemplate, CoreObjectTemplateSync, CoreObjectThread, CoreObjectThreadSync, CorePasswordCredential, CorePasswordCredentialSync, CoreProfile, CoreProfileSync, CoreProposedChange, CoreProposedChangeSync, CoreReadOnlyRepository, CoreReadOnlyRepositorySync, CoreRepository, CoreRepositoryGroup, CoreRepositoryGroupSync, CoreRepositorySync, CoreRepositoryValidator, CoreRepositoryValidatorSync, CoreResourcePool, CoreResourcePoolSync, CoreSchemaCheck, CoreSchemaCheckSync, CoreSchemaValidator, CoreSchemaValidatorSync, CoreStandardCheck, CoreStandardCheckSync, CoreStandardGroup, CoreStandardGroupSync, CoreStandardWebhook, CoreStandardWebhookSync, CoreTaskTarget, CoreTaskTargetSync, CoreThread, CoreThreadComment, CoreThreadCommentSync, CoreThreadSync, CoreTransformJinja2, CoreTransformJinja2Sync, CoreTransformPython, CoreTransformPythonSync, CoreTransformation, CoreTransformationSync, CoreTriggerRule, CoreTriggerRuleSync, CoreUserValidator, CoreUserValidatorSync, CoreValidator, CoreValidatorSync, CoreWebhook, CoreWebhookSync, CoreWeightedPoolResource, CoreWeightedPoolResourceSync, InternalAccountToken, InternalAccountTokenSync, InternalIPPrefixAvailable, InternalIPPrefixAvailableSync, InternalIPRangeAvailable, InternalIPRangeAvailableSync, InternalRefreshToken, InternalRefreshTokenSync, IpamNamespace, IpamNamespaceSync, LineageOwner, LineageOwnerSync, LineageSource, LineageSourceSync
 
 if TYPE_CHECKING:
     from infrahub_sdk.node import RelatedNode, RelationshipManager
     from infrahub_sdk.protocols_base import (
-        Dropdown,
-        DropdownOptional,
-        Integer,
+        AnyAttribute,
+        AnyAttributeOptional,
         String,
         StringOptional,
+        Integer,
+        IntegerOptional,
+        Boolean,
+        BooleanOptional,
+        DateTime,
+        DateTimeOptional,
+        Dropdown,
+        DropdownOptional,
+        HashedPassword,
+        HashedPasswordOptional,
+        MacAddress,
+        MacAddressOptional,
+        IPHost,
+        IPHostOptional,
+        IPNetwork,
+        IPNetworkOptional,
+        JSONAttribute,
+        JSONAttributeOptional,
+        ListAttribute,
+        ListAttributeOptional,
+        URL,
+        URLOptional,
     )
 
 
 class NetworkBuildingBlock(CoreNode):
     index: Integer
     name: String
+    children: RelationshipManager
+    member_of_groups: RelationshipManager
+    parent: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
+class TemplateCoreArtifactTarget(CoreNode):
+    template_name: String
+    artifacts: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 class NetworkEndpoint(CoreNode):
     link: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
+class NetworkGenericDevice(CoreNode):
+    hostname: String
+    interfaces: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+class ComputeGenericUnit(CoreNode):
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+class VirtualizationHostVirtualMachine(CoreNode):
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    virtual_machines: RelationshipManager
+
+class TemplateNetworkEndpoint(CoreNode):
+    template_name: String
+    link: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+class TemplateNetworkGenericDevice(CoreNode):
+    template_name: String
+    interfaces: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 class LocationPhysical(CoreNode):
     index: Integer
     name: String
-
+    children: RelationshipManager
+    member_of_groups: RelationshipManager
+    parent: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 class GeneratorTarget(CoreNode):
     checksum: StringOptional
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 
-class NetworkDevice(CoreArtifactTarget):
+
+class AvdArtifact(CoreNode):
+    hostvar_checksum: StringOptional
+    hostvar_identifier: StringOptional
+    hostvar_url: URLOptional
+    name: String
+    structured_config_checksum: StringOptional
+    structured_config_identifier: StringOptional
+    structured_config_url: URLOptional
+    device: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class NetworkDevice(CoreArtifactTarget, NetworkGenericDevice):
+    bgp_asn: IntegerOptional
     hostname: String
+    index: IntegerOptional
+    node_id: IntegerOptional
     role: Dropdown
+    artifacts: RelationshipManager
+    avd_artifact: RelatedNode
+    device_type: RelatedNode
     interfaces: RelationshipManager
     loopback_ip: RelatedNode
+    member_of_groups: RelationshipManager
+    mgmt_ip: RelatedNode
+    object_template: RelatedNode
     pod: RelatedNode
+    profiles: RelationshipManager
     rack: RelatedNode
+    subscriber_of_groups: RelationshipManager
 
 
-class NetworkFabric(NetworkBuildingBlock):
-    amount_of_super_spines: Integer
+class NetworkDeviceType(CoreNode):
+    name: String
+    devices: RelationshipManager
+    manufacturer: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class AvdEvpn(CoreNode):
+    ebgp_multihop: IntegerOptional
+    name: String
+    overlay_bgp_rtc: BooleanOptional
+    fabric: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
+    amount_of_super_spines: IntegerOptional
+    fabric_interface_sorting_method: DropdownOptional
+    index: Integer
+    mgmt_gateway: StringOptional
+    mgmt_routes: ListAttributeOptional
+    mgmt_routes1: ListAttributeOptional
+    name: String
+    spine_interface_sorting_method: DropdownOptional
+    artifacts: RelationshipManager
+    asn_pool: RelatedNode
+    avd_evpn: RelatedNode
+    children: RelationshipManager
+    member_of_groups: RelationshipManager
+    mgmt_pool: RelatedNode
+    node_id_pool: RelatedNode
+    parent: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
     super_spine_switch_template: RelatedNode
 
 
 class LocationHall(LocationPhysical):
-    pass
+    index: Integer
+    name: String
+    children: RelationshipManager
+    member_of_groups: RelationshipManager
+    parent: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 
 class IpamIPAddress(BuiltinIPAddress):
-    pass
+    address: IPHost
+    description: StringOptional
+    ip_namespace: RelatedNode
+    ip_prefix: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 
 class IpamIPPrefix(BuiltinIPPrefix):
+    broadcast_address: StringOptional
+    description: StringOptional
+    hostmask: StringOptional
+    is_pool: BooleanOptional
+    is_top_level: BooleanOptional
+    member_type: DropdownOptional
+    netmask: StringOptional
+    network_address: StringOptional
+    prefix: IPNetwork
     role: Dropdown
+    utilization: IntegerOptional
+    children: RelationshipManager
+    ip_addresses: RelationshipManager
+    ip_namespace: RelatedNode
+    member_of_groups: RelationshipManager
+    parent: RelatedNode
+    profiles: RelationshipManager
+    resource_pool: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    vlan: RelatedNode
 
 
 class NetworkInterface(NetworkEndpoint):
     description: StringOptional
     index: StringOptional
+    mtu: IntegerOptional
     name: String
     role: DropdownOptional
-    status: Dropdown
+    status: DropdownOptional
     device: RelatedNode
     ip_address: RelatedNode
+    link: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    tagged_vlan: RelationshipManager
+    untagged_vlan: RelatedNode
+
+
+class IpamL2Domain(CoreNode):
+    name: String
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    vlans: RelationshipManager
 
 
 class NetworkLink(CoreNode):
     medium: Dropdown
     name: String
     endpoints: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class OrganizationManufacturer(CoreNode):
+    name: String
+    device_types: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ComputePhysicalServer(ComputeGenericUnit, NetworkGenericDevice, VirtualizationHostVirtualMachine):
+    hostname: String
+    role: Dropdown
+    status: Dropdown
+    interfaces: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    rack: RelatedNode
+    subscriber_of_groups: RelationshipManager
+    virtual_machines: RelationshipManager
 
 
 class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
-    amount_of_spines: Integer
+    amount_of_spines: IntegerOptional
+    checksum: StringOptional
+    index: Integer
+    leaf_interface_sorting_method: DropdownOptional
+    name: String
     role: DropdownOptional
+    spine_interface_sorting_method: DropdownOptional
+    children: RelationshipManager
     devices: RelationshipManager
     loopback_pool: RelatedNode
+    member_of_groups: RelationshipManager
+    parent: RelatedNode
     prefix_pool: RelatedNode
+    profiles: RelationshipManager
     racks: RelationshipManager
     spine_switch_template: RelatedNode
+    subscriber_of_groups: RelationshipManager
 
 
 class LocationRack(LocationPhysical, GeneratorTarget):
-    rack_type: Dropdown
+    amount_of_leafs: IntegerOptional
+    checksum: StringOptional
+    index: Integer
+    name: String
+    rack_type: DropdownOptional
+    children: RelationshipManager
     devices: RelationshipManager
     leaf_switch_template: RelatedNode
+    member_of_groups: RelationshipManager
+    parent: RelatedNode
     pod: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class IpamVLAN(CoreNode):
+    description: StringOptional
+    name: String
+    role: DropdownOptional
+    status: Dropdown
+    vlan_id: Integer
+    l2domain: RelatedNode
+    member_of_groups: RelationshipManager
+    prefixes: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class VirtualizationVirtualMachine(ComputeGenericUnit):
+    disk: IntegerOptional
+    memory: IntegerOptional
+    role: DropdownOptional
+    vcpu: IntegerOptional
+    host: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+
+
+class ProfileAvdArtifact(LineageSource, CoreProfile, CoreNode):
+    hostvar_checksum: StringOptional
+    hostvar_identifier: StringOptional
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    structured_config_checksum: StringOptional
+    structured_config_identifier: StringOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileAvdEvpn(LineageSource, CoreProfile, CoreNode):
+    ebgp_multihop: IntegerOptional
+    name: StringOptional
+    overlay_bgp_rtc: BooleanOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    fabric: RelationshipManager
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileBuiltinIPAddress(LineageSource, CoreProfile, CoreNode):
+    address: IPHostOptional
+    description: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    ip_namespace: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileBuiltinIPPrefix(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    is_pool: BooleanOptional
+    member_type: DropdownOptional
+    prefix: IPNetworkOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    ip_namespace: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileBuiltinTag(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileComputeGenericUnit(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileComputePhysicalServer(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    status: DropdownOptional
+    member_of_groups: RelationshipManager
+    rack: RelatedNode
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileGeneratorTarget(LineageSource, CoreProfile, CoreNode):
+    checksum: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileIpamIPAddress(LineageSource, CoreProfile, CoreNode):
+    address: IPHostOptional
+    description: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    ip_namespace: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileIpamIPPrefix(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    is_pool: BooleanOptional
+    member_type: DropdownOptional
+    prefix: IPNetworkOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    ip_namespace: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    vlan: RelatedNode
+
+
+class ProfileIpamL2Domain(LineageSource, CoreProfile, CoreNode):
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileIpamNamespace(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    ip_addresses: RelationshipManager
+    ip_prefixes: RelationshipManager
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileIpamVLAN(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    status: DropdownOptional
+    vlan_id: IntegerOptional
+    member_of_groups: RelationshipManager
+    prefixes: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileLocationHall(LineageSource, CoreProfile, CoreNode):
+    index: IntegerOptional
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileLocationPhysical(LineageSource, CoreProfile, CoreNode):
+    index: IntegerOptional
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileLocationRack(LineageSource, CoreProfile, CoreNode):
+    amount_of_leafs: IntegerOptional
+    checksum: StringOptional
+    index: IntegerOptional
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    rack_type: DropdownOptional
+    devices: RelationshipManager
+    leaf_switch_template: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkBuildingBlock(LineageSource, CoreProfile, CoreNode):
+    index: IntegerOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkDevice(LineageSource, CoreProfile, CoreNode):
+    bgp_asn: IntegerOptional
+    index: IntegerOptional
+    node_id: IntegerOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    artifacts: RelationshipManager
+    avd_artifact: RelatedNode
+    device_type: RelatedNode
+    loopback_ip: RelatedNode
+    member_of_groups: RelationshipManager
+    mgmt_ip: RelatedNode
+    pod: RelatedNode
+    rack: RelatedNode
+    related_nodes: RelationshipManager
+    related_templates: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkDeviceType(LineageSource, CoreProfile, CoreNode):
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    devices: RelationshipManager
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkEndpoint(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    link: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    related_templates: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
+    amount_of_super_spines: IntegerOptional
+    fabric_interface_sorting_method: DropdownOptional
+    index: IntegerOptional
+    mgmt_gateway: StringOptional
+    mgmt_routes: ListAttributeOptional
+    mgmt_routes1: ListAttributeOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    spine_interface_sorting_method: DropdownOptional
+    artifacts: RelationshipManager
+    asn_pool: RelatedNode
+    avd_evpn: RelatedNode
+    member_of_groups: RelationshipManager
+    mgmt_pool: RelatedNode
+    node_id_pool: RelatedNode
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    super_spine_switch_template: RelatedNode
+
+
+class ProfileNetworkGenericDevice(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    related_templates: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkInterface(LineageSource, CoreProfile, CoreNode):
+    mtu: IntegerOptional
+    name: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    status: DropdownOptional
+    ip_address: RelatedNode
+    link: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    related_templates: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    tagged_vlan: RelationshipManager
+    untagged_vlan: RelatedNode
+
+
+class ProfileNetworkLink(LineageSource, CoreProfile, CoreNode):
+    medium: DropdownOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    endpoints: RelationshipManager
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkPod(LineageSource, CoreProfile, CoreNode):
+    amount_of_spines: IntegerOptional
+    checksum: StringOptional
+    index: IntegerOptional
+    leaf_interface_sorting_method: DropdownOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    spine_interface_sorting_method: DropdownOptional
+    devices: RelationshipManager
+    loopback_pool: RelatedNode
+    member_of_groups: RelationshipManager
+    prefix_pool: RelatedNode
+    racks: RelationshipManager
+    related_nodes: RelationshipManager
+    spine_switch_template: RelatedNode
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileOrganizationManufacturer(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    device_types: RelationshipManager
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileVirtualizationHostVirtualMachine(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileVirtualizationVirtualMachine(LineageSource, CoreProfile, CoreNode):
+    disk: IntegerOptional
+    memory: IntegerOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    vcpu: IntegerOptional
+    host: RelatedNode
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+
+
+class TemplateNetworkDevice(LineageSource, TemplateCoreArtifactTarget, TemplateNetworkGenericDevice, CoreObjectTemplate, CoreNode):
+    bgp_asn: IntegerOptional
+    index: IntegerOptional
+    node_id: IntegerOptional
+    role: DropdownOptional
+    template_name: String
+    artifacts: RelationshipManager
+    avd_artifact: RelatedNode
+    device_type: RelatedNode
+    interfaces: RelationshipManager
+    loopback_ip: RelatedNode
+    member_of_groups: RelationshipManager
+    mgmt_ip: RelatedNode
+    pod: RelatedNode
+    profiles: RelationshipManager
+    rack: RelatedNode
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class TemplateNetworkInterface(LineageSource, CoreObjectComponentTemplate, TemplateNetworkEndpoint, CoreNode):
+    mtu: IntegerOptional
+    name: String
+    role: DropdownOptional
+    status: DropdownOptional
+    template_name: String
+    device: RelatedNode
+    ip_address: RelatedNode
+    link: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+    tagged_vlan: RelationshipManager
+    untagged_vlan: RelatedNode
+
