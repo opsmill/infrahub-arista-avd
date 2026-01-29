@@ -30,6 +30,9 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric_id = data.network_fabric.edges[0].node.id
         self.fabric_super_spine_switch_template = data.network_fabric.edges[0].node.super_spine_switch_template.node.id
         self.amount_of_super_spines = data.network_fabric.edges[0].node.amount_of_super_spines.value
+        self.fabric = await self.client.get("NetworkFabric", id=self.fabric_id)
+        self.fabric.avd_hostvars_ready = False
+        await self.fabric.save()
 
         # Get AVD-related pool references
         asn_pool_node = data.network_fabric.edges[0].node.asn_pool

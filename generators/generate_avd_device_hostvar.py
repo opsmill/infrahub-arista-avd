@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from netutils.vlan import vlanlist_to_config
+from typing import Any
 
+from infrahub_sdk import InfrahubClient
 from infrahub_sdk.generator import InfrahubGenerator
+from netutils.vlan import vlanlist_to_config
 
 from pyavd._eos_designs.schema import EosDesigns
 
@@ -16,6 +18,38 @@ ROLE_TO_AVD_TYPE: dict[str, str] = {
     "leaf": "l3leaf",
 }
 
+async def check_fabric_hostvars_ready(client: InfrahubClient, fabric: str) -> bool:
+    fabric = await client.get("NetworkFabric", id=fabric, include=["pods"], prefetch_relationships=True)
+
+    devices = set()
+    for pod_peer in fabric.pods.peers:
+        pod = pod_peer.peer
+        await pod.devices.fetch()
+        await pod.racks.fetch()
+
+        for device_peer in pod.devices.peers:
+            devices.add(device_peer.peer)
+        
+        for rack_peer in pod.racks.peers:
+            rack = rack_peer.peer
+            await rack.devices.fetch()
+
+            for device_peer in rack.devices.peers:
+                devices.add(device_peer.peer)
+
+    for device in devices:
+        await device.avd_artifact.fetch()
+
+        if not device.avd_artifact:
+            return False
+
+        if not device.avd_artifact.peer.hostvar_identifier.value:
+            return False
+
+    fabric.avd_hostvars_ready = True
+    await fabric.save(allow_upsert=True)
+    return True
+    
 
 def extract_uplinks_from_dict(
     interfaces: GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
