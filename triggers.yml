@@ -10,6 +10,8 @@ spec:
       generator: generate-rack
     - name: run-avd-device-structured-config-generator
       generator: generate-avd-device-structured-config
+    - name: run-backfill-structured-config-generator
+      generator: backfill-structured-config
 
 ---
 apiVersion: infrahub.app/v1
@@ -106,3 +108,14 @@ spec:
           - attribute_name: avd_hostvars_ready
             value: "True"
             value_previous: "False"
+
+    - name: trigger-backfill-structured-config-update-checksum
+      branch_scope: "other_branches"
+      node_kind: AvdArtifact
+      mutation_action: "updated"
+      action: run-backfill-structured-config-generator
+      matches:
+        kind: CoreNodeTriggerAttributeMatch
+        data:
+          - attribute_name: structured_config_checksum
+            value_match: any
