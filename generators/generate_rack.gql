@@ -65,6 +65,7 @@ query RackGeneratorQuery($rack_name: String!) {
 						}
 						parent {
 							node {
+								__typename
 								... on NetworkFabric {
 									asn_pool {
 										node {
