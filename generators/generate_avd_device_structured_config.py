@@ -16,6 +16,7 @@ from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 from .generate_avd_inputs_query import GenerateAvdInputsQuery
 from solution_ai_dc.protocols import AvdArtifact
 
+
 class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
     """Builds AVD inputs and structured config for all devices in a fabric."""
 
@@ -78,9 +79,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
         return list(devices.values())
 
-    async def _fetch_hostvars_from_storage(
-        self, devices: list[dict[str, Any]]
-    ) -> dict[str, dict[str, Any]]:
+    async def _fetch_hostvars_from_storage(self, devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         """Fetch hostvar content from object storage for each device.
 
         Args:
@@ -147,13 +146,15 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         for hostname, inputs in hostvars.items():
             print(f"\n  Generating structured config for {hostname}...")
             try:
-                structured_config = get_device_structured_config(
-                    hostname=hostname,
-                    inputs=inputs,
-                    avd_facts=avd_facts
-                )
+                structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
                 response = await self.client.object_store.upload(content=json.dumps(structured_config))
-                avd_artifact = await self.client.create(AvdArtifact, name=hostname, structured_config_checksum=response['checksum'], structured_config_identifier=response['identifier'], device=device_mapping[hostname])
+                avd_artifact = await self.client.create(
+                    AvdArtifact,
+                    name=hostname,
+                    structured_config_checksum=response["checksum"],
+                    structured_config_identifier=response["identifier"],
+                    device=device_mapping[hostname],
+                )
                 await avd_artifact.save(allow_upsert=True)
                 print(f"    ✓ Generated structured config with {len(structured_config)} top-level keys")
             except Exception as e:

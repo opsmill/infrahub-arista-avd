@@ -20,12 +20,8 @@ class FabricGeneratorQueryNetworkFabricEdges(BaseModel):
 class FabricGeneratorQueryNetworkFabricEdgesNode(BaseModel):
     id: str
     name: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeName"]
-    amount_of_super_spines: Optional[
-        "FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines"
-    ]
-    super_spine_switch_template: (
-        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate"
-    )
+    amount_of_super_spines: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines"]
+    super_spine_switch_template: "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate"
     mgmt_gateway: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway"]
     asn_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool"
     node_id_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool"
@@ -41,15 +37,11 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines(BaseModel):
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate(BaseModel):
-    node: Optional[
-        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode"
-    ]
+    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode"]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode(BaseModel):
-    typename__: Literal["CoreObjectTemplate", "TemplateNetworkDevice"] = Field(
-        alias="__typename"
-    )
+    typename__: Literal["CoreObjectTemplate", "TemplateNetworkDevice"] = Field(alias="__typename")
     id: Optional[str]
 
 

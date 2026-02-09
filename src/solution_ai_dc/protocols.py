@@ -6,7 +6,180 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from infrahub_sdk.protocols import CoreNode, BuiltinIPAddress, BuiltinIPAddressSync, BuiltinIPNamespace, BuiltinIPNamespaceSync, BuiltinIPPrefix, BuiltinIPPrefixSync, BuiltinTag, BuiltinTagSync, CoreAccount, CoreAccountGroup, CoreAccountGroupSync, CoreAccountRole, CoreAccountRoleSync, CoreAccountSync, CoreAction, CoreActionSync, CoreArtifact, CoreArtifactCheck, CoreArtifactCheckSync, CoreArtifactDefinition, CoreArtifactDefinitionSync, CoreArtifactSync, CoreArtifactTarget, CoreArtifactTargetSync, CoreArtifactThread, CoreArtifactThreadSync, CoreArtifactValidator, CoreArtifactValidatorSync, CoreBasePermission, CoreBasePermissionSync, CoreChangeComment, CoreChangeCommentSync, CoreChangeThread, CoreChangeThreadSync, CoreCheck, CoreCheckDefinition, CoreCheckDefinitionSync, CoreCheckSync, CoreComment, CoreCommentSync, CoreCredential, CoreCredentialSync, CoreCustomWebhook, CoreCustomWebhookSync, CoreDataCheck, CoreDataCheckSync, CoreDataValidator, CoreDataValidatorSync, CoreFileCheck, CoreFileCheckSync, CoreFileThread, CoreFileThreadSync, CoreGeneratorAction, CoreGeneratorActionSync, CoreGeneratorAwareGroup, CoreGeneratorAwareGroupSync, CoreGeneratorCheck, CoreGeneratorCheckSync, CoreGeneratorDefinition, CoreGeneratorDefinitionSync, CoreGeneratorGroup, CoreGeneratorGroupSync, CoreGeneratorInstance, CoreGeneratorInstanceSync, CoreGeneratorValidator, CoreGeneratorValidatorSync, CoreGenericAccount, CoreGenericAccountSync, CoreGenericRepository, CoreGenericRepositorySync, CoreGlobalPermission, CoreGlobalPermissionSync, CoreGraphQLQuery, CoreGraphQLQueryGroup, CoreGraphQLQueryGroupSync, CoreGraphQLQuerySync, CoreGroup, CoreGroupAction, CoreGroupActionSync, CoreGroupSync, CoreGroupTriggerRule, CoreGroupTriggerRuleSync, CoreIPAddressPool, CoreIPAddressPoolSync, CoreIPPrefixPool, CoreIPPrefixPoolSync, CoreMenu, CoreMenuItem, CoreMenuItemSync, CoreMenuSync, CoreNodeSync, CoreNodeTriggerAttributeMatch, CoreNodeTriggerAttributeMatchSync, CoreNodeTriggerMatch, CoreNodeTriggerMatchSync, CoreNodeTriggerRelationshipMatch, CoreNodeTriggerRelationshipMatchSync, CoreNodeTriggerRule, CoreNodeTriggerRuleSync, CoreNumberPool, CoreNumberPoolSync, CoreObjectComponentTemplate, CoreObjectComponentTemplateSync, CoreObjectPermission, CoreObjectPermissionSync, CoreObjectTemplate, CoreObjectTemplateSync, CoreObjectThread, CoreObjectThreadSync, CorePasswordCredential, CorePasswordCredentialSync, CoreProfile, CoreProfileSync, CoreProposedChange, CoreProposedChangeSync, CoreReadOnlyRepository, CoreReadOnlyRepositorySync, CoreRepository, CoreRepositoryGroup, CoreRepositoryGroupSync, CoreRepositorySync, CoreRepositoryValidator, CoreRepositoryValidatorSync, CoreResourcePool, CoreResourcePoolSync, CoreSchemaCheck, CoreSchemaCheckSync, CoreSchemaValidator, CoreSchemaValidatorSync, CoreStandardCheck, CoreStandardCheckSync, CoreStandardGroup, CoreStandardGroupSync, CoreStandardWebhook, CoreStandardWebhookSync, CoreTaskTarget, CoreTaskTargetSync, CoreThread, CoreThreadComment, CoreThreadCommentSync, CoreThreadSync, CoreTransformJinja2, CoreTransformJinja2Sync, CoreTransformPython, CoreTransformPythonSync, CoreTransformation, CoreTransformationSync, CoreTriggerRule, CoreTriggerRuleSync, CoreUserValidator, CoreUserValidatorSync, CoreValidator, CoreValidatorSync, CoreWebhook, CoreWebhookSync, CoreWeightedPoolResource, CoreWeightedPoolResourceSync, InternalAccountToken, InternalAccountTokenSync, InternalIPPrefixAvailable, InternalIPPrefixAvailableSync, InternalIPRangeAvailable, InternalIPRangeAvailableSync, InternalRefreshToken, InternalRefreshTokenSync, IpamNamespace, IpamNamespaceSync, LineageOwner, LineageOwnerSync, LineageSource, LineageSourceSync
+from infrahub_sdk.protocols import (
+    CoreNode,
+    BuiltinIPAddress,
+    BuiltinIPAddressSync,
+    BuiltinIPNamespace,
+    BuiltinIPNamespaceSync,
+    BuiltinIPPrefix,
+    BuiltinIPPrefixSync,
+    BuiltinTag,
+    BuiltinTagSync,
+    CoreAccount,
+    CoreAccountGroup,
+    CoreAccountGroupSync,
+    CoreAccountRole,
+    CoreAccountRoleSync,
+    CoreAccountSync,
+    CoreAction,
+    CoreActionSync,
+    CoreArtifact,
+    CoreArtifactCheck,
+    CoreArtifactCheckSync,
+    CoreArtifactDefinition,
+    CoreArtifactDefinitionSync,
+    CoreArtifactSync,
+    CoreArtifactTarget,
+    CoreArtifactTargetSync,
+    CoreArtifactThread,
+    CoreArtifactThreadSync,
+    CoreArtifactValidator,
+    CoreArtifactValidatorSync,
+    CoreBasePermission,
+    CoreBasePermissionSync,
+    CoreChangeComment,
+    CoreChangeCommentSync,
+    CoreChangeThread,
+    CoreChangeThreadSync,
+    CoreCheck,
+    CoreCheckDefinition,
+    CoreCheckDefinitionSync,
+    CoreCheckSync,
+    CoreComment,
+    CoreCommentSync,
+    CoreCredential,
+    CoreCredentialSync,
+    CoreCustomWebhook,
+    CoreCustomWebhookSync,
+    CoreDataCheck,
+    CoreDataCheckSync,
+    CoreDataValidator,
+    CoreDataValidatorSync,
+    CoreFileCheck,
+    CoreFileCheckSync,
+    CoreFileThread,
+    CoreFileThreadSync,
+    CoreGeneratorAction,
+    CoreGeneratorActionSync,
+    CoreGeneratorAwareGroup,
+    CoreGeneratorAwareGroupSync,
+    CoreGeneratorCheck,
+    CoreGeneratorCheckSync,
+    CoreGeneratorDefinition,
+    CoreGeneratorDefinitionSync,
+    CoreGeneratorGroup,
+    CoreGeneratorGroupSync,
+    CoreGeneratorInstance,
+    CoreGeneratorInstanceSync,
+    CoreGeneratorValidator,
+    CoreGeneratorValidatorSync,
+    CoreGenericAccount,
+    CoreGenericAccountSync,
+    CoreGenericRepository,
+    CoreGenericRepositorySync,
+    CoreGlobalPermission,
+    CoreGlobalPermissionSync,
+    CoreGraphQLQuery,
+    CoreGraphQLQueryGroup,
+    CoreGraphQLQueryGroupSync,
+    CoreGraphQLQuerySync,
+    CoreGroup,
+    CoreGroupAction,
+    CoreGroupActionSync,
+    CoreGroupSync,
+    CoreGroupTriggerRule,
+    CoreGroupTriggerRuleSync,
+    CoreIPAddressPool,
+    CoreIPAddressPoolSync,
+    CoreIPPrefixPool,
+    CoreIPPrefixPoolSync,
+    CoreMenu,
+    CoreMenuItem,
+    CoreMenuItemSync,
+    CoreMenuSync,
+    CoreNodeSync,
+    CoreNodeTriggerAttributeMatch,
+    CoreNodeTriggerAttributeMatchSync,
+    CoreNodeTriggerMatch,
+    CoreNodeTriggerMatchSync,
+    CoreNodeTriggerRelationshipMatch,
+    CoreNodeTriggerRelationshipMatchSync,
+    CoreNodeTriggerRule,
+    CoreNodeTriggerRuleSync,
+    CoreNumberPool,
+    CoreNumberPoolSync,
+    CoreObjectComponentTemplate,
+    CoreObjectComponentTemplateSync,
+    CoreObjectPermission,
+    CoreObjectPermissionSync,
+    CoreObjectTemplate,
+    CoreObjectTemplateSync,
+    CoreObjectThread,
+    CoreObjectThreadSync,
+    CorePasswordCredential,
+    CorePasswordCredentialSync,
+    CoreProfile,
+    CoreProfileSync,
+    CoreProposedChange,
+    CoreProposedChangeSync,
+    CoreReadOnlyRepository,
+    CoreReadOnlyRepositorySync,
+    CoreRepository,
+    CoreRepositoryGroup,
+    CoreRepositoryGroupSync,
+    CoreRepositorySync,
+    CoreRepositoryValidator,
+    CoreRepositoryValidatorSync,
+    CoreResourcePool,
+    CoreResourcePoolSync,
+    CoreSchemaCheck,
+    CoreSchemaCheckSync,
+    CoreSchemaValidator,
+    CoreSchemaValidatorSync,
+    CoreStandardCheck,
+    CoreStandardCheckSync,
+    CoreStandardGroup,
+    CoreStandardGroupSync,
+    CoreStandardWebhook,
+    CoreStandardWebhookSync,
+    CoreTaskTarget,
+    CoreTaskTargetSync,
+    CoreThread,
+    CoreThreadComment,
+    CoreThreadCommentSync,
+    CoreThreadSync,
+    CoreTransformJinja2,
+    CoreTransformJinja2Sync,
+    CoreTransformPython,
+    CoreTransformPythonSync,
+    CoreTransformation,
+    CoreTransformationSync,
+    CoreTriggerRule,
+    CoreTriggerRuleSync,
+    CoreUserValidator,
+    CoreUserValidatorSync,
+    CoreValidator,
+    CoreValidatorSync,
+    CoreWebhook,
+    CoreWebhookSync,
+    CoreWeightedPoolResource,
+    CoreWeightedPoolResourceSync,
+    InternalAccountToken,
+    InternalAccountTokenSync,
+    InternalIPPrefixAvailable,
+    InternalIPPrefixAvailableSync,
+    InternalIPRangeAvailable,
+    InternalIPRangeAvailableSync,
+    InternalRefreshToken,
+    InternalRefreshTokenSync,
+    IpamNamespace,
+    IpamNamespaceSync,
+    LineageOwner,
+    LineageOwnerSync,
+    LineageSource,
+    LineageSourceSync,
+)
 
 if TYPE_CHECKING:
     from infrahub_sdk.node import RelatedNode, RelationshipManager
@@ -49,6 +222,7 @@ class NetworkBuildingBlock(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
+
 class TemplateCoreArtifactTarget(CoreNode):
     template_name: String
     artifacts: RelationshipManager
@@ -56,11 +230,13 @@ class TemplateCoreArtifactTarget(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
+
 class NetworkEndpoint(CoreNode):
     link: RelatedNode
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
+
 
 class NetworkGenericDevice(CoreNode):
     hostname: String
@@ -69,16 +245,19 @@ class NetworkGenericDevice(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
+
 class ComputeGenericUnit(CoreNode):
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
+
 
 class VirtualizationHostVirtualMachine(CoreNode):
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
     virtual_machines: RelationshipManager
+
 
 class TemplateNetworkEndpoint(CoreNode):
     template_name: String
@@ -87,12 +266,14 @@ class TemplateNetworkEndpoint(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
+
 class TemplateNetworkGenericDevice(CoreNode):
     template_name: String
     interfaces: RelationshipManager
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
+
 
 class LocationPhysical(CoreNode):
     index: Integer
@@ -103,12 +284,12 @@ class LocationPhysical(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
+
 class GeneratorTarget(CoreNode):
     checksum: StringOptional
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 
 class AvdArtifact(CoreNode):
@@ -341,8 +522,6 @@ class VirtualizationVirtualMachine(ComputeGenericUnit):
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
-
 
 
 class ProfileAvdArtifact(LineageSource, CoreProfile, CoreNode):
@@ -681,9 +860,9 @@ class ProfileVirtualizationVirtualMachine(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager
 
 
-
-
-class TemplateNetworkDevice(LineageSource, TemplateCoreArtifactTarget, TemplateNetworkGenericDevice, CoreObjectTemplate, CoreNode):
+class TemplateNetworkDevice(
+    LineageSource, TemplateCoreArtifactTarget, TemplateNetworkGenericDevice, CoreObjectTemplate, CoreNode
+):
     bgp_asn: IntegerOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -718,4 +897,3 @@ class TemplateNetworkInterface(LineageSource, CoreObjectComponentTemplate, Templ
     subscriber_of_groups: RelationshipManager
     tagged_vlan: RelationshipManager
     untagged_vlan: RelatedNode
-

@@ -29,10 +29,12 @@ class AvdEosConfigTransform(InfrahubTransform):
         structured_config_peer = device.avd_artifact.node.structured_config_identifier
         structured_config_value = structured_config_peer.value if structured_config_peer else None
 
-        structured_config = await self.client.object_store.get(identifier=structured_config_value) if structured_config_value else None
+        structured_config = (
+            await self.client.object_store.get(identifier=structured_config_value) if structured_config_value else None
+        )
         if not structured_config:
             return f"! No structured config available for {hostname}"
-        
+
         structured_config_value = json.loads(structured_config)
 
         return pyavd.get_device_config(structured_config_value)

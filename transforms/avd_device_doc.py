@@ -29,7 +29,9 @@ class AvdDeviceDocTransform(InfrahubTransform):
         structured_config_peer = device.avd_artifact.node.structured_config_identifier
         structured_config_id = structured_config_peer.value if structured_config_peer else None
 
-        structured_config = await self.client.object_store.get(identifier=structured_config_id) if structured_config_id else None
+        structured_config = (
+            await self.client.object_store.get(identifier=structured_config_id) if structured_config_id else None
+        )
         if not structured_config:
             return f"# No structured config available for {hostname}"
 

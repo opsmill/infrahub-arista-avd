@@ -10,7 +10,10 @@ from pyavd._eos_designs.schema import EosDesigns
 from solution_ai_dc.generator import set_fabric_avd_hostvars_ready
 from solution_ai_dc.protocols import AvdArtifact
 
-from .generate_avd_device_inputs_query import GenerateAvdDeviceInputsQuery, GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces
+from .generate_avd_device_inputs_query import (
+    GenerateAvdDeviceInputsQuery,
+    GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
+)
 
 # Mapping from Infrahub device roles to AVD types
 ROLE_TO_AVD_TYPE: dict[str, str] = {
@@ -18,6 +21,7 @@ ROLE_TO_AVD_TYPE: dict[str, str] = {
     "spine": "spine",
     "leaf": "l3leaf",
 }
+
 
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
     pods = await client.filters(kind="NetworkPod", parent__ids=[fabric_id])
@@ -48,7 +52,7 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
 
     await set_fabric_avd_hostvars_ready(client, fabric_id, True)
     return True
-    
+
 
 def extract_uplinks_from_dict(
     interfaces: GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
@@ -264,7 +268,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["mgmt_ip"] = mgmt_ip
 
         node_config["uplink_ipv4_pool"] = "10.250.0.0/16"
-        node_config["vtep_loopback_ipv4_pool"] = "10.251.0.0/24" # Move to auto generated when creating devices
+        node_config["vtep_loopback_ipv4_pool"] = "10.251.0.0/24"  # Move to auto generated when creating devices
 
         # Add uplink configuration for spine and leaf devices
         if uplinks["uplink_interfaces"]:
@@ -302,10 +306,17 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         print(f"\nFull hostvars structure:")
         import json
+
         print(json.dumps(hostvars, indent=2))
 
         response = await self.client.object_store.upload(content=json.dumps(hostvars))
-        avd_artifact = await self.client.create(AvdArtifact, name=hostname, hostvar_checksum=response['checksum'], hostvar_identifier=response['identifier'], device=device_id)
+        avd_artifact = await self.client.create(
+            AvdArtifact,
+            name=hostname,
+            hostvar_checksum=response["checksum"],
+            hostvar_identifier=response["identifier"],
+            device=device_id,
+        )
         await avd_artifact.save(allow_upsert=True)
 
-        
+        await check_fabric_hostvars_ready(self.client, fabric.id)
