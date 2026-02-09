@@ -30,6 +30,8 @@ nodes:
             label: Pod Leaf Spine
           - name: management
             label: Management
+          - name: backfill
+            label: Backfill (from structured config)
   - name: IPAddress
     namespace: Ipam
     inherit_from:
