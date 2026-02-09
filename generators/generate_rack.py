@@ -118,7 +118,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
     async def check_fabric_hostvars_ready(self) -> None:
         """Check if all devices in the fabric have hostvars and set readiness flag."""
-        from generators.generate_avd_device_hostvar import check_fabric_hostvars_ready
+        from .generate_avd_device_hostvar import check_fabric_hostvars_ready
 
         await check_fabric_hostvars_ready(self.client, self.fabric.id)
 
