@@ -113,8 +113,6 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.update_checksum()
 
-        # await self.generate_hostvars_for_devices(self.spine_switches)
-
     async def create_spine_switches(self) -> None:
         """Create the spine switches"""
 

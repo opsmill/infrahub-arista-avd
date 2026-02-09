@@ -55,8 +55,6 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.update_checksum()
 
-        # await self.generate_hostvars_for_devices(self.super_spine_devices)
-
     async def create_super_spine_switches(self) -> None:
         fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
 

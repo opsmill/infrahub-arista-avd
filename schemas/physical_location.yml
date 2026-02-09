@@ -57,6 +57,10 @@ nodes:
         parameters:
           min_value: 1
           max_value: 2
+      - name: generation_complete
+        kind: Boolean
+        optional: true
+        default_value: false
     relationships:
       - name: leaf_switch_template
         kind: Attribute

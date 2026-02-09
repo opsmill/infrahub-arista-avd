@@ -37,19 +37,45 @@ class GeneratorMixin:
         joined = ",".join(sorted_ids)
         return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
-    async def generate_hostvars_for_devices(self, devices: list) -> None:
-        """Generate AVD hostvars for a list of devices by chaining to the hostvar generator."""
-        from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar
 
-        for device in devices:
-            hostname = device.hostname.value
-            logger.info(f"Chaining hostvars generation for device {hostname}")
-            hostvar_gen = GenerateAVDDeviceHostvar(
-                query="avd_device_hostvar",
-                client=self._init_client,
-                infrahub_node=type(device),
-                branch=self.branch_name,
-                params={"hostname": hostname},
-                convert_query_response=False,
-            )
-            await hostvar_gen.run(identifier=f"generate-avd-device-hostvar-{hostname}")
+async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> bool:
+    """Check if all racks across all non-fabric pods have generation_complete set to True."""
+    pods = await client.filters(kind="NetworkPod", parent__ids=[fabric_id])
+
+    for pod in pods:
+        if hasattr(pod, "role") and pod.role.value == "fabric":
+            continue
+
+        racks = await client.filters(kind="LocationRack", pod__ids=[pod.id])
+        if not racks:
+            continue
+
+        for rack in racks:
+            if not rack.generation_complete.value:
+                logger.info(f"Rack {rack.name.value} not yet generated, waiting...")
+                return False
+
+    logger.info("All racks generated for fabric %s", fabric_id)
+    return True
+
+
+async def trigger_hostvar_generation(client: InfrahubClient) -> None:
+    """Trigger the hostvar generator via CoreGeneratorDefinition mutation."""
+    generator_defs = await client.filters(kind="CoreGeneratorDefinition", name__value="generate-avd-device-hostvar")
+    if not generator_defs:
+        logger.error("Could not find CoreGeneratorDefinition 'generate-avd-device-hostvar'")
+        return
+
+    generator_def = generator_defs[0]
+    logger.info("Triggering hostvar generation via CoreGeneratorDefinitionRun for %s", generator_def.id)
+
+    await client.execute_graphql(
+        query="""
+        mutation RunGenerator($id: String!) {
+            CoreGeneratorDefinitionRun(data: { id: $id }) {
+                ok
+            }
+        }
+        """,
+        variables={"id": generator_def.id},
+    )

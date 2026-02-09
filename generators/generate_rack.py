@@ -9,8 +9,13 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumb
 from solution_ai_dc import sorting as solution_ai_dc_sorting
 from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
 from solution_ai_dc.cabling import build_rack_cabling_plan, connect_interface_maps
-from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
-from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkPod
+from solution_ai_dc.generator import (
+    GeneratorMixin,
+    check_all_racks_generated,
+    set_fabric_avd_hostvars_ready,
+    trigger_hostvar_generation,
+)
+from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkPod
 
 from .rack_generator_query import RackGeneratorQuery
 
@@ -67,6 +72,11 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric = self.pod.parent.peer
         await set_fabric_avd_hostvars_ready(self.client, self.fabric.id, False)
 
+        # Reset generation_complete flag to prevent stale flags during re-runs
+        rack = await self.client.get(kind=LocationRack, id=self.rack_id)
+        rack.generation_complete.value = False
+        await rack.save(allow_upsert=True)
+
         self.loopback_pool_id: str = data.location_rack.edges[0].node.pod.node.loopback_pool.node.id
         self.prefix_pool_id: str = data.location_rack.edges[0].node.pod.node.prefix_pool.node.id
 
@@ -112,15 +122,16 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.connect_leafs_to_spine()
 
-        # await self.generate_hostvars_for_devices(self.leaf_switches)
+        # Mark this rack as generation complete
+        rack = await self.client.get(kind=LocationRack, id=self.rack_id)
+        rack.generation_complete.value = True
+        await rack.save(allow_upsert=True)
+        self.logger.info(f"Rack {self.rack_name} generation complete")
 
-        await self.check_fabric_hostvars_ready()
-
-    async def check_fabric_hostvars_ready(self) -> None:
-        """Check if all devices in the fabric have hostvars and set readiness flag."""
-        from .generate_avd_device_hostvar import check_fabric_hostvars_ready
-
-        await check_fabric_hostvars_ready(self.client, self.fabric.id)
+        # Check if all racks in the fabric are done; if so, trigger hostvar generation
+        if await check_all_racks_generated(self.client, self.fabric.id):
+            self.logger.info("All racks generated — triggering hostvar generation")
+            await trigger_hostvar_generation(self.client)
 
     async def create_leaf_switches(self) -> None:
         for index in range(1, self.rack_amount_of_leafs + 1):
