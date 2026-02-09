@@ -39,10 +39,10 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric: str) -> bo
                 devices.add(device_peer.peer)
 
     for device in devices:
-        await device.avd_artifact.fetch()
-
-        if not device.avd_artifact:
+        if not device.avd_artifact.id:
             return False
+
+        await device.avd_artifact.fetch()
 
         if not device.avd_artifact.peer.hostvar_identifier.value:
             return False
