@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 
 
 class ComputedInterfaceDescriptionQuery(BaseModel):
-    network_interface: "ComputedInterfaceDescriptionQueryNetworkInterface" = Field(alias="NetworkInterface")
+    network_interface: "ComputedInterfaceDescriptionQueryNetworkInterface" = Field(
+        alias="NetworkInterface"
+    )
 
 
 class ComputedInterfaceDescriptionQueryNetworkInterface(BaseModel):
@@ -28,14 +30,24 @@ class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLink(BaseModel):
 
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNode(BaseModel):
     id: str
-    endpoints: "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints"
+    endpoints: (
+        "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints"
+    )
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints(BaseModel):
-    edges: Optional[list["ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges"]]
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoints(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges"
+        ]
+    ]
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges(BaseModel):
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdges(
+    BaseModel
+):
     node: Optional[
         Annotated[
             Union[
@@ -47,12 +59,16 @@ class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoint
     ]
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkEndpoint(BaseModel):
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkEndpoint(
+    BaseModel
+):
     typename__: Literal["NetworkEndpoint"] = Field(alias="__typename")
     id: Optional[str]
 
 
-class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterface(BaseModel):
+class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterface(
+    BaseModel
+):
     typename__: Literal["NetworkInterface"] = Field(alias="__typename")
     id: str
     name: Optional[
@@ -78,7 +94,9 @@ class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpoint
 class ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNode(
     BaseModel
 ):
-    typename__: Literal["ComputePhysicalServer", "NetworkDevice", "NetworkGenericDevice"] = Field(alias="__typename")
+    typename__: Literal[
+        "ComputePhysicalServer", "NetworkDevice", "NetworkGenericDevice"
+    ] = Field(alias="__typename")
     hostname: Optional[
         "ComputedInterfaceDescriptionQueryNetworkInterfaceEdgesNodeLinkNodeEndpointsEdgesNodeNetworkInterfaceDeviceNodeHostname"
     ]

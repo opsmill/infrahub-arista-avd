@@ -59,7 +59,9 @@ class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParent(BaseModel):
 
 
 class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParentNode(BaseModel):
-    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(alias="__typename")
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
+        alias="__typename"
+    )
     id: Optional[str]
 
 

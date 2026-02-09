@@ -89,6 +89,12 @@ max-line-length = 150
 max-complexity = 17
 
 
+[tool.uv]
+override-dependencies = [
+    "ariadne-codegen>=0.17.1",
+    "click>=8.3",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

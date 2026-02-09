@@ -49,9 +49,13 @@ class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdges(BaseModel):
 
 class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode(BaseModel):
     name: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeName"]
-    description: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeDescription"]
+    description: Optional[
+        "StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeDescription"
+    ]
     role: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeRole"]
-    status: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeStatus"]
+    status: Optional[
+        "StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeStatus"
+    ]
     ip_address: "StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddress"
 
 
@@ -72,14 +76,22 @@ class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeStatus(BaseMode
 
 
 class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddress(BaseModel):
-    node: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode"]
+    node: Optional[
+        "StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode"
+    ]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode(BaseModel):
-    address: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress"]
+class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode(
+    BaseModel
+):
+    address: Optional[
+        "StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress"
+    ]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress(BaseModel):
+class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress(
+    BaseModel
+):
     value: Optional[str]
 
 

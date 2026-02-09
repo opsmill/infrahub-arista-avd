@@ -7,6 +7,12 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
+[manifest]
+overrides = [
+    { name = "ariadne-codegen", specifier = ">=0.17.1" },
+    { name = "click", specifier = ">=8.3" },
+]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"
@@ -40,7 +46,7 @@ wheels = [
 
 [[package]]
 name = "ariadne-codegen"
-version = "0.15.3"
+version = "0.17.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "autoflake" },
@@ -52,9 +58,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "toml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/80/77efaec6129440d4c303e403e4fbf7196e02ac3f45cf72ab86614c8f944e/ariadne_codegen-0.15.3.tar.gz", hash = "sha256:30d8b876168411fb05eb52398ab319ce994b6d0b3fe6ae17056dc8a9f14aea6e", size = 66333, upload-time = "2025-09-19T10:24:15.629Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/35/ec18a8a0361c11557d41e4a1e9da20144fca7fe25453895f1b7e45382e2f/ariadne_codegen-0.17.1.tar.gz", hash = "sha256:2e835c93b44b2a62289184d73d85c89bae9fa9b15270a842abbf061f9c218ce8", size = 67264, upload-time = "2026-01-09T10:52:51.971Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/af/ce9774603c1f501b0e4a4e4796f48c05bbde2110e34d1479137711490c83/ariadne_codegen-0.15.3-py3-none-any.whl", hash = "sha256:7cd2cc68a7d3860422c8e03f5fe575ed6db22fca0a8a379779919fa08cf2a4f4", size = 95708, upload-time = "2025-09-19T10:24:13.247Z" },
+    { url = "https://files.pythonhosted.org/packages/11/46/9124d0827ca1bea365c1d90c7cb2622e6cb8589cf6a8d2e42c0152d60bb6/ariadne_codegen-0.17.1-py3-none-any.whl", hash = "sha256:5173e718d7c3b00bed9f532cf907c816b79314f022556dfb63535ee518ce9e59", size = 96581, upload-time = "2026-01-09T10:52:50.464Z" },
 ]
 
 [[package]]
@@ -261,14 +267,14 @@ wheels = [
 
 [[package]]
 name = "click"
-version = "8.1.8"
+version = "8.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593, upload-time = "2024-12-21T18:38:44.339Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/fa/656b739db8587d7b5dfa22e22ed02566950fbfbcdc20311993483657a5c0/click-8.3.1.tar.gz", hash = "sha256:12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a", size = 295065, upload-time = "2025-11-15T20:45:42.706Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/d4/7ebdbd03970677812aac39c869717059dbb71a4cfc033ca6e5221787892c/click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2", size = 98188, upload-time = "2024-12-21T18:38:41.666Z" },
+    { url = "https://files.pythonhosted.org/packages/98/78/01c019cdb5d6498122777c1a43056ebb3ebfeef2076d9d026bfe15583b2b/click-8.3.1-py3-none-any.whl", hash = "sha256:981153a64e25f12d547d3426c367a4857371575ee7ad18df2a6183ab0545b2a6", size = 108274, upload-time = "2025-11-15T20:45:41.139Z" },
 ]
 
 [[package]]

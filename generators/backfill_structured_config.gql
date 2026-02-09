@@ -1,0 +1,47 @@
+query BackfillStructuredConfigQuery($hostname: String!) {
+  NetworkDevice(hostname__value: $hostname) {
+    edges {
+      node {
+        id
+        hostname {
+          value
+        }
+        role {
+          value
+        }
+        avd_artifact {
+          node {
+            id
+            structured_config_identifier {
+              value
+            }
+          }
+        }
+        interfaces {
+          edges {
+            node {
+              id
+              name {
+                value
+              }
+              role {
+                value
+              }
+              mtu {
+                value
+              }
+              ip_address {
+                node {
+                  id
+                  address {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

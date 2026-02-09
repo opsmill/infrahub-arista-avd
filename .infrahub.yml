@@ -37,6 +37,9 @@ queries:
   - name: avd_fabric_devices
     file_path: "./transforms/avd_fabric_devices.gql"
 
+  - name: backfill_structured_config
+    file_path: "./generators/backfill_structured_config.gql"
+
 
 generator_definitions:
   - name: generate-avd-device-hostvar
@@ -90,6 +93,17 @@ generator_definitions:
     parameters:
       fabric_name: name__value
     class_name: AvdDeviceStructuredConfigGenerator
+    convert_query_response: false
+    execute_in_proposed_change: false
+    execute_after_merge: false
+
+  - name: backfill-structured-config
+    file_path: "./generators/backfill_structured_config.py"
+    query: backfill_structured_config
+    targets: avd_devices
+    parameters:
+      hostname: hostname__value
+    class_name: BackfillStructuredConfigGenerator
     convert_query_response: false
     execute_in_proposed_change: false
     execute_after_merge: false
