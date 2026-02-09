@@ -9,7 +9,7 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumb
 from solution_ai_dc import sorting as solution_ai_dc_sorting
 from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
 from solution_ai_dc.cabling import build_pod_cabling_plan, connect_interface_maps
-from solution_ai_dc.generator import GeneratorMixin
+from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkPod
 
 from .pod_generator_query import PodGeneratorQuery
@@ -64,9 +64,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
             0
         ].node.parent.node.amount_of_super_spines.value
 
-        self.fabric = await self.client.get("NetworkFabric", id=self.fabric_id)
-        self.fabric.avd_hostvars_ready = False
-        await self.fabric.save(allow_upsert=True)
+        await set_fabric_avd_hostvars_ready(self.client, self.fabric_id, False)
 
         self.spine_switches = []
 
@@ -114,6 +112,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         await self.connect_spine_to_super_spine()
 
         await self.update_checksum()
+
+        # await self.generate_hostvars_for_devices(self.spine_switches)
 
     async def create_spine_switches(self) -> None:
         """Create the spine switches"""

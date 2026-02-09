@@ -5,7 +5,7 @@ import logging
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
-from solution_ai_dc.generator import GeneratorMixin
+from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkPod
 
 from .fabric_generator_query import FabricGeneratorQuery
@@ -30,9 +30,8 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric_id = data.network_fabric.edges[0].node.id
         self.fabric_super_spine_switch_template = data.network_fabric.edges[0].node.super_spine_switch_template.node.id
         self.amount_of_super_spines = data.network_fabric.edges[0].node.amount_of_super_spines.value
-        self.fabric = await self.client.get("NetworkFabric", id=self.fabric_id)
-        self.fabric.avd_hostvars_ready = False
-        await self.fabric.save()
+        await set_fabric_avd_hostvars_ready(self.client, self.fabric_id, False)
+        self.super_spine_devices: list[NetworkDevice] = []
 
         # Get AVD-related pool references
         asn_pool_node = data.network_fabric.edges[0].node.asn_pool
@@ -55,6 +54,8 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         await self.create_super_spine_switches()
 
         await self.update_checksum()
+
+        # await self.generate_hostvars_for_devices(self.super_spine_devices)
 
     async def create_super_spine_switches(self) -> None:
         fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
@@ -93,6 +94,8 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
             loopback_interface.status.value = "active"
             loopback_interface.ip_address = device.loopback_ip.id
             await loopback_interface.save(allow_upsert=True)
+
+            self.super_spine_devices.append(device)
 
     async def allocate_resource_pools(self) -> None:
         fabric_supernet_pool = await self.client.get(kind=CoreIPPrefixPool, name__value="FabricSupernetPool")
