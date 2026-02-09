@@ -17,7 +17,7 @@ from solution_ai_dc.protocols import NetworkInterface
 
 from .backfill_structured_config_query import (
     BackfillStructuredConfigQuery,
-    BackfillStructuredConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode,
+    BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
 )
 
 INTERFACE_SECTIONS = ["ethernet_interfaces", "loopback_interfaces", "management_interfaces"]
@@ -44,10 +44,10 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
     def _build_interface_map(
         self,
-        interfaces: list[BackfillStructuredConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode],
-    ) -> dict[str, BackfillStructuredConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode]:
+        interfaces: list[BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode],
+    ) -> dict[str, BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode]:
         """Build a dict mapping interface name -> GraphQL interface node."""
-        result: dict[str, BackfillStructuredConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode] = {}
+        result: dict[str, BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode] = {}
         for iface in interfaces:
             if iface.name and iface.name.value:
                 result[iface.name.value] = iface
@@ -55,7 +55,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
     async def _backfill_ip(
         self,
-        interface_node: BackfillStructuredConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode,
+        interface_node: BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
         ip_str: str,
         hostname: str,
     ) -> None:
@@ -94,7 +94,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
     async def _update_mtu(
         self,
-        interface_node: BackfillStructuredConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode,
+        interface_node: BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
         mtu: int,
         hostname: str,
     ) -> None:
@@ -113,19 +113,25 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
     async def generate(self, data: dict) -> None:
         """Backfill IPs and MTU from structured config into the data model."""
         data: BackfillStructuredConfigQuery = BackfillStructuredConfigQuery(**data)
-        device = data.network_device.edges[0].node
-        hostname = device.hostname.value if device.hostname else "unknown"
+        artifact = data.avd_artifact.edges[0].node
 
-        # Check for structured config
-        avd_artifact = device.avd_artifact.node
-        if not avd_artifact or not avd_artifact.structured_config_identifier:
-            self.logger.warning(f"[{hostname}] No structured config available, skipping")
+        # Get structured config identifier
+        if not artifact.structured_config_identifier:
+            self.logger.warning("No structured config identifier on artifact, skipping")
             return
 
-        identifier = avd_artifact.structured_config_identifier.value
+        identifier = artifact.structured_config_identifier.value
         if not identifier:
-            self.logger.warning(f"[{hostname}] No structured config identifier, skipping")
+            self.logger.warning("Empty structured config identifier, skipping")
             return
+
+        # Get device info via relationship
+        device = artifact.device.node
+        if not device:
+            self.logger.warning("No device linked to artifact, skipping")
+            return
+
+        hostname = device.hostname.value if device.hostname else "unknown"
 
         # Fetch structured config from object storage
         try:

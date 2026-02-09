@@ -1,40 +1,43 @@
-query BackfillStructuredConfigQuery($hostname: String!) {
-  NetworkDevice(hostname__value: $hostname) {
+query BackfillStructuredConfigQuery($device_hostname: String!) {
+  AvdArtifact(device__hostname__value: $device_hostname) {
     edges {
       node {
         id
-        hostname {
+        structured_config_identifier {
           value
         }
-        role {
-          value
-        }
-        avd_artifact {
+        device {
           node {
+            __typename
             id
-            structured_config_identifier {
-              value
-            }
-          }
-        }
-        interfaces {
-          edges {
-            node {
-              id
-              name {
+            ... on NetworkDevice {
+              hostname {
                 value
               }
               role {
                 value
               }
-              mtu {
-                value
-              }
-              ip_address {
-                node {
-                  id
-                  address {
-                    value
+              interfaces {
+                edges {
+                  node {
+                    id
+                    name {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                    mtu {
+                      value
+                    }
+                    ip_address {
+                      node {
+                        id
+                        address {
+                          value
+                        }
+                      }
+                    }
                   }
                 }
               }

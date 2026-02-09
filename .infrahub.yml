@@ -100,9 +100,9 @@ generator_definitions:
   - name: backfill-structured-config
     file_path: "./generators/backfill_structured_config.py"
     query: backfill_structured_config
-    targets: avd_devices
+    targets: avd_artifacts
     parameters:
-      hostname: hostname__value
+      device_hostname: device__hostname__value
     class_name: BackfillStructuredConfigGenerator
     convert_query_response: false
     execute_in_proposed_change: false

@@ -10,3 +10,4 @@ spec:
     - name: pods
     - name: devices
     - name: avd_devices
+    - name: avd_artifacts

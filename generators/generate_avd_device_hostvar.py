@@ -316,6 +316,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvar_checksum=response["checksum"],
             hostvar_identifier=response["identifier"],
             device=device_id,
+            member_of_groups=["avd_artifacts"],
         )
         await avd_artifact.save(allow_upsert=True)
 

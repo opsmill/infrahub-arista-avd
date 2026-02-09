@@ -154,6 +154,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     structured_config_checksum=response["checksum"],
                     structured_config_identifier=response["identifier"],
                     device=device_mapping[hostname],
+                    member_of_groups=["avd_artifacts"],
                 )
                 await avd_artifact.save(allow_upsert=True)
                 print(f"    ✓ Generated structured config with {len(structured_config)} top-level keys")
