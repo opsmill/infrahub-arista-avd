@@ -20,10 +20,10 @@ ROLE_TO_AVD_TYPE: dict[str, str] = {
 }
 
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric: str) -> bool:
-    fabric = await client.get("NetworkFabric", id=fabric, include=["pods"], prefetch_relationships=True)
+    fabric = await client.get("NetworkFabric", id=fabric, include=["children"], prefetch_relationships=True)
 
     devices = set()
-    for pod_peer in fabric.pods.peers:
+    for pod_peer in fabric.children.peers:
         pod = pod_peer.peer
         await pod.devices.fetch()
         await pod.racks.fetch()
