@@ -9,6 +9,7 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumb
 from solution_ai_dc import sorting as solution_ai_dc_sorting
 from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
 from solution_ai_dc.cabling import build_rack_cabling_plan, connect_interface_maps
+from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkPod
 
 from .rack_generator_query import RackGeneratorQuery
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 EXCLUDED_RACK_TYPES = []
 
 
-class RackGenerator(InfrahubGenerator):
+class RackGenerator(InfrahubGenerator, GeneratorMixin):
     rack_id: str
     rack_index: int
     rack_name: str
@@ -63,9 +64,8 @@ class RackGenerator(InfrahubGenerator):
         self.pod_amount_of_spines: int = data.location_rack.edges[0].node.pod.node.amount_of_spines.value
         self.pod: NetworkPod = await self.client.get(kind=NetworkPod, id=self.pod_id)
         await self.pod.parent.fetch()
-        self.fabric: NetworkFabric = self.pod.parent.peer
-        self.fabric.avd_hostvars_ready = False
-        await self.fabric.save(allow_upsert=True)
+        self.fabric = self.pod.parent.peer
+        await set_fabric_avd_hostvars_ready(self.client, self.fabric.id, False)
 
         self.loopback_pool_id: str = data.location_rack.edges[0].node.pod.node.loopback_pool.node.id
         self.prefix_pool_id: str = data.location_rack.edges[0].node.pod.node.prefix_pool.node.id
@@ -111,6 +111,16 @@ class RackGenerator(InfrahubGenerator):
         await self.create_leaf_switches()
 
         await self.connect_leafs_to_spine()
+
+        # await self.generate_hostvars_for_devices(self.leaf_switches)
+
+        await self.check_fabric_hostvars_ready()
+
+    async def check_fabric_hostvars_ready(self) -> None:
+        """Check if all devices in the fabric have hostvars and set readiness flag."""
+        from generators.generate_avd_device_hostvar import check_fabric_hostvars_ready
+
+        await check_fabric_hostvars_ready(self.client, self.fabric.id)
 
     async def create_leaf_switches(self) -> None:
         for index in range(1, self.rack_amount_of_leafs + 1):

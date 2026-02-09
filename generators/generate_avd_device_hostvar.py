@@ -5,11 +5,12 @@ from typing import Any
 from infrahub_sdk import InfrahubClient
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.vlan import vlanlist_to_config
-
 from pyavd._eos_designs.schema import EosDesigns
 
-from .generate_avd_device_inputs_query import GenerateAvdDeviceInputsQuery, GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces
+from solution_ai_dc.generator import set_fabric_avd_hostvars_ready
 from solution_ai_dc.protocols import AvdArtifact
+
+from .generate_avd_device_inputs_query import GenerateAvdDeviceInputsQuery, GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces
 
 # Mapping from Infrahub device roles to AVD types
 ROLE_TO_AVD_TYPE: dict[str, str] = {
@@ -46,8 +47,7 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric: str) -> bo
         if not device.avd_artifact.peer.hostvar_identifier.value:
             return False
 
-    fabric.avd_hostvars_ready = True
-    await fabric.save(allow_upsert=True)
+    await set_fabric_avd_hostvars_ready(client, fabric.id, True)
     return True
     
 
