@@ -19,19 +19,17 @@ ROLE_TO_AVD_TYPE: dict[str, str] = {
     "leaf": "l3leaf",
 }
 
-async def check_fabric_hostvars_ready(client: InfrahubClient, fabric: str) -> bool:
-    fabric = await client.get("NetworkFabric", id=fabric)
-    await fabric.children.fetch()
+async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
+    pods = await client.filters(kind="NetworkPod", parent__ids=[fabric_id])
 
     devices = set()
-    for pod_peer in fabric.children.peers:
-        pod = pod_peer.peer
+    for pod in pods:
         await pod.devices.fetch()
         await pod.racks.fetch()
 
         for device_peer in pod.devices.peers:
             devices.add(device_peer.peer)
-        
+
         for rack_peer in pod.racks.peers:
             rack = rack_peer.peer
             await rack.devices.fetch()
@@ -48,7 +46,7 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric: str) -> bo
         if not device.avd_artifact.peer.hostvar_identifier.value:
             return False
 
-    await set_fabric_avd_hostvars_ready(client, fabric.id, True)
+    await set_fabric_avd_hostvars_ready(client, fabric_id, True)
     return True
     
 
