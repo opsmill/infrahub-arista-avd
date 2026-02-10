@@ -8,6 +8,7 @@ from typing import Any
 
 import pyavd
 from infrahub_sdk.transforms import InfrahubTransform
+
 from .avd_device_config_query import AvdDeviceConfigQuery
 
 
@@ -16,7 +17,7 @@ class AvdEosConfigTransform(InfrahubTransform):
 
     query = "avd_device_config"
 
-    async def transform(self, data: AvdDeviceConfigQuery) -> str:
+    async def transform(self, data: dict[str, Any]) -> str:
         """Transform structured config to EOS CLI configuration."""
         data: AvdDeviceConfigQuery = AvdDeviceConfigQuery(**data)
         device_edges = data.network_device.edges

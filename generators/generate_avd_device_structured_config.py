@@ -13,8 +13,10 @@ from typing import Any
 import pyavd
 from infrahub_sdk.generator import InfrahubGenerator
 from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
-from .generate_avd_inputs_query import GenerateAvdInputsQuery
+
 from solution_ai_dc.protocols import AvdArtifact
+
+from .generate_avd_inputs_query import GenerateAvdInputsQuery
 
 
 class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
@@ -105,7 +107,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
         return result
 
-    async def generate(self, data: GenerateAvdInputsQuery) -> None:
+    async def generate(self, data: dict) -> None:
         """Generate AVD inputs and structured config for all devices."""
         data: GenerateAvdInputsQuery = GenerateAvdInputsQuery(**data)
         # Extract all devices from nested fabric structure
