@@ -6,6 +6,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from infrahub_sdk.exceptions import NodeNotFoundError
 
 from generators.backfill_structured_config import (
     INTERFACE_SECTIONS,
@@ -38,6 +39,7 @@ from generators.backfill_structured_config_query import (
     BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeRole as Role,
 )
 from solution_ai_dc.protocols import (
+    CoreAccountGroup,
     IpamIPAddress,
     IpamIPPrefix,
     RoutingBGPNeighbor,
@@ -939,11 +941,13 @@ class TestGenerate:
 
         mock_prefix = _make_saveable_mock()
         mock_ip = _make_saveable_mock()
+        mock_avd_group = MagicMock()
+        mock_avd_group.id = "avd-group-id"
         mock_interface = _make_saveable_mock()
         mock_interface_mtu = _make_saveable_mock()
 
         gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
-        gen.client.get = AsyncMock(side_effect=[mock_interface, mock_interface_mtu])
+        gen.client.get = AsyncMock(side_effect=[mock_avd_group, mock_interface, mock_interface_mtu])
 
         interfaces = [
             {
@@ -1057,6 +1061,259 @@ class TestGenerate:
         assert RoutingRouteMap in created_types
         assert RoutingRouteMapEntry in created_types
         assert RoutingStaticRoute in created_types
+
+
+# --- AVD Source Attribution ---
+
+
+class TestGetAvdSource:
+    async def test_returns_group_id_when_found(self) -> None:
+        """Test that _get_avd_source returns the group ID when CoreAccountGroup exists."""
+        gen = _make_generator()
+        mock_group = MagicMock()
+        mock_group.id = "avd-group-123"
+        gen.client.get = AsyncMock(return_value=mock_group)
+
+        result = await gen._get_avd_source()
+
+        assert result == "avd-group-123"
+        gen.client.get.assert_awaited_once_with(CoreAccountGroup, name__value="AVD")
+
+    async def test_returns_none_when_not_found(self) -> None:
+        """Test that _get_avd_source returns None when CoreAccountGroup is missing."""
+        gen = _make_generator()
+        gen.client.get = AsyncMock(side_effect=NodeNotFoundError(identifier={"name": ["AVD"]}))
+
+        result = await gen._get_avd_source()
+
+        assert result is None
+
+
+class TestSetSource:
+    def test_sets_source_on_all_attributes(self) -> None:
+        """Test that _set_source sets source on all node attributes."""
+        node = MagicMock()
+        attr1 = MagicMock()
+        attr2 = MagicMock()
+        node._attributes = ["attr1", "attr2"]
+        node.attr1 = attr1
+        node.attr2 = attr2
+
+        BackfillStructuredConfigGenerator._set_source(node, "avd-group-123")
+
+        assert attr1.source is not None
+        assert attr1.source.id == "avd-group-123"
+        assert attr2.source is not None
+        assert attr2.source.id == "avd-group-123"
+
+    def test_noop_when_source_is_none(self) -> None:
+        """Test that _set_source is a no-op when source_id is None."""
+        node = MagicMock()
+        attr1 = MagicMock()
+        node._attributes = ["attr1"]
+        node.attr1 = attr1
+        original_source = attr1.source
+
+        BackfillStructuredConfigGenerator._set_source(node, None)
+
+        assert attr1.source is original_source
+
+
+class TestSourceAttributionIp:
+    async def test_backfill_ip_sets_source_on_prefix_and_address(self) -> None:
+        """Test that _backfill_ip sets AVD source on IpamIPPrefix and IpamIPAddress."""
+        gen = _make_generator()
+        mock_prefix = MagicMock()
+        mock_prefix.save = AsyncMock()
+        mock_prefix._attributes = ["prefix", "role"]
+        mock_prefix.prefix = MagicMock()
+        mock_prefix.role = MagicMock()
+
+        mock_ip = MagicMock()
+        mock_ip.save = AsyncMock()
+        mock_ip._attributes = ["address"]
+        mock_ip.address = MagicMock()
+
+        mock_interface = _make_saveable_mock()
+
+        gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
+        gen.client.get = AsyncMock(return_value=mock_interface)
+
+        iface = _make_interface(name="Ethernet1", ip_node=None)
+        await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1", avd_source="avd-123")
+
+        assert mock_prefix.prefix.source.id == "avd-123"
+        assert mock_prefix.role.source.id == "avd-123"
+        assert mock_ip.address.source.id == "avd-123"
+
+    async def test_backfill_ip_no_source_when_none(self) -> None:
+        """Test that _backfill_ip does not set source when avd_source is None."""
+        gen = _make_generator()
+        mock_prefix = _make_saveable_mock()
+        mock_ip = _make_saveable_mock()
+        mock_interface = _make_saveable_mock()
+
+        gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
+        gen.client.get = AsyncMock(return_value=mock_interface)
+
+        iface = _make_interface(name="Ethernet1", ip_node=None)
+        await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1", avd_source=None)
+
+        # save should still be called, but source not set
+        mock_prefix.save.assert_awaited_once()
+        mock_ip.save.assert_awaited_once()
+
+
+class TestSourceAttributionMtu:
+    async def test_update_mtu_sets_source(self) -> None:
+        """Test that _update_mtu sets AVD source on the MTU attribute."""
+        gen = _make_generator()
+        mock_interface = _make_saveable_mock()
+        mock_interface.mtu = MagicMock()
+        gen.client.get = AsyncMock(return_value=mock_interface)
+
+        iface = _make_interface(mtu=1500)
+        await gen._update_mtu(iface, 9214, "leaf-1", avd_source="avd-123")
+
+        assert mock_interface.mtu.source.id == "avd-123"
+
+
+class TestSourceAttributionBgp:
+    async def test_bgp_peer_group_sets_source(self) -> None:
+        """Test that _backfill_bgp_peer_groups sets AVD source on peer groups."""
+        gen = _make_generator()
+        mock_pg = MagicMock()
+        mock_pg.save = AsyncMock()
+        mock_pg._attributes = ["name", "type"]
+        mock_pg.name = MagicMock()
+        mock_pg.type = MagicMock()
+        gen.client.create = AsyncMock(return_value=mock_pg)
+
+        bgp_config = {"peer_groups": [{"name": "PG1", "type": "ipv4"}]}
+        await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1", avd_source="avd-123")
+
+        assert mock_pg.name.source.id == "avd-123"
+        assert mock_pg.type.source.id == "avd-123"
+
+    async def test_bgp_neighbor_sets_source(self) -> None:
+        """Test that _backfill_bgp_neighbors sets AVD source on neighbors."""
+        gen = _make_generator()
+        mock_nb = MagicMock()
+        mock_nb.save = AsyncMock()
+        mock_nb._attributes = ["peer_address"]
+        mock_nb.peer_address = MagicMock()
+        gen.client.create = AsyncMock(return_value=mock_nb)
+
+        bgp_config = {"neighbors": [{"ip_address": "10.0.0.1"}]}
+        await gen._backfill_bgp_neighbors(bgp_config, "dev-1", "leaf-1", {}, avd_source="avd-123")
+
+        assert mock_nb.peer_address.source.id == "avd-123"
+
+
+class TestSourceAttributionRouting:
+    async def test_prefix_list_sets_source(self) -> None:
+        """Test that _backfill_prefix_lists sets AVD source on prefix lists and entries."""
+        gen = _make_generator()
+        mock_pl = MagicMock()
+        mock_pl.save = AsyncMock()
+        mock_pl._attributes = ["name"]
+        mock_pl.name = MagicMock()
+
+        mock_entry = MagicMock()
+        mock_entry.save = AsyncMock()
+        mock_entry._attributes = ["sequence", "action"]
+        mock_entry.sequence = MagicMock()
+        mock_entry.action = MagicMock()
+
+        gen.client.create = AsyncMock(side_effect=[mock_pl, mock_entry])
+
+        prefix_lists = [
+            {"name": "PL1", "sequence_numbers": [{"sequence": 10, "action": "permit any"}]}
+        ]
+        await gen._backfill_prefix_lists(prefix_lists, "dev-1", "leaf-1", avd_source="avd-123")
+
+        assert mock_pl.name.source.id == "avd-123"
+        assert mock_entry.sequence.source.id == "avd-123"
+        assert mock_entry.action.source.id == "avd-123"
+
+    async def test_route_map_sets_source(self) -> None:
+        """Test that _backfill_route_maps sets AVD source on route maps and entries."""
+        gen = _make_generator()
+        mock_rm = MagicMock()
+        mock_rm.save = AsyncMock()
+        mock_rm._attributes = ["name"]
+        mock_rm.name = MagicMock()
+
+        mock_entry = MagicMock()
+        mock_entry.save = AsyncMock()
+        mock_entry._attributes = ["sequence", "type"]
+        mock_entry.sequence = MagicMock()
+        mock_entry.type = MagicMock()
+
+        gen.client.create = AsyncMock(side_effect=[mock_rm, mock_entry])
+
+        route_maps = [{"name": "RM1", "sequence_numbers": [{"sequence": 10, "type": "permit"}]}]
+        await gen._backfill_route_maps(route_maps, "dev-1", "leaf-1", avd_source="avd-123")
+
+        assert mock_rm.name.source.id == "avd-123"
+        assert mock_entry.sequence.source.id == "avd-123"
+
+    async def test_static_route_sets_source(self) -> None:
+        """Test that _backfill_static_routes sets AVD source on static routes."""
+        gen = _make_generator()
+        mock_route = MagicMock()
+        mock_route.save = AsyncMock()
+        mock_route._attributes = ["prefix", "vrf"]
+        mock_route.prefix = MagicMock()
+        mock_route.vrf = MagicMock()
+        gen.client.create = AsyncMock(return_value=mock_route)
+
+        static_routes = [{"destination_address_prefix": "0.0.0.0/0", "gateway": "1.1.1.1"}]
+        await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1", avd_source="avd-123")
+
+        assert mock_route.prefix.source.id == "avd-123"
+        assert mock_route.vrf.source.id == "avd-123"
+
+
+class TestSourceAttributionGracefulDegradation:
+    async def test_generate_continues_without_source_when_group_missing(self) -> None:
+        """Test that generate works correctly when CoreAccountGroup is not found."""
+        gen = _make_generator()
+
+        structured_config = {
+            "ethernet_interfaces": [
+                {"name": "Ethernet1", "ip_address": "10.0.0.1/31"},
+            ]
+        }
+        gen.client.object_store.get = AsyncMock(return_value=json.dumps(structured_config))
+
+        mock_prefix = _make_saveable_mock()
+        mock_ip = _make_saveable_mock()
+        mock_interface = _make_saveable_mock()
+
+        gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
+
+        # First get call is for CoreAccountGroup (not found), rest for interface
+        gen.client.get = AsyncMock(
+            side_effect=[NodeNotFoundError(identifier={"name": ["AVD"]}), mock_interface]
+        )
+
+        interfaces = [
+            {
+                "node": {
+                    "id": "iface-1",
+                    "name": {"value": "Ethernet1"},
+                    "role": {"value": "uplink"},
+                    "mtu": None,
+                    "ip_address": {"node": None},
+                }
+            }
+        ]
+        data = _build_artifact_query_data(interfaces=interfaces)
+        await gen.generate(data)
+
+        # Should still create prefix and IP, just without source
+        assert gen.client.create.call_count == 2
 
 
 # --- Constants ---

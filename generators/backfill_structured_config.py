@@ -12,9 +12,12 @@ import json
 import logging
 from typing import Any
 
+from infrahub_sdk.exceptions import NodeNotFoundError
 from infrahub_sdk.generator import InfrahubGenerator
+from infrahub_sdk.node import NodeProperty
 
 from solution_ai_dc.protocols import (
+    CoreAccountGroup,
     IpamIPAddress,
     IpamIPPrefix,
     NetworkInterface,
@@ -52,6 +55,33 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
     logger = logging.getLogger("infrahub.tasks")
 
+    async def _get_avd_source(self) -> str | None:
+        """Look up the 'AVD' CoreAccountGroup and return its ID for source attribution.
+
+        Returns None with a warning log if the group cannot be found.
+        """
+        try:
+            group = await self.client.get(CoreAccountGroup, name__value="AVD")
+        except NodeNotFoundError:
+            self.logger.warning("CoreAccountGroup 'AVD' not found; skipping source attribution")
+            return None
+        else:
+            return group.id
+
+    @staticmethod
+    def _set_source(node: Any, source_id: str | None) -> None:  # noqa: ANN401
+        """Set the source property on all attributes of a node.
+
+        No-op when *source_id* is ``None``.
+        """
+        if not source_id:
+            return
+        prop = NodeProperty(source_id)
+        for attr_name in node._attributes:  # noqa: SLF001
+            attr = getattr(node, attr_name, None)
+            if attr is not None and hasattr(attr, "source"):
+                attr.source = prop
+
     def _build_interface_map(
         self,
         interfaces: list[BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode],
@@ -68,6 +98,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         interface_node: BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
         ip_str: str,
         hostname: str,
+        avd_source: str | None = None,
     ) -> None:
         """Create IpamIPPrefix and IpamIPAddress, assign to interface."""
         iface_name = interface_node.name.value if interface_node.name else "unknown"
@@ -86,6 +117,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             prefix=prefix_str,
             role="backfill",
         )
+        self._set_source(prefix, avd_source)
         await prefix.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Ensured prefix {prefix_str}")
 
@@ -94,6 +126,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             address=str(ip_iface),
             ip_prefix=prefix,
         )
+        self._set_source(ip_address, avd_source)
         await ip_address.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Ensured IP address {ip_iface}")
 
@@ -107,6 +140,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         interface_node: BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
         mtu: int,
         hostname: str,
+        avd_source: str | None = None,
     ) -> None:
         """Update interface MTU if it differs from current value."""
         iface_name = interface_node.name.value if interface_node.name else "unknown"
@@ -117,6 +151,8 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
         interface = await self.client.get(NetworkInterface, id=interface_node.id)
         interface.mtu.value = mtu
+        if avd_source and hasattr(interface.mtu, "source"):
+            interface.mtu.source = NodeProperty(avd_source)
         await interface.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Updated MTU on {iface_name}: {current_mtu} -> {mtu}")
 
@@ -140,6 +176,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         bgp_config: dict[str, Any],
         device_id: str,
         hostname: str,
+        avd_source: str | None = None,
     ) -> dict[str, Any]:
         """Backfill BGP peer groups, return a map of name -> saved peer group object."""
         peer_group_map: dict[str, Any] = {}
@@ -165,6 +202,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             pg_attrs.update(self._extract_optional(pg_config, pg_fields, stringify=["remote_as", "local_as"]))
 
             peer_group = await self.client.create(RoutingBGPPeerGroup, **pg_attrs)
+            self._set_source(peer_group, avd_source)
             await peer_group.save(allow_upsert=True)
             peer_group_map[pg_name] = peer_group
             self.logger.info(f"[{hostname}] Ensured BGP peer group '{pg_name}'")
@@ -177,6 +215,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         device_id: str,
         hostname: str,
         peer_group_map: dict[str, Any],
+        avd_source: str | None = None,
     ) -> None:
         """Backfill BGP neighbors from router_bgp config."""
         nb_fields = ["remote_as", "description", "shutdown", "bfd", "ebgp_multihop", "send_community"]
@@ -193,6 +232,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 nb_attrs["peer_group"] = peer_group_map[pg_name]
 
             neighbor = await self.client.create(RoutingBGPNeighbor, **nb_attrs)
+            self._set_source(neighbor, avd_source)
             await neighbor.save(allow_upsert=True)
             self.logger.info(f"[{hostname}] Ensured BGP neighbor {nb_addr}")
 
@@ -201,10 +241,11 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         bgp_config: dict[str, Any],
         device_id: str,
         hostname: str,
+        avd_source: str | None = None,
     ) -> None:
         """Backfill BGP peer groups and neighbors from router_bgp config."""
-        peer_group_map = await self._backfill_bgp_peer_groups(bgp_config, device_id, hostname)
-        await self._backfill_bgp_neighbors(bgp_config, device_id, hostname, peer_group_map)
+        peer_group_map = await self._backfill_bgp_peer_groups(bgp_config, device_id, hostname, avd_source)
+        await self._backfill_bgp_neighbors(bgp_config, device_id, hostname, peer_group_map, avd_source)
 
     # --- Prefix list backfill ---
 
@@ -213,6 +254,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         prefix_lists: list[dict[str, Any]],
         device_id: str,
         hostname: str,
+        avd_source: str | None = None,
     ) -> None:
         """Backfill prefix list entries from structured config."""
         for pl_config in prefix_lists:
@@ -225,6 +267,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 name=pl_name,
                 device=device_id,
             )
+            self._set_source(pl, avd_source)
             await pl.save(allow_upsert=True)
             self.logger.info(f"[{hostname}] Ensured prefix list '{pl_name}'")
 
@@ -240,6 +283,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                     action=action,
                     prefix_list=pl,
                 )
+                self._set_source(entry, avd_source)
                 await entry.save(allow_upsert=True)
                 self.logger.info(f"[{hostname}] Ensured prefix list entry {pl_name} seq {seq}")
 
@@ -250,6 +294,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         route_maps: list[dict[str, Any]],
         device_id: str,
         hostname: str,
+        avd_source: str | None = None,
     ) -> None:
         """Backfill route map entries from structured config."""
         for rm_config in route_maps:
@@ -262,6 +307,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 name=rm_name,
                 device=device_id,
             )
+            self._set_source(rm, avd_source)
             await rm.save(allow_upsert=True)
             self.logger.info(f"[{hostname}] Ensured route map '{rm_name}'")
 
@@ -284,6 +330,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                     entry_attrs["set"] = seq_config["set"]
 
                 entry = await self.client.create(RoutingRouteMapEntry, **entry_attrs)
+                self._set_source(entry, avd_source)
                 await entry.save(allow_upsert=True)
                 self.logger.info(f"[{hostname}] Ensured route map entry {rm_name} seq {seq}")
 
@@ -294,6 +341,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         static_routes: list[dict[str, Any]],
         device_id: str,
         hostname: str,
+        avd_source: str | None = None,
     ) -> None:
         """Backfill static routes from structured config."""
         for sr_config in static_routes:
@@ -321,6 +369,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             sr_attrs["vrf"] = vrf or "default"
 
             route = await self.client.create(RoutingStaticRoute, **sr_attrs)
+            self._set_source(route, avd_source)
             await route.save(allow_upsert=True)
             self.logger.info(f"[{hostname}] Ensured static route {prefix} (vrf={vrf})")
 
@@ -331,27 +380,28 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         structured_config: dict[str, Any],
         device_id: str,
         hostname: str,
+        avd_source: str | None = None,
     ) -> None:
         """Process all routing sections from structured config."""
         bgp_config = structured_config.get("router_bgp")
         if bgp_config:
             self.logger.info(f"[{hostname}] Processing router_bgp")
-            await self._backfill_bgp(bgp_config, device_id, hostname)
+            await self._backfill_bgp(bgp_config, device_id, hostname, avd_source)
 
         prefix_lists = structured_config.get("prefix_lists")
         if prefix_lists:
             self.logger.info(f"[{hostname}] Processing prefix_lists: {len(prefix_lists)} lists")
-            await self._backfill_prefix_lists(prefix_lists, device_id, hostname)
+            await self._backfill_prefix_lists(prefix_lists, device_id, hostname, avd_source)
 
         route_maps = structured_config.get("route_maps")
         if route_maps:
             self.logger.info(f"[{hostname}] Processing route_maps: {len(route_maps)} maps")
-            await self._backfill_route_maps(route_maps, device_id, hostname)
+            await self._backfill_route_maps(route_maps, device_id, hostname, avd_source)
 
         static_routes = structured_config.get("static_routes")
         if static_routes:
             self.logger.info(f"[{hostname}] Processing static_routes: {len(static_routes)} routes")
-            await self._backfill_static_routes(static_routes, device_id, hostname)
+            await self._backfill_static_routes(static_routes, device_id, hostname, avd_source)
 
     # --- Main generate ---
 
@@ -394,6 +444,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
         self.logger.info(f"[{hostname}] Loaded structured config with {len(structured_config)} top-level keys")
 
+        # Look up AVD source for data lineage attribution
+        avd_source = await self._get_avd_source()
+
         # Build interface map from GraphQL data
         interfaces = [edge.node for edge in device.interfaces.edges if edge.node]
         interface_map = self._build_interface_map(interfaces)
@@ -420,15 +473,15 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 # IP backfill (gap-fill only)
                 ip_str = iface_config.get("ip_address")
                 if ip_str and not (gql_iface.ip_address.node):
-                    await self._backfill_ip(gql_iface, ip_str, hostname)
+                    await self._backfill_ip(gql_iface, ip_str, hostname, avd_source)
 
                 # MTU update
                 mtu = iface_config.get("mtu")
                 if mtu is not None:
-                    await self._update_mtu(gql_iface, mtu, hostname)
+                    await self._update_mtu(gql_iface, mtu, hostname, avd_source)
 
         # Process routing sections
-        await self._process_routing_sections(structured_config, device_id, hostname)
+        await self._process_routing_sections(structured_config, device_id, hostname, avd_source)
 
         # Log remaining unmodeled sections
         unmodeled_present = [s for s in UNMODELED_SECTIONS if s in structured_config]
