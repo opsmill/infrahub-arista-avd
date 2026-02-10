@@ -125,6 +125,40 @@ class AvdArtifact(CoreNode):
     subscriber_of_groups: RelationshipManager
 
 
+class RoutingBGPNeighbor(CoreNode):
+    bfd: BooleanOptional
+    description: StringOptional
+    ebgp_multihop: IntegerOptional
+    peer_address: String
+    remote_as: StringOptional
+    send_community: StringOptional
+    shutdown: BooleanOptional
+    device: RelatedNode
+    member_of_groups: RelationshipManager
+    peer_group: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class RoutingBGPPeerGroup(CoreNode):
+    bfd: BooleanOptional
+    description: StringOptional
+    ebgp_multihop: IntegerOptional
+    local_as: StringOptional
+    maximum_routes: IntegerOptional
+    name: String
+    remote_as: StringOptional
+    route_map_in: StringOptional
+    route_map_out: StringOptional
+    send_community: StringOptional
+    type: DropdownOptional
+    update_source: StringOptional
+    device: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class NetworkDevice(CoreArtifactTarget, NetworkGenericDevice):
     bgp_asn: IntegerOptional
     hostname: String
@@ -133,6 +167,8 @@ class NetworkDevice(CoreArtifactTarget, NetworkGenericDevice):
     role: Dropdown
     artifacts: RelationshipManager
     avd_artifact: RelatedNode
+    bgp_neighbors: RelationshipManager
+    bgp_peer_groups: RelationshipManager
     device_type: RelatedNode
     interfaces: RelationshipManager
     loopback_ip: RelatedNode
@@ -140,8 +176,11 @@ class NetworkDevice(CoreArtifactTarget, NetworkGenericDevice):
     mgmt_ip: RelatedNode
     object_template: RelatedNode
     pod: RelatedNode
+    prefix_lists: RelationshipManager
     profiles: RelationshipManager
     rack: RelatedNode
+    route_maps: RelationshipManager
+    static_routes: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
 
@@ -304,6 +343,24 @@ class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
     subscriber_of_groups: RelationshipManager
 
 
+class RoutingPrefixList(CoreNode):
+    name: String
+    device: RelatedNode
+    entries: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class RoutingPrefixListEntry(CoreNode):
+    action: String
+    sequence: Integer
+    member_of_groups: RelationshipManager
+    prefix_list: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class LocationRack(LocationPhysical, GeneratorTarget):
     amount_of_leafs: IntegerOptional
     checksum: StringOptional
@@ -317,6 +374,42 @@ class LocationRack(LocationPhysical, GeneratorTarget):
     member_of_groups: RelationshipManager
     parent: RelatedNode
     pod: RelatedNode
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class RoutingRouteMap(CoreNode):
+    name: String
+    device: RelatedNode
+    entries: RelationshipManager
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class RoutingRouteMapEntry(CoreNode):
+    description: StringOptional
+    match: ListAttributeOptional
+    sequence: Integer
+    set: ListAttributeOptional
+    type: Dropdown
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    route_map: RelatedNode
+    subscriber_of_groups: RelationshipManager
+
+
+class RoutingStaticRoute(CoreNode):
+    distance: IntegerOptional
+    gateway: StringOptional
+    interface: StringOptional
+    next_hop: StringOptional
+    prefix: String
+    route_name: StringOptional
+    tag: IntegerOptional
+    vrf: StringOptional
+    device: RelatedNode
+    member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
@@ -600,6 +693,89 @@ class ProfileOrganizationManufacturer(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager
 
 
+class ProfileRoutingBGPNeighbor(LineageSource, CoreProfile, CoreNode):
+    bfd: BooleanOptional
+    description: StringOptional
+    ebgp_multihop: IntegerOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    remote_as: StringOptional
+    send_community: StringOptional
+    shutdown: BooleanOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileRoutingBGPPeerGroup(LineageSource, CoreProfile, CoreNode):
+    bfd: BooleanOptional
+    description: StringOptional
+    ebgp_multihop: IntegerOptional
+    local_as: StringOptional
+    maximum_routes: IntegerOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    remote_as: StringOptional
+    route_map_in: StringOptional
+    route_map_out: StringOptional
+    send_community: StringOptional
+    type: DropdownOptional
+    update_source: StringOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileRoutingPrefixList(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileRoutingPrefixListEntry(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileRoutingRouteMap(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileRoutingRouteMapEntry(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    match: ListAttributeOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    set: ListAttributeOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileRoutingStaticRoute(LineageSource, CoreProfile, CoreNode):
+    distance: IntegerOptional
+    gateway: StringOptional
+    interface: StringOptional
+    next_hop: StringOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    route_name: StringOptional
+    tag: IntegerOptional
+    vrf: StringOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class ProfileVirtualizationHostVirtualMachine(LineageSource, CoreProfile, CoreNode):
     profile_name: String
     profile_priority: IntegerOptional
@@ -630,15 +806,20 @@ class TemplateNetworkDevice(LineageSource, TemplateCoreArtifactTarget, TemplateN
     template_name: String
     artifacts: RelationshipManager
     avd_artifact: RelatedNode
+    bgp_neighbors: RelationshipManager
+    bgp_peer_groups: RelationshipManager
     device_type: RelatedNode
     interfaces: RelationshipManager
     loopback_ip: RelatedNode
     member_of_groups: RelationshipManager
     mgmt_ip: RelatedNode
     pod: RelatedNode
+    prefix_lists: RelationshipManager
     profiles: RelationshipManager
     rack: RelatedNode
     related_nodes: RelationshipManager
+    route_maps: RelationshipManager
+    static_routes: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
 

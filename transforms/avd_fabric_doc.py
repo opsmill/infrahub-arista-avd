@@ -4,10 +4,13 @@ Generates fabric documentation from stored structured configs.
 """
 
 import copy
+import json
 from typing import Any
 
 import pyavd
 from infrahub_sdk.transforms import InfrahubTransform
+
+from .avd_fabric_devices_query import AvdFabricDevicesQuery
 
 
 class AvdFabricDocTransform(InfrahubTransform):
@@ -17,42 +20,55 @@ class AvdFabricDocTransform(InfrahubTransform):
 
     async def transform(self, data: dict[str, Any]) -> str:
         """Transform fabric data to documentation."""
+        data: AvdFabricDevicesQuery = AvdFabricDevicesQuery(**data)
+
         # Get fabric info
-        fabric_edges = data.get("NetworkFabric", {}).get("edges", [])
+        fabric_edges = data.network_fabric.edges
         if not fabric_edges:
             return "# No fabric found"
 
-        fabric_node = fabric_edges[0]["node"]
-        fabric_name = fabric_node["name"]["value"]
-        fabric_id = fabric_node["id"]
+        fabric_node = fabric_edges[0].node
+        fabric_name = fabric_node.name.value
+        fabric_id = fabric_node.id
 
         # Get all devices and filter by fabric
-        device_edges = data.get("NetworkDevice", {}).get("edges", [])
+        device_edges = data.network_device.edges
         all_hostvars: dict[str, dict[str, Any]] = {}
         structured_configs: dict[str, dict[str, Any]] = {}
 
         for edge in device_edges:
-            device = edge["node"]
+            device = edge.node
             # Check if device belongs to this fabric
-            pod = device.get("pod", {}).get("node")
-            if not pod:
+            if not device.pod or not device.pod.node:
                 continue
-            parent = pod.get("parent", {}).get("node")
-            if not parent or parent.get("id") != fabric_id:
+            pod_node = device.pod.node
+            if not pod_node.parent or not pod_node.parent.node:
+                continue
+            if pod_node.parent.node.id != fabric_id:
                 continue
 
-            hostname = device["hostname"]["value"]
+            hostname = device.hostname.value
 
-            avd_inputs = device.get("avd_inputs", {})
-            avd_inputs_value = avd_inputs.get("value") if avd_inputs else None
+            # Fetch AVD data from object store via avd_artifact relationship
+            if not device.avd_artifact or not device.avd_artifact.node:
+                continue
 
-            avd_structured = device.get("avd_structured_config", {})
-            avd_structured_value = avd_structured.get("value") if avd_structured else None
+            artifact_node = device.avd_artifact.node
 
-            if avd_inputs_value:
-                all_hostvars[hostname] = avd_inputs_value
-            if avd_structured_value:
-                structured_configs[hostname] = avd_structured_value
+            hostvar_id = artifact_node.hostvar_identifier.value if artifact_node.hostvar_identifier else None
+            structured_config_id = (
+                artifact_node.structured_config_identifier.value
+                if artifact_node.structured_config_identifier
+                else None
+            )
+
+            if hostvar_id:
+                hostvar_content = await self.client.object_store.get(identifier=hostvar_id)
+                all_hostvars[hostname] = json.loads(hostvar_content)
+
+            if structured_config_id:
+                sc_content = await self.client.object_store.get(identifier=structured_config_id)
+                structured_configs[hostname] = json.loads(sc_content)
 
         if not all_hostvars or not structured_configs:
             return f"# {fabric_name}\n\nNo AVD data available for this fabric."

@@ -39,6 +39,9 @@ class AvdFabricDevicesQueryNetworkDeviceEdgesNode(BaseModel):
     id: str
     hostname: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeHostname"]
     pod: "AvdFabricDevicesQueryNetworkDeviceEdgesNodePod"
+    avd_artifact: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact"] = Field(
+        default=None, alias="avd_artifact"
+    )
 
 
 class AvdFabricDevicesQueryNetworkDeviceEdgesNodeHostname(BaseModel):
@@ -65,6 +68,23 @@ class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParentNode(BaseModel):
     id: Optional[str]
 
 
+class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact(BaseModel):
+    node: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNode"]
+
+
+class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNode(BaseModel):
+    hostvar_identifier: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeIdentifier"] = Field(
+        default=None, alias="hostvar_identifier"
+    )
+    structured_config_identifier: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeIdentifier"] = (
+        Field(default=None, alias="structured_config_identifier")
+    )
+
+
+class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeIdentifier(BaseModel):
+    value: Optional[str]
+
+
 AvdFabricDevicesQuery.model_rebuild()
 AvdFabricDevicesQueryNetworkFabric.model_rebuild()
 AvdFabricDevicesQueryNetworkFabricEdges.model_rebuild()
@@ -75,3 +95,5 @@ AvdFabricDevicesQueryNetworkDeviceEdgesNode.model_rebuild()
 AvdFabricDevicesQueryNetworkDeviceEdgesNodePod.model_rebuild()
 AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNode.model_rebuild()
 AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParent.model_rebuild()
+AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact.model_rebuild()
+AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNode.model_rebuild()
