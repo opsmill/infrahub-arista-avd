@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypedDict
 
 from infrahub_sdk import InfrahubClient
 from infrahub_sdk.generator import InfrahubGenerator
@@ -14,6 +14,18 @@ from .generate_avd_device_inputs_query import (
     GenerateAvdDeviceInputsQuery,
     GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
 )
+
+
+class UplinkData(TypedDict):
+    uplink_interfaces: list[str]
+    uplink_switches: list[str]
+    uplink_switch_interfaces: list[str]
+
+
+class ServerEndpoint(TypedDict):
+    name: str
+    adapters: list[dict[str, Any]]
+
 
 # Mapping from Infrahub device roles to AVD types
 ROLE_TO_AVD_TYPE: dict[str, str] = {
@@ -58,7 +70,7 @@ def extract_uplinks_from_dict(
     interfaces: GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
     uplink_role: str | None,
     device_id: str,
-) -> dict[str, list[str]]:
+) -> UplinkData:
     """Extract uplink information from device interfaces (dict format).
 
     Args:
@@ -113,7 +125,7 @@ def extract_uplinks_from_dict(
 def extract_connected_endpoints(
     interfaces: GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
     hostname: str,
-) -> list[dict]:
+) -> list[ServerEndpoint]:
     """Extract connected endpoints (servers) from device interfaces.
 
     Args:
@@ -123,7 +135,7 @@ def extract_connected_endpoints(
     Returns:
         List of server endpoint configs for pyAVD
     """
-    servers: dict[str, dict] = {}  # Group by remote device name
+    servers: dict[str, ServerEndpoint] = {}  # Group by remote device name
 
     for edge in interfaces:
         interface = edge.node
@@ -176,7 +188,7 @@ def extract_connected_endpoints(
                         }
 
                     # Build adapter config
-                    adapter: dict = {
+                    adapter: dict[str, Any] = {
                         "endpoint_ports": [endpoint_port],
                         "switch_ports": [switch_port],
                         "switches": [hostname],
@@ -255,7 +267,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         node_type_key = "super_spine" if role == "super_spine" else avd_type
 
         # Build node config (goes in node_type_key.nodes array)
-        node_config: dict[str, any] = {"name": hostname}
+        node_config: dict[str, Any] = {"name": hostname}
 
         if node_id is not None:
             node_config["id"] = node_id
@@ -277,7 +289,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
 
         # Build complete pyAVD hostvars structure
-        hostvars: dict[str, any] = {
+        hostvars: dict[str, Any] = {
             "type": avd_type,
             "fabric_name": fabric_name,
         }
