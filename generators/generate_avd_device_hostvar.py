@@ -218,6 +218,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         pod = device.pod.node
         fabric = pod.parent.node
 
+        # Mark hostvars as not ready while regenerating
+        await set_fabric_avd_hostvars_ready(self.client, fabric.id, False)
+
         # Extract basic device info
         device_id = device.id
         hostname = device.hostname.value
