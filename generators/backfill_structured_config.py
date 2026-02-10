@@ -14,7 +14,18 @@ from typing import Any
 
 from infrahub_sdk.generator import InfrahubGenerator
 
-from solution_ai_dc.protocols import NetworkInterface
+from solution_ai_dc.protocols import (
+    IpamIPAddress,
+    IpamIPPrefix,
+    NetworkInterface,
+    RoutingBGPNeighbor,
+    RoutingBGPPeerGroup,
+    RoutingPrefixList,
+    RoutingPrefixListEntry,
+    RoutingRouteMap,
+    RoutingRouteMapEntry,
+    RoutingStaticRoute,
+)
 
 from .backfill_structured_config_query import (
     BackfillStructuredConfigQuery,
@@ -71,7 +82,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         prefix_str = str(network)
 
         prefix = await self.client.create(
-            kind="IpamIPPrefix",
+            IpamIPPrefix,
             prefix=prefix_str,
             role="backfill",
         )
@@ -79,7 +90,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         self.logger.info(f"[{hostname}] Ensured prefix {prefix_str}")
 
         ip_address = await self.client.create(
-            kind="IpamIPAddress",
+            IpamIPAddress,
             address=str(ip_iface),
             ip_prefix=prefix,
         )
@@ -143,7 +154,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             pg_attrs: dict[str, Any] = {"name": pg_name, "device": device_id}
             pg_attrs.update(self._extract_optional(pg_config, pg_fields, stringify=["remote_as", "local_as"]))
 
-            peer_group = await self.client.create(kind="RoutingBGPPeerGroup", **pg_attrs)
+            peer_group = await self.client.create(RoutingBGPPeerGroup, **pg_attrs)
             await peer_group.save(allow_upsert=True)
             peer_group_map[pg_name] = peer_group
             self.logger.info(f"[{hostname}] Ensured BGP peer group '{pg_name}'")
@@ -171,7 +182,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             if pg_name and pg_name in peer_group_map:
                 nb_attrs["peer_group"] = peer_group_map[pg_name]
 
-            neighbor = await self.client.create(kind="RoutingBGPNeighbor", **nb_attrs)
+            neighbor = await self.client.create(RoutingBGPNeighbor, **nb_attrs)
             await neighbor.save(allow_upsert=True)
             self.logger.info(f"[{hostname}] Ensured BGP neighbor {nb_addr}")
 
@@ -200,7 +211,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 continue
 
             pl = await self.client.create(
-                kind="RoutingPrefixList",
+                RoutingPrefixList,
                 name=pl_name,
                 device=device_id,
             )
@@ -214,7 +225,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                     continue
 
                 entry = await self.client.create(
-                    kind="RoutingPrefixListEntry",
+                    RoutingPrefixListEntry,
                     sequence=seq,
                     action=action,
                     prefix_list=pl,
@@ -237,7 +248,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 continue
 
             rm = await self.client.create(
-                kind="RoutingRouteMap",
+                RoutingRouteMap,
                 name=rm_name,
                 device=device_id,
             )
@@ -262,7 +273,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 if seq_config.get("set"):
                     entry_attrs["set"] = seq_config["set"]
 
-                entry = await self.client.create(kind="RoutingRouteMapEntry", **entry_attrs)
+                entry = await self.client.create(RoutingRouteMapEntry, **entry_attrs)
                 await entry.save(allow_upsert=True)
                 self.logger.info(f"[{hostname}] Ensured route map entry {rm_name} seq {seq}")
 
@@ -299,7 +310,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             vrf = sr_config.get("vrf", "default")
             sr_attrs["vrf"] = vrf or "default"
 
-            route = await self.client.create(kind="RoutingStaticRoute", **sr_attrs)
+            route = await self.client.create(RoutingStaticRoute, **sr_attrs)
             await route.save(allow_upsert=True)
             self.logger.info(f"[{hostname}] Ensured static route {prefix} (vrf={vrf})")
 

@@ -6,10 +6,7 @@ into pyAVD-compatible hostvars structures.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+from typing import Any
 
 # Mapping from Infrahub device roles to AVD types
 ROLE_TO_AVD_TYPE: dict[str, str] = {
@@ -35,42 +32,6 @@ def get_avd_type(role: str) -> str:
         msg = f"Unknown device role: {role}"
         raise ValueError(msg)
     return ROLE_TO_AVD_TYPE[role]
-
-
-def extract_uplink_info(
-    device_interfaces: Sequence[Any],
-    uplink_role: str,
-) -> tuple[list[str], list[str], list[str]]:
-    """Extract uplink information from device interfaces.
-
-    Args:
-        device_interfaces: List of interface objects with link and name attributes
-        uplink_role: The interface role to filter for uplinks (e.g., "super_spine", "spine")
-
-    Returns:
-        Tuple of (uplink_interfaces, uplink_switches, uplink_switch_interfaces)
-    """
-    uplink_interfaces: list[str] = []
-    uplink_switches: list[str] = []
-    uplink_switch_interfaces: list[str] = []
-
-    for interface in device_interfaces:
-        if interface.role.value != uplink_role:
-            continue
-
-        uplink_interfaces.append(interface.name.value)
-
-        # Get the remote endpoint from the link
-        if interface.link.node:
-            link = interface.link.node
-            for endpoint in link.endpoints.peers:
-                # Skip this interface, find the remote one
-                if endpoint.id != interface.id:
-                    remote_device = endpoint.device.node
-                    uplink_switches.append(remote_device.hostname.value)
-                    uplink_switch_interfaces.append(endpoint.name.value)
-
-    return uplink_interfaces, uplink_switches, uplink_switch_interfaces
 
 
 class AvdInputsBuilder:
@@ -141,64 +102,3 @@ class AvdInputsBuilder:
                 hostvars["uplink_switch_interfaces"] = uplink_switch_interfaces
 
         return hostvars
-
-    def build_fabric_hostvars(
-        self,
-        devices: Sequence[Any],
-    ) -> dict[str, dict[str, Any]]:
-        """Build hostvars for all devices in a fabric.
-
-        Args:
-            devices: Sequence of device objects from Infrahub
-
-        Returns:
-            Dictionary mapping hostname to hostvars
-        """
-        all_hostvars: dict[str, dict[str, Any]] = {}
-
-        for device in devices:
-            hostname = device.hostname.value
-            role = device.role.value
-            bgp_asn = device.bgp_asn.value if hasattr(device, "bgp_asn") and device.bgp_asn.value else 0
-            node_id = device.node_id.value if hasattr(device, "node_id") and device.node_id.value else 0
-
-            loopback_ip = None
-            if hasattr(device, "loopback_ip") and device.loopback_ip.node:
-                loopback_ip = str(device.loopback_ip.node.address.value).split("/")[0]
-
-            mgmt_ip = None
-            if hasattr(device, "mgmt_ip") and device.mgmt_ip.node:
-                mgmt_ip = str(device.mgmt_ip.node.address.value).split("/")[0]
-
-            # Determine uplink role based on device role
-            uplink_role = None
-            if role == "spine":
-                uplink_role = "super_spine"
-            elif role == "leaf":
-                uplink_role = "spine"
-
-            uplink_interfaces: list[str] = []
-            uplink_switches: list[str] = []
-            uplink_switch_interfaces: list[str] = []
-
-            if uplink_role and hasattr(device, "interfaces"):
-                uplink_interfaces, uplink_switches, uplink_switch_interfaces = extract_uplink_info(
-                    device.interfaces.peers,
-                    uplink_role,
-                )
-
-            hostvars = self.build_device_hostvars(
-                hostname=hostname,
-                role=role,
-                bgp_asn=bgp_asn,
-                node_id=node_id,
-                loopback_ip=loopback_ip,
-                mgmt_ip=mgmt_ip,
-                uplink_interfaces=uplink_interfaces,
-                uplink_switches=uplink_switches,
-                uplink_switch_interfaces=uplink_switch_interfaces,
-            )
-
-            all_hostvars[hostname] = hostvars
-
-        return all_hostvars

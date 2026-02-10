@@ -37,6 +37,17 @@ from generators.backfill_structured_config_query import (
 from generators.backfill_structured_config_query import (
     BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeRole as Role,
 )
+from solution_ai_dc.protocols import (
+    IpamIPAddress,
+    IpamIPPrefix,
+    RoutingBGPNeighbor,
+    RoutingBGPPeerGroup,
+    RoutingPrefixList,
+    RoutingPrefixListEntry,
+    RoutingRouteMap,
+    RoutingRouteMapEntry,
+    RoutingStaticRoute,
+)
 
 
 def _make_interface(
@@ -357,7 +368,7 @@ class TestBackfillIp:
 
         # Verify prefix creation
         gen.client.create.assert_any_call(
-            kind="IpamIPPrefix",
+            IpamIPPrefix,
             prefix="10.0.0.0/31",
             role="backfill",
         )
@@ -365,7 +376,7 @@ class TestBackfillIp:
 
         # Verify IP creation
         gen.client.create.assert_any_call(
-            kind="IpamIPAddress",
+            IpamIPAddress,
             address="10.0.0.1/31",
             ip_prefix=mock_prefix,
         )
@@ -399,7 +410,7 @@ class TestBackfillIp:
         await gen._backfill_ip(iface, "10.255.0.1/32", "leaf-1")
 
         gen.client.create.assert_any_call(
-            kind="IpamIPPrefix",
+            IpamIPPrefix,
             prefix="10.255.0.1/32",
             role="backfill",
         )
@@ -454,7 +465,7 @@ class TestBackfillBgpPeerGroups:
         result = await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1")
 
         gen.client.create.assert_called_once_with(
-            kind="RoutingBGPPeerGroup",
+            RoutingBGPPeerGroup,
             name="IPv4-UNDERLAY-PEERS",
             device="dev-1",
             type="ipv4",
@@ -486,7 +497,7 @@ class TestBackfillBgpPeerGroups:
         result = await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1")
 
         gen.client.create.assert_called_once_with(
-            kind="RoutingBGPPeerGroup",
+            RoutingBGPPeerGroup,
             name="EVPN-OVERLAY-PEERS",
             device="dev-1",
             type="evpn",
@@ -552,7 +563,7 @@ class TestBackfillBgpNeighbors:
         await gen._backfill_bgp_neighbors(bgp_config, "dev-1", "leaf-1", peer_group_map)
 
         gen.client.create.assert_called_once_with(
-            kind="RoutingBGPNeighbor",
+            RoutingBGPNeighbor,
             peer_address="172.31.255.0",
             device="dev-1",
             remote_as="65000",
@@ -624,10 +635,10 @@ class TestBackfillBgp:
         assert gen.client.create.call_count == 2
         # Verify peer group was created first
         first_call = gen.client.create.call_args_list[0]
-        assert first_call.kwargs["kind"] == "RoutingBGPPeerGroup"
+        assert first_call.args[0] is RoutingBGPPeerGroup
         # Verify neighbor was created second
         second_call = gen.client.create.call_args_list[1]
-        assert second_call.kwargs["kind"] == "RoutingBGPNeighbor"
+        assert second_call.args[0] is RoutingBGPNeighbor
 
 
 # --- Prefix list backfill ---
@@ -653,12 +664,12 @@ class TestBackfillPrefixLists:
 
         assert gen.client.create.call_count == 2
         gen.client.create.assert_any_call(
-            kind="RoutingPrefixList",
+            RoutingPrefixList,
             name="PL-LOOPBACKS-EVPN-OVERLAY",
             device="dev-1",
         )
         gen.client.create.assert_any_call(
-            kind="RoutingPrefixListEntry",
+            RoutingPrefixListEntry,
             sequence=10,
             action="permit 10.255.0.0/27 eq 32",
             prefix_list=mock_pl,
@@ -744,12 +755,12 @@ class TestBackfillRouteMaps:
 
         assert gen.client.create.call_count == 2
         gen.client.create.assert_any_call(
-            kind="RoutingRouteMap",
+            RoutingRouteMap,
             name="RM-CONN-2-BGP",
             device="dev-1",
         )
         gen.client.create.assert_any_call(
-            kind="RoutingRouteMapEntry",
+            RoutingRouteMapEntry,
             sequence=10,
             type="permit",
             route_map=mock_rm,
@@ -824,7 +835,7 @@ class TestBackfillStaticRoutes:
         await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1")
 
         gen.client.create.assert_called_once_with(
-            kind="RoutingStaticRoute",
+            RoutingStaticRoute,
             prefix="0.0.0.0/0",
             device="dev-1",
             gateway="192.168.0.1",
@@ -1047,15 +1058,15 @@ class TestGenerate:
         data = _build_artifact_query_data()
         await gen.generate(data)
 
-        # Verify all routing kinds were created
-        created_kinds = [c.kwargs["kind"] for c in gen.client.create.call_args_list]
-        assert "RoutingBGPPeerGroup" in created_kinds
-        assert "RoutingBGPNeighbor" in created_kinds
-        assert "RoutingPrefixList" in created_kinds
-        assert "RoutingPrefixListEntry" in created_kinds
-        assert "RoutingRouteMap" in created_kinds
-        assert "RoutingRouteMapEntry" in created_kinds
-        assert "RoutingStaticRoute" in created_kinds
+        # Verify all routing protocol classes were used
+        created_types = [c.args[0] for c in gen.client.create.call_args_list]
+        assert RoutingBGPPeerGroup in created_types
+        assert RoutingBGPNeighbor in created_types
+        assert RoutingPrefixList in created_types
+        assert RoutingPrefixListEntry in created_types
+        assert RoutingRouteMap in created_types
+        assert RoutingRouteMapEntry in created_types
+        assert RoutingStaticRoute in created_types
 
 
 # --- Constants ---
