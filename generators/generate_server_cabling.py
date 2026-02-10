@@ -5,7 +5,8 @@ from typing import Any
 
 from infrahub_sdk.generator import InfrahubGenerator
 
-from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkLink
+from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_hostvar_generation
+from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkLink, NetworkPod
 
 
 class ServerCablingGenerator(InfrahubGenerator):
@@ -75,6 +76,25 @@ class ServerCablingGenerator(InfrahubGenerator):
         # Upsert links and assign VLANs
         for server_iface, leaf_iface_id in pairings:
             await self._cable_interface(server_hostname, server_iface, leaf_iface_id)
+
+        # Trigger AVD hostvar regeneration cascade
+        await self._trigger_avd_cascade(rack_id, server_hostname)
+
+    async def _trigger_avd_cascade(self, rack_id: str, server_hostname: str) -> None:
+        """Navigate from rack to fabric and trigger AVD hostvar regeneration."""
+        rack = await self.client.get(LocationRack, id=rack_id)
+        await rack.pod.fetch()  # type: ignore[union-attr]
+        pod = await self.client.get(NetworkPod, id=rack.pod.peer.id)  # type: ignore[union-attr]
+        await pod.parent.fetch()  # type: ignore[union-attr]
+        fabric = pod.parent.peer  # type: ignore[union-attr]
+
+        self.logger.info(
+            "Server %s cabled — triggering AVD cascade for fabric %s",
+            server_hostname,
+            fabric.name.value,
+        )
+        await set_fabric_avd_hostvars_ready(self.client, fabric.id, False)
+        await trigger_hostvar_generation(self.client)
 
     def _get_server_interfaces(self, server_node: dict) -> list[dict[str, Any]]:
         """Extract server interfaces with their VLANs."""

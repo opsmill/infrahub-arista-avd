@@ -8,13 +8,20 @@ from generators.generate_server_cabling import ServerCablingGenerator
 from solution_ai_dc.protocols import NetworkLink
 
 
-def _make_generator() -> ServerCablingGenerator:
-    """Create a generator instance with mocked client."""
+def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
+    """Create a generator instance with mocked client.
+
+    Args:
+        mock_cascade: If True, patch _trigger_avd_cascade to avoid needing
+            rack→pod→fabric navigation setup in every test.
+    """
     gen = ServerCablingGenerator.__new__(ServerCablingGenerator)
     gen.client = MagicMock()
     gen.client.filters = AsyncMock(return_value=[])
     gen.client.get = AsyncMock()
     gen.client.create = AsyncMock()
+    if mock_cascade:
+        gen._trigger_avd_cascade = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
     return gen
 
 
@@ -732,3 +739,112 @@ class TestNoServerInQuery:
             await gen.generate({})
             mock_warn.assert_called_once()
             assert "No server found" in mock_warn.call_args[0][0]
+
+
+class TestAvdCascadeTrigger:
+    """Test AVD cascade trigger after server cabling."""
+
+    @pytest.mark.asyncio
+    async def test_cascade_called_after_successful_cabling(self) -> None:
+        """After cabling completes, _trigger_avd_cascade must be called."""
+        gen = _make_generator()
+
+        iface = _make_interface("iface-1", "Ethernet1")
+        data = _make_server_data(interfaces=[iface])
+
+        mock_leaf = _make_mock_leaf()
+        gen.client.filters = AsyncMock(side_effect=[
+            [mock_leaf],
+            [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
+        ])
+
+        mock_iface = MagicMock()
+        mock_iface.id = "iface-1"
+        mock_iface.name.value = "Ethernet1"
+        mock_iface.device.display_label = "leaf-pod1-1-1"
+        mock_iface.status = MagicMock()
+        mock_iface.tagged_vlan = MagicMock()
+        mock_iface.tagged_vlan.fetch = AsyncMock()
+        mock_iface.tagged_vlan.extend = MagicMock()
+        mock_iface.untagged_vlan = MagicMock()
+        mock_iface.untagged_vlan.fetch = AsyncMock()
+        mock_iface.untagged_vlan.add = MagicMock()
+        mock_iface.save = AsyncMock()
+
+        gen.client.get = AsyncMock(return_value=mock_iface)
+
+        mock_link = MagicMock()
+        mock_link.save = AsyncMock()
+        gen.client.create = AsyncMock(return_value=mock_link)
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    async def test_cascade_not_called_when_no_rack(self) -> None:
+        """When server has no rack, cascade must not be called."""
+        gen = _make_generator()
+
+        data = _make_server_data(no_rack=True)
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    async def test_cascade_not_called_when_no_interfaces(self) -> None:
+        """When server has no interfaces, cascade must not be called."""
+        gen = _make_generator()
+
+        data = _make_server_data(interfaces=[])
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    async def test_cascade_not_called_when_no_leaf_switches(self) -> None:
+        """When no leaf switches in rack, cascade must not be called."""
+        gen = _make_generator()
+
+        iface = _make_interface("iface-1", "Ethernet1")
+        data = _make_server_data(interfaces=[iface])
+
+        gen.client.filters = AsyncMock(return_value=[])
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    @patch("generators.generate_server_cabling.trigger_hostvar_generation", new_callable=AsyncMock)
+    @patch("generators.generate_server_cabling.set_fabric_avd_hostvars_ready", new_callable=AsyncMock)
+    async def test_trigger_avd_cascade_navigates_to_fabric(
+        self,
+        mock_set_ready: AsyncMock,
+        mock_trigger: AsyncMock,
+    ) -> None:
+        """_trigger_avd_cascade navigates rack→pod→fabric and triggers cascade."""
+        gen = _make_generator(mock_cascade=False)
+
+        # Build mock chain: rack.pod.peer → pod, pod.parent.peer → fabric
+        mock_fabric = MagicMock()
+        mock_fabric.id = "fabric-1"
+        mock_fabric.name.value = "Fabric-A"
+
+        mock_pod = MagicMock()
+        mock_pod.parent.fetch = AsyncMock()
+        mock_pod.parent.peer = mock_fabric
+
+        mock_rack = MagicMock()
+        mock_rack.pod.fetch = AsyncMock()
+        mock_rack.pod.peer.id = "pod-1"
+
+        gen.client.get = AsyncMock(side_effect=[mock_rack, mock_pod])
+
+        await gen._trigger_avd_cascade("rack-1", "server-1")  # noqa: SLF001
+
+        # Verify hostvars set to False and hostvar generation triggered
+        mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)
+        mock_trigger.assert_awaited_once_with(gen.client)
