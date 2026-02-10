@@ -9,6 +9,7 @@ import pytest
 
 from generators.backfill_structured_config import (
     INTERFACE_SECTIONS,
+    ROUTING_SECTIONS,
     UNMODELED_SECTIONS,
     BackfillStructuredConfigGenerator,
 )
@@ -64,6 +65,13 @@ def _make_generator() -> BackfillStructuredConfigGenerator:
     gen = BackfillStructuredConfigGenerator.__new__(BackfillStructuredConfigGenerator)
     gen.client = AsyncMock()
     return gen
+
+
+def _make_saveable_mock() -> MagicMock:
+    """Create a MagicMock with an async save method."""
+    mock = MagicMock()
+    mock.save = AsyncMock()
+    return mock
 
 
 def _build_artifact_query_data(
@@ -277,6 +285,59 @@ class TestMtuSkipLogic:
         assert current_mtu != 9214
 
 
+# --- _extract_optional helper ---
+
+
+class TestExtractOptional:
+    def test_extracts_present_keys(self) -> None:
+        """Test that present keys are extracted."""
+        config = {"type": "ipv4", "remote_as": 65000, "bfd": True}
+        result = BackfillStructuredConfigGenerator._extract_optional(
+            config, ["type", "remote_as", "bfd"]
+        )
+        assert result == {"type": "ipv4", "remote_as": 65000, "bfd": True}
+
+    def test_skips_none_keys(self) -> None:
+        """Test that None values are skipped."""
+        config = {"type": None, "remote_as": 65000}
+        result = BackfillStructuredConfigGenerator._extract_optional(
+            config, ["type", "remote_as"]
+        )
+        assert result == {"remote_as": 65000}
+
+    def test_skips_missing_keys(self) -> None:
+        """Test that missing keys are skipped."""
+        config = {"type": "ipv4"}
+        result = BackfillStructuredConfigGenerator._extract_optional(
+            config, ["type", "remote_as"]
+        )
+        assert result == {"type": "ipv4"}
+
+    def test_stringify_keys(self) -> None:
+        """Test that stringify keys are converted to strings."""
+        config = {"remote_as": 65000, "local_as": 65001}
+        result = BackfillStructuredConfigGenerator._extract_optional(
+            config, ["remote_as", "local_as"], stringify=["remote_as", "local_as"]
+        )
+        assert result == {"remote_as": "65000", "local_as": "65001"}
+
+    def test_skips_empty_string(self) -> None:
+        """Test that empty strings are skipped."""
+        config = {"description": ""}
+        result = BackfillStructuredConfigGenerator._extract_optional(
+            config, ["description"]
+        )
+        assert result == {}
+
+    def test_preserves_false_and_zero(self) -> None:
+        """Test that False and 0 are preserved (not skipped as falsy)."""
+        config = {"bfd": False, "ebgp_multihop": 0}
+        result = BackfillStructuredConfigGenerator._extract_optional(
+            config, ["bfd", "ebgp_multihop"]
+        )
+        assert result == {"bfd": False, "ebgp_multihop": 0}
+
+
 # --- Async methods with mocked client ---
 
 
@@ -284,12 +345,9 @@ class TestBackfillIp:
     async def test_backfill_creates_prefix_ip_and_assigns(self) -> None:
         """Test that _backfill_ip creates prefix, IP, and assigns to interface."""
         gen = _make_generator()
-        mock_prefix = MagicMock()
-        mock_prefix.save = AsyncMock()
-        mock_ip = MagicMock()
-        mock_ip.save = AsyncMock()
-        mock_interface = MagicMock()
-        mock_interface.save = AsyncMock()
+        mock_prefix = _make_saveable_mock()
+        mock_ip = _make_saveable_mock()
+        mock_interface = _make_saveable_mock()
 
         gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
         gen.client.get = AsyncMock(return_value=mock_interface)
@@ -330,12 +388,9 @@ class TestBackfillIp:
     async def test_backfill_loopback_ip(self) -> None:
         """Test backfill with a /32 loopback address."""
         gen = _make_generator()
-        mock_prefix = MagicMock()
-        mock_prefix.save = AsyncMock()
-        mock_ip = MagicMock()
-        mock_ip.save = AsyncMock()
-        mock_interface = MagicMock()
-        mock_interface.save = AsyncMock()
+        mock_prefix = _make_saveable_mock()
+        mock_ip = _make_saveable_mock()
+        mock_interface = _make_saveable_mock()
 
         gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
         gen.client.get = AsyncMock(return_value=mock_interface)
@@ -354,9 +409,8 @@ class TestUpdateMtu:
     async def test_update_mtu_when_different(self) -> None:
         """Test that MTU is updated when it differs from current."""
         gen = _make_generator()
-        mock_interface = MagicMock()
+        mock_interface = _make_saveable_mock()
         mock_interface.mtu = MagicMock()
-        mock_interface.save = AsyncMock()
         gen.client.get = AsyncMock(return_value=mock_interface)
 
         iface = _make_interface(mtu=1500)
@@ -374,6 +428,484 @@ class TestUpdateMtu:
         await gen._update_mtu(iface, 9214, "leaf-1")
 
         gen.client.get.assert_not_called()
+
+
+# --- BGP backfill ---
+
+
+class TestBackfillBgpPeerGroups:
+    async def test_creates_peer_group(self) -> None:
+        """Test that a BGP peer group is created from structured config."""
+        gen = _make_generator()
+        mock_pg = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_pg)
+
+        bgp_config = {
+            "peer_groups": [
+                {
+                    "name": "IPv4-UNDERLAY-PEERS",
+                    "type": "ipv4",
+                    "remote_as": "65000",
+                    "send_community": "all",
+                    "maximum_routes": 12000,
+                }
+            ]
+        }
+        result = await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1")
+
+        gen.client.create.assert_called_once_with(
+            kind="RoutingBGPPeerGroup",
+            name="IPv4-UNDERLAY-PEERS",
+            device="dev-1",
+            type="ipv4",
+            remote_as="65000",
+            send_community="all",
+            maximum_routes=12000,
+        )
+        mock_pg.save.assert_awaited_once_with(allow_upsert=True)
+        assert "IPv4-UNDERLAY-PEERS" in result
+
+    async def test_creates_evpn_peer_group_with_bfd(self) -> None:
+        """Test peer group with BFD and multihop settings."""
+        gen = _make_generator()
+        mock_pg = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_pg)
+
+        bgp_config = {
+            "peer_groups": [
+                {
+                    "name": "EVPN-OVERLAY-PEERS",
+                    "type": "evpn",
+                    "remote_as": "65000",
+                    "bfd": True,
+                    "ebgp_multihop": 3,
+                    "update_source": "Loopback0",
+                }
+            ]
+        }
+        result = await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1")
+
+        gen.client.create.assert_called_once_with(
+            kind="RoutingBGPPeerGroup",
+            name="EVPN-OVERLAY-PEERS",
+            device="dev-1",
+            type="evpn",
+            remote_as="65000",
+            bfd=True,
+            ebgp_multihop=3,
+            update_source="Loopback0",
+        )
+        assert "EVPN-OVERLAY-PEERS" in result
+
+    async def test_skips_peer_group_without_name(self) -> None:
+        """Test that peer groups without name are skipped."""
+        gen = _make_generator()
+        bgp_config = {"peer_groups": [{"type": "ipv4"}]}
+        result = await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1")
+
+        gen.client.create.assert_not_called()
+        assert result == {}
+
+    async def test_empty_peer_groups(self) -> None:
+        """Test with no peer_groups key."""
+        gen = _make_generator()
+        bgp_config = {}
+        result = await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1")
+
+        gen.client.create.assert_not_called()
+        assert result == {}
+
+    async def test_peer_group_integer_as_stringified(self) -> None:
+        """Test that integer remote_as is converted to string."""
+        gen = _make_generator()
+        mock_pg = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_pg)
+
+        bgp_config = {"peer_groups": [{"name": "PG1", "remote_as": 65000}]}
+        await gen._backfill_bgp_peer_groups(bgp_config, "dev-1", "leaf-1")
+
+        gen.client.create.assert_called_once()
+        call_kwargs = gen.client.create.call_args.kwargs
+        assert call_kwargs["remote_as"] == "65000"
+
+
+class TestBackfillBgpNeighbors:
+    async def test_creates_neighbor_with_peer_group(self) -> None:
+        """Test that a BGP neighbor is created and linked to peer group."""
+        gen = _make_generator()
+        mock_nb = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_nb)
+
+        mock_pg = _make_saveable_mock()
+        peer_group_map = {"IPv4-UNDERLAY-PEERS": mock_pg}
+
+        bgp_config = {
+            "neighbors": [
+                {
+                    "ip_address": "172.31.255.0",
+                    "peer_group": "IPv4-UNDERLAY-PEERS",
+                    "remote_as": "65000",
+                    "description": "spine-1_Ethernet1",
+                }
+            ]
+        }
+        await gen._backfill_bgp_neighbors(bgp_config, "dev-1", "leaf-1", peer_group_map)
+
+        gen.client.create.assert_called_once_with(
+            kind="RoutingBGPNeighbor",
+            peer_address="172.31.255.0",
+            device="dev-1",
+            remote_as="65000",
+            description="spine-1_Ethernet1",
+            peer_group=mock_pg,
+        )
+        mock_nb.save.assert_awaited_once_with(allow_upsert=True)
+
+    async def test_creates_neighbor_without_peer_group(self) -> None:
+        """Test neighbor creation when peer_group is not in map."""
+        gen = _make_generator()
+        mock_nb = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_nb)
+
+        bgp_config = {
+            "neighbors": [
+                {
+                    "ip_address": "10.0.0.1",
+                    "peer_group": "UNKNOWN-PG",
+                    "remote_as": "65001",
+                }
+            ]
+        }
+        await gen._backfill_bgp_neighbors(bgp_config, "dev-1", "leaf-1", {})
+
+        gen.client.create.assert_called_once()
+        call_kwargs = gen.client.create.call_args.kwargs
+        assert "peer_group" not in call_kwargs
+
+    async def test_skips_neighbor_without_ip(self) -> None:
+        """Test that neighbors without ip_address are skipped."""
+        gen = _make_generator()
+        bgp_config = {"neighbors": [{"peer_group": "PG1"}]}
+        await gen._backfill_bgp_neighbors(bgp_config, "dev-1", "leaf-1", {})
+
+        gen.client.create.assert_not_called()
+
+    async def test_creates_multiple_neighbors(self) -> None:
+        """Test creating multiple BGP neighbors."""
+        gen = _make_generator()
+        mock_nb = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_nb)
+
+        bgp_config = {
+            "neighbors": [
+                {"ip_address": "172.31.255.0", "remote_as": "65000"},
+                {"ip_address": "172.31.255.2", "remote_as": "65000"},
+            ]
+        }
+        await gen._backfill_bgp_neighbors(bgp_config, "dev-1", "leaf-1", {})
+
+        assert gen.client.create.call_count == 2
+
+
+class TestBackfillBgp:
+    async def test_full_bgp_backfill(self) -> None:
+        """Test that _backfill_bgp processes both peer groups and neighbors."""
+        gen = _make_generator()
+        mock_pg = _make_saveable_mock()
+        mock_nb = _make_saveable_mock()
+        gen.client.create = AsyncMock(side_effect=[mock_pg, mock_nb])
+
+        bgp_config = {
+            "peer_groups": [{"name": "PG1", "type": "ipv4", "remote_as": "65000"}],
+            "neighbors": [{"ip_address": "10.0.0.1", "peer_group": "PG1"}],
+        }
+        await gen._backfill_bgp(bgp_config, "dev-1", "leaf-1")
+
+        assert gen.client.create.call_count == 2
+        # Verify peer group was created first
+        first_call = gen.client.create.call_args_list[0]
+        assert first_call.kwargs["kind"] == "RoutingBGPPeerGroup"
+        # Verify neighbor was created second
+        second_call = gen.client.create.call_args_list[1]
+        assert second_call.kwargs["kind"] == "RoutingBGPNeighbor"
+
+
+# --- Prefix list backfill ---
+
+
+class TestBackfillPrefixLists:
+    async def test_creates_prefix_list_with_entries(self) -> None:
+        """Test creating a prefix list and its entries."""
+        gen = _make_generator()
+        mock_pl = _make_saveable_mock()
+        mock_entry = _make_saveable_mock()
+        gen.client.create = AsyncMock(side_effect=[mock_pl, mock_entry])
+
+        prefix_lists = [
+            {
+                "name": "PL-LOOPBACKS-EVPN-OVERLAY",
+                "sequence_numbers": [
+                    {"sequence": 10, "action": "permit 10.255.0.0/27 eq 32"},
+                ],
+            }
+        ]
+        await gen._backfill_prefix_lists(prefix_lists, "dev-1", "leaf-1")
+
+        assert gen.client.create.call_count == 2
+        gen.client.create.assert_any_call(
+            kind="RoutingPrefixList",
+            name="PL-LOOPBACKS-EVPN-OVERLAY",
+            device="dev-1",
+        )
+        gen.client.create.assert_any_call(
+            kind="RoutingPrefixListEntry",
+            sequence=10,
+            action="permit 10.255.0.0/27 eq 32",
+            prefix_list=mock_pl,
+        )
+
+    async def test_creates_prefix_list_with_multiple_entries(self) -> None:
+        """Test prefix list with multiple sequence entries."""
+        gen = _make_generator()
+        mock_pl = _make_saveable_mock()
+        mock_e1 = _make_saveable_mock()
+        mock_e2 = _make_saveable_mock()
+        gen.client.create = AsyncMock(side_effect=[mock_pl, mock_e1, mock_e2])
+
+        prefix_lists = [
+            {
+                "name": "PL-TEST",
+                "sequence_numbers": [
+                    {"sequence": 10, "action": "permit 10.0.0.0/8 le 24"},
+                    {"sequence": 20, "action": "deny 0.0.0.0/0 le 32"},
+                ],
+            }
+        ]
+        await gen._backfill_prefix_lists(prefix_lists, "dev-1", "leaf-1")
+
+        assert gen.client.create.call_count == 3
+
+    async def test_skips_prefix_list_without_name(self) -> None:
+        """Test that prefix lists without name are skipped."""
+        gen = _make_generator()
+        prefix_lists = [{"sequence_numbers": [{"sequence": 10, "action": "permit any"}]}]
+        await gen._backfill_prefix_lists(prefix_lists, "dev-1", "leaf-1")
+
+        gen.client.create.assert_not_called()
+
+    async def test_skips_entry_without_sequence(self) -> None:
+        """Test that entries without sequence number are skipped."""
+        gen = _make_generator()
+        mock_pl = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_pl)
+
+        prefix_lists = [
+            {
+                "name": "PL-TEST",
+                "sequence_numbers": [{"action": "permit any"}],
+            }
+        ]
+        await gen._backfill_prefix_lists(prefix_lists, "dev-1", "leaf-1")
+
+        # Only the prefix list itself, no entries
+        gen.client.create.assert_called_once()
+
+    async def test_empty_prefix_lists(self) -> None:
+        """Test with empty list."""
+        gen = _make_generator()
+        await gen._backfill_prefix_lists([], "dev-1", "leaf-1")
+        gen.client.create.assert_not_called()
+
+
+# --- Route map backfill ---
+
+
+class TestBackfillRouteMaps:
+    async def test_creates_route_map_with_entry(self) -> None:
+        """Test creating a route map with a sequence entry."""
+        gen = _make_generator()
+        mock_rm = _make_saveable_mock()
+        mock_entry = _make_saveable_mock()
+        gen.client.create = AsyncMock(side_effect=[mock_rm, mock_entry])
+
+        route_maps = [
+            {
+                "name": "RM-CONN-2-BGP",
+                "sequence_numbers": [
+                    {
+                        "sequence": 10,
+                        "type": "permit",
+                        "match": ["ip address prefix-list PL-LOOPBACKS-EVPN-OVERLAY"],
+                    },
+                ],
+            }
+        ]
+        await gen._backfill_route_maps(route_maps, "dev-1", "leaf-1")
+
+        assert gen.client.create.call_count == 2
+        gen.client.create.assert_any_call(
+            kind="RoutingRouteMap",
+            name="RM-CONN-2-BGP",
+            device="dev-1",
+        )
+        gen.client.create.assert_any_call(
+            kind="RoutingRouteMapEntry",
+            sequence=10,
+            type="permit",
+            route_map=mock_rm,
+            match=["ip address prefix-list PL-LOOPBACKS-EVPN-OVERLAY"],
+        )
+
+    async def test_creates_route_map_entry_with_set(self) -> None:
+        """Test route map entry with set actions."""
+        gen = _make_generator()
+        mock_rm = _make_saveable_mock()
+        mock_entry = _make_saveable_mock()
+        gen.client.create = AsyncMock(side_effect=[mock_rm, mock_entry])
+
+        route_maps = [
+            {
+                "name": "RM-SET-COMMUNITY",
+                "sequence_numbers": [
+                    {
+                        "sequence": 10,
+                        "type": "permit",
+                        "description": "Set community",
+                        "match": ["community COMM-LIST"],
+                        "set": ["community 65000:100", "local-preference 200"],
+                    },
+                ],
+            }
+        ]
+        await gen._backfill_route_maps(route_maps, "dev-1", "leaf-1")
+
+        entry_call = gen.client.create.call_args_list[1]
+        assert entry_call.kwargs["description"] == "Set community"
+        assert entry_call.kwargs["set"] == ["community 65000:100", "local-preference 200"]
+
+    async def test_skips_route_map_without_name(self) -> None:
+        """Test that route maps without name are skipped."""
+        gen = _make_generator()
+        route_maps = [{"sequence_numbers": [{"sequence": 10, "type": "permit"}]}]
+        await gen._backfill_route_maps(route_maps, "dev-1", "leaf-1")
+
+        gen.client.create.assert_not_called()
+
+    async def test_skips_entry_without_type(self) -> None:
+        """Test that entries without type are skipped."""
+        gen = _make_generator()
+        mock_rm = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_rm)
+
+        route_maps = [{"name": "RM-TEST", "sequence_numbers": [{"sequence": 10}]}]
+        await gen._backfill_route_maps(route_maps, "dev-1", "leaf-1")
+
+        # Only the route map itself, no entries
+        gen.client.create.assert_called_once()
+
+
+# --- Static route backfill ---
+
+
+class TestBackfillStaticRoutes:
+    async def test_creates_static_route_with_gateway(self) -> None:
+        """Test creating a static route with gateway."""
+        gen = _make_generator()
+        mock_route = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_route)
+
+        static_routes = [
+            {
+                "destination_address_prefix": "0.0.0.0/0",
+                "gateway": "192.168.0.1",
+                "vrf": "MGMT",
+            }
+        ]
+        await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1")
+
+        gen.client.create.assert_called_once_with(
+            kind="RoutingStaticRoute",
+            prefix="0.0.0.0/0",
+            device="dev-1",
+            gateway="192.168.0.1",
+            vrf="MGMT",
+        )
+        mock_route.save.assert_awaited_once_with(allow_upsert=True)
+
+    async def test_uses_prefix_field_as_fallback(self) -> None:
+        """Test that prefix field is used when destination_address_prefix is absent."""
+        gen = _make_generator()
+        mock_route = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_route)
+
+        static_routes = [{"prefix": "10.0.0.0/24", "next_hop": "192.168.1.1"}]
+        await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1")
+
+        gen.client.create.assert_called_once()
+        call_kwargs = gen.client.create.call_args.kwargs
+        assert call_kwargs["prefix"] == "10.0.0.0/24"
+        assert call_kwargs["next_hop"] == "192.168.1.1"
+
+    async def test_defaults_vrf_to_default(self) -> None:
+        """Test that VRF defaults to 'default' when not specified."""
+        gen = _make_generator()
+        mock_route = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_route)
+
+        static_routes = [{"destination_address_prefix": "10.0.0.0/24", "gateway": "1.1.1.1"}]
+        await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1")
+
+        call_kwargs = gen.client.create.call_args.kwargs
+        assert call_kwargs["vrf"] == "default"
+
+    async def test_includes_optional_fields(self) -> None:
+        """Test that optional fields like distance, tag, name are included."""
+        gen = _make_generator()
+        mock_route = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_route)
+
+        static_routes = [
+            {
+                "destination_address_prefix": "10.0.0.0/24",
+                "gateway": "1.1.1.1",
+                "distance": 10,
+                "tag": 100,
+                "name": "Route to DC2",
+                "interface": "Ethernet1",
+            }
+        ]
+        await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1")
+
+        call_kwargs = gen.client.create.call_args.kwargs
+        assert call_kwargs["distance"] == 10
+        assert call_kwargs["tag"] == 100
+        assert call_kwargs["route_name"] == "Route to DC2"
+        assert call_kwargs["interface"] == "Ethernet1"
+
+    async def test_skips_route_without_prefix(self) -> None:
+        """Test that routes without prefix or destination_address_prefix are skipped."""
+        gen = _make_generator()
+        static_routes = [{"gateway": "1.1.1.1", "vrf": "MGMT"}]
+        await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1")
+
+        gen.client.create.assert_not_called()
+
+    async def test_creates_multiple_static_routes(self) -> None:
+        """Test creating multiple static routes."""
+        gen = _make_generator()
+        mock_route = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_route)
+
+        static_routes = [
+            {"destination_address_prefix": "0.0.0.0/0", "gateway": "192.168.0.1", "vrf": "MGMT"},
+            {"destination_address_prefix": "10.0.0.0/8", "gateway": "172.16.0.1"},
+        ]
+        await gen._backfill_static_routes(static_routes, "dev-1", "leaf-1")
+
+        assert gen.client.create.call_count == 2
+
+
+# --- Generate method ---
 
 
 class TestGenerate:
@@ -404,14 +936,10 @@ class TestGenerate:
         }
         gen.client.object_store.get = AsyncMock(return_value=json.dumps(structured_config))
 
-        mock_prefix = MagicMock()
-        mock_prefix.save = AsyncMock()
-        mock_ip = MagicMock()
-        mock_ip.save = AsyncMock()
-        mock_interface = MagicMock()
-        mock_interface.save = AsyncMock()
-        mock_interface_mtu = MagicMock()
-        mock_interface_mtu.save = AsyncMock()
+        mock_prefix = _make_saveable_mock()
+        mock_ip = _make_saveable_mock()
+        mock_interface = _make_saveable_mock()
+        mock_interface_mtu = _make_saveable_mock()
 
         gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
         gen.client.get = AsyncMock(side_effect=[mock_interface, mock_interface_mtu])
@@ -492,6 +1020,43 @@ class TestGenerate:
 
         gen.client.create.assert_not_called()
 
+    async def test_processes_routing_sections(self) -> None:
+        """Test that generate processes BGP, prefix lists, route maps, and static routes."""
+        gen = _make_generator()
+
+        structured_config = {
+            "router_bgp": {
+                "as": 65001,
+                "peer_groups": [{"name": "PG1", "type": "ipv4"}],
+                "neighbors": [{"ip_address": "10.0.0.1", "peer_group": "PG1"}],
+            },
+            "prefix_lists": [
+                {"name": "PL1", "sequence_numbers": [{"sequence": 10, "action": "permit any"}]},
+            ],
+            "route_maps": [
+                {"name": "RM1", "sequence_numbers": [{"sequence": 10, "type": "permit"}]},
+            ],
+            "static_routes": [
+                {"destination_address_prefix": "0.0.0.0/0", "gateway": "1.1.1.1"},
+            ],
+        }
+        gen.client.object_store.get = AsyncMock(return_value=json.dumps(structured_config))
+        mock_obj = _make_saveable_mock()
+        gen.client.create = AsyncMock(return_value=mock_obj)
+
+        data = _build_artifact_query_data()
+        await gen.generate(data)
+
+        # Verify all routing kinds were created
+        created_kinds = [c.kwargs["kind"] for c in gen.client.create.call_args_list]
+        assert "RoutingBGPPeerGroup" in created_kinds
+        assert "RoutingBGPNeighbor" in created_kinds
+        assert "RoutingPrefixList" in created_kinds
+        assert "RoutingPrefixListEntry" in created_kinds
+        assert "RoutingRouteMap" in created_kinds
+        assert "RoutingRouteMapEntry" in created_kinds
+        assert "RoutingStaticRoute" in created_kinds
+
 
 # --- Constants ---
 
@@ -503,8 +1068,22 @@ class TestConstants:
         assert "loopback_interfaces" in INTERFACE_SECTIONS
         assert "management_interfaces" in INTERFACE_SECTIONS
 
-    def test_unmodeled_sections(self) -> None:
-        """Verify key unmodeled sections are listed."""
-        assert "router_bgp" in UNMODELED_SECTIONS
-        assert "prefix_lists" in UNMODELED_SECTIONS
-        assert "route_maps" in UNMODELED_SECTIONS
+    def test_routing_sections(self) -> None:
+        """Verify expected routing sections."""
+        assert "router_bgp" in ROUTING_SECTIONS
+        assert "prefix_lists" in ROUTING_SECTIONS
+        assert "route_maps" in ROUTING_SECTIONS
+        assert "static_routes" in ROUTING_SECTIONS
+
+    def test_unmodeled_sections_no_routing(self) -> None:
+        """Verify routing sections have been removed from unmodeled list."""
+        assert "router_bgp" not in UNMODELED_SECTIONS
+        assert "prefix_lists" not in UNMODELED_SECTIONS
+        assert "route_maps" not in UNMODELED_SECTIONS
+        assert "static_routes" not in UNMODELED_SECTIONS
+
+    def test_remaining_unmodeled_sections(self) -> None:
+        """Verify remaining unmodeled sections are still tracked."""
+        assert "ip_routing" in UNMODELED_SECTIONS
+        assert "spanning_tree" in UNMODELED_SECTIONS
+        assert "ntp" in UNMODELED_SECTIONS

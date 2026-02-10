@@ -59,6 +59,42 @@ spec:
             kind: LocationRack
             icon: "clarity:rack-server-solid"
 
+    - namespace: Routing
+      name: Menu
+      label: Routing
+      icon: "mdi:router"
+      children:
+        data:
+          - namespace: Routing
+            name: BGPPeerGroup
+            label: BGP Peer Groups
+            kind: RoutingBGPPeerGroup
+            icon: "mdi:router"
+
+          - namespace: Routing
+            name: BGPNeighbor
+            label: BGP Neighbors
+            kind: RoutingBGPNeighbor
+            icon: "mdi:connection"
+
+          - namespace: Routing
+            name: PrefixList
+            label: Prefix Lists
+            kind: RoutingPrefixList
+            icon: "mdi:format-list-bulleted"
+
+          - namespace: Routing
+            name: RouteMap
+            label: Route Maps
+            kind: RoutingRouteMap
+            icon: "mdi:map-outline"
+
+          - namespace: Routing
+            name: StaticRoute
+            label: Static Routes
+            kind: RoutingStaticRoute
+            icon: "mdi:routes"
+
     - namespace: Organization
       name: Menu
       label: Organization
