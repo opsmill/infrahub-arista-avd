@@ -26,9 +26,11 @@ nodes:
     label: Physical Server
     include_in_menu: true
     icon: mdi:server
+    generate_template: true
     inherit_from:
       - ComputeGenericUnit
       - NetworkGenericDevice
+      - GeneratorTarget
       # If you don't want to have VM running directly on your physical server you can comment out the following line
       - VirtualizationHostVirtualMachine
     attributes:

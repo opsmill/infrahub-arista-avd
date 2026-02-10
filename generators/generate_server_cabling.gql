@@ -1,0 +1,95 @@
+query ServerCablingQuery($server_name: String!) {
+  ComputePhysicalServer(hostname__value: $server_name) {
+    edges {
+      node {
+        id
+        hostname {
+          value
+        }
+        role {
+          value
+        }
+        status {
+          value
+        }
+        rack {
+          node {
+            id
+            name {
+              value
+            }
+          }
+        }
+        interfaces {
+          edges {
+            node {
+              id
+              name {
+                value
+              }
+              role {
+                value
+              }
+              status {
+                value
+              }
+              link {
+                node {
+                  id
+                }
+              }
+              tagged_vlan {
+                edges {
+                  node {
+                    id
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
+              untagged_vlan {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                }
+              }
+              profiles {
+                edges {
+                  node {
+                    id
+                    ... on ProfileNetworkInterface {
+                      profile_name {
+                        value
+                      }
+                      tagged_vlan {
+                        edges {
+                          node {
+                            id
+                            name {
+                              value
+                            }
+                          }
+                        }
+                      }
+                      untagged_vlan {
+                        node {
+                          id
+                          name {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

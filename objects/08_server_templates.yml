@@ -1,0 +1,41 @@
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: TemplateComputePhysicalServer
+  parameters:
+    expand_range: true
+  data:
+    - template_name: "compute-server-single"
+      role: "compute"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateNetworkInterface
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "ComputeServerSingleEthernet1"
+            name: "Ethernet1"
+            profiles: ["profile-server-compute"]
+    - template_name: "compute-server-dual"
+      role: "compute"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateNetworkInterface
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "ComputeServerDualEthernet[1-2]"
+            name: "Ethernet[1-2]"
+            profiles: ["profile-server-compute"]
+    - template_name: "gpu-server-single"
+      role: "gpu"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateNetworkInterface
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "GpuServerSingleEthernet1"
+            name: "Ethernet1"
+            profiles: ["profile-server-gpu"]
