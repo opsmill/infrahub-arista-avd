@@ -249,3 +249,10 @@ When schema changes, regenerate type-safe protocol classes:
 ```bash
 infrahubctl protocols --output src/solution_ai_dc/protocols.py
 ```
+
+## Active Technologies
+- Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0 (001-enforce-protocols)
+- Neo4j (via Infrahub), PostgreSQL, Redis, RabbitMQ (001-enforce-protocols)
+
+## Recent Changes
+- 001-enforce-protocols: Added Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0
