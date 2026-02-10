@@ -37,9 +37,7 @@ class AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNode(BaseModel):
     ]
 
 
-class AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(
-    BaseModel
-):
+class AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(BaseModel):
     value: Optional[str]
 
 

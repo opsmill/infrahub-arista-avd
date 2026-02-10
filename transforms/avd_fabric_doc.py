@@ -57,9 +57,7 @@ class AvdFabricDocTransform(InfrahubTransform):
 
             hostvar_id = artifact_node.hostvar_identifier.value if artifact_node.hostvar_identifier else None
             structured_config_id = (
-                artifact_node.structured_config_identifier.value
-                if artifact_node.structured_config_identifier
-                else None
+                artifact_node.structured_config_identifier.value if artifact_node.structured_config_identifier else None
             )
 
             if hostvar_id:

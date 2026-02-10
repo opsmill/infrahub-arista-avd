@@ -303,25 +303,19 @@ class TestExtractOptional:
     def test_extracts_present_keys(self) -> None:
         """Test that present keys are extracted."""
         config = {"type": "ipv4", "remote_as": 65000, "bfd": True}
-        result = BackfillStructuredConfigGenerator._extract_optional(
-            config, ["type", "remote_as", "bfd"]
-        )
+        result = BackfillStructuredConfigGenerator._extract_optional(config, ["type", "remote_as", "bfd"])
         assert result == {"type": "ipv4", "remote_as": 65000, "bfd": True}
 
     def test_skips_none_keys(self) -> None:
         """Test that None values are skipped."""
         config = {"type": None, "remote_as": 65000}
-        result = BackfillStructuredConfigGenerator._extract_optional(
-            config, ["type", "remote_as"]
-        )
+        result = BackfillStructuredConfigGenerator._extract_optional(config, ["type", "remote_as"])
         assert result == {"remote_as": 65000}
 
     def test_skips_missing_keys(self) -> None:
         """Test that missing keys are skipped."""
         config = {"type": "ipv4"}
-        result = BackfillStructuredConfigGenerator._extract_optional(
-            config, ["type", "remote_as"]
-        )
+        result = BackfillStructuredConfigGenerator._extract_optional(config, ["type", "remote_as"])
         assert result == {"type": "ipv4"}
 
     def test_stringify_keys(self) -> None:
@@ -335,17 +329,13 @@ class TestExtractOptional:
     def test_skips_empty_string(self) -> None:
         """Test that empty strings are skipped."""
         config = {"description": ""}
-        result = BackfillStructuredConfigGenerator._extract_optional(
-            config, ["description"]
-        )
+        result = BackfillStructuredConfigGenerator._extract_optional(config, ["description"])
         assert result == {}
 
     def test_preserves_false_and_zero(self) -> None:
         """Test that False and 0 are preserved (not skipped as falsy)."""
         config = {"bfd": False, "ebgp_multihop": 0}
-        result = BackfillStructuredConfigGenerator._extract_optional(
-            config, ["bfd", "ebgp_multihop"]
-        )
+        result = BackfillStructuredConfigGenerator._extract_optional(config, ["bfd", "ebgp_multihop"])
         assert result == {"bfd": False, "ebgp_multihop": 0}
 
 

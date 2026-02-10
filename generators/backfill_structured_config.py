@@ -123,7 +123,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
     # --- BGP backfill ---
 
     @staticmethod
-    def _extract_optional(config: dict[str, Any], keys: list[str], stringify: list[str] | None = None) -> dict[str, Any]:
+    def _extract_optional(
+        config: dict[str, Any], keys: list[str], stringify: list[str] | None = None
+    ) -> dict[str, Any]:
         """Extract optional fields from a config dict, only including non-None/non-empty values."""
         result: dict[str, Any] = {}
         stringify = stringify or []
@@ -142,9 +144,17 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         """Backfill BGP peer groups, return a map of name -> saved peer group object."""
         peer_group_map: dict[str, Any] = {}
         pg_fields = [
-            "type", "remote_as", "local_as", "description", "send_community",
-            "maximum_routes", "bfd", "ebgp_multihop", "update_source",
-            "route_map_in", "route_map_out",
+            "type",
+            "remote_as",
+            "local_as",
+            "description",
+            "send_community",
+            "maximum_routes",
+            "bfd",
+            "ebgp_multihop",
+            "update_source",
+            "route_map_in",
+            "route_map_out",
         ]
         for pg_config in bgp_config.get("peer_groups", []):
             pg_name = pg_config.get("name")

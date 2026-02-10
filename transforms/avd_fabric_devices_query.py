@@ -39,9 +39,7 @@ class AvdFabricDevicesQueryNetworkDeviceEdgesNode(BaseModel):
     id: str
     hostname: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeHostname"]
     pod: "AvdFabricDevicesQueryNetworkDeviceEdgesNodePod"
-    avd_artifact: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact"] = Field(
-        default=None, alias="avd_artifact"
-    )
+    avd_artifact: "AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact"
 
 
 class AvdFabricDevicesQueryNetworkDeviceEdgesNodeHostname(BaseModel):
@@ -62,9 +60,7 @@ class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParent(BaseModel):
 
 
 class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParentNode(BaseModel):
-    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
-        alias="__typename"
-    )
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(alias="__typename")
     id: Optional[str]
 
 
@@ -73,15 +69,17 @@ class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact(BaseModel):
 
 
 class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNode(BaseModel):
-    hostvar_identifier: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeIdentifier"] = Field(
-        default=None, alias="hostvar_identifier"
-    )
-    structured_config_identifier: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeIdentifier"] = (
-        Field(default=None, alias="structured_config_identifier")
-    )
+    hostvar_identifier: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier"]
+    structured_config_identifier: Optional[
+        "AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier"
+    ]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeIdentifier(BaseModel):
+class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier(BaseModel):
+    value: Optional[str]
+
+
+class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(BaseModel):
     value: Optional[str]
 
 

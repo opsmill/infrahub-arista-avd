@@ -6,9 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class BackfillStructuredConfigQuery(BaseModel):
-    avd_artifact: "BackfillStructuredConfigQueryAvdArtifact" = Field(
-        alias="AvdArtifact"
-    )
+    avd_artifact: "BackfillStructuredConfigQueryAvdArtifact" = Field(alias="AvdArtifact")
 
 
 class BackfillStructuredConfigQueryAvdArtifact(BaseModel):
@@ -27,9 +25,7 @@ class BackfillStructuredConfigQueryAvdArtifactEdgesNode(BaseModel):
     device: "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDevice"
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeStructuredConfigIdentifier(
-    BaseModel
-):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeStructuredConfigIdentifier(BaseModel):
     value: Optional[str]
 
 
@@ -39,9 +35,7 @@ class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDevice(BaseModel):
 
 class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNode(BaseModel):
     id: str
-    hostname: Optional[
-        "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeHostname"
-    ]
+    hostname: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeHostname"]
     role: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeRole"]
     interfaces: "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfaces"
 
@@ -55,73 +49,45 @@ class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeRole(BaseModel)
 
 
 class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfaces(BaseModel):
-    edges: list[
-        "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdges"
-    ]
+    edges: list["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdges"]
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdges(
-    BaseModel
-):
-    node: Optional[
-        "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode"
-    ]
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdges(BaseModel):
+    node: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode"]
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode(
-    BaseModel
-):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode(BaseModel):
     id: str
-    name: Optional[
-        "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeName"
-    ]
-    role: Optional[
-        "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeRole"
-    ]
-    mtu: Optional[
-        "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeMtu"
-    ]
+    name: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeName"]
+    role: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeRole"]
+    mtu: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeMtu"]
     ip_address: "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddress"
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeName(
-    BaseModel
-):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeName(BaseModel):
     value: Optional[str]
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeRole(
-    BaseModel
-):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeRole(BaseModel):
     value: Optional[str]
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeMtu(
-    BaseModel
-):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeMtu(BaseModel):
     value: Optional[Any]
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddress(
-    BaseModel
-):
-    node: Optional[
-        "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddressNode"
-    ]
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddress(BaseModel):
+    node: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddressNode"]
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddressNode(
-    BaseModel
-):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddressNode(BaseModel):
     id: str
     address: Optional[
         "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddressNodeAddress"
     ]
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddressNodeAddress(
-    BaseModel
-):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeIpAddressNodeAddress(BaseModel):
     value: Optional[str]
 
 
