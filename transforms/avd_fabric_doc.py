@@ -82,4 +82,4 @@ class AvdFabricDocTransform(InfrahubTransform):
             fabric_name,
         )
 
-        return fabric_doc.content
+        return fabric_doc.fabric_documentation
