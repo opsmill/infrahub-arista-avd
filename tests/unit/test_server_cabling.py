@@ -8,13 +8,20 @@ from generators.generate_server_cabling import ServerCablingGenerator
 from solution_ai_dc.protocols import NetworkLink
 
 
-def _make_generator() -> ServerCablingGenerator:
-    """Create a generator instance with mocked client."""
+def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
+    """Create a generator instance with mocked client.
+
+    Args:
+        mock_cascade: If True, patch _trigger_avd_cascade to avoid needing
+            rack→pod→fabric navigation setup in every test.
+    """
     gen = ServerCablingGenerator.__new__(ServerCablingGenerator)
     gen.client = MagicMock()
     gen.client.filters = AsyncMock(return_value=[])
     gen.client.get = AsyncMock()
     gen.client.create = AsyncMock()
+    if mock_cascade:
+        gen._trigger_avd_cascade = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
     return gen
 
 
@@ -48,14 +55,13 @@ def _make_server_data(
 def _make_interface(
     iface_id: str = "iface-1",
     name: str = "Ethernet1",
-    linked: bool = False,
     tagged_vlan_ids: list[dict] | None = None,
     untagged_vlan: dict | None = None,
     profile_tagged_vlan_ids: list[dict] | None = None,
     profile_untagged_vlan: dict | None = None,
 ) -> dict:
     """Build an interface node for the query response."""
-    link = {"node": {"id": "link-1"}} if linked else {"node": None}
+    link: dict = {"node": None}
 
     tagged_edges = []
     if tagged_vlan_ids:
@@ -103,15 +109,11 @@ def _make_mock_leaf(leaf_id: str = "leaf-1", hostname: str = "leaf-pod1-1-1") ->
 def _make_mock_leaf_interface(
     iface_id: str = "leaf-iface-1",
     name: str = "Ethernet1",
-    has_link: bool = False,
 ) -> MagicMock:
     """Create a mock leaf interface."""
     iface = MagicMock()
     iface.id = iface_id
     iface.name.value = name
-    iface.link = MagicMock()
-    iface.link.fetch = AsyncMock()
-    iface.link.peer = MagicMock() if has_link else None
     iface.save = AsyncMock()
     iface.device.display_label = "leaf-pod1-1-1"
     return iface
@@ -146,9 +148,11 @@ class TestSingleHomedCabling:
         mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
         mock_leaf_iface.status = MagicMock()
         mock_leaf_iface.tagged_vlan = MagicMock()
-        mock_leaf_iface.tagged_vlan.set = MagicMock()
+        mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.tagged_vlan.extend = MagicMock()
         mock_leaf_iface.untagged_vlan = MagicMock()
-        mock_leaf_iface.untagged_vlan.set = MagicMock()
+        mock_leaf_iface.untagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.untagged_vlan.add = MagicMock()
         mock_leaf_iface.save = AsyncMock()
 
         gen.client.get = AsyncMock(side_effect=[
@@ -252,9 +256,11 @@ class TestVlanAssignment:
         mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
         mock_leaf_iface.status = MagicMock()
         mock_leaf_iface.tagged_vlan = MagicMock()
-        mock_leaf_iface.tagged_vlan.set = MagicMock()
+        mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.tagged_vlan.extend = MagicMock()
         mock_leaf_iface.untagged_vlan = MagicMock()
-        mock_leaf_iface.untagged_vlan.set = MagicMock()
+        mock_leaf_iface.untagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.untagged_vlan.add = MagicMock()
         mock_leaf_iface.save = AsyncMock()
 
         gen.client.get = AsyncMock(side_effect=[
@@ -271,7 +277,7 @@ class TestVlanAssignment:
         await gen.generate(data)
 
         # Verify tagged VLANs were set on leaf interface
-        mock_leaf_iface.tagged_vlan.set.assert_called_once_with(["vlan-300", "vlan-400"])
+        mock_leaf_iface.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
 
     @pytest.mark.asyncio
     async def test_untagged_vlan_copied_to_leaf(self) -> None:
@@ -298,9 +304,11 @@ class TestVlanAssignment:
         mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
         mock_leaf_iface.status = MagicMock()
         mock_leaf_iface.tagged_vlan = MagicMock()
-        mock_leaf_iface.tagged_vlan.set = MagicMock()
+        mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.tagged_vlan.extend = MagicMock()
         mock_leaf_iface.untagged_vlan = MagicMock()
-        mock_leaf_iface.untagged_vlan.set = MagicMock()
+        mock_leaf_iface.untagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.untagged_vlan.add = MagicMock()
         mock_leaf_iface.save = AsyncMock()
 
         gen.client.get = AsyncMock(side_effect=[
@@ -316,7 +324,7 @@ class TestVlanAssignment:
 
         await gen.generate(data)
 
-        mock_leaf_iface.untagged_vlan.set.assert_called_once_with("vlan-100")
+        mock_leaf_iface.untagged_vlan.add.assert_called_once_with("vlan-100")
 
 
 class TestInterfaceStatusActive:
@@ -346,9 +354,11 @@ class TestInterfaceStatusActive:
         mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
         mock_leaf_iface.status = MagicMock()
         mock_leaf_iface.tagged_vlan = MagicMock()
-        mock_leaf_iface.tagged_vlan.set = MagicMock()
+        mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.tagged_vlan.extend = MagicMock()
         mock_leaf_iface.untagged_vlan = MagicMock()
-        mock_leaf_iface.untagged_vlan.set = MagicMock()
+        mock_leaf_iface.untagged_vlan.fetch = AsyncMock()
+        mock_leaf_iface.untagged_vlan.add = MagicMock()
         mock_leaf_iface.save = AsyncMock()
 
         gen.client.get = AsyncMock(side_effect=[
@@ -389,10 +399,10 @@ class TestNoLeafSwitches:
 
 
 class TestInsufficientInterfaces:
-    """T013: Test warning when insufficient leaf interfaces available."""
+    """T013: Test that insufficient leaf interfaces cables what it can."""
 
     @pytest.mark.asyncio
-    async def test_insufficient_interfaces_logs_warning(self) -> None:
+    async def test_insufficient_interfaces_cables_partial(self) -> None:
         gen = _make_generator()
 
         iface1 = _make_interface("iface-1", "Ethernet1")
@@ -406,37 +416,42 @@ class TestInsufficientInterfaces:
             [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
         ])
 
+        mock_iface = MagicMock()
+        mock_iface.id = "iface-1"
+        mock_iface.name.value = "Ethernet1"
+        mock_iface.device.display_label = "leaf-pod1-1-1"
+        mock_iface.status = MagicMock()
+        mock_iface.tagged_vlan = MagicMock()
+        mock_iface.tagged_vlan.fetch = AsyncMock()
+        mock_iface.tagged_vlan.extend = MagicMock()
+        mock_iface.untagged_vlan = MagicMock()
+        mock_iface.untagged_vlan.fetch = AsyncMock()
+        mock_iface.untagged_vlan.add = MagicMock()
+        mock_iface.save = AsyncMock()
+
+        gen.client.get = AsyncMock(return_value=mock_iface)
+
+        mock_link = MagicMock()
+        mock_link.save = AsyncMock()
+        gen.client.create = AsyncMock(return_value=mock_link)
+
         with patch.object(gen.logger, "warning") as mock_warn:
             await gen.generate(data)
             assert any("Insufficient" in str(call) for call in mock_warn.call_args_list)
 
+        # One link created (for the one available leaf interface)
+        assert gen.client.create.call_count == 1
+
 
 class TestIdempotency:
-    """T014: Test idempotency - already-cabled server is skipped."""
+    """T014: Test idempotency - re-running upserts the same links."""
 
     @pytest.mark.asyncio
-    async def test_already_cabled_server_skipped(self) -> None:
+    async def test_rerun_upserts_same_link(self) -> None:
         gen = _make_generator()
 
-        # All interfaces already linked
-        iface = _make_interface("iface-1", "Ethernet1", linked=True)
+        iface = _make_interface("iface-1", "Ethernet1")
         data = _make_server_data(interfaces=[iface])
-
-        with patch.object(gen.logger, "info") as mock_info:
-            await gen.generate(data)
-            assert any("already fully cabled" in str(call) for call in mock_info.call_args_list)
-
-        # No links created
-        gen.client.create.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_partially_cabled_server_cables_remaining(self) -> None:
-        gen = _make_generator()
-
-        # One linked, one unlinked
-        iface1 = _make_interface("iface-1", "Ethernet1", linked=True)
-        iface2 = _make_interface("iface-2", "Ethernet2", linked=False)
-        data = _make_server_data(interfaces=[iface1, iface2])
 
         mock_leaf = _make_mock_leaf()
         gen.client.filters = AsyncMock(side_effect=[
@@ -445,14 +460,16 @@ class TestIdempotency:
         ])
 
         mock_iface = MagicMock()
-        mock_iface.id = "iface-2"
+        mock_iface.id = "iface-1"
         mock_iface.name.value = "Ethernet1"
         mock_iface.device.display_label = "leaf-pod1-1-1"
         mock_iface.status = MagicMock()
         mock_iface.tagged_vlan = MagicMock()
-        mock_iface.tagged_vlan.set = MagicMock()
+        mock_iface.tagged_vlan.fetch = AsyncMock()
+        mock_iface.tagged_vlan.extend = MagicMock()
         mock_iface.untagged_vlan = MagicMock()
-        mock_iface.untagged_vlan.set = MagicMock()
+        mock_iface.untagged_vlan.fetch = AsyncMock()
+        mock_iface.untagged_vlan.add = MagicMock()
         mock_iface.save = AsyncMock()
 
         gen.client.get = AsyncMock(return_value=mock_iface)
@@ -463,8 +480,9 @@ class TestIdempotency:
 
         await gen.generate(data)
 
-        # Only one link created (for the unlinked interface)
+        # Link created with allow_upsert
         assert gen.client.create.call_count == 1
+        mock_link.save.assert_called_once_with(allow_upsert=True)
 
 
 class TestSingleLeafDualHomed:
@@ -493,9 +511,11 @@ class TestSingleLeafDualHomed:
         mock_iface.device.display_label = "leaf-pod1-1-1"
         mock_iface.status = MagicMock()
         mock_iface.tagged_vlan = MagicMock()
-        mock_iface.tagged_vlan.set = MagicMock()
+        mock_iface.tagged_vlan.fetch = AsyncMock()
+        mock_iface.tagged_vlan.extend = MagicMock()
         mock_iface.untagged_vlan = MagicMock()
-        mock_iface.untagged_vlan.set = MagicMock()
+        mock_iface.untagged_vlan.fetch = AsyncMock()
+        mock_iface.untagged_vlan.add = MagicMock()
         mock_iface.save = AsyncMock()
 
         gen.client.get = AsyncMock(return_value=mock_iface)
@@ -719,3 +739,112 @@ class TestNoServerInQuery:
             await gen.generate({})
             mock_warn.assert_called_once()
             assert "No server found" in mock_warn.call_args[0][0]
+
+
+class TestAvdCascadeTrigger:
+    """Test AVD cascade trigger after server cabling."""
+
+    @pytest.mark.asyncio
+    async def test_cascade_called_after_successful_cabling(self) -> None:
+        """After cabling completes, _trigger_avd_cascade must be called."""
+        gen = _make_generator()
+
+        iface = _make_interface("iface-1", "Ethernet1")
+        data = _make_server_data(interfaces=[iface])
+
+        mock_leaf = _make_mock_leaf()
+        gen.client.filters = AsyncMock(side_effect=[
+            [mock_leaf],
+            [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
+        ])
+
+        mock_iface = MagicMock()
+        mock_iface.id = "iface-1"
+        mock_iface.name.value = "Ethernet1"
+        mock_iface.device.display_label = "leaf-pod1-1-1"
+        mock_iface.status = MagicMock()
+        mock_iface.tagged_vlan = MagicMock()
+        mock_iface.tagged_vlan.fetch = AsyncMock()
+        mock_iface.tagged_vlan.extend = MagicMock()
+        mock_iface.untagged_vlan = MagicMock()
+        mock_iface.untagged_vlan.fetch = AsyncMock()
+        mock_iface.untagged_vlan.add = MagicMock()
+        mock_iface.save = AsyncMock()
+
+        gen.client.get = AsyncMock(return_value=mock_iface)
+
+        mock_link = MagicMock()
+        mock_link.save = AsyncMock()
+        gen.client.create = AsyncMock(return_value=mock_link)
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    async def test_cascade_not_called_when_no_rack(self) -> None:
+        """When server has no rack, cascade must not be called."""
+        gen = _make_generator()
+
+        data = _make_server_data(no_rack=True)
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    async def test_cascade_not_called_when_no_interfaces(self) -> None:
+        """When server has no interfaces, cascade must not be called."""
+        gen = _make_generator()
+
+        data = _make_server_data(interfaces=[])
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    async def test_cascade_not_called_when_no_leaf_switches(self) -> None:
+        """When no leaf switches in rack, cascade must not be called."""
+        gen = _make_generator()
+
+        iface = _make_interface("iface-1", "Ethernet1")
+        data = _make_server_data(interfaces=[iface])
+
+        gen.client.filters = AsyncMock(return_value=[])
+
+        await gen.generate(data)
+
+        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+
+    @pytest.mark.asyncio
+    @patch("generators.generate_server_cabling.trigger_hostvar_generation", new_callable=AsyncMock)
+    @patch("generators.generate_server_cabling.set_fabric_avd_hostvars_ready", new_callable=AsyncMock)
+    async def test_trigger_avd_cascade_navigates_to_fabric(
+        self,
+        mock_set_ready: AsyncMock,
+        mock_trigger: AsyncMock,
+    ) -> None:
+        """_trigger_avd_cascade navigates rack→pod→fabric and triggers cascade."""
+        gen = _make_generator(mock_cascade=False)
+
+        # Build mock chain: rack.pod.peer → pod, pod.parent.peer → fabric
+        mock_fabric = MagicMock()
+        mock_fabric.id = "fabric-1"
+        mock_fabric.name.value = "Fabric-A"
+
+        mock_pod = MagicMock()
+        mock_pod.parent.fetch = AsyncMock()
+        mock_pod.parent.peer = mock_fabric
+
+        mock_rack = MagicMock()
+        mock_rack.pod.fetch = AsyncMock()
+        mock_rack.pod.peer.id = "pod-1"
+
+        gen.client.get = AsyncMock(side_effect=[mock_rack, mock_pod])
+
+        await gen._trigger_avd_cascade("rack-1", "server-1")  # noqa: SLF001
+
+        # Verify hostvars set to False and hostvar generation triggered
+        mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)
+        mock_trigger.assert_awaited_once_with(gen.client)

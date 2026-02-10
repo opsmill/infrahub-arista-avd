@@ -2,7 +2,7 @@ from typing import Any, NamedTuple
 
 from infrahub_sdk.transforms import InfrahubTransform
 
-from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkLink, NetworkPod
+from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkLink, NetworkPod, ComputePhysicalServer
 
 from .fabric_cabling_plan_query import FabricCablingPlanQuery
 
@@ -33,7 +33,9 @@ class CablingPlan(InfrahubTransform):
         )
         for link in links:
             [src_interface, dst_interface] = link.endpoints.peers
-
+            print(link.id, src_interface.peer, dst_interface.peer)
+            if not dst_interface.peer.device.id:
+                continue
             csv_data.append(
                 [
                     src_interface.peer.device.peer.rack.peer.name.value

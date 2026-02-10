@@ -77,6 +77,7 @@ def _make_generator() -> BackfillStructuredConfigGenerator:
     """Create a generator instance with a mocked client."""
     gen = BackfillStructuredConfigGenerator.__new__(BackfillStructuredConfigGenerator)
     gen.client = AsyncMock()
+    gen.client.filters = AsyncMock(return_value=[])
     return gen
 
 

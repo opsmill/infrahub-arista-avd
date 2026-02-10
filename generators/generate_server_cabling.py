@@ -5,7 +5,8 @@ from typing import Any
 
 from infrahub_sdk.generator import InfrahubGenerator
 
-from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkLink
+from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_hostvar_generation
+from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkLink, NetworkPod
 
 
 class ServerCablingGenerator(InfrahubGenerator):
@@ -23,77 +24,87 @@ class ServerCablingGenerator(InfrahubGenerator):
         # Get rack info
         rack_rel = server_node.get("rack")
         if not rack_rel or not rack_rel.get("node"):
-            self.logger.warning("Server %s has no rack assigned, skipping cabling", server_hostname)
+            self.logger.warning("Server %s has no rack assigned", server_hostname)
             return
 
         rack_id: str = rack_rel["node"]["id"]
         rack_name: str = rack_rel["node"]["name"]["value"]
 
-        # Get server interfaces, filter out already-linked ones
+        # Get all server interfaces
         server_interfaces = self._get_server_interfaces(server_node)
-        unlinked_interfaces = [iface for iface in server_interfaces if not iface["linked"]]
-
         if not server_interfaces:
-            self.logger.warning("Server %s has no interfaces, skipping cabling", server_hostname)
-            return
-
-        if not unlinked_interfaces:
-            self.logger.info("Server %s is already fully cabled, nothing to do", server_hostname)
+            self.logger.warning("Server %s has no interfaces", server_hostname)
             return
 
         # Find leaf switches in the same rack
         leaf_switches = await self._get_rack_leaf_switches(rack_id)
         if not leaf_switches:
-            self.logger.warning("No leaf switches found in rack %s, skipping cabling for server %s", rack_name, server_hostname)
+            self.logger.warning("No leaf switches found in rack %s for server %s", rack_name, server_hostname)
             return
 
-        # Get available (unlinked) server/storage-role interfaces on leaf switches
-        available_leaf_interfaces = await self._get_available_leaf_interfaces(leaf_switches)
-        if not available_leaf_interfaces:
+        # Get all server/storage-role interfaces on leaf switches
+        leaf_interfaces = await self._get_leaf_interfaces(leaf_switches)
+        if not leaf_interfaces:
             self.logger.warning(
-                "No available server-role interfaces on leaf switches in rack %s, skipping cabling for server %s",
+                "No server-role interfaces on leaf switches in rack %s for server %s",
                 rack_name,
                 server_hostname,
             )
             return
 
-        # Validate sufficient interfaces
-        if len(available_leaf_interfaces) < len(unlinked_interfaces):
+        # Warn if insufficient but proceed with what we have
+        if len(leaf_interfaces) < len(server_interfaces):
             self.logger.warning(
-                "Insufficient leaf interfaces in rack %s: need %d, have %d. Skipping cabling for server %s",
+                "Insufficient leaf interfaces in rack %s: need %d, have %d for server %s",
                 rack_name,
-                len(unlinked_interfaces),
-                len(available_leaf_interfaces),
+                len(server_interfaces),
+                len(leaf_interfaces),
                 server_hostname,
             )
-            return
 
-        # Distribute server interfaces across leaves (round-robin)
-        pairings = self._distribute_interfaces(unlinked_interfaces, available_leaf_interfaces, leaf_switches)
+        # Distribute server interfaces across leaves (round-robin, deterministic by index)
+        pairings = self._distribute_interfaces(server_interfaces, leaf_interfaces, leaf_switches)
 
-        if len(leaf_switches) == 1 and len(unlinked_interfaces) > 1:
+        if len(leaf_switches) == 1 and len(server_interfaces) > 1:
             self.logger.info(
                 "Only one leaf switch in rack %s; connecting all %d server interfaces to %s",
                 rack_name,
-                len(unlinked_interfaces),
+                len(server_interfaces),
                 leaf_switches[0].hostname.value,
             )
 
-        # Create links and assign VLANs
+        # Upsert links and assign VLANs
         for server_iface, leaf_iface_id in pairings:
             await self._cable_interface(server_hostname, server_iface, leaf_iface_id)
 
+        # Trigger AVD hostvar regeneration cascade
+        await self._trigger_avd_cascade(rack_id, server_hostname)
+
+    async def _trigger_avd_cascade(self, rack_id: str, server_hostname: str) -> None:
+        """Navigate from rack to fabric and trigger AVD hostvar regeneration."""
+        rack = await self.client.get(LocationRack, id=rack_id)
+        await rack.pod.fetch()  # type: ignore[union-attr]
+        pod = await self.client.get(NetworkPod, id=rack.pod.peer.id)  # type: ignore[union-attr]
+        await pod.parent.fetch()  # type: ignore[union-attr]
+        fabric = pod.parent.peer  # type: ignore[union-attr]
+
+        self.logger.info(
+            "Server %s cabled — triggering AVD cascade for fabric %s",
+            server_hostname,
+            fabric.name.value,
+        )
+        await set_fabric_avd_hostvars_ready(self.client, fabric.id, False)
+        await trigger_hostvar_generation(self.client)
+
     def _get_server_interfaces(self, server_node: dict) -> list[dict[str, Any]]:
-        """Extract server interfaces with their link status and VLANs."""
+        """Extract server interfaces with their VLANs."""
         interfaces = []
         for edge in server_node.get("interfaces", {}).get("edges", []):
             node = edge["node"]
-            linked = node.get("link") and node["link"].get("node") is not None
             vlans = self._extract_vlans(node)
             interfaces.append({
                 "id": node["id"],
                 "name": node["name"]["value"],
-                "linked": linked,
                 "tagged_vlan_ids": vlans["tagged"],
                 "untagged_vlan_id": vlans["untagged"],
             })
@@ -133,9 +144,9 @@ class ServerCablingGenerator(InfrahubGenerator):
         """Find all leaf switches in the given rack."""
         return await self.client.filters(kind=NetworkDevice, rack__ids=[rack_id], role__value="leaf")
 
-    async def _get_available_leaf_interfaces(self, leaf_switches: list[NetworkDevice]) -> list[dict[str, Any]]:
-        """Get unlinked server/storage-role interfaces from leaf switches."""
-        available: list[dict[str, Any]] = []
+    async def _get_leaf_interfaces(self, leaf_switches: list[NetworkDevice]) -> list[dict[str, Any]]:
+        """Get all server/storage-role interfaces from leaf switches."""
+        result: list[dict[str, Any]] = []
         for leaf in leaf_switches:
             interfaces = await self.client.filters(
                 kind=NetworkInterface,
@@ -143,16 +154,13 @@ class ServerCablingGenerator(InfrahubGenerator):
                 role__values=["server", "storage"],
             )
             for iface in interfaces:
-                # Check if interface has an existing link
-                await iface.link.fetch()  # type: ignore[union-attr]
-                if not iface.link.peer:  # type: ignore[union-attr]
-                    available.append({
-                        "id": iface.id,
-                        "leaf_id": leaf.id,
-                        "leaf_hostname": leaf.hostname.value,
-                        "name": iface.name.value,
-                    })
-        return available
+                result.append({
+                    "id": iface.id,
+                    "leaf_id": leaf.id,
+                    "leaf_hostname": leaf.hostname.value,
+                    "name": iface.name.value,
+                })
+        return result
 
     def _distribute_interfaces(
         self,
@@ -209,7 +217,9 @@ class ServerCablingGenerator(InfrahubGenerator):
 
         # Re-fetch interfaces after link creation to get updated link relationship
         server_interface = await self.client.get(NetworkInterface, id=server_iface["id"], include=["link"])
-        leaf_interface = await self.client.get(NetworkInterface, id=leaf_iface_id, include=["link"])
+        leaf_interface = await self.client.get(
+            NetworkInterface, id=leaf_iface_id, include=["link", "tagged_vlan", "untagged_vlan"],
+        )
 
         # Set interfaces to active
         server_interface.status.value = "active"
@@ -217,11 +227,13 @@ class ServerCablingGenerator(InfrahubGenerator):
 
         leaf_interface.status.value = "active"
 
-        # Assign VLANs from server interface profile to leaf interface
+        # Assign VLANs from server interface to leaf interface
         if server_iface["tagged_vlan_ids"]:
-            leaf_interface.tagged_vlan.set(server_iface["tagged_vlan_ids"])  # type: ignore[union-attr]
+            await leaf_interface.tagged_vlan.fetch()  # type: ignore[union-attr]
+            leaf_interface.tagged_vlan.extend(server_iface["tagged_vlan_ids"])  # type: ignore[union-attr]
         if server_iface["untagged_vlan_id"]:
-            leaf_interface.untagged_vlan.set(server_iface["untagged_vlan_id"])  # type: ignore[union-attr]
+            await leaf_interface.untagged_vlan.fetch()  # type: ignore[union-attr]
+            leaf_interface.untagged_vlan.add(server_iface["untagged_vlan_id"])  # type: ignore[union-attr]
 
         await leaf_interface.save(allow_upsert=True)
 

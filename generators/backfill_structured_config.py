@@ -277,12 +277,21 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 if seq is None or not action:
                     continue
 
-                entry = await self.client.create(
-                    RoutingPrefixListEntry,
-                    sequence=seq,
-                    action=action,
-                    prefix_list=pl,
+                existing = await self.client.filters(
+                    kind=RoutingPrefixListEntry,
+                    prefix_list__ids=[pl.id],
+                    sequence__value=seq,
                 )
+                if existing:
+                    entry = existing[0]
+                    entry.action.value = action  # type: ignore[union-attr]
+                else:
+                    entry = await self.client.create(
+                        RoutingPrefixListEntry,
+                        sequence=seq,
+                        action=action,
+                        prefix_list=pl,
+                    )
                 self._set_source(entry, avd_source)
                 await entry.save(allow_upsert=True)
                 self.logger.info(f"[{hostname}] Ensured prefix list entry {pl_name} seq {seq}")
@@ -317,19 +326,34 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 if seq is None or not seq_type:
                     continue
 
-                entry_attrs: dict[str, Any] = {
-                    "sequence": seq,
-                    "type": seq_type,
-                    "route_map": rm,
-                }
-                if seq_config.get("description"):
-                    entry_attrs["description"] = seq_config["description"]
-                if seq_config.get("match"):
-                    entry_attrs["match"] = seq_config["match"]
-                if seq_config.get("set"):
-                    entry_attrs["set"] = seq_config["set"]
+                existing = await self.client.filters(
+                    kind=RoutingRouteMapEntry,
+                    route_map__ids=[rm.id],
+                    sequence__value=seq,
+                )
+                if existing:
+                    entry = existing[0]
+                    entry.type.value = seq_type  # type: ignore[union-attr]
+                    if seq_config.get("description"):
+                        entry.description.value = seq_config["description"]  # type: ignore[union-attr]
+                    if seq_config.get("match"):
+                        entry.match.value = seq_config["match"]  # type: ignore[union-attr]
+                    if seq_config.get("set"):
+                        entry.set.value = seq_config["set"]  # type: ignore[union-attr]
+                else:
+                    entry_attrs: dict[str, Any] = {
+                        "sequence": seq,
+                        "type": seq_type,
+                        "route_map": rm,
+                    }
+                    if seq_config.get("description"):
+                        entry_attrs["description"] = seq_config["description"]
+                    if seq_config.get("match"):
+                        entry_attrs["match"] = seq_config["match"]
+                    if seq_config.get("set"):
+                        entry_attrs["set"] = seq_config["set"]
+                    entry = await self.client.create(RoutingRouteMapEntry, **entry_attrs)
 
-                entry = await self.client.create(RoutingRouteMapEntry, **entry_attrs)
                 self._set_source(entry, avd_source)
                 await entry.save(allow_upsert=True)
                 self.logger.info(f"[{hostname}] Ensured route map entry {rm_name} seq {seq}")
