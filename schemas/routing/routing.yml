@@ -1,0 +1,402 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+nodes:
+  # --- BGP ---
+
+  - name: BGPPeerGroup
+    namespace: Routing
+    description: BGP peer group configuration
+    label: BGP Peer Group
+    icon: mdi:router
+    include_in_menu: false
+    uniqueness_constraints:
+      - [device, name__value]
+    human_friendly_id:
+      - device__hostname__value
+      - name__value
+    order_by:
+      - name__value
+    display_label: name__value
+    attributes:
+      - name: name
+        kind: Text
+        order_weight: 1000
+      - name: type
+        label: Address Family Type
+        kind: Dropdown
+        optional: true
+        choices:
+          - name: ipv4
+            label: IPv4
+          - name: evpn
+            label: EVPN
+        order_weight: 2000
+      - name: remote_as
+        label: Remote AS
+        kind: Text
+        optional: true
+        order_weight: 3000
+      - name: local_as
+        label: Local AS
+        kind: Text
+        optional: true
+        order_weight: 4000
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 5000
+      - name: send_community
+        label: Send Community
+        kind: Text
+        optional: true
+        order_weight: 6000
+      - name: maximum_routes
+        label: Maximum Routes
+        kind: Number
+        optional: true
+        order_weight: 7000
+      - name: bfd
+        label: BFD
+        kind: Boolean
+        optional: true
+        order_weight: 8000
+      - name: ebgp_multihop
+        label: eBGP Multihop
+        kind: Number
+        optional: true
+        order_weight: 9000
+      - name: update_source
+        label: Update Source
+        kind: Text
+        optional: true
+        order_weight: 10000
+      - name: route_map_in
+        label: Route Map In
+        kind: Text
+        optional: true
+        order_weight: 11000
+      - name: route_map_out
+        label: Route Map Out
+        kind: Text
+        optional: true
+        order_weight: 12000
+    relationships:
+      - name: device
+        peer: NetworkDevice
+        kind: Attribute
+        cardinality: one
+        optional: false
+        identifier: device__bgp_peer_group
+        order_weight: 500
+
+  - name: BGPNeighbor
+    namespace: Routing
+    description: BGP neighbor/session configuration
+    label: BGP Neighbor
+    icon: mdi:connection
+    include_in_menu: false
+    uniqueness_constraints:
+      - [device, peer_address__value]
+    human_friendly_id:
+      - device__hostname__value
+      - peer_address__value
+    order_by:
+      - peer_address__value
+    display_label: peer_address__value
+    attributes:
+      - name: peer_address
+        label: Peer Address
+        kind: Text
+        order_weight: 1000
+      - name: remote_as
+        label: Remote AS
+        kind: Text
+        optional: true
+        order_weight: 3000
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 4000
+      - name: shutdown
+        kind: Boolean
+        optional: true
+        order_weight: 5000
+      - name: bfd
+        label: BFD
+        kind: Boolean
+        optional: true
+        order_weight: 6000
+      - name: ebgp_multihop
+        label: eBGP Multihop
+        kind: Number
+        optional: true
+        order_weight: 7000
+      - name: send_community
+        label: Send Community
+        kind: Text
+        optional: true
+        order_weight: 8000
+    relationships:
+      - name: device
+        peer: NetworkDevice
+        kind: Attribute
+        cardinality: one
+        optional: false
+        identifier: device__bgp_neighbor
+        order_weight: 500
+      - name: peer_group
+        label: Peer Group
+        peer: RoutingBGPPeerGroup
+        kind: Attribute
+        cardinality: one
+        optional: true
+        order_weight: 2000
+
+  # --- Prefix Lists ---
+
+  - name: PrefixList
+    namespace: Routing
+    description: IP prefix list for route filtering
+    label: Prefix List
+    icon: mdi:format-list-bulleted
+    include_in_menu: false
+    uniqueness_constraints:
+      - [device, name__value]
+    human_friendly_id:
+      - device__hostname__value
+      - name__value
+    order_by:
+      - name__value
+    display_label: name__value
+    attributes:
+      - name: name
+        kind: Text
+        order_weight: 1000
+    relationships:
+      - name: device
+        peer: NetworkDevice
+        kind: Attribute
+        cardinality: one
+        optional: false
+        identifier: device__prefix_list
+        order_weight: 500
+      - name: entries
+        peer: RoutingPrefixListEntry
+        kind: Component
+        cardinality: many
+        optional: true
+        order_weight: 2000
+
+  - name: PrefixListEntry
+    namespace: Routing
+    description: Individual prefix list entry
+    label: Prefix List Entry
+    icon: mdi:format-list-numbered
+    include_in_menu: false
+    uniqueness_constraints:
+      - [prefix_list, sequence__value]
+    order_by:
+      - sequence__value
+    display_label: sequence__value
+    attributes:
+      - name: sequence
+        kind: Number
+        order_weight: 1000
+      - name: action
+        kind: Text
+        description: "Action string, e.g. 'permit 10.255.0.0/27 eq 32'"
+        order_weight: 2000
+    relationships:
+      - name: prefix_list
+        peer: RoutingPrefixList
+        kind: Parent
+        cardinality: one
+        optional: false
+        order_weight: 500
+
+  # --- Route Maps ---
+
+  - name: RouteMap
+    namespace: Routing
+    description: Route map for route policy
+    label: Route Map
+    icon: mdi:map-outline
+    include_in_menu: false
+    uniqueness_constraints:
+      - [device, name__value]
+    human_friendly_id:
+      - device__hostname__value
+      - name__value
+    order_by:
+      - name__value
+    display_label: name__value
+    attributes:
+      - name: name
+        kind: Text
+        order_weight: 1000
+    relationships:
+      - name: device
+        peer: NetworkDevice
+        kind: Attribute
+        cardinality: one
+        optional: false
+        identifier: device__route_map
+        order_weight: 500
+      - name: entries
+        peer: RoutingRouteMapEntry
+        kind: Component
+        cardinality: many
+        optional: true
+        order_weight: 2000
+
+  - name: RouteMapEntry
+    namespace: Routing
+    description: Individual route map entry
+    label: Route Map Entry
+    icon: mdi:map-marker
+    include_in_menu: false
+    uniqueness_constraints:
+      - [route_map, sequence__value]
+    order_by:
+      - sequence__value
+    display_label: sequence__value
+    attributes:
+      - name: sequence
+        kind: Number
+        order_weight: 1000
+      - name: type
+        kind: Dropdown
+        choices:
+          - name: permit
+            label: Permit
+          - name: deny
+            label: Deny
+        order_weight: 2000
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 3000
+      - name: match
+        label: Match Conditions
+        kind: List
+        optional: true
+        order_weight: 4000
+      - name: set
+        label: Set Actions
+        kind: List
+        optional: true
+        order_weight: 5000
+    relationships:
+      - name: route_map
+        peer: RoutingRouteMap
+        kind: Parent
+        cardinality: one
+        optional: false
+        order_weight: 500
+
+  # --- Static Routes ---
+
+  - name: StaticRoute
+    namespace: Routing
+    description: Static route entry
+    label: Static Route
+    icon: mdi:routes
+    include_in_menu: false
+    uniqueness_constraints:
+      - [device, prefix__value, vrf__value]
+    human_friendly_id:
+      - device__hostname__value
+      - prefix__value
+    order_by:
+      - prefix__value
+    display_label: prefix__value
+    attributes:
+      - name: prefix
+        label: Destination Prefix
+        kind: Text
+        order_weight: 1000
+      - name: gateway
+        label: Gateway
+        kind: Text
+        optional: true
+        order_weight: 2000
+      - name: next_hop
+        label: Next Hop
+        kind: Text
+        optional: true
+        order_weight: 3000
+      - name: interface
+        label: Interface
+        kind: Text
+        optional: true
+        order_weight: 4000
+      - name: distance
+        label: Administrative Distance
+        kind: Number
+        optional: true
+        order_weight: 5000
+      - name: tag
+        kind: Number
+        optional: true
+        order_weight: 6000
+      - name: route_name
+        label: Route Description
+        kind: Text
+        optional: true
+        order_weight: 7000
+      - name: vrf
+        label: VRF
+        kind: Text
+        optional: true
+        default_value: "default"
+        order_weight: 8000
+    relationships:
+      - name: device
+        peer: NetworkDevice
+        kind: Attribute
+        cardinality: one
+        optional: false
+        identifier: device__static_route
+        order_weight: 500
+
+extensions:
+  nodes:
+    - kind: NetworkDevice
+      relationships:
+        - name: bgp_peer_groups
+          label: BGP Peer Groups
+          peer: RoutingBGPPeerGroup
+          optional: true
+          cardinality: many
+          kind: Generic
+          identifier: device__bgp_peer_group
+        - name: bgp_neighbors
+          label: BGP Neighbors
+          peer: RoutingBGPNeighbor
+          optional: true
+          cardinality: many
+          kind: Generic
+          identifier: device__bgp_neighbor
+        - name: prefix_lists
+          label: Prefix Lists
+          peer: RoutingPrefixList
+          optional: true
+          cardinality: many
+          kind: Generic
+          identifier: device__prefix_list
+        - name: route_maps
+          label: Route Maps
+          peer: RoutingRouteMap
+          optional: true
+          cardinality: many
+          kind: Generic
+          identifier: device__route_map
+        - name: static_routes
+          label: Static Routes
+          peer: RoutingStaticRoute
+          optional: true
+          cardinality: many
+          kind: Generic
+          identifier: device__static_route
