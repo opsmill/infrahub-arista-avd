@@ -4,6 +4,7 @@ from typing import Any, TypedDict
 
 from infrahub_sdk import InfrahubClient
 from infrahub_sdk.generator import InfrahubGenerator
+from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 from pyavd._eos_designs.schema import EosDesigns
 
@@ -115,11 +116,33 @@ def extract_uplinks_from_dict(
                         uplink_switches.append(remote_device.hostname.value)
                         uplink_switch_interfaces.append(endpoint.name.value)
 
+    # Sort all three lists in lockstep by local interface name to ensure
+    # deterministic ordering regardless of GraphQL return order.
+    # This prevents P2P IP address changes when Neo4j returns interfaces
+    # in a different order (e.g., after adding server interfaces).
+    if uplink_interfaces:
+        sorted_names = sort_interface_list(uplink_interfaces)
+        name_to_idx = {name: i for i, name in enumerate(uplink_interfaces)}
+        sorted_indices = [name_to_idx[name] for name in sorted_names]
+        uplink_interfaces = [uplink_interfaces[i] for i in sorted_indices]
+        uplink_switches = [uplink_switches[i] for i in sorted_indices]
+        uplink_switch_interfaces = [uplink_switch_interfaces[i] for i in sorted_indices]
+
     return {
         "uplink_interfaces": uplink_interfaces,
         "uplink_switches": uplink_switches,
         "uplink_switch_interfaces": uplink_switch_interfaces,
     }
+
+
+def _sort_server_endpoints(servers: dict[str, ServerEndpoint]) -> list[ServerEndpoint]:
+    """Sort servers by name and adapters within each server by switch port."""
+    sorted_servers = sorted(servers.values(), key=lambda s: s["name"])
+    for server in sorted_servers:
+        server["adapters"].sort(
+            key=lambda a: sort_interface_list(a["switch_ports"])[0] if a["switch_ports"] else ""
+        )
+    return sorted_servers
 
 
 def extract_connected_endpoints(
@@ -208,7 +231,7 @@ def extract_connected_endpoints(
 
                     servers[server_name]["adapters"].append(adapter)
 
-    return list(servers.values())
+    return _sort_server_endpoints(servers)
 
 
 class GenerateAVDDeviceHostvar(InfrahubGenerator):
