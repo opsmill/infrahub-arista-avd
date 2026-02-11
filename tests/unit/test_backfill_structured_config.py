@@ -424,14 +424,18 @@ class TestUpdateMtu:
         assert mock_interface.mtu.value == 9214
         mock_interface.save.assert_awaited_once_with(allow_upsert=True)
 
-    async def test_skip_mtu_when_same(self) -> None:
-        """Test that MTU update is skipped when current equals target."""
+    async def test_upserts_mtu_when_same(self) -> None:
+        """Test that MTU is always saved even when current equals target."""
         gen = _make_generator()
+        mock_interface = _make_saveable_mock()
+        mock_interface.mtu = MagicMock(value=9214)
+        gen.client.get = AsyncMock(return_value=mock_interface)
 
         iface = _make_interface(mtu=9214)
         await gen._update_mtu(iface, 9214, "leaf-1")
 
-        gen.client.get.assert_not_called()
+        gen.client.get.assert_awaited_once()
+        mock_interface.save.assert_awaited_once_with(allow_upsert=True)
 
 
 # --- BGP backfill ---
@@ -967,8 +971,8 @@ class TestGenerate:
         # Should have created prefix and IP
         assert gen.client.create.call_count == 2
 
-    async def test_skips_interface_with_existing_ip(self) -> None:
-        """Test that interfaces with existing IPs are not backfilled."""
+    async def test_upserts_interface_with_existing_ip(self) -> None:
+        """Test that interfaces with existing IPs are still upserted."""
         gen = _make_generator()
 
         structured_config = {
@@ -997,7 +1001,8 @@ class TestGenerate:
         data = _build_artifact_query_data(interfaces=interfaces)
         await gen.generate(data)
 
-        gen.client.create.assert_not_called()
+        # Should create prefix and IP even though interface already has one
+        assert gen.client.create.call_count == 2
 
     async def test_skips_unmatched_interface(self) -> None:
         """Test that structured config interfaces not in data model are skipped."""

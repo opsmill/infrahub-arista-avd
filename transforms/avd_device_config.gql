@@ -8,6 +8,9 @@ query AvdDeviceConfigQuery($name: String!) {
         }
         avd_artifact {
           node {
+            structured_config_checksum {
+              value
+            }
             structured_config_identifier {
               value
             }

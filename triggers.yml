@@ -12,6 +12,8 @@ spec:
       generator: generate-avd-device-structured-config
     - name: run-backfill-structured-config-generator
       generator: backfill-structured-config
+    - name: run-server-cabling-generator
+      generator: generate-server-cabling
 
 ---
 apiVersion: infrahub.app/v1
@@ -119,3 +121,9 @@ spec:
         data:
           - attribute_name: structured_config_checksum
             value_match: any
+
+    - name: trigger-server-cabling-generator-created
+      branch_scope: "other_branches"
+      node_kind: ComputePhysicalServer
+      mutation_action: "created"
+      action: run-server-cabling-generator

@@ -32,6 +32,9 @@ query AvdFabricDevicesQuery($name: String!) {
             hostvar_identifier {
               value
             }
+            structured_config_checksum {
+              value
+            }
             structured_config_identifier {
               value
             }

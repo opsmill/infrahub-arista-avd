@@ -142,19 +142,15 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         hostname: str,
         avd_source: str | None = None,
     ) -> None:
-        """Update interface MTU if it differs from current value."""
+        """Update interface MTU."""
         iface_name = interface_node.name.value if interface_node.name else "unknown"
-        current_mtu = interface_node.mtu.value if interface_node.mtu else None
-
-        if current_mtu == mtu:
-            return
 
         interface = await self.client.get(NetworkInterface, id=interface_node.id)
         interface.mtu.value = mtu
         if avd_source and hasattr(interface.mtu, "source"):
             interface.mtu.source = NodeProperty(avd_source)
         await interface.save(allow_upsert=True)
-        self.logger.info(f"[{hostname}] Updated MTU on {iface_name}: {current_mtu} -> {mtu}")
+        self.logger.info(f"[{hostname}] Ensured MTU {mtu} on {iface_name}")
 
     # --- BGP backfill ---
 
@@ -494,9 +490,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                     self.logger.debug(f"[{hostname}] Interface {iface_name} not in data model, skipping")
                     continue
 
-                # IP backfill (gap-fill only)
+                # IP backfill
                 ip_str = iface_config.get("ip_address")
-                if ip_str and not (gql_iface.ip_address.node):
+                if ip_str:
                     await self._backfill_ip(gql_iface, ip_str, hostname, avd_source)
 
                 # MTU update
