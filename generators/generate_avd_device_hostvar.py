@@ -8,7 +8,7 @@ from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 from pyavd._eos_designs.schema import EosDesigns
 
-from solution_ai_dc.generator import set_fabric_avd_hostvars_ready
+from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_structured_config_generation
 from solution_ai_dc.protocols import AvdArtifact, NetworkPod
 
 from .generate_avd_device_inputs_query import (
@@ -64,6 +64,7 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
             return False
 
     await set_fabric_avd_hostvars_ready(client, fabric_id, True)
+    await trigger_structured_config_generation(client)
     return True
 
 

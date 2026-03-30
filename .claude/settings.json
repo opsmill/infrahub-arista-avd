@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "opsmill": {
+      "source": {
+        "source": "github",
+        "repo": "opsmill/claude-marketplace"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "infrahub@opsmill": true
+  }
+}
