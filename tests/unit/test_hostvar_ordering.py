@@ -9,40 +9,40 @@ from generators.generate_avd_device_hostvar import (
 )
 
 # Short aliases for deeply nested Pydantic model types
-IfaceEdge = q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdges
-IfaceNode = q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNode
-IfaceName = q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeName
-IfaceRole = q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeRole
-IfaceLink = q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeLink
-LinkNode = q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeLinkNode
-LinkEndpoints = (
-    q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeLinkNodeEndpoints
+IfaceEdge = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges
+IfaceNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNode
+IfaceName = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeName
+IfaceRole = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeRole
+IfaceConnector = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnector
+ConnectorNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNode
+ConnectorEndpoints = (
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNodeConnectedEndpoints
 )
 EndpointEdge = (
-    q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeLinkNodeEndpointsEdges
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNodeConnectedEndpointsEdges
 )
-_ep = "GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeLinkNodeEndpointsEdgesNode"
-EndpointIface = getattr(q, f"{_ep}NetworkInterface")
-EndpointIfaceName = getattr(q, f"{_ep}NetworkInterfaceName")
-EndpointDevice = getattr(q, f"{_ep}NetworkInterfaceDevice")
-EndpointNetworkDevice = getattr(q, f"{_ep}NetworkInterfaceDeviceNodeNetworkDevice")
-EndpointNetworkDeviceHostname = getattr(
-    q, f"{_ep}NetworkInterfaceDeviceNodeNetworkDeviceHostname"
+_ep = "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNodeConnectedEndpointsEdgesNode"
+EndpointIface = getattr(q, f"{_ep}DcimInterface")
+EndpointIfaceName = getattr(q, f"{_ep}DcimInterfaceName")
+EndpointDevice = getattr(q, f"{_ep}DcimInterfaceDevice")
+EndpointNetworkDevice = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimDevice")
+EndpointNetworkDeviceName = getattr(
+    q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceName"
 )
 EndpointNetworkDeviceRole = getattr(
-    q, f"{_ep}NetworkInterfaceDeviceNodeNetworkDeviceRole"
+    q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceRole"
 )
 EndpointGenericDevice = getattr(
-    q, f"{_ep}NetworkInterfaceDeviceNodeNetworkGenericDevice"
+    q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDevice"
 )
-EndpointGenericDeviceHostname = getattr(
-    q, f"{_ep}NetworkInterfaceDeviceNodeNetworkGenericDeviceHostname"
+EndpointGenericDeviceName = getattr(
+    q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDeviceName"
 )
 TaggedVlan = (
-    q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeTaggedVlan
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeTaggedVlan
 )
 UntaggedVlan = (
-    q.GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeUntaggedVlan
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeUntaggedVlan
 )
 
 
@@ -63,21 +63,21 @@ def _make_uplink_edge(
             role=IfaceRole(value=role),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
-            link=IfaceLink(
-                node=LinkNode(
+            connector=IfaceConnector(
+                node=ConnectorNode(
                     id=f"link-{iface_id}",
-                    endpoints=LinkEndpoints(
+                    connected_endpoints=ConnectorEndpoints(
                         edges=[
                             EndpointEdge(
                                 node=EndpointIface(
-                                    __typename="NetworkInterface",
+                                    __typename="DcimInterface",
                                     id=remote_iface_id,
                                     name=EndpointIfaceName(value=remote_iface_name),
                                     device=EndpointDevice(
                                         node=EndpointNetworkDevice(
-                                            __typename="NetworkDevice",
+                                            __typename="DcimDevice",
                                             id=remote_device_id,
-                                            hostname=EndpointNetworkDeviceHostname(value=remote_hostname),
+                                            name=EndpointNetworkDeviceName(value=remote_hostname),
                                             role=EndpointNetworkDeviceRole(value="spine"),
                                         )
                                     ),
@@ -107,21 +107,21 @@ def _make_server_edge(
             role=IfaceRole(value="server"),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
-            link=IfaceLink(
-                node=LinkNode(
+            connector=IfaceConnector(
+                node=ConnectorNode(
                     id=f"link-{iface_id}",
-                    endpoints=LinkEndpoints(
+                    connected_endpoints=ConnectorEndpoints(
                         edges=[
                             EndpointEdge(
                                 node=EndpointIface(
-                                    __typename="NetworkInterface",
+                                    __typename="DcimInterface",
                                     id=remote_iface_id,
                                     name=EndpointIfaceName(value=remote_iface_name),
                                     device=EndpointDevice(
                                         node=EndpointGenericDevice(
                                             __typename="ComputePhysicalServer",
                                             id=remote_device_id,
-                                            hostname=EndpointGenericDeviceHostname(value=remote_hostname),
+                                            name=EndpointGenericDeviceName(value=remote_hostname),
                                         )
                                     ),
                                 )

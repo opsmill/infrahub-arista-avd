@@ -1,10 +1,10 @@
 query GenerateAvdDeviceInputsQuery($hostname: String!) {
-  NetworkDevice(hostname__value: $hostname) {
+  DcimDevice(name__value: $hostname) {
     edges {
       node {
         __typename
         id
-        hostname {
+        name {
           value
         }
         role {
@@ -105,16 +105,16 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                   }
                 }
               }
-              link {
+              connector {
                 node {
                   __typename
                   id
-                  endpoints {
+                  connected_endpoints {
                     edges {
                       node {
                         __typename
                         id
-                        ... on NetworkInterface {
+                        ... on DcimInterface {
                           name {
                             value
                           }
@@ -122,10 +122,10 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                             node {
                               __typename
                               id
-                              hostname {
+                              name {
                                 value
                               }
-                              ... on NetworkDevice {
+                              ... on DcimDevice {
                                 role {
                                   value
                                 }

@@ -13,7 +13,7 @@ from solution_ai_dc.protocols import AvdArtifact, NetworkPod
 
 from .generate_avd_device_inputs_query import (
     GenerateAvdDeviceInputsQuery,
-    GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
+    GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces,
 )
 
 
@@ -69,7 +69,7 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
 
 
 def extract_uplinks_from_dict(
-    interfaces: GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
+    interfaces: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces,
     uplink_role: str | None,
     device_id: str,
 ) -> UplinkData:
@@ -101,9 +101,9 @@ def extract_uplinks_from_dict(
             continue
 
         # Get the remote endpoint from the link
-        link = interface.link.node
+        link = interface.connector.node
         if link:
-            endpoints = link.endpoints.edges
+            endpoints = link.connected_endpoints.edges
             for ep_edge in endpoints:
                 endpoint = ep_edge.node
                 # Skip null endpoints or this interface
@@ -114,7 +114,7 @@ def extract_uplinks_from_dict(
                     if remote_device:
                         # Only add interface when we have a valid link with remote device
                         uplink_interfaces.append(interface.name.value)
-                        uplink_switches.append(remote_device.hostname.value)
+                        uplink_switches.append(remote_device.name.value)
                         uplink_switch_interfaces.append(endpoint.name.value)
 
     # Sort all three lists in lockstep by local interface name to ensure
@@ -147,7 +147,7 @@ def _sort_server_endpoints(servers: dict[str, ServerEndpoint]) -> list[ServerEnd
 
 
 def extract_connected_endpoints(
-    interfaces: GenerateAvdDeviceInputsQueryNetworkDeviceEdgesNodeInterfaces,
+    interfaces: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces,
     hostname: str,
 ) -> list[ServerEndpoint]:
     """Extract connected endpoints (servers) from device interfaces.
@@ -167,8 +167,8 @@ def extract_connected_endpoints(
         if not iface_role or iface_role.value != "server":
             continue
 
-        # Get the remote endpoint from the link
-        link = interface.link.node
+        # Get the remote endpoint from the connector
+        link = interface.connector.node
         if not link:
             continue
 
@@ -191,7 +191,7 @@ def extract_connected_endpoints(
             if status == "active":
                 untagged_vlan = untagged_vlan_node.vlan_id.value
 
-        endpoints = link.endpoints.edges
+        endpoints = link.connected_endpoints.edges
         for ep_edge in endpoints:
             endpoint = ep_edge.node
             if not endpoint:
@@ -200,7 +200,7 @@ def extract_connected_endpoints(
             if endpoint.id != interface.id:
                 remote_device = endpoint.device.node
                 if remote_device:
-                    server_name = remote_device.hostname.value
+                    server_name = remote_device.name.value
                     endpoint_port = endpoint.name.value
                     switch_port = interface.name.value
 
@@ -247,7 +247,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract basic device info
         device_id = device.id
-        hostname = device.hostname.value
+        hostname = device.name.value
         role = device.role.value
         bgp_asn = device.bgp_asn.value if device.bgp_asn else None
         node_id = device.node_id.value if device.node_id else None

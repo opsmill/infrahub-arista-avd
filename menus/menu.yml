@@ -25,19 +25,19 @@ spec:
           - namespace: Network
             name: Device
             label: Devices
-            kind: NetworkDevice
+            kind: DcimDevice
             icon: "mdi:server"
 
           - namespace: Network
             name: DeviceType
             label: Device Types
-            kind: NetworkDeviceType
+            kind: DcimDeviceType
             icon: "mdi:server"
 
           - namespace: Network
             name: Link
             label: Connections
-            kind: NetworkLink
+            kind: DcimConnector
             icon: "material-symbols:cable"
 
     - namespace: Location

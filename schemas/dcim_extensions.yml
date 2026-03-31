@@ -1,0 +1,132 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+extensions:
+  nodes:
+    - kind: DcimDevice
+      attributes:
+        - name: index
+          kind: Number
+          optional: true
+        - name: role
+          kind: Dropdown
+          optional: true
+          choices:
+            - name: super_spine
+              label: Super spine
+            - name: spine
+              label: Spine
+            - name: leaf
+              label: Leaf
+        - name: bgp_asn
+          label: BGP ASN
+          kind: Number
+          optional: true
+        - name: node_id
+          label: Node ID
+          kind: Number
+          optional: true
+      relationships:
+        - name: loopback_ip
+          peer: IpamIPAddress
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "device__ip_address"
+        - name: mgmt_ip
+          label: Management IP
+          peer: IpamIPAddress
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "device__mgmt_ip"
+        - name: rack
+          peer: LocationRack
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "rack__device"
+        - name: pod
+          peer: NetworkPod
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "pod__device"
+        - name: avd_artifact
+          peer: AvdArtifact
+          kind: Attribute
+          cardinality: one
+          optional: true
+
+    - kind: DcimInterface
+      attributes:
+        - name: description
+          kind: Text
+          computed_attribute:
+            kind: TransformPython
+            transform: computed_interface_description
+          read_only: true
+          optional: true
+          order_weight: 4000
+        - name: role
+          kind: Dropdown
+          optional: true
+          choices:
+            - name: uplink
+              label: Uplink
+            - name: access
+              label: Access
+            - name: spine
+              label: Spine
+            - name: super_spine
+              label: Super Spine
+            - name: leaf
+              label: Leaf
+            - name: loopback
+              label: Loopback
+            - name: server
+              label: Server
+            - name: storage
+              label: Storage
+          order_weight: 3000
+        - name: mtu
+          label: MTU
+          kind: Number
+          optional: true
+          order_weight: 5000
+        - name: index
+          kind: Text
+          read_only: true
+          optional: true
+          computed_attribute:
+            jinja2_template: "{{ \"%03d\"| format(name__value | split_interface | last | int) }}"
+            kind: Jinja2
+          order_weight: 20000
+      relationships:
+        - name: ip_address
+          label: IP Address
+          peer: IpamIPAddress
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: interface__ip_address
+          order_weight: 6000
+
+    - kind: DcimConnector
+      attributes:
+        - name: name
+          kind: Text
+          unique: true
+          optional: false
+        - name: medium
+          label: Medium
+          kind: Dropdown
+          optional: false
+          choices:
+            - name: mmf
+              label: Multi-Mode Fibre
+            - name: smf
+              label: Single-Mode Fibre
+            - name: copper
+              label: Copper

@@ -1,9 +1,9 @@
 query ServerCablingQuery($server_name: String!) {
-  ComputePhysicalServer(hostname__value: $server_name) {
+  ComputePhysicalServer(name__value: $server_name) {
     edges {
       node {
         id
-        hostname {
+        name {
           value
         }
         role {
@@ -33,7 +33,7 @@ query ServerCablingQuery($server_name: String!) {
               status {
                 value
               }
-              link {
+              connector {
                 node {
                   id
                 }
@@ -60,7 +60,7 @@ query ServerCablingQuery($server_name: String!) {
                 edges {
                   node {
                     id
-                    ... on ProfileNetworkInterface {
+                    ... on ProfileDcimInterface {
                       profile_name {
                         value
                       }

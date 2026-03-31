@@ -2,14 +2,14 @@
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: TemplateNetworkDevice
+  kind: TemplateDcimDevice
   parameters:
     expand_range: true
   data:
     - template_name: "spine-switch"
       role: "spine"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -25,7 +25,7 @@ spec:
     - template_name: "super-spine-switch"
       role: "super_spine"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -39,7 +39,7 @@ spec:
             name: "Ethernet[29-32]"
     - template_name: "Generic Switch"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -52,7 +52,7 @@ spec:
     - template_name: "leaf-switch-compute"
       role: "leaf"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -69,7 +69,7 @@ spec:
     - template_name: "leaf-switch-storage"
       role: "leaf"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -86,7 +86,7 @@ spec:
       device_type: ["Dell", "PowerSwitch Z9864F-ON"]
       role: "spine"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -103,7 +103,7 @@ spec:
       device_type: ["Dell", "PowerSwitch Z9864F-ON"]
       role: "super_spine"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -117,7 +117,7 @@ spec:
       role: "leaf"
       device_type: ["Dell", "PowerSwitch S5232F-ON"]
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -134,7 +134,7 @@ spec:
       role: "leaf"
       device_type: ["Dell", "PowerSwitch S5232F-ON"]
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:

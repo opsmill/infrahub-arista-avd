@@ -22,7 +22,7 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
                           node {
                             __typename
                             id
-                            hostname {
+                            name {
                               value
                             }
                             avd_artifact {
@@ -44,7 +44,7 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
                     node {
                       __typename
                       id
-                      hostname {
+                      name {
                         value
                       }
                       avd_artifact {

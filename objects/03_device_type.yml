@@ -2,7 +2,7 @@
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: NetworkDeviceType
+  kind: DcimDeviceType
   data:
     - name: "PowerSwitch Z9864F-ON"
       manufacturer: ["Dell"]

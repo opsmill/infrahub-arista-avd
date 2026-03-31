@@ -6,7 +6,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
-from solution_ai_dc.protocols import NetworkDevice, NetworkInterface, NetworkPod
+from solution_ai_dc.protocols import DcimDevice, DcimInterface, NetworkPod
 
 from .fabric_generator_query import FabricGeneratorQuery
 
@@ -31,7 +31,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric_super_spine_switch_template = data.network_fabric.edges[0].node.super_spine_switch_template.node.id
         self.amount_of_super_spines = data.network_fabric.edges[0].node.amount_of_super_spines.value
         await set_fabric_avd_hostvars_ready(self.client, self.fabric_id, False)
-        self.super_spine_devices: list[NetworkDevice] = []
+        self.super_spine_devices: list[DcimDevice] = []
 
         # Get AVD-related pool references
         asn_pool_node = data.network_fabric.edges[0].node.asn_pool
@@ -76,18 +76,18 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
             if self.mgmt_pool:
                 device_kwargs["mgmt_ip"] = self.mgmt_pool
 
-            device = await self.client.create(NetworkDevice, **device_kwargs)
+            device = await self.client.create(DcimDevice, **device_kwargs)
             await device.save(allow_upsert=True)
 
             # FIX: seems the id of a related node assigned from a pool is not immediately accessible
             device = await self.client.get(
-                NetworkDevice,
+                DcimDevice,
                 id=device.id,
                 include=["ip_address"],
-                exclude=["rack", "pod", "role", "hostname", "object_template", "member_of_groups"],
+                exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
             )
             loopback_interface = await self.client.get(
-                NetworkInterface, device__ids=[device.id], role__value="loopback"
+                DcimInterface, device__ids=[device.id], role__value="loopback"
             )
             loopback_interface.status.value = "active"
             loopback_interface.ip_address = device.loopback_ip.id
@@ -104,7 +104,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         fabric_prefix_pool = await self.client.create(
             kind=CoreIPPrefixPool,
             name=f"{self.fabric_name}-prefix-pool",
-            default_prefix_type="IpamIPPrefix",
+            default_prefix_type="IpamPrefix",
             default_prefix_length=24,
             ip_namespace={"hfid": ["default"]},
             resources=[fabric_supernet],

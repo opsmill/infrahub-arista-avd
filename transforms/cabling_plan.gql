@@ -25,7 +25,7 @@ query FabricCablingPlanQuery($name: String!) {
                           node {
                             __typename
                             id
-                            link {
+                            connector {
                               node {
                                 __typename
                                 id

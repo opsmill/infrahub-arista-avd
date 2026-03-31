@@ -6,91 +6,91 @@ from pydantic import BaseModel, Field
 
 
 class StartupConfigQuery(BaseModel):
-    network_device: "StartupConfigQueryNetworkDevice" = Field(alias="NetworkDevice")
+    dcim_device: "StartupConfigQueryDcimDevice" = Field(alias="DcimDevice")
 
 
-class StartupConfigQueryNetworkDevice(BaseModel):
-    edges: list["StartupConfigQueryNetworkDeviceEdges"]
+class StartupConfigQueryDcimDevice(BaseModel):
+    edges: list["StartupConfigQueryDcimDeviceEdges"]
 
 
-class StartupConfigQueryNetworkDeviceEdges(BaseModel):
-    node: Optional["StartupConfigQueryNetworkDeviceEdgesNode"]
+class StartupConfigQueryDcimDeviceEdges(BaseModel):
+    node: Optional["StartupConfigQueryDcimDeviceEdgesNode"]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNode(BaseModel):
-    hostname: Optional["StartupConfigQueryNetworkDeviceEdgesNodeHostname"]
-    loopback_ip: "StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIp"
-    interfaces: "StartupConfigQueryNetworkDeviceEdgesNodeInterfaces"
+class StartupConfigQueryDcimDeviceEdgesNode(BaseModel):
+    name: Optional["StartupConfigQueryDcimDeviceEdgesNodeName"]
+    loopback_ip: "StartupConfigQueryDcimDeviceEdgesNodeLoopbackIp"
+    interfaces: "StartupConfigQueryDcimDeviceEdgesNodeInterfaces"
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeHostname(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeName(BaseModel):
     value: Optional[str]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIp(BaseModel):
-    node: Optional["StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIpNode"]
+class StartupConfigQueryDcimDeviceEdgesNodeLoopbackIp(BaseModel):
+    node: Optional["StartupConfigQueryDcimDeviceEdgesNodeLoopbackIpNode"]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIpNode(BaseModel):
-    address: Optional["StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIpNodeAddress"]
+class StartupConfigQueryDcimDeviceEdgesNodeLoopbackIpNode(BaseModel):
+    address: Optional["StartupConfigQueryDcimDeviceEdgesNodeLoopbackIpNodeAddress"]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIpNodeAddress(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeLoopbackIpNodeAddress(BaseModel):
     ip: Optional[str]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfaces(BaseModel):
-    edges: list["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdges"]
+class StartupConfigQueryDcimDeviceEdgesNodeInterfaces(BaseModel):
+    edges: list["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges"]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdges(BaseModel):
-    node: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode"]
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges(BaseModel):
+    node: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNode"]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode(BaseModel):
-    name: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeName"]
-    description: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeDescription"]
-    role: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeRole"]
-    status: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeStatus"]
-    ip_address: "StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddress"
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNode(BaseModel):
+    name: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeName"]
+    description: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeDescription"]
+    role: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeRole"]
+    status: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeStatus"]
+    ip_address: "StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddress"
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeName(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeName(BaseModel):
     value: Optional[str]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeDescription(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeDescription(BaseModel):
     value: Optional[str]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeRole(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeRole(BaseModel):
     value: Optional[str]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeStatus(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeStatus(BaseModel):
     value: Optional[str]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddress(BaseModel):
-    node: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode"]
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddress(BaseModel):
+    node: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode"]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode(BaseModel):
-    address: Optional["StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress"]
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode(BaseModel):
+    address: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress"]
 
 
-class StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress(BaseModel):
     value: Optional[str]
 
 
 StartupConfigQuery.model_rebuild()
-StartupConfigQueryNetworkDevice.model_rebuild()
-StartupConfigQueryNetworkDeviceEdges.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNode.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIp.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNodeLoopbackIpNode.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNodeInterfaces.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdges.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNode.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddress.model_rebuild()
-StartupConfigQueryNetworkDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode.model_rebuild()
+StartupConfigQueryDcimDevice.model_rebuild()
+StartupConfigQueryDcimDeviceEdges.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNode.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNodeLoopbackIp.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNodeLoopbackIpNode.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNodeInterfaces.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNode.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddress.model_rebuild()
+StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode.model_rebuild()

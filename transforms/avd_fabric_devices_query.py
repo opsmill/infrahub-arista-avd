@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class AvdFabricDevicesQuery(BaseModel):
     network_fabric: "AvdFabricDevicesQueryNetworkFabric" = Field(alias="NetworkFabric")
-    network_device: "AvdFabricDevicesQueryNetworkDevice" = Field(alias="NetworkDevice")
+    dcim_device: "AvdFabricDevicesQueryDcimDevice" = Field(alias="DcimDevice")
 
 
 class AvdFabricDevicesQueryNetworkFabric(BaseModel):
@@ -27,59 +27,59 @@ class AvdFabricDevicesQueryNetworkFabricEdgesNodeName(BaseModel):
     value: Optional[str]
 
 
-class AvdFabricDevicesQueryNetworkDevice(BaseModel):
-    edges: list["AvdFabricDevicesQueryNetworkDeviceEdges"]
+class AvdFabricDevicesQueryDcimDevice(BaseModel):
+    edges: list["AvdFabricDevicesQueryDcimDeviceEdges"]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdges(BaseModel):
-    node: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNode"]
+class AvdFabricDevicesQueryDcimDeviceEdges(BaseModel):
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNode"]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNode(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNode(BaseModel):
     id: str
-    hostname: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeHostname"]
-    pod: "AvdFabricDevicesQueryNetworkDeviceEdgesNodePod"
-    avd_artifact: "AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact"
+    name: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodeName"]
+    pod: "AvdFabricDevicesQueryDcimDeviceEdgesNodePod"
+    avd_artifact: "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact"
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodeHostname(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeName(BaseModel):
     value: Optional[str]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodePod(BaseModel):
-    node: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNode"]
+class AvdFabricDevicesQueryDcimDeviceEdgesNodePod(BaseModel):
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode"]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNode(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode(BaseModel):
     id: str
-    parent: "AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParent"
+    parent: "AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent"
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParent(BaseModel):
-    node: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParentNode"]
+class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent(BaseModel):
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParentNode"]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParentNode(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParentNode(BaseModel):
     typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(alias="__typename")
     id: Optional[str]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact(BaseModel):
-    node: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNode"]
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode"]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNode(BaseModel):
-    hostvar_identifier: Optional["AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier"]
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
+    hostvar_identifier: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier"]
     structured_config_identifier: Optional[
-        "AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier"
+        "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier"
     ]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier(BaseModel):
     value: Optional[str]
 
 
-class AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(BaseModel):
     value: Optional[str]
 
 
@@ -87,11 +87,11 @@ AvdFabricDevicesQuery.model_rebuild()
 AvdFabricDevicesQueryNetworkFabric.model_rebuild()
 AvdFabricDevicesQueryNetworkFabricEdges.model_rebuild()
 AvdFabricDevicesQueryNetworkFabricEdgesNode.model_rebuild()
-AvdFabricDevicesQueryNetworkDevice.model_rebuild()
-AvdFabricDevicesQueryNetworkDeviceEdges.model_rebuild()
-AvdFabricDevicesQueryNetworkDeviceEdgesNode.model_rebuild()
-AvdFabricDevicesQueryNetworkDeviceEdgesNodePod.model_rebuild()
-AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNode.model_rebuild()
-AvdFabricDevicesQueryNetworkDeviceEdgesNodePodNodeParent.model_rebuild()
-AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifact.model_rebuild()
-AvdFabricDevicesQueryNetworkDeviceEdgesNodeAvdArtifactNode.model_rebuild()
+AvdFabricDevicesQueryDcimDevice.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdges.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNode.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNodePod.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()

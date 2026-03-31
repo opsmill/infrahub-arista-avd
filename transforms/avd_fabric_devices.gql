@@ -9,11 +9,11 @@ query AvdFabricDevicesQuery($name: String!) {
       }
     }
   }
-  NetworkDevice {
+  DcimDevice {
     edges {
       node {
         id
-        hostname {
+        name {
           value
         }
         pod {

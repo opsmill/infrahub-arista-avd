@@ -58,7 +58,7 @@ class TestAvdInputsBuilder:
         """Test hostvars generation for super-spine device."""
         builder = AvdInputsBuilder("test-fabric", "10.0.0.1")
         hostvars = builder.build_device_hostvars(
-            hostname="ss-test-1",
+            device_name="ss-test-1",
             role="super_spine",
             bgp_asn=65000,
             node_id=1,
@@ -80,7 +80,7 @@ class TestAvdInputsBuilder:
         """Test hostvars generation for spine device with uplinks."""
         builder = AvdInputsBuilder("test-fabric")
         hostvars = builder.build_device_hostvars(
-            hostname="spine-test-1",
+            device_name="spine-test-1",
             role="spine",
             bgp_asn=65001,
             node_id=2,
@@ -99,7 +99,7 @@ class TestAvdInputsBuilder:
         """Test hostvars generation for leaf device with uplinks."""
         builder = AvdInputsBuilder("test-fabric")
         hostvars = builder.build_device_hostvars(
-            hostname="leaf-test-1-1",
+            device_name="leaf-test-1-1",
             role="leaf",
             bgp_asn=65002,
             node_id=3,
@@ -115,7 +115,7 @@ class TestAvdInputsBuilder:
         """Test that optional fields are not included when not provided."""
         builder = AvdInputsBuilder("test-fabric")
         hostvars = builder.build_device_hostvars(
-            hostname="ss-test-1",
+            device_name="ss-test-1",
             role="super_spine",
             bgp_asn=65000,
             node_id=1,
@@ -129,7 +129,7 @@ class TestAvdInputsBuilder:
         """Test that BGP ASN is converted to string."""
         builder = AvdInputsBuilder("test-fabric")
         hostvars = builder.build_device_hostvars(
-            hostname="test",
+            device_name="test",
             role="spine",
             bgp_asn=65000,
             node_id=1,

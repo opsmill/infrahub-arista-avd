@@ -50,7 +50,7 @@ generator_definitions:
     query: avd_device_hostvar
     targets: avd_devices
     parameters:
-      hostname: hostname__value
+      hostname: name__value
     class_name: GenerateAVDDeviceHostvar
     convert_query_response: false
     execute_in_proposed_change: false
@@ -105,7 +105,7 @@ generator_definitions:
     query: backfill_structured_config
     targets: avd_artifacts
     parameters:
-      device_hostname: device__hostname__value
+      device_hostname: device__name__value
     class_name: BackfillStructuredConfigGenerator
     convert_query_response: false
     execute_in_proposed_change: false
@@ -116,7 +116,7 @@ generator_definitions:
     query: generate_server_cabling
     targets: servers
     parameters:
-      server_name: hostname__value
+      server_name: name__value
     class_name: ServerCablingGenerator
     convert_query_response: false
     execute_in_proposed_change: false
@@ -149,7 +149,7 @@ artifact_definitions:
   - name: "startup_configuration"
     artifact_name: "Startup configuration"
     parameters:
-      name: "hostname__value"
+      name: "name__value"
     content_type: "text/plain"
     targets: "devices"
     transformation: "device_startup_config"
@@ -163,7 +163,7 @@ artifact_definitions:
   - name: "avd_eos_configuration"
     artifact_name: "AVD EOS Configuration"
     parameters:
-      name: "hostname__value"
+      name: "name__value"
     content_type: "text/plain"
     targets: "avd_devices"
     transformation: "avd_eos_config"
@@ -177,7 +177,7 @@ artifact_definitions:
   - name: "avd_device_documentation"
     artifact_name: "AVD Device Documentation"
     parameters:
-      name: "hostname__value"
+      name: "name__value"
     content_type: "text/markdown"
     targets: "avd_devices"
     transformation: "avd_device_doc"

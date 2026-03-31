@@ -41,7 +41,7 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate(BaseMod
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode(BaseModel):
-    typename__: Literal["CoreObjectTemplate", "TemplateNetworkDevice"] = Field(alias="__typename")
+    typename__: Literal["CoreObjectTemplate", "TemplateDcimDevice"] = Field(alias="__typename")
     id: Optional[str]
 
 

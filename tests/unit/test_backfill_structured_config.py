@@ -41,7 +41,7 @@ from generators.backfill_structured_config_query import (
 from solution_ai_dc.protocols import (
     CoreAccountGroup,
     IpamIPAddress,
-    IpamIPPrefix,
+    IpamPrefix,
     RoutingBGPNeighbor,
     RoutingBGPPeerGroup,
     RoutingPrefixList,
@@ -98,9 +98,9 @@ def _build_artifact_query_data(
     device = None
     if device_node:
         device = {
-            "__typename": "NetworkDevice",
+            "__typename": "DcimDevice",
             "id": "dev-1",
-            "hostname": {"value": hostname},
+            "name": {"value": hostname},
             "role": {"value": "leaf"},
             "interfaces": {"edges": interfaces or []},
         }
@@ -134,7 +134,7 @@ class TestQueryModelParsing:
         assert artifact.structured_config_identifier.value == "sc-id-123"
         device = artifact.device.node
         assert device.id == "dev-1"
-        assert device.hostname.value == "leaf-1"
+        assert device.name.value == "leaf-1"
         assert device.role.value == "leaf"
         assert device.interfaces.edges == []
 
@@ -361,7 +361,7 @@ class TestBackfillIp:
 
         # Verify prefix creation
         gen.client.create.assert_any_call(
-            IpamIPPrefix,
+            IpamPrefix,
             prefix="10.0.0.0/31",
             role="backfill",
         )
@@ -403,7 +403,7 @@ class TestBackfillIp:
         await gen._backfill_ip(iface, "10.255.0.1/32", "leaf-1")
 
         gen.client.create.assert_any_call(
-            IpamIPPrefix,
+            IpamPrefix,
             prefix="10.255.0.1/32",
             role="backfill",
         )

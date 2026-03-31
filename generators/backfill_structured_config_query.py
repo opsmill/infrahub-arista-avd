@@ -35,12 +35,12 @@ class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDevice(BaseModel):
 
 class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNode(BaseModel):
     id: str
-    hostname: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeHostname"]
+    name: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeName"]
     role: Optional["BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeRole"]
     interfaces: "BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfaces"
 
 
-class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeHostname(BaseModel):
+class BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeName(BaseModel):
     value: Optional[str]
 
 

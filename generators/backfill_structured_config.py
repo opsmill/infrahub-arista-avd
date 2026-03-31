@@ -1,7 +1,7 @@
 """Backfill Structured Config Generator.
 
-Reads AVD structured config per-device and backfills IpamIPPrefix,
-IpamIPAddress, NetworkInterface.mtu, BGP peer groups/neighbors,
+Reads AVD structured config per-device and backfills IpamPrefix,
+IpamIPAddress, DcimInterface.mtu, BGP peer groups/neighbors,
 prefix lists, route maps, and static routes into the Infrahub data model.
 """
 
@@ -18,9 +18,9 @@ from infrahub_sdk.node import NodeProperty
 
 from solution_ai_dc.protocols import (
     CoreAccountGroup,
+    DcimInterface,
     IpamIPAddress,
-    IpamIPPrefix,
-    NetworkInterface,
+    IpamPrefix,
     RoutingBGPNeighbor,
     RoutingBGPPeerGroup,
     RoutingPrefixList,
@@ -100,7 +100,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         hostname: str,
         avd_source: str | None = None,
     ) -> None:
-        """Create IpamIPPrefix and IpamIPAddress, assign to interface."""
+        """Create IpamPrefix and IpamIPAddress, assign to interface."""
         iface_name = interface_node.name.value if interface_node.name else "unknown"
 
         try:
@@ -113,7 +113,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         prefix_str = str(network)
 
         prefix = await self.client.create(
-            IpamIPPrefix,
+            IpamPrefix,
             prefix=prefix_str,
             role="backfill",
         )
@@ -130,7 +130,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         await ip_address.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Ensured IP address {ip_iface}")
 
-        interface = await self.client.get(NetworkInterface, id=interface_node.id, include=["link"])
+        interface = await self.client.get(DcimInterface, id=interface_node.id, include=["connector"])
         interface.ip_address = ip_address
         await interface.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Assigned {ip_iface} to {iface_name}")
@@ -145,7 +145,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         """Update interface MTU."""
         iface_name = interface_node.name.value if interface_node.name else "unknown"
 
-        interface = await self.client.get(NetworkInterface, id=interface_node.id)
+        interface = await self.client.get(DcimInterface, id=interface_node.id)
         interface.mtu.value = mtu
         if avd_source and hasattr(interface.mtu, "source"):
             interface.mtu.source = NodeProperty(avd_source)
@@ -446,7 +446,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             self.logger.warning("No device linked to artifact, skipping")
             return
 
-        hostname = device.hostname.value if device.hostname else "unknown"
+        hostname = device.name.value if device.name else "unknown"
         device_id = device.id
 
         # Fetch structured config from object storage

@@ -15,7 +15,7 @@ from solution_ai_dc.generator import (
     set_fabric_avd_hostvars_ready,
     trigger_hostvar_generation,
 )
-from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkPod
+from solution_ai_dc.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
 
 from .rack_generator_query import RackGeneratorQuery
 
@@ -39,9 +39,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     pod_index: int
     pod_name: str
 
-    spine_switches: list[NetworkDevice]
+    spine_switches: list[DcimDevice]
 
-    leaf_switches: list[NetworkDevice]
+    leaf_switches: list[DcimDevice]
 
     loopback_pool: CoreIPAddressPool
     prefix_pool: CoreIPPrefixPool
@@ -83,7 +83,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.loopback_pool = await self.client.get(kind=CoreIPAddressPool, id=self.loopback_pool_id)
         self.prefix_pool = await self.client.get(kind=CoreIPPrefixPool, id=self.prefix_pool_id)
 
-        self.spine_switches = await self.client.filters(kind=NetworkDevice, pod__ids=[self.pod_id], role__value="spine")
+        self.spine_switches = await self.client.filters(kind=DcimDevice, pod__ids=[self.pod_id], role__value="spine")
 
         if self.rack_type in EXCLUDED_RACK_TYPES:
             msg = f"Cannot run rack generator on {self.rack_name}-{self.rack_id}: {self.rack_type} is not supported by the generator!"
@@ -154,19 +154,19 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             if self.mgmt_pool:
                 device_kwargs["mgmt_ip"] = self.mgmt_pool
 
-            leaf_switch = await self.client.create(NetworkDevice, **device_kwargs)
+            leaf_switch = await self.client.create(DcimDevice, **device_kwargs)
             await leaf_switch.save(allow_upsert=True)
             self.leaf_switches.append(leaf_switch)
 
             # FIX: seems the id of a related node assigned from a pool is not immediately accessible
             device = await self.client.get(
-                NetworkDevice,
+                DcimDevice,
                 id=leaf_switch.id,
                 include=["ip_address"],
-                exclude=["rack", "pod", "role", "hostname", "object_template", "member_of_groups"],
+                exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
             )
             loopback_interface = await self.client.get(
-                NetworkInterface, device__ids=[device.id], role__value="loopback"
+                DcimInterface, device__ids=[device.id], role__value="loopback"
             )
             loopback_interface.status.value = "active"
             loopback_interface.ip_address = device.loopback_ip.id
@@ -174,18 +174,18 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
     async def connect_leafs_to_spine(self) -> None:
         spine_interfaces = await self.client.filters(
-            kind=NetworkInterface, device__ids=[spine.id for spine in self.spine_switches], role__value="leaf"
+            kind=DcimInterface, device__ids=[spine.id for spine in self.spine_switches], role__value="leaf"
         )
         spine_interface_map = self.spine_interface_sorting_function(spine_interfaces)
 
         leaf_interfaces = await self.client.filters(
-            kind=NetworkInterface,
+            kind=DcimInterface,
             device__ids=[leaf_switch.id for leaf_switch in self.leaf_switches],
             role__value="spine",
         )
         leaf_interface_map = self.leaf_interface_sorting_function(leaf_interfaces)
 
-        created_cabling_plan: list[tuple[NetworkInterface, NetworkInterface]] = build_rack_cabling_plan(
+        created_cabling_plan: list[tuple[DcimInterface, DcimInterface]] = build_rack_cabling_plan(
             rack_index=self.rack_index,
             src_interface_map=leaf_interface_map,
             dst_interface_map=spine_interface_map,

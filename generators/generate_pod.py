@@ -10,7 +10,7 @@ from solution_ai_dc import sorting as solution_ai_dc_sorting
 from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
 from solution_ai_dc.cabling import build_pod_cabling_plan, connect_interface_maps
 from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
-from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkPod
+from solution_ai_dc.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
 
 from .pod_generator_query import PodGeneratorQuery
 
@@ -36,8 +36,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
     loopback_pool: CoreIPAddressPool
 
     pod_prefix_pool: CoreIPPrefixPool
-    spine_switches: list[NetworkDevice]
-    super_spine_switches: list[NetworkDevice]
+    spine_switches: list[DcimDevice]
+    super_spine_switches: list[DcimDevice]
 
     asn_pool: CoreNumberPool | None
     node_id_pool: CoreNumberPool | None
@@ -134,18 +134,18 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
             if self.mgmt_pool:
                 device_kwargs["mgmt_ip"] = self.mgmt_pool
 
-            device = await self.client.create(NetworkDevice, **device_kwargs)
+            device = await self.client.create(DcimDevice, **device_kwargs)
             await device.save(allow_upsert=True)
 
             # FIX: seems the id of a related node assigned from a pool is not immediately accessible
             device = await self.client.get(
-                NetworkDevice,
+                DcimDevice,
                 id=device.id,
                 include=["ip_address"],
-                exclude=["rack", "pod", "role", "hostname", "object_template", "member_of_groups"],
+                exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
             )
             loopback_interface = await self.client.get(
-                NetworkInterface, device__ids=[device.id], role__value="loopback"
+                DcimInterface, device__ids=[device.id], role__value="loopback"
             )
             loopback_interface.status.value = "active"
             loopback_interface.ip_address = device.loopback_ip.id
@@ -169,7 +169,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         self.pod_prefix_pool = await self.client.create(
             kind=CoreIPPrefixPool,
             name=f"{self.fabric_name}-{self.pod_name}-prefix-pool",
-            default_prefix_type="IpamIPPrefix",
+            default_prefix_type="IpamPrefix",
             default_prefix_length=24,
             ip_namespace={"hfid": ["default"]},
             resources=[pod_supernet],
@@ -199,25 +199,25 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         pod.prefix_pool = self.pod_prefix_pool
         await pod.save(allow_upsert=True)
 
-    async def get_super_spine_switches_for_fabric(self) -> tuple[NetworkPod, list[NetworkDevice]]:
+    async def get_super_spine_switches_for_fabric(self) -> tuple[NetworkPod, list[DcimDevice]]:
         self.fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
         self.super_spine_switches = await self.client.filters(
-            kind=NetworkDevice, pod__ids=[self.fabric_pod.id], role__value="super_spine"
+            kind=DcimDevice, pod__ids=[self.fabric_pod.id], role__value="super_spine"
         )
         return self.fabric_pod, self.super_spine_switches
 
     async def connect_spine_to_super_spine(self) -> None:
         spine_interfaces = await self.client.filters(
-            kind=NetworkInterface, device__ids=[spine.id for spine in self.spine_switches], role__value="super_spine"
+            kind=DcimInterface, device__ids=[spine.id for spine in self.spine_switches], role__value="super_spine"
         )
         spine_interface_map = self.spine_interface_sorting_function(spine_interfaces)
 
         super_spine_interfaces = await self.client.filters(
-            kind=NetworkInterface, device__ids=[ss.id for ss in self.super_spine_switches], role__value="spine"
+            kind=DcimInterface, device__ids=[ss.id for ss in self.super_spine_switches], role__value="spine"
         )
         super_spine_interface_map = self.fabric_interface_sorting_function(super_spine_interfaces)
 
-        created_cabling_plan: list[tuple[NetworkInterface, NetworkInterface]] = build_pod_cabling_plan(
+        created_cabling_plan: list[tuple[DcimInterface, DcimInterface]] = build_pod_cabling_plan(
             pod_index=self.pod_index,
             src_interface_map=spine_interface_map,
             dst_interface_map=super_spine_interface_map,

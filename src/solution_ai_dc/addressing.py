@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from .protocols import NetworkInterface
+from .protocols import DcimInterface
 
 if TYPE_CHECKING:
     import logging
@@ -16,14 +16,14 @@ if TYPE_CHECKING:
 
 async def assign_ip_address_to_interface(
     client: InfrahubClient,
-    interface: NetworkInterface,
+    interface: DcimInterface,
     logger: logging.Logger,
     host_addresses: Generator[IPv4Address],
     prefix_len: int,
 ) -> None:
     ip_address = await client.create(kind="IpamIPAddress", address=str(next(host_addresses)) + f"/{prefix_len}")
     await ip_address.save(allow_upsert=True)
-    interface = await client.get(NetworkInterface, id=interface.id, include=["link"])
+    interface = await client.get(DcimInterface, id=interface.id, include=["connector"])
     interface.ip_address = ip_address
     await interface.save(allow_upsert=True)
     logger.info(f"Assigned {ip_address.address.value} to {interface.display_label}")
@@ -32,7 +32,7 @@ async def assign_ip_address_to_interface(
 async def assign_ip_addresses_to_p2p_connections(
     client: InfrahubClient,
     logger: logging.Logger,
-    connections: list[tuple[NetworkInterface, NetworkInterface]],
+    connections: list[tuple[DcimInterface, DcimInterface]],
     prefix_len: int,
     prefix_role: str,
     pool: CoreIPPrefixPool,

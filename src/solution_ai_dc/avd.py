@@ -49,7 +49,7 @@ class AvdInputsBuilder:
 
     def build_device_hostvars(
         self,
-        hostname: str,  # noqa: ARG002 - kept for API completeness
+        device_name: str,  # noqa: ARG002 - kept for API completeness
         role: str,
         bgp_asn: int,
         node_id: int,
@@ -62,7 +62,7 @@ class AvdInputsBuilder:
         """Build hostvars dict for a single device.
 
         Args:
-            hostname: Device hostname
+            device_name: Device name
             role: Device role (super_spine, spine, leaf)
             bgp_asn: BGP autonomous system number
             node_id: Unique node ID within the fabric
