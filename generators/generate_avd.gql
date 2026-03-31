@@ -22,14 +22,16 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
                           node {
                             __typename
                             id
-                            name {
-                              value
-                            }
-                            avd_artifact {
-                              node {
-                                __typename
-                                hostvar_identifier {
-                                  value
+                            ... on DcimDevice {
+                              name {
+                                value
+                              }
+                              avd_artifact {
+                                node {
+                                  __typename
+                                  hostvar_identifier {
+                                    value
+                                  }
                                 }
                               }
                             }
