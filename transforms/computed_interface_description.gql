@@ -4,24 +4,26 @@ query ComputedInterfaceDescriptionQuery($id: ID!) {
       node {
         __typename
         id
-        connector {
-          node {
-            __typename
-            id
-            connected_endpoints {
-              edges {
-                node {
-                  __typename
-                  id
-                  ... on DcimInterface {
-                    name {
-                      value
-                    }
-                    device {
-                      node {
-                        __typename
-                        name {
-                          value
+        ... on DcimEndpoint {
+          connector {
+            node {
+              __typename
+              id
+              connected_endpoints {
+                edges {
+                  node {
+                    __typename
+                    id
+                    ... on DcimInterface {
+                      name {
+                        value
+                      }
+                      device {
+                        node {
+                          __typename
+                          name {
+                            value
+                          }
                         }
                       }
                     }

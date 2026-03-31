@@ -33,9 +33,11 @@ query ServerCablingQuery($server_name: String!) {
               status {
                 value
               }
-              connector {
-                node {
-                  id
+              ... on DcimEndpoint {
+                connector {
+                  node {
+                    id
+                  }
                 }
               }
               tagged_vlan {
