@@ -60,7 +60,8 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
 
         for idx in range(1, self.amount_of_super_spines + 1):
             device_kwargs = {
-                "hostname": f"ss-{self.fabric_name}-{idx}",
+                "name": f"ss-{self.fabric_name}-{idx}",
+                "status": "provisioning",
                 "object_template": {"id": self.fabric_super_spine_switch_template},
                 "loopback_ip": self.loopback_pool,
                 "role": "super_spine",

@@ -118,7 +118,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
         for idx in range(1, self.amount_of_spines + 1):
             device_kwargs = {
-                "hostname": f"spine-{self.pod_name}-{idx}",
+                "name": f"spine-{self.pod_name}-{idx}",
+                "status": "provisioning",
                 "object_template": {"id": self.pod_spine_switch_template},
                 "pod": {"id": self.pod_id},
                 "loopback_ip": self.loopback_pool,

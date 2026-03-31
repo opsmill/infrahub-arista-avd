@@ -136,7 +136,8 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     async def create_leaf_switches(self) -> None:
         for index in range(1, self.rack_amount_of_leafs + 1):
             device_kwargs = {
-                "hostname": f"leaf-{self.pod_name}-{self.rack_index}-{index}",
+                "name": f"leaf-{self.pod_name}-{self.rack_index}-{index}",
+                "status": "provisioning",
                 "object_template": {"id": self.rack_leaf_switch_template},
                 "pod": {"id": self.pod_id},
                 "rack": {"id": self.rack_id},
