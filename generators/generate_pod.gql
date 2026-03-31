@@ -1,5 +1,5 @@
-query PodGeneratorQuery($pod_name: String!) {
-  NetworkPod(name__value: $pod_name) {
+query PodGeneratorQuery($name: String!) {
+  NetworkPod(name__value: $name) {
     edges {
       node {
         id

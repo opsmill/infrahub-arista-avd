@@ -1,5 +1,5 @@
-query ServerCablingQuery($server_name: String!) {
-  ComputePhysicalServer(name__value: $server_name) {
+query ServerCablingQuery($name: String!) {
+  ComputePhysicalServer(name__value: $name) {
     edges {
       node {
         id

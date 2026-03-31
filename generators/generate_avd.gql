@@ -1,5 +1,5 @@
-query GenerateAvdInputsQuery($fabric_name: String!) {
-  NetworkFabric(name__value: $fabric_name) {
+query GenerateAvdInputsQuery($name: String!) {
+  NetworkFabric(name__value: $name) {
     edges {
       node {
         __typename

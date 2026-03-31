@@ -60,7 +60,7 @@ generator_definitions:
     query: generate_fabric
     targets: fabrics
     parameters:
-      fabric_name: name__value
+      name: name__value
     class_name: FabricGenerator
     convert_query_response: false
     execute_in_proposed_change: false
@@ -71,7 +71,7 @@ generator_definitions:
     query: generate_pod
     targets: pods
     parameters:
-      pod_name: name__value
+      name: name__value
     class_name: PodGenerator
     convert_query_response: false
     execute_in_proposed_change: false
@@ -82,7 +82,7 @@ generator_definitions:
     query: generate_rack
     targets: racks
     parameters:
-      rack_name: name__value
+      name: name__value
     class_name: RackGenerator
     convert_query_response: false
     execute_in_proposed_change: false
@@ -94,7 +94,7 @@ generator_definitions:
     query: generate_avd
     targets: fabrics
     parameters:
-      fabric_name: name__value
+      name: name__value
     class_name: AvdDeviceStructuredConfigGenerator
     convert_query_response: false
     execute_in_proposed_change: false
@@ -116,7 +116,7 @@ generator_definitions:
     query: generate_server_cabling
     targets: servers
     parameters:
-      server_name: name__value
+      name: name__value
     class_name: ServerCablingGenerator
     convert_query_response: false
     execute_in_proposed_change: false

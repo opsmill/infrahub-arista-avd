@@ -67,7 +67,7 @@ async def connect_interface_maps(
     for src_interface, dst_interface in cabling_plan:
         name = f"{src_interface.device.display_label}-{src_interface.name.value}__{dst_interface.device.display_label}-{dst_interface.name.value}"
         network_link = await client.create(
-            kind="DcimConnector", name=name, medium="copper", connected_endpoints=[src_interface, dst_interface]
+            kind="NetworkLink", name=name, medium="copper", connected_endpoints=[src_interface, dst_interface]
         )
         await network_link.save(allow_upsert=True)
 
