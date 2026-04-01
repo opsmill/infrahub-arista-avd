@@ -7,7 +7,6 @@ from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_ai_dc import sorting as solution_ai_dc_sorting
-from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
 from solution_ai_dc.cabling import build_rack_cabling_plan, connect_interface_maps
 from solution_ai_dc.generator import (
     GeneratorMixin,
@@ -166,9 +165,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 include=["ip_address"],
                 exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
             )
-            loopback_interface = await self.client.get(
-                DcimInterface, device__ids=[device.id], role__value="loopback"
-            )
+            loopback_interface = await self.client.get(DcimInterface, device__ids=[device.id], role__value="loopback")
             loopback_interface.status.value = "active"
             loopback_interface.ip_address = device.loopback_ip.id
             await loopback_interface.save(allow_upsert=True)

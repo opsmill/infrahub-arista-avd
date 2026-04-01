@@ -145,9 +145,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 include=["ip_address"],
                 exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
             )
-            loopback_interface = await self.client.get(
-                DcimInterface, device__ids=[device.id], role__value="loopback"
-            )
+            loopback_interface = await self.client.get(DcimInterface, device__ids=[device.id], role__value="loopback")
             loopback_interface.status.value = "active"
             loopback_interface.ip_address = device.loopback_ip.id
             await loopback_interface.save(allow_upsert=True)

@@ -10,11 +10,10 @@ import json
 import logging
 from typing import Any
 
-import pyavd
 from infrahub_sdk.generator import InfrahubGenerator
 from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 
-from solution_ai_dc.protocols import AvdArtifact
+from solution_ai_dc.protocols import AvdArtifact, AvdStructuredConfigFile
 
 from .generate_avd_inputs_query import GenerateAvdInputsQuery
 
@@ -30,7 +29,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         Traverses: NetworkFabric -> children (pods) -> devices + racks -> devices
 
         Returns:
-            List of dicts with hostname and hostvar_identifier (if available)
+            List of dicts with hostname, id, and has_hostvar flag
         """
         devices: dict[str, dict[str, Any]] = {}  # Use dict to dedupe by hostname
 
@@ -49,16 +48,16 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             for device_edge in child_node.devices.edges:
                 device = device_edge.node
                 hostname = device.name.value
-                hostvar_id = None
+                has_hostvar = False
 
                 avd_artifact = device.avd_artifact.node
-                if avd_artifact:
-                    hostvar_id = avd_artifact.hostvar_identifier.value
+                if avd_artifact and avd_artifact.hostvar_file.node:
+                    has_hostvar = True
 
                 devices[hostname] = {
                     "id": device.id,
                     "hostname": hostname,
-                    "hostvar_identifier": hostvar_id,
+                    "has_hostvar": has_hostvar,
                 }
 
             # Get devices from racks
@@ -67,25 +66,25 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 for device_edge in rack_node.devices.edges:
                     device = device_edge.node
                     hostname = device.name.value
-                    hostvar_id = None
+                    has_hostvar = False
 
                     avd_artifact = device.avd_artifact.node
-                    if avd_artifact:
-                        hostvar_id = avd_artifact.hostvar_identifier.value
+                    if avd_artifact and avd_artifact.hostvar_file.node:
+                        has_hostvar = True
 
                     devices[hostname] = {
                         "id": device.id,
                         "hostname": hostname,
-                        "hostvar_identifier": hostvar_id,
+                        "has_hostvar": has_hostvar,
                     }
 
         return list(devices.values())
 
     async def _fetch_hostvars_from_storage(self, devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-        """Fetch hostvar content from object storage for each device.
+        """Fetch hostvar content from CoreFileObject for each device.
 
         Args:
-            devices: List of dicts with hostname and hostvar_identifier
+            devices: List of dicts with hostname and has_hostvar flag
 
         Returns:
             Dict mapping hostname to hostvars content (only devices with artifacts)
@@ -94,13 +93,15 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
         for device in devices:
             hostname = device["hostname"]
-            hostvar_id = device.get("hostvar_identifier")
 
-            if not hostvar_id:
+            if not device.get("has_hostvar"):
                 continue
 
             try:
-                content = await self.client.object_store.get(identifier=hostvar_id)
+                artifact = await self.client.get(AvdArtifact, name__value=hostname)
+                await artifact.hostvar_file.fetch()
+                hostvar_file = artifact.hostvar_file.peer
+                content = await hostvar_file.download_file()
                 result[hostname] = json.loads(content)
             except Exception as e:
                 self.logger.warning(f"Failed to fetch hostvars for {hostname}: {e}")
@@ -117,14 +118,14 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         print(f"\nFound {len(devices)} devices:")
         device_mapping: dict[str, str] = {}
         for d in devices:
-            status = "✓" if d["hostvar_identifier"] else "✗"
+            status = "✓" if d["has_hostvar"] else "✗"
             device_mapping[d["hostname"]] = d["id"]
-            print(f"  {status} {d['hostname']}: {d['hostvar_identifier'] or 'no artifact'}")
+            print(f"  {status} {d['hostname']}: {'has hostvar' if d['has_hostvar'] else 'no artifact'}")
 
         # Fetch hostvars from object storage
         hostvars = await self._fetch_hostvars_from_storage(devices)
 
-        print(f"\nHostvars:")
+        print("\nHostvars:")
         print(json.dumps(hostvars, indent=2))
 
         for hostname, inputs in hostvars.items():
@@ -149,16 +150,19 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             print(f"\n  Generating structured config for {hostname}...")
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
-                response = await self.client.object_store.upload(content=json.dumps(structured_config))
-                avd_artifact = await self.client.create(
-                    AvdArtifact,
-                    name=hostname,
-                    structured_config_checksum=response["checksum"],
-                    structured_config_identifier=response["identifier"],
-                    device=device_mapping[hostname],
-                    member_of_groups=["avd_artifacts"],
+
+                avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
+
+                sc_file = await self.client.create(
+                    AvdStructuredConfigFile,
+                    artifact=avd_artifact,
+                    member_of_groups=["avd_structured_configs"],
                 )
-                await avd_artifact.save(allow_upsert=True)
+                sc_file.upload_from_bytes(
+                    content=json.dumps(structured_config).encode(),
+                    name=f"{hostname}-structured-config.json",
+                )
+                await sc_file.save(allow_upsert=True)
                 print(f"    ✓ Generated structured config with {len(structured_config)} top-level keys")
             except Exception as e:
                 print(f"    ❌ Failed: {e}")

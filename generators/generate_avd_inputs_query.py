@@ -1,119 +1,75 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 
 class GenerateAvdInputsQuery(BaseModel):
-    network_fabric: "GenerateAvdInputsQueryNetworkFabric" = Field(alias="NetworkFabric")
+    network_fabric: GenerateAvdInputsQueryNetworkFabric = Field(alias="NetworkFabric")
 
 
 class GenerateAvdInputsQueryNetworkFabric(BaseModel):
-    edges: list["GenerateAvdInputsQueryNetworkFabricEdges"]
+    edges: list[GenerateAvdInputsQueryNetworkFabricEdges]
 
 
 class GenerateAvdInputsQueryNetworkFabricEdges(BaseModel):
-    node: Optional["GenerateAvdInputsQueryNetworkFabricEdgesNode"]
+    node: GenerateAvdInputsQueryNetworkFabricEdgesNode | None
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNode(BaseModel):
     id: str
-    name: Optional["GenerateAvdInputsQueryNetworkFabricEdgesNodeName"]
-    children: "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildren"
+    name: GenerateAvdInputsQueryNetworkFabricEdgesNodeName | None
+    children: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildren
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildren(BaseModel):
-    edges: Optional[list["GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdges"]]
+    edges: list[GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdges] | None
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdges(BaseModel):
-    node: Optional[
-        Annotated[
-            Union[
-                "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock",
-                "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod",
-            ],
-            Field(discriminator="typename__"),
-        ]
-    ]
+    node: Annotated[GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock | GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod, Field(discriminator="typename__")] | None
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock(
-    BaseModel
-):
-    typename__: Literal["NetworkBuildingBlock", "NetworkFabric"] = Field(
-        alias="__typename"
-    )
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock(BaseModel):
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric"] = Field(alias="__typename")
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod(
-    BaseModel
-):
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod(BaseModel):
     typename__: Literal["NetworkPod"] = Field(alias="__typename")
-    racks: (
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks"
-    )
-    devices: (
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices"
-    )
+    racks: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks
+    devices: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks(
-    BaseModel
-):
-    edges: list[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdges"
-    ]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks(BaseModel):
+    edges: list[GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdges]
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdges(
-    BaseModel
-):
-    node: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNode"
-    ]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdges(BaseModel):
+    node: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNode | None
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNode(
-    BaseModel
-):
-    devices: "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevices"
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNode(BaseModel):
+    devices: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevices
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevices(
-    BaseModel
-):
-    edges: Optional[
-        list[
-            "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges"
-        ]
-    ]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevices(BaseModel):
+    edges: list[GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges] | None
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges(
-    BaseModel
-):
-    node: Optional[
-        Annotated[
-            Union[
-                "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimPhysicalDevice",
-                "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDevice",
-            ],
-            Field(discriminator="typename__"),
-        ]
-    ]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges(BaseModel):
+    node: Annotated[GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimPhysicalDevice | GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDevice, Field(discriminator="typename__")] | None
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimPhysicalDevice(
     BaseModel
 ):
     typename__: Literal["DcimPhysicalDevice"] = Field(alias="__typename")
-    id: Optional[str]
+    id: str | None
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDevice(
@@ -121,92 +77,60 @@ class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRac
 ):
     typename__: Literal["DcimDevice"] = Field(alias="__typename")
     id: str
-    name: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName"
-    ]
-    avd_artifact: "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifact"
+    name: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName | None
+    avd_artifact: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifact
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName(
     BaseModel
 ):
-    value: Optional[str]
+    value: str | None
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifact(
     BaseModel
 ):
-    node: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNode"
-    ]
+    node: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNode | None
 
 
 class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNode(
     BaseModel
 ):
-    hostvar_identifier: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarIdentifier"
-    ]
+    hostvar_file: GenerateAvdInputsQueryFileRef | None
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarIdentifier(
-    BaseModel
-):
-    value: Optional[str]
+class GenerateAvdInputsQueryFileRef(BaseModel):
+    node: GenerateAvdInputsQueryFileRefNode | None
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices(
-    BaseModel
-):
-    edges: list[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges"
-    ]
-
-
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(
-    BaseModel
-):
-    node: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode"
-    ]
-
-
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode(
-    BaseModel
-):
+class GenerateAvdInputsQueryFileRefNode(BaseModel):
     id: str
-    name: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeName"
-    ]
-    avd_artifact: "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifact"
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeName(
-    BaseModel
-):
-    value: Optional[str]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices(BaseModel):
+    edges: list[GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges]
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifact(
-    BaseModel
-):
-    node: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode"
-    ]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(BaseModel):
+    node: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode | None
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode(
-    BaseModel
-):
-    hostvar_identifier: Optional[
-        "GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarIdentifier"
-    ]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode(BaseModel):
+    id: str
+    name: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeName | None
+    avd_artifact: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifact
 
 
-class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarIdentifier(
-    BaseModel
-):
-    value: Optional[str]
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeName(BaseModel):
+    value: str | None
+
+
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifact(BaseModel):
+    node: GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode | None
+
+
+class GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode(BaseModel):
+    hostvar_file: GenerateAvdInputsQueryFileRef | None
 
 
 GenerateAvdInputsQuery.model_rebuild()
@@ -229,3 +153,4 @@ GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEd
 GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode.model_rebuild()
 GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifact.model_rebuild()
 GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode.model_rebuild()
+GenerateAvdInputsQueryFileRef.model_rebuild()

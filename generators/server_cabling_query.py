@@ -1,212 +1,144 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 
 class ServerCablingQuery(BaseModel):
-    compute_physical_server: "ServerCablingQueryComputePhysicalServer" = Field(
-        alias="ComputePhysicalServer"
-    )
+    compute_physical_server: ServerCablingQueryComputePhysicalServer = Field(alias="ComputePhysicalServer")
 
 
 class ServerCablingQueryComputePhysicalServer(BaseModel):
-    edges: list["ServerCablingQueryComputePhysicalServerEdges"]
+    edges: list[ServerCablingQueryComputePhysicalServerEdges]
 
 
 class ServerCablingQueryComputePhysicalServerEdges(BaseModel):
-    node: Optional["ServerCablingQueryComputePhysicalServerEdgesNode"]
+    node: ServerCablingQueryComputePhysicalServerEdgesNode | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNode(BaseModel):
     id: str
-    name: Optional["ServerCablingQueryComputePhysicalServerEdgesNodeName"]
-    role: Optional["ServerCablingQueryComputePhysicalServerEdgesNodeRole"]
-    status: Optional["ServerCablingQueryComputePhysicalServerEdgesNodeStatus"]
-    rack: "ServerCablingQueryComputePhysicalServerEdgesNodeRack"
-    interfaces: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfaces"
+    name: ServerCablingQueryComputePhysicalServerEdgesNodeName | None
+    role: ServerCablingQueryComputePhysicalServerEdgesNodeRole | None
+    status: ServerCablingQueryComputePhysicalServerEdgesNodeStatus | None
+    rack: ServerCablingQueryComputePhysicalServerEdgesNodeRack
+    interfaces: ServerCablingQueryComputePhysicalServerEdgesNodeInterfaces
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeRole(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeStatus(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeRack(BaseModel):
-    node: Optional["ServerCablingQueryComputePhysicalServerEdgesNodeRackNode"]
+    node: ServerCablingQueryComputePhysicalServerEdgesNodeRackNode | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeRackNode(BaseModel):
     id: str
-    name: Optional["ServerCablingQueryComputePhysicalServerEdgesNodeRackNodeName"]
+    name: ServerCablingQueryComputePhysicalServerEdgesNodeRackNodeName | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeRackNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfaces(BaseModel):
-    edges: Optional[
-        list["ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdges"]
-    ]
+    edges: list[ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdges] | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdges(BaseModel):
-    node: Optional[
-        Annotated[
-            Union[
-                "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeDcimInterface",
-                "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysical",
-            ],
-            Field(discriminator="typename__"),
-        ]
-    ]
+    node: Annotated[ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeDcimInterface | ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysical, Field(discriminator="typename__")] | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeDcimInterface(
-    BaseModel
-):
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeDcimInterface(BaseModel):
     typename__: Literal["DcimInterface", "InterfaceVirtual"] = Field(alias="__typename")
-    id: Optional[str]
+    id: str | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysical(
-    BaseModel
-):
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysical(BaseModel):
     typename__: Literal["InterfacePhysical"] = Field(alias="__typename")
     id: str
-    name: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalName"
-    ]
-    role: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalRole"
-    ]
-    status: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalStatus"
-    ]
-    connector: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnector"
-    tagged_vlan: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan"
-    untagged_vlan: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan"
-    profiles: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfiles"
+    name: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalName | None
+    role: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalRole | None
+    status: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalStatus | None
+    connector: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnector
+    tagged_vlan: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan
+    untagged_vlan: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan
+    profiles: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfiles
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalName(
-    BaseModel
-):
-    value: Optional[str]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalName(BaseModel):
+    value: str | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalRole(
-    BaseModel
-):
-    value: Optional[str]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalRole(BaseModel):
+    value: str | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalStatus(
-    BaseModel
-):
-    value: Optional[str]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalStatus(BaseModel):
+    value: str | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnector(
-    BaseModel
-):
-    node: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNode"
-    ]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnector(BaseModel):
+    node: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNode | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNode(
-    BaseModel
-):
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNode(BaseModel):
     typename__: Literal["DcimConnector", "NetworkLink"] = Field(alias="__typename")
-    id: Optional[str]
+    id: str | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan(
-    BaseModel
-):
-    edges: list[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdges"
-    ]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan(BaseModel):
+    edges: list[ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdges]
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdges(
-    BaseModel
-):
-    node: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdgesNode"
-    ]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdges(BaseModel):
+    node: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdgesNode | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdgesNode(
     BaseModel
 ):
     id: str
-    name: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdgesNodeName"
-    ]
+    name: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdgesNodeName | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlanEdgesNodeName(
     BaseModel
 ):
-    value: Optional[str]
+    value: str | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan(
-    BaseModel
-):
-    node: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNode"
-    ]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan(BaseModel):
+    node: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNode | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNode(
-    BaseModel
-):
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNode(BaseModel):
     id: str
-    name: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNodeName"
-    ]
+    name: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNodeName | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNodeName(
     BaseModel
 ):
-    value: Optional[str]
+    value: str | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfiles(
-    BaseModel
-):
-    edges: Optional[
-        list[
-            "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdges"
-        ]
-    ]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfiles(BaseModel):
+    edges: list[ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdges] | None
 
 
-class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdges(
-    BaseModel
-):
-    node: Optional[
-        Annotated[
-            Union[
-                "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeCoreProfile",
-                "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterface",
-            ],
-            Field(discriminator="typename__"),
-        ]
-    ]
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdges(BaseModel):
+    node: Annotated[ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeCoreProfile | ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterface, Field(discriminator="typename__")] | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeCoreProfile(
@@ -260,7 +192,7 @@ class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfa
         "ProfileVirtualizationHostVirtualMachine",
         "ProfileVirtualizationVirtualMachine",
     ] = Field(alias="__typename")
-    id: Optional[str]
+    id: str | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterface(
@@ -268,71 +200,61 @@ class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfa
 ):
     typename__: Literal["ProfileDcimInterface"] = Field(alias="__typename")
     id: str
-    profile_name: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceProfileName"
-    ]
-    tagged_vlan: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlan"
-    untagged_vlan: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlan"
+    profile_name: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceProfileName | None
+    tagged_vlan: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlan
+    untagged_vlan: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlan
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceProfileName(
     BaseModel
 ):
-    value: Optional[str]
+    value: str | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlan(
     BaseModel
 ):
     edges: list[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdges"
+        ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdges
     ]
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdges(
     BaseModel
 ):
-    node: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdgesNode"
-    ]
+    node: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdgesNode | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdgesNode(
     BaseModel
 ):
     id: str
-    name: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdgesNodeName"
-    ]
+    name: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdgesNodeName | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceTaggedVlanEdgesNodeName(
     BaseModel
 ):
-    value: Optional[str]
+    value: str | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlan(
     BaseModel
 ):
-    node: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlanNode"
-    ]
+    node: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlanNode | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlanNode(
     BaseModel
 ):
     id: str
-    name: Optional[
-        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlanNodeName"
-    ]
+    name: ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlanNodeName | None
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalProfilesEdgesNodeProfileDcimInterfaceUntaggedVlanNodeName(
     BaseModel
 ):
-    value: Optional[str]
+    value: str | None
 
 
 ServerCablingQuery.model_rebuild()

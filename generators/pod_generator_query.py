@@ -1,136 +1,108 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class PodGeneratorQuery(BaseModel):
-    network_pod: "PodGeneratorQueryNetworkPod" = Field(alias="NetworkPod")
+    network_pod: PodGeneratorQueryNetworkPod = Field(alias="NetworkPod")
 
 
 class PodGeneratorQueryNetworkPod(BaseModel):
-    edges: list["PodGeneratorQueryNetworkPodEdges"]
+    edges: list[PodGeneratorQueryNetworkPodEdges]
 
 
 class PodGeneratorQueryNetworkPodEdges(BaseModel):
-    node: Optional["PodGeneratorQueryNetworkPodEdgesNode"]
+    node: PodGeneratorQueryNetworkPodEdgesNode | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNode(BaseModel):
     id: str
-    amount_of_spines: Optional["PodGeneratorQueryNetworkPodEdgesNodeAmountOfSpines"]
-    name: Optional["PodGeneratorQueryNetworkPodEdgesNodeName"]
-    checksum: Optional["PodGeneratorQueryNetworkPodEdgesNodeChecksum"]
-    index: Optional["PodGeneratorQueryNetworkPodEdgesNodeIndex"]
-    role: Optional["PodGeneratorQueryNetworkPodEdgesNodeRole"]
-    spine_switch_template: "PodGeneratorQueryNetworkPodEdgesNodeSpineSwitchTemplate"
-    parent: "PodGeneratorQueryNetworkPodEdgesNodeParent"
+    amount_of_spines: PodGeneratorQueryNetworkPodEdgesNodeAmountOfSpines | None
+    name: PodGeneratorQueryNetworkPodEdgesNodeName | None
+    checksum: PodGeneratorQueryNetworkPodEdgesNodeChecksum | None
+    index: PodGeneratorQueryNetworkPodEdgesNodeIndex | None
+    role: PodGeneratorQueryNetworkPodEdgesNodeRole | None
+    spine_switch_template: PodGeneratorQueryNetworkPodEdgesNodeSpineSwitchTemplate
+    parent: PodGeneratorQueryNetworkPodEdgesNodeParent
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeAmountOfSpines(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeChecksum(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeIndex(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeRole(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeSpineSwitchTemplate(BaseModel):
-    node: Optional["PodGeneratorQueryNetworkPodEdgesNodeSpineSwitchTemplateNode"]
+    node: PodGeneratorQueryNetworkPodEdgesNodeSpineSwitchTemplateNode | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeSpineSwitchTemplateNode(BaseModel):
-    typename__: Literal[
-        "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
-    ] = Field(alias="__typename")
-    id: Optional[str]
+    typename__: Literal["CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"] = Field(
+        alias="__typename"
+    )
+    id: str | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParent(BaseModel):
-    node: Optional[
-        Annotated[
-            Union[
-                "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkBuildingBlock",
-                "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabric",
-            ],
-            Field(discriminator="typename__"),
-        ]
-    ]
+    node: Annotated[PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkBuildingBlock | PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabric, Field(discriminator="typename__")] | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkBuildingBlock(BaseModel):
-    typename__: Literal["NetworkBuildingBlock", "NetworkPod"] = Field(
-        alias="__typename"
-    )
-    id: Optional[str]
-    name: Optional[
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkBuildingBlockName"
-    ]
+    typename__: Literal["NetworkBuildingBlock", "NetworkPod"] = Field(alias="__typename")
+    id: str | None
+    name: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkBuildingBlockName | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkBuildingBlockName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabric(BaseModel):
     typename__: Literal["NetworkFabric"] = Field(alias="__typename")
     id: str
-    name: Optional["PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricName"]
-    amount_of_super_spines: Optional[
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAmountOfSuperSpines"
-    ]
-    fabric_interface_sorting_method: Optional[
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricInterfaceSortingMethod"
-    ]
-    spine_interface_sorting_method: Optional[
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricSpineInterfaceSortingMethod"
-    ]
-    asn_pool: "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAsnPool"
-    node_id_pool: (
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricNodeIdPool"
-    )
-    mgmt_pool: "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPool"
+    name: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricName | None
+    amount_of_super_spines: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAmountOfSuperSpines | None
+    fabric_interface_sorting_method: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricInterfaceSortingMethod | None
+    spine_interface_sorting_method: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricSpineInterfaceSortingMethod | None
+    asn_pool: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAsnPool
+    node_id_pool: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricNodeIdPool
+    mgmt_pool: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPool
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
-class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAmountOfSuperSpines(
-    BaseModel
-):
-    value: Optional[Any]
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAmountOfSuperSpines(BaseModel):
+    value: Any | None
 
 
-class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricInterfaceSortingMethod(
-    BaseModel
-):
-    value: Optional[str]
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricInterfaceSortingMethod(BaseModel):
+    value: str | None
 
 
-class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricSpineInterfaceSortingMethod(
-    BaseModel
-):
-    value: Optional[str]
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricSpineInterfaceSortingMethod(BaseModel):
+    value: str | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAsnPool(BaseModel):
-    node: Optional[
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAsnPoolNode"
-    ]
+    node: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAsnPoolNode | None
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAsnPoolNode(BaseModel):
@@ -138,26 +110,18 @@ class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAsnPoolNode(Bas
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricNodeIdPool(BaseModel):
-    node: Optional[
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricNodeIdPoolNode"
-    ]
+    node: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricNodeIdPoolNode | None
 
 
-class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricNodeIdPoolNode(
-    BaseModel
-):
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricNodeIdPoolNode(BaseModel):
     id: str
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPool(BaseModel):
-    node: Optional[
-        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPoolNode"
-    ]
+    node: PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPoolNode | None
 
 
-class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPoolNode(
-    BaseModel
-):
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPoolNode(BaseModel):
     id: str
 
 

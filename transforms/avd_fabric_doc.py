@@ -10,6 +10,8 @@ from typing import Any
 import pyavd
 from infrahub_sdk.transforms import InfrahubTransform
 
+from solution_ai_dc.protocols import AvdHostvarFile, AvdStructuredConfigFile
+
 from .avd_fabric_devices_query import AvdFabricDevicesQuery
 
 
@@ -49,23 +51,23 @@ class AvdFabricDocTransform(InfrahubTransform):
 
             hostname = device.name.value
 
-            # Fetch AVD data from object store via avd_artifact relationship
+            # Fetch AVD data from CoreFileObject children
             if not device.avd_artifact or not device.avd_artifact.node:
                 continue
 
             artifact_node = device.avd_artifact.node
 
-            hostvar_id = artifact_node.hostvar_identifier.value if artifact_node.hostvar_identifier else None
-            structured_config_id = (
-                artifact_node.structured_config_identifier.value if artifact_node.structured_config_identifier else None
-            )
+            hostvar_file_node = artifact_node.hostvar_file.node if artifact_node.hostvar_file else None
+            sc_file_node = artifact_node.structured_config_file.node if artifact_node.structured_config_file else None
 
-            if hostvar_id:
-                hostvar_content = await self.client.object_store.get(identifier=hostvar_id)
+            if hostvar_file_node:
+                hv_file = await self.client.get(AvdHostvarFile, id=hostvar_file_node.id)
+                hostvar_content = await hv_file.download_file()
                 all_hostvars[hostname] = json.loads(hostvar_content)
 
-            if structured_config_id:
-                sc_content = await self.client.object_store.get(identifier=structured_config_id)
+            if sc_file_node:
+                sc_file = await self.client.get(AvdStructuredConfigFile, id=sc_file_node.id)
+                sc_content = await sc_file.download_file()
                 structured_configs[hostname] = json.loads(sc_content)
 
         if not all_hostvars or not structured_configs:
