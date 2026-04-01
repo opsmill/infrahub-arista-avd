@@ -1,36 +1,29 @@
 # yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
 ---
 version: "1.0"
-generics:
-  - name: Physical
-    namespace: Location
-    hierarchical: true
-    display_label: name__value
-    include_in_menu: false
-    attributes:
-      - name: name
-        kind: Text
-        branch: aware
-      - name: index
-        kind: Number
-        branch: agnostic
+
 nodes:
   - name: Hall
     namespace: Location
     branch: agnostic
     inherit_from:
-      - LocationPhysical
+      - LocationGeneric
     human_friendly_id:
       - name__value
     children: LocationRack
     parent: ""
     include_in_menu: false
+    attributes:
+      - name: index
+        kind: Number
+        branch: agnostic
 
   - name: Rack
     namespace: Location
     branch: agnostic
     inherit_from:
-      - LocationPhysical
+      - LocationGeneric
+      - LocationHosting
       - GeneratorTarget
     parent: LocationHall
     children: ""
@@ -39,6 +32,9 @@ nodes:
     uniqueness_constraints: [["pod", "index__value"]]
     include_in_menu: false
     attributes:
+      - name: index
+        kind: Number
+        branch: agnostic
       - name: rack_type
         kind: Dropdown
         branch: aware
@@ -76,7 +72,7 @@ nodes:
         optional: false
         identifier: "rack__pod"
       - name: devices
-        peer: NetworkDevice
+        peer: DcimPhysicalDevice
         branch: aware
         kind: Generic
         cardinality: many

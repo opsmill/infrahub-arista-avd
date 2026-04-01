@@ -182,7 +182,7 @@ nodes:
         kind: Generic
         identifier: "rack__pod"
       - name: devices
-        peer: NetworkDevice
+        peer: DcimDevice
         branch: aware
         kind: Generic
         cardinality: many

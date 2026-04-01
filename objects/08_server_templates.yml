@@ -10,7 +10,7 @@ spec:
       role: "compute"
       status: "provisioning"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -21,7 +21,7 @@ spec:
       role: "compute"
       status: "provisioning"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:
@@ -32,7 +32,7 @@ spec:
       role: "gpu"
       status: "provisioning"
       interfaces:
-        kind: TemplateNetworkInterface
+        kind: TemplateInterfacePhysical
         parameters:
           expand_range: true
         data:

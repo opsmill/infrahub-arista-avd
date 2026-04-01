@@ -6,44 +6,55 @@ from pydantic import BaseModel, Field
 
 
 class AvdDeviceConfigQuery(BaseModel):
-    network_device: "AvdDeviceConfigQueryNetworkDevice" = Field(alias="NetworkDevice")
+    dcim_device: "AvdDeviceConfigQueryDcimDevice" = Field(alias="DcimDevice")
 
 
-class AvdDeviceConfigQueryNetworkDevice(BaseModel):
-    edges: list["AvdDeviceConfigQueryNetworkDeviceEdges"]
+class AvdDeviceConfigQueryDcimDevice(BaseModel):
+    edges: list["AvdDeviceConfigQueryDcimDeviceEdges"]
 
 
-class AvdDeviceConfigQueryNetworkDeviceEdges(BaseModel):
-    node: Optional["AvdDeviceConfigQueryNetworkDeviceEdgesNode"]
+class AvdDeviceConfigQueryDcimDeviceEdges(BaseModel):
+    node: Optional["AvdDeviceConfigQueryDcimDeviceEdgesNode"]
 
 
-class AvdDeviceConfigQueryNetworkDeviceEdgesNode(BaseModel):
+class AvdDeviceConfigQueryDcimDeviceEdgesNode(BaseModel):
     id: str
-    hostname: Optional["AvdDeviceConfigQueryNetworkDeviceEdgesNodeHostname"]
-    avd_artifact: "AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifact"
+    name: Optional["AvdDeviceConfigQueryDcimDeviceEdgesNodeName"]
+    avd_artifact: "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact"
 
 
-class AvdDeviceConfigQueryNetworkDeviceEdgesNodeHostname(BaseModel):
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeName(BaseModel):
     value: Optional[str]
 
 
-class AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifact(BaseModel):
-    node: Optional["AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNode"]
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
+    node: Optional["AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode"]
 
 
-class AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNode(BaseModel):
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
+    structured_config_checksum: Optional[
+        "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigChecksum"
+    ]
     structured_config_identifier: Optional[
-        "AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier"
+        "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier"
     ]
 
 
-class AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(BaseModel):
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigChecksum(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(
+    BaseModel
+):
     value: Optional[str]
 
 
 AvdDeviceConfigQuery.model_rebuild()
-AvdDeviceConfigQueryNetworkDevice.model_rebuild()
-AvdDeviceConfigQueryNetworkDeviceEdges.model_rebuild()
-AvdDeviceConfigQueryNetworkDeviceEdgesNode.model_rebuild()
-AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifact.model_rebuild()
-AvdDeviceConfigQueryNetworkDeviceEdgesNodeAvdArtifactNode.model_rebuild()
+AvdDeviceConfigQueryDcimDevice.model_rebuild()
+AvdDeviceConfigQueryDcimDeviceEdges.model_rebuild()
+AvdDeviceConfigQueryDcimDeviceEdgesNode.model_rebuild()
+AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
+AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()

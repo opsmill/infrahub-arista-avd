@@ -50,7 +50,7 @@ nodes:
           jinja2_template: "http://localhost:8000/api/storage/object/{{ structured_config_identifier__value }}"
     relationships:
       - name: device
-        peer: NetworkDevice
+        peer: DcimDevice
         kind: Attribute
         cardinality: one
         optional: false

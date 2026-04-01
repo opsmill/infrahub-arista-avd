@@ -6,7 +6,7 @@ from typing import Any
 from infrahub_sdk.generator import InfrahubGenerator
 
 from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_hostvar_generation
-from solution_ai_dc.protocols import LocationRack, NetworkDevice, NetworkInterface, NetworkLink, NetworkPod
+from solution_ai_dc.protocols import DcimConnector, DcimDevice, DcimInterface, LocationRack, NetworkPod
 
 
 class ServerCablingGenerator(InfrahubGenerator):
@@ -19,7 +19,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             return
 
         server_node = servers[0]["node"]
-        server_hostname: str = server_node["hostname"]["value"]
+        server_hostname: str = server_node["name"]["value"]
 
         # Get rack info
         rack_rel = server_node.get("rack")
@@ -70,7 +70,7 @@ class ServerCablingGenerator(InfrahubGenerator):
                 "Only one leaf switch in rack %s; connecting all %d server interfaces to %s",
                 rack_name,
                 len(server_interfaces),
-                leaf_switches[0].hostname.value,
+                leaf_switches[0].name.value,
             )
 
         # Upsert links and assign VLANs
@@ -140,16 +140,16 @@ class ServerCablingGenerator(InfrahubGenerator):
             if vlan_id not in tagged:
                 tagged.append(vlan_id)
 
-    async def _get_rack_leaf_switches(self, rack_id: str) -> list[NetworkDevice]:
+    async def _get_rack_leaf_switches(self, rack_id: str) -> list[DcimDevice]:
         """Find all leaf switches in the given rack."""
-        return await self.client.filters(kind=NetworkDevice, rack__ids=[rack_id], role__value="leaf")
+        return await self.client.filters(kind=DcimDevice, rack__ids=[rack_id], role__value="leaf")
 
-    async def _get_leaf_interfaces(self, leaf_switches: list[NetworkDevice]) -> list[dict[str, Any]]:
+    async def _get_leaf_interfaces(self, leaf_switches: list[DcimDevice]) -> list[dict[str, Any]]:
         """Get all server/storage-role interfaces from leaf switches."""
         result: list[dict[str, Any]] = []
         for leaf in leaf_switches:
             interfaces = await self.client.filters(
-                kind=NetworkInterface,
+                kind=DcimInterface,
                 device__ids=[leaf.id],
                 role__values=["server", "storage"],
             )
@@ -157,7 +157,7 @@ class ServerCablingGenerator(InfrahubGenerator):
                 result.append({
                     "id": iface.id,
                     "leaf_id": leaf.id,
-                    "leaf_hostname": leaf.hostname.value,
+                    "leaf_hostname": leaf.name.value,
                     "name": iface.name.value,
                 })
         return result
@@ -166,7 +166,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         self,
         server_interfaces: list[dict[str, Any]],
         available_leaf_interfaces: list[dict[str, Any]],
-        leaf_switches: list[NetworkDevice],
+        leaf_switches: list[DcimDevice],
     ) -> list[tuple[dict[str, Any], str]]:
         """Pair server interfaces with leaf interfaces using round-robin across leaves."""
         if len(leaf_switches) <= 1:
@@ -202,23 +202,23 @@ class ServerCablingGenerator(InfrahubGenerator):
     ) -> None:
         """Create a network link between server and leaf interfaces and assign VLANs."""
         # Re-fetch interfaces for proper SDK objects
-        server_interface = await self.client.get(NetworkInterface, id=server_iface["id"])
-        leaf_interface = await self.client.get(NetworkInterface, id=leaf_iface_id, include=["link"])
+        server_interface = await self.client.get(DcimInterface, id=server_iface["id"])
+        leaf_interface = await self.client.get(DcimInterface, id=leaf_iface_id, include=["connector"])
 
         # Create the network link
         link_name = f"{server_hostname}-{server_iface['name']}__{leaf_interface.device.display_label}-{leaf_interface.name.value}"
         network_link = await self.client.create(
-            NetworkLink,
+            DcimConnector,
             name=link_name,
             medium="copper",
-            endpoints=[server_interface, leaf_interface],
+            connected_endpoints=[server_interface, leaf_interface],
         )
         await network_link.save(allow_upsert=True)
 
         # Re-fetch interfaces after link creation to get updated link relationship
-        server_interface = await self.client.get(NetworkInterface, id=server_iface["id"], include=["link"])
+        server_interface = await self.client.get(DcimInterface, id=server_iface["id"], include=["connector"])
         leaf_interface = await self.client.get(
-            NetworkInterface, id=leaf_iface_id, include=["link", "tagged_vlan", "untagged_vlan"],
+            DcimInterface, id=leaf_iface_id, include=["connector", "tagged_vlan", "untagged_vlan"],
         )
 
         # Set interfaces to active

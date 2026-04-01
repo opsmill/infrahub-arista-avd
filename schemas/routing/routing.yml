@@ -14,7 +14,7 @@ nodes:
     uniqueness_constraints:
       - [device, name__value]
     human_friendly_id:
-      - device__hostname__value
+      - device__name__value
       - name__value
     order_by:
       - name__value
@@ -84,7 +84,7 @@ nodes:
         order_weight: 12000
     relationships:
       - name: device
-        peer: NetworkDevice
+        peer: DcimDevice
         kind: Attribute
         cardinality: one
         optional: false
@@ -100,7 +100,7 @@ nodes:
     uniqueness_constraints:
       - [device, peer_address__value]
     human_friendly_id:
-      - device__hostname__value
+      - device__name__value
       - peer_address__value
     order_by:
       - peer_address__value
@@ -140,7 +140,7 @@ nodes:
         order_weight: 8000
     relationships:
       - name: device
-        peer: NetworkDevice
+        peer: DcimDevice
         kind: Attribute
         cardinality: one
         optional: false
@@ -165,7 +165,7 @@ nodes:
     uniqueness_constraints:
       - [device, name__value]
     human_friendly_id:
-      - device__hostname__value
+      - device__name__value
       - name__value
     order_by:
       - name__value
@@ -176,7 +176,7 @@ nodes:
         order_weight: 1000
     relationships:
       - name: device
-        peer: NetworkDevice
+        peer: DcimDevice
         kind: Attribute
         cardinality: one
         optional: false
@@ -227,7 +227,7 @@ nodes:
     uniqueness_constraints:
       - [device, name__value]
     human_friendly_id:
-      - device__hostname__value
+      - device__name__value
       - name__value
     order_by:
       - name__value
@@ -238,7 +238,7 @@ nodes:
         order_weight: 1000
     relationships:
       - name: device
-        peer: NetworkDevice
+        peer: DcimDevice
         kind: Attribute
         cardinality: one
         optional: false
@@ -307,7 +307,7 @@ nodes:
     uniqueness_constraints:
       - [device, prefix__value, vrf__value]
     human_friendly_id:
-      - device__hostname__value
+      - device__name__value
       - prefix__value
     order_by:
       - prefix__value
@@ -354,7 +354,7 @@ nodes:
         order_weight: 8000
     relationships:
       - name: device
-        peer: NetworkDevice
+        peer: DcimDevice
         kind: Attribute
         cardinality: one
         optional: false
@@ -363,7 +363,7 @@ nodes:
 
 extensions:
   nodes:
-    - kind: NetworkDevice
+    - kind: DcimDevice
       relationships:
         - name: bgp_peer_groups
           label: BGP Peer Groups

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .protocols import NetworkDevice, NetworkInterface
+from .protocols import DcimDevice, DcimInterface
 
 if TYPE_CHECKING:
     import logging
@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 
 def build_pod_cabling_plan(
     pod_index: int,
-    src_interface_map: dict[NetworkDevice, list[NetworkInterface]],
-    dst_interface_map: dict[NetworkDevice, list[NetworkInterface]],
-) -> list[tuple[NetworkInterface, NetworkInterface]]:
+    src_interface_map: dict[DcimDevice, list[DcimInterface]],
+    dst_interface_map: dict[DcimDevice, list[DcimInterface]],
+) -> list[tuple[DcimInterface, DcimInterface]]:
     """Builds a cabling plan between source and destination interfaces based on Indexes
 
     TODO Write unit test to validate that the algorithm works as expected
@@ -24,7 +24,7 @@ def build_pod_cabling_plan(
     dst_interface_base_index = (pod_index - 2) * len(dst_interface_map)
     src_index = 0
 
-    cabling_plan: list[tuple[NetworkInterface, NetworkInterface]] = []
+    cabling_plan: list[tuple[DcimInterface, DcimInterface]] = []
 
     for src_interfaces in src_interface_map.values():
         dst_interface_index = dst_interface_base_index + src_index
@@ -42,10 +42,10 @@ def build_pod_cabling_plan(
 
 def build_rack_cabling_plan(
     rack_index: int,
-    src_interface_map: dict[NetworkDevice, list[NetworkInterface]],
-    dst_interface_map: dict[NetworkDevice, list[NetworkInterface]],
-) -> list[tuple[NetworkInterface, NetworkInterface]]:
-    cabling_plan: list[tuple[NetworkInterface, NetworkInterface]] = []
+    src_interface_map: dict[DcimDevice, list[DcimInterface]],
+    dst_interface_map: dict[DcimDevice, list[DcimInterface]],
+) -> list[tuple[DcimInterface, DcimInterface]]:
+    cabling_plan: list[tuple[DcimInterface, DcimInterface]] = []
     dst_devices = list(dst_interface_map.keys())
     dst_device_count = len(dst_devices)
 
@@ -62,17 +62,17 @@ def build_rack_cabling_plan(
 
 
 async def connect_interface_maps(
-    client: InfrahubClient, logger: logging.Logger, cabling_plan: list[tuple[NetworkInterface, NetworkInterface]]
+    client: InfrahubClient, logger: logging.Logger, cabling_plan: list[tuple[DcimInterface, DcimInterface]]
 ) -> None:
     for src_interface, dst_interface in cabling_plan:
         name = f"{src_interface.device.display_label}-{src_interface.name.value}__{dst_interface.device.display_label}-{dst_interface.name.value}"
         network_link = await client.create(
-            kind="NetworkLink", name=name, medium="copper", endpoints=[src_interface, dst_interface]
+            kind="NetworkLink", name=name, medium="copper", connected_endpoints=[src_interface, dst_interface]
         )
         await network_link.save(allow_upsert=True)
 
-        src_interface = await client.get(NetworkInterface, id=src_interface.id, include=["link"])
-        dst_interface = await client.get(NetworkInterface, id=dst_interface.id, include=["link"])
+        src_interface = await client.get(DcimInterface, id=src_interface.id, include=["connector"])
+        dst_interface = await client.get(DcimInterface, id=dst_interface.id, include=["connector"])
 
         src_interface.status.value = "active"
         dst_interface.status.value = "active"

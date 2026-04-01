@@ -1,27 +1,29 @@
 query ComputedInterfaceDescriptionQuery($id: ID!) {
-  NetworkInterface(ids: [$id]) {
+  DcimInterface(ids: [$id]) {
     edges {
       node {
         __typename
         id
-        link {
-          node {
-            __typename
-            id
-            endpoints {
-              edges {
-                node {
-                  __typename
-                  id
-                  ... on NetworkInterface {
-                    name {
-                      value
-                    }
-                    device {
-                      node {
-                        __typename
-                        hostname {
-                          value
+        ... on DcimEndpoint {
+          connector {
+            node {
+              __typename
+              id
+              connected_endpoints {
+                edges {
+                  node {
+                    __typename
+                    id
+                    ... on DcimInterface {
+                      name {
+                        value
+                      }
+                      device {
+                        node {
+                          __typename
+                          name {
+                            value
+                          }
                         }
                       }
                     }

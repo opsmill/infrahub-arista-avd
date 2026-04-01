@@ -1,9 +1,9 @@
-query ServerCablingQuery($server_name: String!) {
-  ComputePhysicalServer(hostname__value: $server_name) {
+query ServerCablingQuery($name: String!) {
+  ComputePhysicalServer(name__value: $name) {
     edges {
       node {
         id
-        hostname {
+        name {
           value
         }
         role {
@@ -23,23 +23,34 @@ query ServerCablingQuery($server_name: String!) {
         interfaces {
           edges {
             node {
+              __typename
               id
-              name {
-                value
-              }
-              role {
-                value
-              }
-              status {
-                value
-              }
-              link {
-                node {
-                  id
+              ... on InterfacePhysical {
+                name {
+                  value
                 }
-              }
-              tagged_vlan {
-                edges {
+                role {
+                  value
+                }
+                status {
+                  value
+                }
+                connector {
+                  node {
+                    id
+                  }
+                }
+                tagged_vlan {
+                  edges {
+                    node {
+                      id
+                      name {
+                        value
+                      }
+                    }
+                  }
+                }
+                untagged_vlan {
                   node {
                     id
                     name {
@@ -47,38 +58,30 @@ query ServerCablingQuery($server_name: String!) {
                     }
                   }
                 }
-              }
-              untagged_vlan {
-                node {
-                  id
-                  name {
-                    value
-                  }
-                }
-              }
-              profiles {
-                edges {
-                  node {
-                    id
-                    ... on ProfileNetworkInterface {
-                      profile_name {
-                        value
-                      }
-                      tagged_vlan {
-                        edges {
+                profiles {
+                  edges {
+                    node {
+                      id
+                      ... on ProfileDcimInterface {
+                        profile_name {
+                          value
+                        }
+                        tagged_vlan {
+                          edges {
+                            node {
+                              id
+                              name {
+                                value
+                              }
+                            }
+                          }
+                        }
+                        untagged_vlan {
                           node {
                             id
                             name {
                               value
                             }
-                          }
-                        }
-                      }
-                      untagged_vlan {
-                        node {
-                          id
-                          name {
-                            value
                           }
                         }
                       }

@@ -13,7 +13,40 @@ class TestInfrahub(TestInfrahubDockerClient):
         await client.schema.wait_until_converged(branch=default_branch)
 
         resp = await client.schema.load(schemas=schemas, branch=default_branch, wait_until_converged=True)
+        await client.schema.wait_until_converged(branch=default_branch)
         assert resp.errors == {}
+
+    @pytest.mark.asyncio
+    async def test_load_objects(
+        self,
+        default_branch: str,
+        client: InfrahubClient,
+        schemas: list[dict],
+        infrahub_port: int,
+    ) -> None:
+        """Load schemas then load all object files via infrahubctl object load."""
+        await client.schema.wait_until_converged(branch=default_branch)
+
+        resp = await client.schema.load(schemas=schemas, branch=default_branch, wait_until_converged=True)
+        assert resp.errors == {}, f"Schema load errors: {resp.errors}"
+        await client.schema.wait_until_converged(branch=default_branch)
+
+        infrahub_address = f"http://localhost:{infrahub_port}"
+        result = self.execute_command(
+            address=infrahub_address,
+            command="infrahubctl object load objects/",
+        )
+        print(result.stdout, flush=True)
+        if result.stderr:
+            print(result.stderr, flush=True)
+        assert result.returncode == 0, f"infrahubctl object load failed:\n{result.stdout}\n{result.stderr}"
+
+        # Verify key objects were created with the new kind names
+        manufacturers = await client.all(kind="OrganizationManufacturer")
+        assert len(manufacturers) > 0, "No manufacturers loaded"
+
+        device_types = await client.all(kind="DcimDeviceType")
+        assert len(device_types) > 0, "No device types loaded"
 
     @pytest.mark.asyncio
     async def test_load_repository(

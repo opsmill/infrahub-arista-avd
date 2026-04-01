@@ -2,7 +2,7 @@
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: ProfileNetworkInterface
+  kind: ProfileDcimInterface
   data:
     - profile_name: "profile-server-compute"
       role: "server"

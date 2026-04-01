@@ -32,7 +32,7 @@ class AvdFabricDocTransform(InfrahubTransform):
         fabric_id = fabric_node.id
 
         # Get all devices and filter by fabric
-        device_edges = data.network_device.edges
+        device_edges = data.dcim_device.edges
         all_hostvars: dict[str, dict[str, Any]] = {}
         structured_configs: dict[str, dict[str, Any]] = {}
 
@@ -47,7 +47,7 @@ class AvdFabricDocTransform(InfrahubTransform):
             if pod_node.parent.node.id != fabric_id:
                 continue
 
-            hostname = device.hostname.value
+            hostname = device.name.value
 
             # Fetch AVD data from object store via avd_artifact relationship
             if not device.avd_artifact or not device.avd_artifact.node:

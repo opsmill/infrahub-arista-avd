@@ -48,7 +48,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             # Get devices directly under pod
             for device_edge in child_node.devices.edges:
                 device = device_edge.node
-                hostname = device.hostname.value
+                hostname = device.name.value
                 hostvar_id = None
 
                 avd_artifact = device.avd_artifact.node
@@ -66,7 +66,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 rack_node = rack_edge.node
                 for device_edge in rack_node.devices.edges:
                     device = device_edge.node
-                    hostname = device.hostname.value
+                    hostname = device.name.value
                     hostvar_id = None
 
                     avd_artifact = device.avd_artifact.node

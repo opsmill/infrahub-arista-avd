@@ -29,7 +29,7 @@ nodes:
     generate_template: true
     inherit_from:
       - ComputeGenericUnit
-      - NetworkGenericDevice
+      - DcimGenericDevice
       - GeneratorTarget
       # If you don't want to have VM running directly on your physical server you can comment out the following line
       - VirtualizationHostVirtualMachine

@@ -1,9 +1,9 @@
 query AvdDeviceConfigQuery($name: String!) {
-  NetworkDevice(hostname__value: $name) {
+  DcimDevice(name__value: $name) {
     edges {
       node {
         id
-        hostname {
+        name {
           value
         }
         avd_artifact {

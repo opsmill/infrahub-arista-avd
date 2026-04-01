@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+extensions:
+  nodes:
+    - kind: IpamPrefix
+      attributes:
+        - name: status
+          kind: Dropdown
+          optional: true
+          choices:
+            - name: active
+              label: Active
+            - name: deprecated
+              label: Deprecated
+            - name: reserved
+              label: Reserved
+        - name: role
+          kind: Dropdown
+          optional: false
+          choices:
+            - name: supernet
+              label: Supernet
+            - name: fabric_supernet
+              label: Fabric Supernet
+            - name: super_spine_loopback
+              label: Super Spine Loopback
+            - name: pod_supernet
+              label: Pod Supernet
+            - name: pod_loopback
+              label: Pod Loopback
+            - name: pod_super_spine_spine
+              label: Pod Super Spine Spine
+            - name: pod_leaf_spine
+              label: Pod Leaf Spine
+            - name: management
+              label: Management
+            - name: backfill
+              label: Backfill (from structured config)

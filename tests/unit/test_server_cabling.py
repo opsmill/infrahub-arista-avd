@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from generators.generate_server_cabling import ServerCablingGenerator
-from solution_ai_dc.protocols import NetworkLink
+from solution_ai_dc.protocols import DcimConnector
 
 
 def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
@@ -38,7 +38,7 @@ def _make_server_data(
 
     server_node: dict = {
         "id": "server-1-id",
-        "hostname": {"value": hostname},
+        "name": {"value": hostname},
         "role": {"value": "compute"},
         "status": {"value": "provisioning"},
         "interfaces": {"edges": [{"node": iface} for iface in interfaces]},
@@ -102,7 +102,7 @@ def _make_mock_leaf(leaf_id: str = "leaf-1", hostname: str = "leaf-pod1-1-1") ->
     """Create a mock leaf switch."""
     leaf = MagicMock()
     leaf.id = leaf_id
-    leaf.hostname.value = hostname
+    leaf.name.value = hostname
     return leaf
 
 
@@ -171,7 +171,7 @@ class TestSingleHomedCabling:
         # Verify link was created with protocol class
         gen.client.create.assert_called_once()
         call_args = gen.client.create.call_args
-        assert call_args.args[0] is NetworkLink
+        assert call_args.args[0] is DcimConnector
         assert call_args.kwargs["medium"] == "copper"
 
 

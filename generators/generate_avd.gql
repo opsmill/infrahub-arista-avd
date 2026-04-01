@@ -1,5 +1,5 @@
-query GenerateAvdInputsQuery($fabric_name: String!) {
-  NetworkFabric(name__value: $fabric_name) {
+query GenerateAvdInputsQuery($name: String!) {
+  NetworkFabric(name__value: $name) {
     edges {
       node {
         __typename
@@ -22,14 +22,16 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
                           node {
                             __typename
                             id
-                            hostname {
-                              value
-                            }
-                            avd_artifact {
-                              node {
-                                __typename
-                                hostvar_identifier {
-                                  value
+                            ... on DcimDevice {
+                              name {
+                                value
+                              }
+                              avd_artifact {
+                                node {
+                                  __typename
+                                  hostvar_identifier {
+                                    value
+                                  }
                                 }
                               }
                             }
@@ -44,7 +46,7 @@ query GenerateAvdInputsQuery($fabric_name: String!) {
                     node {
                       __typename
                       id
-                      hostname {
+                      name {
                         value
                       }
                       avd_artifact {

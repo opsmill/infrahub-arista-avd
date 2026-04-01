@@ -11,18 +11,18 @@ class ComputedInterfaceDescription(InfrahubTransform):
     async def transform(self, data: dict[str, Any]) -> str:
         data: ComputedInterfaceDescriptionQuery = ComputedInterfaceDescriptionQuery(**data)
 
-        src_interface = data.network_interface.edges[0].node.id
-        network_link = data.network_interface.edges[0].node.link.node
+        src_interface = data.dcim_interface.edges[0].node.id
+        dcim_connector = data.dcim_interface.edges[0].node.connector.node
 
-        if not network_link:
+        if not dcim_connector:
             return ""
 
-        endpoint_edges = network_link.endpoints.edges
+        endpoint_edges = dcim_connector.connected_endpoints.edges
 
         for endpoint_node in endpoint_edges:
             if endpoint_node.node.id == src_interface:
                 continue
             dst_interface = endpoint_node.node
-            return f"-> {dst_interface.device.node.hostname.value} {dst_interface.name.value}"
+            return f"-> {dst_interface.device.node.name.value} {dst_interface.name.value}"
 
         return ""

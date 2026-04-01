@@ -2,7 +2,7 @@
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: IpamIPPrefix
+  kind: IpamPrefix
   data:
     - prefix: 10.0.0.0/8
       role: supernet
@@ -14,7 +14,7 @@ spec:
   data:
     - name: FabricSupernetPool
       default_member_type: prefix
-      default_prefix_type: "IpamIPPrefix"
+      default_prefix_type: "IpamPrefix"
       default_prefix_length: 16
       ip_namespace: "default"
       resources:
@@ -27,7 +27,7 @@ spec:
   kind: CoreNumberPool
   data:
     - name: Fabric-A-ASN-Pool
-      node: NetworkDevice
+      node: DcimDevice
       node_attribute: bgp_asn
       start_range: 65000
       end_range: 65999
@@ -39,7 +39,7 @@ spec:
   kind: CoreNumberPool
   data:
     - name: Fabric-A-NodeID-Pool
-      node: NetworkDevice
+      node: DcimDevice
       node_attribute: node_id
       start_range: 1
       end_range: 9999
@@ -51,7 +51,7 @@ spec:
   kind: CoreNumberPool
   data:
     - name: Fabric-B-ASN-Pool
-      node: NetworkDevice
+      node: DcimDevice
       node_attribute: bgp_asn
       start_range: 65100
       end_range: 65199
@@ -63,7 +63,7 @@ spec:
   kind: CoreNumberPool
   data:
     - name: Fabric-B-NodeID-Pool
-      node: NetworkDevice
+      node: DcimDevice
       node_attribute: node_id
       start_range: 1
       end_range: 9999
@@ -72,7 +72,7 @@ spec:
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: IpamIPPrefix
+  kind: IpamPrefix
   data:
     - prefix: 10.255.0.0/24
       role: management
@@ -94,7 +94,7 @@ spec:
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: IpamIPPrefix
+  kind: IpamPrefix
   data:
     - prefix: 10.255.1.0/24
       role: management

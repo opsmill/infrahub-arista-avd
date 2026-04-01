@@ -25,10 +25,12 @@ query FabricCablingPlanQuery($name: String!) {
                           node {
                             __typename
                             id
-                            link {
-                              node {
-                                __typename
-                                id
+                            ... on DcimEndpoint {
+                              connector {
+                                node {
+                                  __typename
+                                  id
+                                }
                               }
                             }
                           }

@@ -1,9 +1,9 @@
 query StartupConfigQuery($name: String!){
-  NetworkDevice(hostname__value: $name) {
+  DcimDevice(name__value: $name) {
     edges {
       node {
         __typename
-        hostname {
+        name {
           value
         }
         loopback_ip {
