@@ -23,25 +23,34 @@ query ServerCablingQuery($name: String!) {
         interfaces {
           edges {
             node {
+              __typename
               id
-              name {
-                value
-              }
-              role {
-                value
-              }
-              status {
-                value
-              }
-              ... on DcimEndpoint {
+              ... on InterfacePhysical {
+                name {
+                  value
+                }
+                role {
+                  value
+                }
+                status {
+                  value
+                }
                 connector {
                   node {
                     id
                   }
                 }
-              }
-              tagged_vlan {
-                edges {
+                tagged_vlan {
+                  edges {
+                    node {
+                      id
+                      name {
+                        value
+                      }
+                    }
+                  }
+                }
+                untagged_vlan {
                   node {
                     id
                     name {
@@ -49,38 +58,30 @@ query ServerCablingQuery($name: String!) {
                     }
                   }
                 }
-              }
-              untagged_vlan {
-                node {
-                  id
-                  name {
-                    value
-                  }
-                }
-              }
-              profiles {
-                edges {
-                  node {
-                    id
-                    ... on ProfileDcimInterface {
-                      profile_name {
-                        value
-                      }
-                      tagged_vlan {
-                        edges {
+                profiles {
+                  edges {
+                    node {
+                      id
+                      ... on ProfileDcimInterface {
+                        profile_name {
+                          value
+                        }
+                        tagged_vlan {
+                          edges {
+                            node {
+                              id
+                              name {
+                                value
+                              }
+                            }
+                          }
+                        }
+                        untagged_vlan {
                           node {
                             id
                             name {
                               value
                             }
-                          }
-                        }
-                      }
-                      untagged_vlan {
-                        node {
-                          id
-                          name {
-                            value
                           }
                         }
                       }

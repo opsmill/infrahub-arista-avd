@@ -60,7 +60,9 @@ class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent(BaseModel):
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParentNode(BaseModel):
-    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(alias="__typename")
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
+        alias="__typename"
+    )
     id: Optional[str]
 
 
@@ -69,17 +71,32 @@ class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
-    hostvar_identifier: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier"]
+    hostvar_identifier: Optional[
+        "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier"
+    ]
+    structured_config_checksum: Optional[
+        "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigChecksum"
+    ]
     structured_config_identifier: Optional[
         "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier"
     ]
 
 
-class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier(
+    BaseModel
+):
     value: Optional[str]
 
 
-class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(BaseModel):
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigChecksum(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(
+    BaseModel
+):
     value: Optional[str]
 
 

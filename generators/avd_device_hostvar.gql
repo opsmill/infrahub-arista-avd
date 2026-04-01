@@ -75,14 +75,27 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
             node {
               __typename
               id
-              name {
-                value
-              }
-              role {
-                value
-              }
-              tagged_vlan {
-                edges {
+              ... on InterfacePhysical {
+                name {
+                  value
+                }
+                role {
+                  value
+                }
+                tagged_vlan {
+                  edges {
+                    node {
+                      __typename
+                      vlan_id {
+                        value
+                      }
+                      status {
+                        value
+                      }
+                    }
+                  }
+                }
+                untagged_vlan {
                   node {
                     __typename
                     vlan_id {
@@ -93,19 +106,6 @@ query GenerateAvdDeviceInputsQuery($hostname: String!) {
                     }
                   }
                 }
-              }
-              untagged_vlan {
-                node {
-                  __typename
-                  vlan_id {
-                    value
-                  }
-                  status {
-                    value
-                  }
-                }
-              }
-              ... on DcimEndpoint {
                 connector {
                   node {
                     __typename

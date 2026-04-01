@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -40,7 +40,7 @@ class StartupConfigQueryDcimDeviceEdgesNodeLoopbackIpNodeAddress(BaseModel):
 
 
 class StartupConfigQueryDcimDeviceEdgesNodeInterfaces(BaseModel):
-    edges: list["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges"]
+    edges: Optional[list["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges"]]
 
 
 class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges(BaseModel):
@@ -48,8 +48,13 @@ class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges(BaseModel):
 
 
 class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNode(BaseModel):
+    typename__: Literal["DcimInterface", "InterfacePhysical", "InterfaceVirtual"] = (
+        Field(alias="__typename")
+    )
     name: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeName"]
-    description: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeDescription"]
+    description: Optional[
+        "StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeDescription"
+    ]
     role: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeRole"]
     status: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeStatus"]
     ip_address: "StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddress"
@@ -72,14 +77,20 @@ class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeStatus(BaseModel):
 
 
 class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddress(BaseModel):
-    node: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode"]
+    node: Optional[
+        "StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode"
+    ]
 
 
 class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNode(BaseModel):
-    address: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress"]
+    address: Optional[
+        "StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress"
+    ]
 
 
-class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress(BaseModel):
+class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeIpAddressNodeAddress(
+    BaseModel
+):
     value: Optional[str]
 
 

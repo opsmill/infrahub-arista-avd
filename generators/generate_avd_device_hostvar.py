@@ -13,7 +13,8 @@ from solution_ai_dc.protocols import AvdArtifact, NetworkPod
 
 from .generate_avd_device_inputs_query import (
     GenerateAvdDeviceInputsQuery,
-    GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces,
+    GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges,
+    GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical,
 )
 
 
@@ -69,7 +70,7 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
 
 
 def extract_uplinks_from_dict(
-    interfaces: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces,
+    interfaces: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges],
     uplink_role: str | None,
     device_id: str,
 ) -> UplinkData:
@@ -96,6 +97,8 @@ def extract_uplinks_from_dict(
 
     for edge in interfaces:
         interface = edge.node
+        if not isinstance(interface, GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical):
+            continue
         iface_role = interface.role
         if not iface_role or iface_role.value != uplink_role:
             continue
@@ -103,13 +106,13 @@ def extract_uplinks_from_dict(
         # Get the remote endpoint from the link
         link = interface.connector.node
         if link:
-            endpoints = link.connected_endpoints.edges
+            endpoints = link.connected_endpoints.edges or []
             for ep_edge in endpoints:
                 endpoint = ep_edge.node
                 # Skip null endpoints or this interface
                 if not endpoint:
                     continue
-                if endpoint.id != interface.id:
+                if endpoint.id != interface.id and hasattr(endpoint, "device"):
                     remote_device = endpoint.device.node
                     if remote_device:
                         # Only add interface when we have a valid link with remote device
@@ -147,7 +150,7 @@ def _sort_server_endpoints(servers: dict[str, ServerEndpoint]) -> list[ServerEnd
 
 
 def extract_connected_endpoints(
-    interfaces: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces,
+    interfaces: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges],
     hostname: str,
 ) -> list[ServerEndpoint]:
     """Extract connected endpoints (servers) from device interfaces.
@@ -163,6 +166,8 @@ def extract_connected_endpoints(
 
     for edge in interfaces:
         interface = edge.node
+        if not isinstance(interface, GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical):
+            continue
         iface_role = interface.role
         if not iface_role or iface_role.value != "server":
             continue
@@ -191,13 +196,13 @@ def extract_connected_endpoints(
             if status == "active":
                 untagged_vlan = untagged_vlan_node.vlan_id.value
 
-        endpoints = link.connected_endpoints.edges
+        endpoints = link.connected_endpoints.edges or []
         for ep_edge in endpoints:
             endpoint = ep_edge.node
             if not endpoint:
                 continue
             # Skip this interface, find the remote one
-            if endpoint.id != interface.id:
+            if endpoint.id != interface.id and hasattr(endpoint, "device"):
                 remote_device = endpoint.device.node
                 if remote_device:
                     server_name = remote_device.name.value
@@ -238,7 +243,7 @@ def extract_connected_endpoints(
 class GenerateAVDDeviceHostvar(InfrahubGenerator):
     async def generate(self, data: dict) -> None:
         data: GenerateAvdDeviceInputsQuery = GenerateAvdDeviceInputsQuery(**data)
-        device = data.network_device.edges[0].node
+        device = data.dcim_device.edges[0].node
         pod = device.pod.node
         fabric = pod.parent.node
 
@@ -276,15 +281,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             uplink_role = "spine"
 
         # Extract uplinks
+        iface_edges = device.interfaces.edges or []
         uplinks = extract_uplinks_from_dict(
-            device.interfaces.edges,
+            iface_edges,
             uplink_role,
             device_id,
         )
 
         # Extract connected endpoints (servers)
         connected_endpoints = extract_connected_endpoints(
-            device.interfaces.edges,
+            iface_edges,
             hostname,
         )
 

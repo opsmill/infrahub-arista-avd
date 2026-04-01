@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 
 
 class ComputedInterfaceDescriptionQuery(BaseModel):
-    dcim_interface: "ComputedInterfaceDescriptionQueryDcimInterface" = Field(alias="DcimInterface")
+    dcim_interface: "ComputedInterfaceDescriptionQueryDcimInterface" = Field(
+        alias="DcimInterface"
+    )
 
 
 class ComputedInterfaceDescriptionQueryDcimInterface(BaseModel):
@@ -14,77 +16,116 @@ class ComputedInterfaceDescriptionQueryDcimInterface(BaseModel):
 
 
 class ComputedInterfaceDescriptionQueryDcimInterfaceEdges(BaseModel):
-    node: Optional["ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNode"]
-
-
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNode(BaseModel):
-    id: str
-    connector: "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnector"
-
-
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnector(BaseModel):
-    node: Optional["ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNode"]
-
-
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNode(BaseModel):
-    id: str
-    connected_endpoints: "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpoints"
-
-
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpoints(BaseModel):
-    edges: Optional[list["ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdges"]]
-
-
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdges(BaseModel):
     node: Optional[
         Annotated[
             Union[
-                "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimEndpoint",
-                "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterface",
+                "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimInterface",
+                "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpoint",
             ],
             Field(discriminator="typename__"),
         ]
     ]
 
 
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimEndpoint(BaseModel):
-    typename__: Literal["DcimEndpoint"] = Field(alias="__typename")
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimInterface(BaseModel):
+    typename__: Literal["DcimInterface", "InterfacePhysical", "InterfaceVirtual"] = (
+        Field(alias="__typename")
+    )
     id: Optional[str]
 
 
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterface(BaseModel):
-    typename__: Literal["DcimInterface"] = Field(alias="__typename")
-    id: str
-    name: Optional[
-        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceName"
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpoint(BaseModel):
+    typename__: Literal["DcimEndpoint"] = Field(alias="__typename")
+    id: Optional[str]
+    connector: (
+        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnector"
+    )
+
+
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnector(
+    BaseModel
+):
+    node: Optional[
+        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNode"
     ]
-    device: "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDevice"
 
 
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceName(
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNode(
+    BaseModel
+):
+    typename__: Literal["DcimConnector", "NetworkLink"] = Field(alias="__typename")
+    id: Optional[str]
+    connected_endpoints: "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpoints"
+
+
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpoints(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdges"
+        ]
+    ]
+
+
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimEndpoint",
+                "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterface",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimEndpoint(
+    BaseModel
+):
+    typename__: Literal["DcimEndpoint", "InterfacePhysical"] = Field(alias="__typename")
+    id: Optional[str]
+
+
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterface(
+    BaseModel
+):
+    typename__: Literal["DcimInterface"] = Field(alias="__typename")
+    id: Optional[str]
+    name: Optional[
+        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceName"
+    ]
+    device: "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDevice"
+
+
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceName(
     BaseModel
 ):
     value: Optional[str]
 
 
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDevice(
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDevice(
     BaseModel
 ):
     node: Optional[
-        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNode"
+        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNode"
     ]
 
 
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNode(
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNode(
     BaseModel
 ):
-    typename__: Literal["ComputePhysicalServer", "DcimDevice", "DcimGenericDevice"] = Field(alias="__typename")
+    typename__: Literal["ComputePhysicalServer", "DcimDevice", "DcimGenericDevice"] = (
+        Field(alias="__typename")
+    )
     name: Optional[
-        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNodeName"
+        "ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNodeName"
     ]
 
 
-class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNodeName(
+class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNodeName(
     BaseModel
 ):
     value: Optional[str]
@@ -93,11 +134,11 @@ class ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnec
 ComputedInterfaceDescriptionQuery.model_rebuild()
 ComputedInterfaceDescriptionQueryDcimInterface.model_rebuild()
 ComputedInterfaceDescriptionQueryDcimInterfaceEdges.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNode.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnector.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNode.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpoints.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdges.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterface.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDevice.model_rebuild()
-ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNode.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpoint.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnector.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNode.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpoints.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdges.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterface.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDevice.model_rebuild()
+ComputedInterfaceDescriptionQueryDcimInterfaceEdgesNodeDcimEndpointConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNode.model_rebuild()

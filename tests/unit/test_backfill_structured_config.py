@@ -61,6 +61,7 @@ def _make_interface(
 ) -> InterfaceNode:
     """Helper to build an InterfaceNode for tests."""
     return InterfaceNode(
+        __typename="InterfacePhysical",
         id=iface_id,
         name=Name(value=name) if name else None,
         role=Role(value=role) if role else None,
@@ -155,6 +156,7 @@ class TestQueryModelParsing:
         interfaces = [
             {
                 "node": {
+                    "__typename": "InterfacePhysical",
                     "id": "iface-1",
                     "name": {"value": "Ethernet1"},
                     "role": {"value": "uplink"},
@@ -957,6 +959,7 @@ class TestGenerate:
         interfaces = [
             {
                 "node": {
+                    "__typename": "InterfacePhysical",
                     "id": "iface-1",
                     "name": {"value": "Ethernet1"},
                     "role": {"value": "uplink"},
@@ -985,6 +988,7 @@ class TestGenerate:
         interfaces = [
             {
                 "node": {
+                    "__typename": "InterfacePhysical",
                     "id": "iface-1",
                     "name": {"value": "Ethernet1"},
                     "role": {"value": "uplink"},
@@ -1018,6 +1022,7 @@ class TestGenerate:
         interfaces = [
             {
                 "node": {
+                    "__typename": "InterfacePhysical",
                     "id": "iface-1",
                     "name": {"value": "Ethernet1"},
                     "role": {"value": "uplink"},
@@ -1307,6 +1312,7 @@ class TestSourceAttributionGracefulDegradation:
         interfaces = [
             {
                 "node": {
+                    "__typename": "InterfacePhysical",
                     "id": "iface-1",
                     "name": {"value": "Ethernet1"},
                     "role": {"value": "uplink"},

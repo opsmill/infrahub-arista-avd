@@ -32,12 +32,23 @@ class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
 
 
 class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
+    structured_config_checksum: Optional[
+        "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigChecksum"
+    ]
     structured_config_identifier: Optional[
         "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier"
     ]
 
 
-class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(BaseModel):
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigChecksum(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(
+    BaseModel
+):
     value: Optional[str]
 
 

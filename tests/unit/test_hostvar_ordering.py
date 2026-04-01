@@ -10,18 +10,18 @@ from generators.generate_avd_device_hostvar import (
 
 # Short aliases for deeply nested Pydantic model types
 IfaceEdge = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges
-IfaceNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNode
-IfaceName = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeName
-IfaceRole = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeRole
-IfaceConnector = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnector
-ConnectorNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNode
+IfaceNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical
+IfaceName = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalName
+IfaceRole = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalRole
+IfaceConnector = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnector
+ConnectorNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNode
 ConnectorEndpoints = (
-    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNodeConnectedEndpoints
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpoints
 )
 EndpointEdge = (
-    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNodeConnectedEndpointsEdges
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdges
 )
-_ep = "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeConnectorNodeConnectedEndpointsEdgesNode"
+_ep = "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNode"
 EndpointIface = getattr(q, f"{_ep}DcimInterface")
 EndpointIfaceName = getattr(q, f"{_ep}DcimInterfaceName")
 EndpointDevice = getattr(q, f"{_ep}DcimInterfaceDevice")
@@ -39,10 +39,10 @@ EndpointGenericDeviceName = getattr(
     q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDeviceName"
 )
 TaggedVlan = (
-    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeTaggedVlan
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan
 )
 UntaggedVlan = (
-    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeUntaggedVlan
+    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan
 )
 
 
@@ -58,6 +58,7 @@ def _make_uplink_edge(
     """Helper to build a single uplink interface edge for testing."""
     return IfaceEdge(
         node=IfaceNode(
+            __typename="InterfacePhysical",
             id=iface_id,
             name=IfaceName(value=iface_name),
             role=IfaceRole(value=role),
@@ -65,6 +66,7 @@ def _make_uplink_edge(
             untagged_vlan=UntaggedVlan(node=None),
             connector=IfaceConnector(
                 node=ConnectorNode(
+                    __typename="NetworkLink",
                     id=f"link-{iface_id}",
                     connected_endpoints=ConnectorEndpoints(
                         edges=[
@@ -102,6 +104,7 @@ def _make_server_edge(
     """Helper to build a single server interface edge for testing."""
     return IfaceEdge(
         node=IfaceNode(
+            __typename="InterfacePhysical",
             id=iface_id,
             name=IfaceName(value=iface_name),
             role=IfaceRole(value="server"),
@@ -109,6 +112,7 @@ def _make_server_edge(
             untagged_vlan=UntaggedVlan(node=None),
             connector=IfaceConnector(
                 node=ConnectorNode(
+                    __typename="NetworkLink",
                     id=f"link-{iface_id}",
                     connected_endpoints=ConnectorEndpoints(
                         edges=[
