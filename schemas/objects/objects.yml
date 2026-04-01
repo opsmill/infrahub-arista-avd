@@ -16,24 +16,6 @@ nodes:
         kind: Text
         unique: true
         order_weight: 100
-      - name: hostvar_checksum
-        kind: Text
-        state: absent
-      - name: hostvar_identifier
-        kind: Text
-        state: absent
-      - name: hostvar_url
-        kind: URL
-        state: absent
-      - name: structured_config_checksum
-        kind: Text
-        state: absent
-      - name: structured_config_identifier
-        kind: Text
-        state: absent
-      - name: structured_config_url
-        kind: URL
-        state: absent
     relationships:
       - name: device
         peer: DcimDevice

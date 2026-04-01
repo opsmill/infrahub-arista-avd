@@ -4,35 +4,38 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from infrahub_sdk.protocols import (
-    BuiltinIPAddress,
-    BuiltinIPPrefix,
-    CoreAccountGroup,
-    CoreArtifactTarget,
-    CoreNode,
-    CoreObjectComponentTemplate,
-    CoreObjectTemplate,
-    CoreProfile,
-    LineageSource,
-)
+from infrahub_sdk.protocols import CoreNode, BuiltinIPAddress, BuiltinIPAddressSync, BuiltinIPNamespace, BuiltinIPNamespaceSync, BuiltinIPPrefix, BuiltinIPPrefixSync, BuiltinTag, BuiltinTagSync, CoreAccount, CoreAccountGroup, CoreAccountGroupSync, CoreAccountRole, CoreAccountRoleSync, CoreAccountSync, CoreAction, CoreActionSync, CoreArtifact, CoreArtifactCheck, CoreArtifactCheckSync, CoreArtifactDefinition, CoreArtifactDefinitionSync, CoreArtifactSync, CoreArtifactTarget, CoreArtifactTargetSync, CoreArtifactThread, CoreArtifactThreadSync, CoreArtifactValidator, CoreArtifactValidatorSync, CoreBasePermission, CoreBasePermissionSync, CoreChangeComment, CoreChangeCommentSync, CoreChangeThread, CoreChangeThreadSync, CoreCheck, CoreCheckDefinition, CoreCheckDefinitionSync, CoreCheckSync, CoreComment, CoreCommentSync, CoreCredential, CoreCredentialSync, CoreCustomWebhook, CoreCustomWebhookSync, CoreDataCheck, CoreDataCheckSync, CoreDataValidator, CoreDataValidatorSync, CoreFileCheck, CoreFileCheckSync, CoreFileObject, CoreFileObjectSync, CoreFileThread, CoreFileThreadSync, CoreGeneratorAction, CoreGeneratorActionSync, CoreGeneratorAwareGroup, CoreGeneratorAwareGroupSync, CoreGeneratorCheck, CoreGeneratorCheckSync, CoreGeneratorDefinition, CoreGeneratorDefinitionSync, CoreGeneratorGroup, CoreGeneratorGroupSync, CoreGeneratorInstance, CoreGeneratorInstanceSync, CoreGeneratorValidator, CoreGeneratorValidatorSync, CoreGenericAccount, CoreGenericAccountSync, CoreGenericRepository, CoreGenericRepositorySync, CoreGlobalPermission, CoreGlobalPermissionSync, CoreGraphQLQuery, CoreGraphQLQueryGroup, CoreGraphQLQueryGroupSync, CoreGraphQLQuerySync, CoreGroup, CoreGroupAction, CoreGroupActionSync, CoreGroupSync, CoreGroupTriggerRule, CoreGroupTriggerRuleSync, CoreIPAddressPool, CoreIPAddressPoolSync, CoreIPPrefixPool, CoreIPPrefixPoolSync, CoreMenu, CoreMenuItem, CoreMenuItemSync, CoreMenuSync, CoreNodeSync, CoreNodeTriggerAttributeMatch, CoreNodeTriggerAttributeMatchSync, CoreNodeTriggerMatch, CoreNodeTriggerMatchSync, CoreNodeTriggerRelationshipMatch, CoreNodeTriggerRelationshipMatchSync, CoreNodeTriggerRule, CoreNodeTriggerRuleSync, CoreNumberPool, CoreNumberPoolSync, CoreObjectComponentTemplate, CoreObjectComponentTemplateSync, CoreObjectPermission, CoreObjectPermissionSync, CoreObjectTemplate, CoreObjectTemplateSync, CoreObjectThread, CoreObjectThreadSync, CorePasswordCredential, CorePasswordCredentialSync, CoreProfile, CoreProfileSync, CoreProposedChange, CoreProposedChangeSync, CoreReadOnlyRepository, CoreReadOnlyRepositorySync, CoreRepository, CoreRepositoryGroup, CoreRepositoryGroupSync, CoreRepositorySync, CoreRepositoryValidator, CoreRepositoryValidatorSync, CoreResourcePool, CoreResourcePoolSync, CoreSchemaCheck, CoreSchemaCheckSync, CoreSchemaValidator, CoreSchemaValidatorSync, CoreStandardCheck, CoreStandardCheckSync, CoreStandardGroup, CoreStandardGroupSync, CoreStandardWebhook, CoreStandardWebhookSync, CoreTaskTarget, CoreTaskTargetSync, CoreThread, CoreThreadComment, CoreThreadCommentSync, CoreThreadSync, CoreTransformJinja2, CoreTransformJinja2Sync, CoreTransformPython, CoreTransformPythonSync, CoreTransformation, CoreTransformationSync, CoreTriggerRule, CoreTriggerRuleSync, CoreUserValidator, CoreUserValidatorSync, CoreValidator, CoreValidatorSync, CoreWebhook, CoreWebhookSync, CoreWeightedPoolResource, CoreWeightedPoolResourceSync, InternalAccountToken, InternalAccountTokenSync, InternalIPPrefixAvailable, InternalIPPrefixAvailableSync, InternalIPRangeAvailable, InternalIPRangeAvailableSync, InternalRefreshToken, InternalRefreshTokenSync, IpamNamespace, IpamNamespaceSync, LineageOwner, LineageOwnerSync, LineageSource, LineageSourceSync
 
 if TYPE_CHECKING:
     from infrahub_sdk.node import RelatedNode, RelationshipManager
     from infrahub_sdk.protocols_base import (
-        BooleanOptional,
-        Dropdown,
-        DropdownOptional,
+        AnyAttribute,
+        AnyAttributeOptional,
+        String,
+        StringOptional,
         Integer,
         IntegerOptional,
+        Boolean,
+        BooleanOptional,
+        DateTime,
+        DateTimeOptional,
+        Dropdown,
+        DropdownOptional,
+        HashedPassword,
+        HashedPasswordOptional,
+        MacAddress,
+        MacAddressOptional,
         IPHost,
         IPHostOptional,
         IPNetwork,
         IPNetworkOptional,
+        JSONAttribute,
+        JSONAttributeOptional,
+        ListAttribute,
         ListAttributeOptional,
-        String,
-        StringOptional,
+        URL,
         URLOptional,
     )
 
@@ -46,13 +49,11 @@ class NetworkBuildingBlock(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
-
 class TemplateComputeGenericUnit(CoreNode):
     template_name: String
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class DcimConnector(CoreNode):
     medium: Dropdown
@@ -62,7 +63,6 @@ class DcimConnector(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
-
 class TemplateCoreArtifactTarget(CoreNode):
     template_name: String
     artifacts: RelationshipManager
@@ -70,14 +70,12 @@ class TemplateCoreArtifactTarget(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
-
 class TemplateDcimEndpoint(CoreNode):
     template_name: String
     connector: RelatedNode
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class TemplateDcimGenericDevice(CoreNode):
     description: StringOptional
@@ -87,10 +85,10 @@ class TemplateDcimGenericDevice(CoreNode):
     member_of_groups: RelationshipManager
     platform: RelatedNode
     primary_address: RelatedNode
+    primary_address_from_resource_pool: RelatedNode
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
     tags: RelationshipManager
-
 
 class TemplateDcimInterface(CoreNode):
     mtu: IntegerOptional
@@ -100,13 +98,14 @@ class TemplateDcimInterface(CoreNode):
     template_name: String
     device: RelatedNode
     ip_address: RelatedNode
+    ip_address_from_resource_pool: RelatedNode
     member_of_groups: RelationshipManager
+    mtu_from_resource_pool: RelatedNode
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
     tagged_vlan: RelationshipManager
     tags: RelationshipManager
     untagged_vlan: RelatedNode
-
 
 class TemplateDcimPhysicalDevice(CoreNode):
     position: IntegerOptional
@@ -116,9 +115,9 @@ class TemplateDcimPhysicalDevice(CoreNode):
     device_type: RelatedNode
     location: RelatedNode
     member_of_groups: RelationshipManager
+    position_from_resource_pool: RelatedNode
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class DcimEndpoint(CoreNode):
     connector: RelatedNode
@@ -126,14 +125,12 @@ class DcimEndpoint(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
-
 class TemplateGeneratorTarget(CoreNode):
     checksum: StringOptional
     template_name: String
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class LocationGeneric(CoreNode):
     description: StringOptional
@@ -146,7 +143,6 @@ class LocationGeneric(CoreNode):
     subscriber_of_groups: RelationshipManager
     tags: RelationshipManager
 
-
 class OrganizationGeneric(CoreNode):
     description: StringOptional
     name: String
@@ -154,7 +150,6 @@ class OrganizationGeneric(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
     tags: RelationshipManager
-
 
 class DcimGenericDevice(CoreNode):
     description: StringOptional
@@ -168,12 +163,10 @@ class DcimGenericDevice(CoreNode):
     subscriber_of_groups: RelationshipManager
     tags: RelationshipManager
 
-
 class ComputeGenericUnit(CoreNode):
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class InterfaceHasSubInterface(CoreNode):
     member_of_groups: RelationshipManager
@@ -181,13 +174,11 @@ class InterfaceHasSubInterface(CoreNode):
     sub_interfaces: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
-
 class VirtualizationHostVirtualMachine(CoreNode):
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
     virtual_machines: RelationshipManager
-
 
 class LocationHosting(CoreNode):
     shortname: StringOptional
@@ -196,7 +187,6 @@ class LocationHosting(CoreNode):
     prefixes: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class DcimInterface(CoreNode):
     description: StringOptional
@@ -214,14 +204,12 @@ class DcimInterface(CoreNode):
     tags: RelationshipManager
     untagged_vlan: RelatedNode
 
-
 class TemplateInterfaceHasSubInterface(CoreNode):
     template_name: String
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     sub_interfaces: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class TemplateInterfaceLayer2(CoreNode):
     l2_mode: DropdownOptional
@@ -230,23 +218,22 @@ class TemplateInterfaceLayer2(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
-
 class TemplateInterfaceLayer3(CoreNode):
     dot1q_id: IntegerOptional
     mac_address: StringOptional
     template_name: String
+    dot1q_id_from_resource_pool: RelatedNode
     ip_addresses: RelationshipManager
+    ip_addresses_from_resource_pool: RelatedNode
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class InterfaceLayer2(CoreNode):
     l2_mode: DropdownOptional
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class InterfaceLayer3(CoreNode):
     dot1q_id: IntegerOptional
@@ -255,7 +242,6 @@ class InterfaceLayer3(CoreNode):
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class DcimPhysicalDevice(CoreNode):
     position: IntegerOptional
@@ -267,13 +253,11 @@ class DcimPhysicalDevice(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
-
 class GeneratorTarget(CoreNode):
     checksum: StringOptional
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
-
 
 class TemplateVirtualizationHostVirtualMachine(CoreNode):
     template_name: String
@@ -283,27 +267,14 @@ class TemplateVirtualizationHostVirtualMachine(CoreNode):
     virtual_machines: RelationshipManager
 
 
+
 class AvdArtifact(CoreNode):
     name: String
     device: RelatedNode
     hostvar_file: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
     structured_config_file: RelatedNode
-    member_of_groups: RelationshipManager
-    profiles: RelationshipManager
-    subscriber_of_groups: RelationshipManager
-
-
-class AvdHostvarFile(CoreNode):
-    artifact: RelatedNode
-    member_of_groups: RelationshipManager
-    profiles: RelationshipManager
-    subscriber_of_groups: RelationshipManager
-
-
-class AvdStructuredConfigFile(CoreNode):
-    artifact: RelatedNode
-    member_of_groups: RelationshipManager
-    profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
 
@@ -435,6 +406,18 @@ class LocationHall(LocationGeneric):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
     tags: RelationshipManager
+
+
+class AvdHostvarFile(CoreFileObject):
+    checksum: String
+    file_name: String
+    file_size: Integer
+    file_type: String
+    storage_id: String
+    artifact: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 
 class IpamIPAddress(BuiltinIPAddress):
@@ -665,6 +648,18 @@ class RoutingStaticRoute(CoreNode):
     subscriber_of_groups: RelationshipManager
 
 
+class AvdStructuredConfigFile(CoreFileObject):
+    checksum: String
+    file_name: String
+    file_size: Integer
+    file_type: String
+    storage_id: String
+    artifact: RelatedNode
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class IpamVLAN(CoreNode):
     description: StringOptional
     name: String
@@ -711,14 +706,11 @@ class VirtualizationVirtualMachine(ComputeGenericUnit):
     subscriber_of_groups: RelationshipManager
 
 
+
+
 class ProfileAvdArtifact(LineageSource, CoreProfile, CoreNode):
-    hostvar_checksum: StringOptional
-    hostvar_identifier: StringOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
-    structured_config_checksum: StringOptional
-    structured_config_identifier: StringOptional
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager
@@ -731,6 +723,22 @@ class ProfileAvdEvpn(LineageSource, CoreProfile, CoreNode):
     profile_name: String
     profile_priority: IntegerOptional
     fabric: RelationshipManager
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileAvdHostvarFile(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileAvdStructuredConfigFile(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager
@@ -1342,15 +1350,9 @@ class ProfileVirtualizationVirtualMachine(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager
 
 
-class TemplateComputePhysicalServer(
-    LineageSource,
-    TemplateComputeGenericUnit,
-    TemplateDcimGenericDevice,
-    TemplateGeneratorTarget,
-    TemplateVirtualizationHostVirtualMachine,
-    CoreObjectTemplate,
-    CoreNode,
-):
+
+
+class TemplateComputePhysicalServer(LineageSource, TemplateComputeGenericUnit, TemplateDcimGenericDevice, TemplateGeneratorTarget, TemplateVirtualizationHostVirtualMachine, CoreObjectTemplate, CoreNode):
     checksum: StringOptional
     description: StringOptional
     os_version: StringOptional
@@ -1361,6 +1363,7 @@ class TemplateComputePhysicalServer(
     member_of_groups: RelationshipManager
     platform: RelatedNode
     primary_address: RelatedNode
+    primary_address_from_resource_pool: RelatedNode
     profiles: RelationshipManager
     rack: RelatedNode
     related_nodes: RelationshipManager
@@ -1369,14 +1372,7 @@ class TemplateComputePhysicalServer(
     virtual_machines: RelationshipManager
 
 
-class TemplateDcimDevice(
-    LineageSource,
-    TemplateCoreArtifactTarget,
-    TemplateDcimGenericDevice,
-    TemplateDcimPhysicalDevice,
-    CoreObjectTemplate,
-    CoreNode,
-):
+class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcimGenericDevice, TemplateDcimPhysicalDevice, CoreObjectTemplate, CoreNode):
     bgp_asn: IntegerOptional
     description: StringOptional
     index: IntegerOptional
@@ -1390,18 +1386,25 @@ class TemplateDcimDevice(
     template_name: String
     artifacts: RelationshipManager
     avd_artifact: RelatedNode
+    bgp_asn_from_resource_pool: RelatedNode
     bgp_neighbors: RelationshipManager
     bgp_peer_groups: RelationshipManager
     device_type: RelatedNode
+    index_from_resource_pool: RelatedNode
     interfaces: RelationshipManager
     location: RelatedNode
     loopback_ip: RelatedNode
+    loopback_ip_from_resource_pool: RelatedNode
     member_of_groups: RelationshipManager
     mgmt_ip: RelatedNode
+    mgmt_ip_from_resource_pool: RelatedNode
+    node_id_from_resource_pool: RelatedNode
     platform: RelatedNode
     pod: RelatedNode
+    position_from_resource_pool: RelatedNode
     prefix_lists: RelationshipManager
     primary_address: RelatedNode
+    primary_address_from_resource_pool: RelatedNode
     profiles: RelationshipManager
     rack: RelatedNode
     related_nodes: RelationshipManager
@@ -1411,16 +1414,7 @@ class TemplateDcimDevice(
     tags: RelationshipManager
 
 
-class TemplateInterfacePhysical(
-    LineageSource,
-    CoreObjectComponentTemplate,
-    TemplateDcimInterface,
-    TemplateInterfaceLayer2,
-    TemplateInterfaceLayer3,
-    TemplateDcimEndpoint,
-    TemplateInterfaceHasSubInterface,
-    CoreNode,
-):
+class TemplateInterfacePhysical(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, TemplateDcimEndpoint, TemplateInterfaceHasSubInterface, CoreNode):
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
     mac_address: StringOptional
@@ -1431,9 +1425,13 @@ class TemplateInterfacePhysical(
     template_name: String
     connector: RelatedNode
     device: RelatedNode
+    dot1q_id_from_resource_pool: RelatedNode
     ip_address: RelatedNode
+    ip_address_from_resource_pool: RelatedNode
     ip_addresses: RelationshipManager
+    ip_addresses_from_resource_pool: RelatedNode
     member_of_groups: RelationshipManager
+    mtu_from_resource_pool: RelatedNode
     profiles: RelationshipManager
     related_nodes: RelationshipManager
     sub_interfaces: RelationshipManager
@@ -1443,14 +1441,7 @@ class TemplateInterfacePhysical(
     untagged_vlan: RelatedNode
 
 
-class TemplateInterfaceVirtual(
-    LineageSource,
-    CoreObjectComponentTemplate,
-    TemplateDcimInterface,
-    TemplateInterfaceLayer2,
-    TemplateInterfaceLayer3,
-    CoreNode,
-):
+class TemplateInterfaceVirtual(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, CoreNode):
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
     mac_address: StringOptional
@@ -1460,9 +1451,13 @@ class TemplateInterfaceVirtual(
     status: DropdownOptional
     template_name: String
     device: RelatedNode
+    dot1q_id_from_resource_pool: RelatedNode
     ip_address: RelatedNode
+    ip_address_from_resource_pool: RelatedNode
     ip_addresses: RelationshipManager
+    ip_addresses_from_resource_pool: RelatedNode
     member_of_groups: RelationshipManager
+    mtu_from_resource_pool: RelatedNode
     parent_interface: RelatedNode
     profiles: RelationshipManager
     related_nodes: RelationshipManager
@@ -1472,16 +1467,18 @@ class TemplateInterfaceVirtual(
     untagged_vlan: RelatedNode
 
 
-class TemplateVirtualizationVirtualMachine(
-    LineageSource, CoreObjectComponentTemplate, TemplateComputeGenericUnit, CoreNode
-):
+class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTemplate, TemplateComputeGenericUnit, CoreNode):
     disk: IntegerOptional
     memory: IntegerOptional
     role: DropdownOptional
     template_name: String
     vcpu: IntegerOptional
+    disk_from_resource_pool: RelatedNode
     host: RelatedNode
     member_of_groups: RelationshipManager
+    memory_from_resource_pool: RelatedNode
     profiles: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager
+    vcpu_from_resource_pool: RelatedNode
+
