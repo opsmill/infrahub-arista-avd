@@ -66,12 +66,6 @@ nodes:
         kind: List
         optional: true
         order_weight: 9000
-      - name: mgmt_routes1
-        label: Management Route 1
-        kind: List
-        optional: true
-        order_weight: 9001
-        branch: aware
       - name: avd_hostvars_ready
         kind: Boolean
         optional: true

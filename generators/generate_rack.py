@@ -190,13 +190,3 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         )
 
         await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)
-
-        # Ignore because this is being assigned by AVD
-        # await assign_ip_addresses_to_p2p_connections(
-        #     client=self.client,
-        #     logger=self.logger,
-        #     connections=created_cabling_plan,
-        #     prefix_len=31,
-        #     prefix_role="pod_leaf_spine",
-        #     pool=self.prefix_pool,
-        # )
