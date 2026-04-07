@@ -1318,8 +1318,7 @@ class TestSourceAttributionGracefulDegradation:
                 {"name": "Ethernet1", "ip_address": "10.0.0.1/31"},
             ]
         }
-        mock_sc_file = MagicMock()
-        mock_sc_file.download_file = AsyncMock(return_value=json.dumps(structured_config).encode())
+        mock_artifact = _make_artifact_mock(structured_config)
 
         mock_prefix = _make_saveable_mock()
         mock_ip = _make_saveable_mock()
@@ -1327,9 +1326,9 @@ class TestSourceAttributionGracefulDegradation:
 
         gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
 
-        # First get call is for AvdStructuredConfigFile, then CoreAccountGroup (not found), then interface
+        # First get call is for AvdArtifact, then CoreAccountGroup (not found), then interface
         gen.client.get = AsyncMock(
-            side_effect=[mock_sc_file, NodeNotFoundError(identifier={"name": ["AVD"]}), mock_interface]
+            side_effect=[mock_artifact, NodeNotFoundError(identifier={"name": ["AVD"]}), mock_interface]
         )
 
         interfaces = [
