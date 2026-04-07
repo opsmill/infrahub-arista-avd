@@ -1,15 +1,6 @@
----
-description: Create or update the feature specification from a natural language feature description.
-handoffs: 
-  - label: Build Technical Plan
-    agent: speckit.plan
-    prompt: Create a plan for the spec. I am building with...
-  - label: Clarify Spec Requirements
-    agent: speckit.clarify
-    prompt: Clarify specification requirements
-    send: true
----
 
+
+<!-- Source: infrahub -->
 ## User Input
 
 ```text
@@ -17,6 +8,140 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+## Pre-Execution Checks
+
+**Check for extension hooks (before specification)**:
+- Check if `.specify/extensions.yml` exists in the project root.
+- If it exists, read it and look for entries under the `hooks.before_specify` key
+- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
+- Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
+- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
+  - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
+  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
+- For each executable hook, output the following based on its `optional` flag:
+  - **Optional hook** (`optional: true`):
+    ```
+    ## Extension Hooks
+
+    **Optional Pre-Hook**: {extension}
+    Command: `/{command}`
+    Description: {description}
+
+    Prompt: {prompt}
+    To execute: `/{command}`
+    ```
+  - **Mandatory hook** (`optional: false`):
+    ```
+    ## Extension Hooks
+
+    **Automatic Pre-Hook**: {extension}
+    Executing: `/{command}`
+    EXECUTE_COMMAND: {command}
+
+    Wait for the result of the hook command before proceeding to the Outline.
+    ```
+- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+
+## Infrahub Routing
+
+**This preset overrides the default `/speckit.specify` command with Infrahub-aware artifact routing.**
+
+### Step 1: Detect Infrahub project
+
+Check if `.infrahub.yml` exists in the repository root.
+
+- **If `.infrahub.yml` does NOT exist**: Skip all Infrahub routing. Use the default `spec-template` (resolved via `resolve_template`). Proceed directly to the **Outline** section below.
+- **If `.infrahub.yml` exists**: Continue to Step 2.
+
+### Step 2: Verify Infrahub connectivity
+
+Run `infrahubctl info` to verify that the Infrahub instance is reachable.
+
+- **If the command fails or Infrahub is not reachable**: Stop and warn the user:
+  ```
+  Infrahub is not reachable. Please start your Infrahub instance first:
+    invoke start
+  Then re-run /speckit.specify
+  ```
+  Do NOT proceed further.
+- **If the command succeeds**: Continue to Step 3.
+
+### Step 3: Analyze prompt for artifact types
+
+Read the user's input (the text after `/speckit.specify`) and classify which Infrahub artifact types are involved. Use this detection table:
+
+| Artifact Type | Keywords / Signals | Extension Template |
+|---------------|-------------------|-------------------|
+| **Schema** | schema, data model, nodes, attributes, relationships, hierarchy, generics, namespace, kind, store information, model | `spec-schema-template` |
+| **Transform** | transform, render, config, artifact, output, template, jinja, generate config, device config, configuration | `spec-transform-template` |
+| **Check** | check, validate, validation, enforce, rule, constraint, verify | `spec-check-template` |
+| **Generator** | generator, auto-create, design-driven, topology, provision, generate objects | `spec-generator-template` |
+| **Menu** | menu, navigation, sidebar, UI, organize | `spec-menu-template` |
+
+**Detection rules**:
+- Match keywords case-insensitively against the user's input
+- A prompt can match **multiple** artifact types
+- If NO artifact type is detected, default to `spec-schema-template` (schema-first principle)
+
+### Step 4: Handle single vs multiple artifact types
+
+**If exactly ONE artifact type is detected**:
+- Load the corresponding extension template from `.specify/extensions/infrahub/templates/`
+- Proceed to the **Outline** section using that template
+
+**If MULTIPLE artifact types are detected**:
+- Present the detected types and their dependency order to the user:
+
+  ```markdown
+  ## Infrahub Artifact Routing
+
+  Your feature involves multiple Infrahub artifact types:
+
+  1. **Schema** - Define the data model (must be done first)
+  2. **Transform** - Render device configurations (depends on schema)
+
+  The spec-driven workflow handles one artifact type per cycle:
+  `/speckit.specify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`
+
+  **Starting with: Schema**
+  After completing the schema cycle, run `/speckit.specify` again for the next artifact.
+  ```
+
+- Use this **dependency order** (earlier items must be completed first):
+  1. Schema (always first -- everything depends on the data model)
+  2. Check, Generator, Transform, Menu (all depend on schema; independent of each other)
+
+- Load the template for the **first** artifact type in the dependency chain
+- Proceed to the **Outline** section using that template
+
+### Step 5: Invoke the corresponding Infrahub skill
+
+**MANDATORY — This step MUST NOT be skipped, rationalized around, or deferred.**
+
+Based on the artifact type detected in Step 3, invoke the corresponding Infrahub skill using the Skill tool BEFORE writing any specification content. The skill loads authoritative reference material (schema properties, validation rules, naming conventions, API patterns) that you MUST use when writing the spec.
+
+| Artifact Type | Skill to Invoke | What It Provides |
+|---------------|----------------|-----------------|
+| **Schema** | `infrahub:schema-creator` | Schema property reference, node/generic definitions, attribute kinds, relationship types, CoreFileObject, naming conventions, validation rules |
+| **Transform** | `infrahub:transform-creator` | Transform types (Python/Jinja2), query patterns, artifact definitions, content types |
+| **Check** | `infrahub:check-creator` | Check definition structure, validation logic patterns, proposed change pipeline |
+| **Generator** | `infrahub:generator-creator` | Generator class patterns, target groups, query parameters, idempotent creation |
+| **Menu** | `infrahub:menu-creator` | Menu structure, node organization, sidebar customization |
+
+**If multiple artifact types were detected**: Invoke the skill for the FIRST artifact type (the one being specified in this cycle).
+
+**Anti-rationalization check**: If you think any of the following, you MUST still invoke the skill:
+- "I already know Infrahub schemas" — The skill has curated reference material you don't have in training data
+- "I fetched the docs via WebFetch" — Web docs may be incomplete or outdated vs. the skill's validated reference
+- "This is a simple change" — Simple changes still need correct attribute kinds, relationship cardinalities, naming conventions
+- "I'll invoke it later during planning" — The spec defines entities and requirements that need accurate domain knowledge NOW
+
+### Step 6: Load the extension template
+
+Read the selected template from `.specify/extensions/infrahub/templates/{template-name}.md`.
+
+- If the template file does not exist, fall back to `.specify/templates/spec-template.md` and warn the user.
 
 ## Outline
 
@@ -30,45 +155,23 @@ Given that feature description, do this:
    - Use action-noun format when possible (e.g., "add-user-auth", "fix-payment-bug")
    - Preserve technical terms and acronyms (OAuth2, API, JWT, etc.)
    - Keep it concise but descriptive enough to understand the feature at a glance
-   - Examples:
-     - "I want to add user authentication" → "user-auth"
-     - "Implement OAuth2 integration for the API" → "oauth2-api-integration"
-     - "Create a dashboard for analytics" → "analytics-dashboard"
-     - "Fix payment processing timeout bug" → "fix-payment-timeout"
 
-2. **Check for existing branches before creating new one**:
+2. **Create the feature branch** by running the script with `--short-name` (and `--json`). In sequential mode, do NOT pass `--number` — the script auto-detects the next available number. In timestamp mode, the script generates a `YYYYMMDD-HHMMSS` prefix automatically:
 
-   a. First, fetch all remote branches to ensure we have the latest information:
+   **Branch numbering mode**: Before running the script, check if `.specify/init-options.json` exists and read the `branch_numbering` value.
+   - If `"timestamp"`, add `--timestamp` (Bash) or `-Timestamp` (PowerShell) to the script invocation
+   - If `"sequential"` or absent, do not add any extra flag (default behavior)
 
-      ```bash
-      git fetch --all --prune
-      ```
-
-   b. Find the highest feature number across all sources for the short-name:
-      - Remote branches: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'`
-      - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
-      - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
-
-   c. Determine the next available number:
-      - Extract all numbers from all three sources
-      - Find the highest number N
-      - Use N+1 for the new branch number
-
-   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the calculated number and short-name:
-      - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
-      - Bash example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --json --number 5 --short-name "user-auth" "Add user authentication"`
-      - PowerShell example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" -Json -Number 5 -ShortName "user-auth" "Add user authentication"`
+   - Bash example: `.specify/scripts/bash/create-new-feature.sh "$ARGUMENTS" --json --short-name "user-auth" "Add user authentication"`
 
    **IMPORTANT**:
-   - Check all three sources (remote branches, local branches, specs directories) to find the highest number
-   - Only match branches/directories with the exact short-name pattern
-   - If no existing branches/directories found with this short-name, start with number 1
+   - Do NOT pass `--number` — the script determines the correct next number automatically
+   - Always include the JSON flag (`--json` for Bash, `-Json` for PowerShell) so the output can be parsed reliably
    - You must only ever run this script once per feature
    - The JSON is provided in the terminal as output - always refer to it to get the actual content you're looking for
    - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
 
-3. Load `.specify/templates/spec-template.md` to understand required sections.
+3. **Load the template** determined by the Infrahub Routing section above (or the default `spec-template` if not an Infrahub project).
 
 4. Follow this execution flow:
 
@@ -91,110 +194,41 @@ Given that feature description, do this:
        Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
     6. Define Success Criteria
        Create measurable, technology-agnostic outcomes
-       Include both quantitative metrics (time, performance, volume) and qualitative measures (user satisfaction, task completion)
+       Include both quantitative metrics and qualitative measures
        Each criterion must be verifiable without implementation details
     7. Identify Key Entities (if data involved)
     8. Return: SUCCESS (spec ready for planning)
 
-5. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+5. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description while preserving section order and headings.
 
 6. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
 
-   a. **Create Spec Quality Checklist**: Generate a checklist file at `FEATURE_DIR/checklists/requirements.md` using the checklist template structure with these validation items:
+   a. **Create Spec Quality Checklist**: Generate a checklist file at `FEATURE_DIR/checklists/requirements.md` with validation items covering:
+      - Content Quality (no implementation details, focused on user value, written for stakeholders, all sections completed)
+      - Requirement Completeness (no NEEDS CLARIFICATION markers, testable requirements, measurable success criteria, edge cases identified)
+      - Feature Readiness (acceptance criteria defined, user scenarios cover primary flows)
 
-      ```markdown
-      # Specification Quality Checklist: [FEATURE NAME]
-      
-      **Purpose**: Validate specification completeness and quality before proceeding to planning
-      **Created**: [DATE]
-      **Feature**: [Link to spec.md]
-      
-      ## Content Quality
-      
-      - [ ] No implementation details (languages, frameworks, APIs)
-      - [ ] Focused on user value and business needs
-      - [ ] Written for non-technical stakeholders
-      - [ ] All mandatory sections completed
-      
-      ## Requirement Completeness
-      
-      - [ ] No [NEEDS CLARIFICATION] markers remain
-      - [ ] Requirements are testable and unambiguous
-      - [ ] Success criteria are measurable
-      - [ ] Success criteria are technology-agnostic (no implementation details)
-      - [ ] All acceptance scenarios are defined
-      - [ ] Edge cases are identified
-      - [ ] Scope is clearly bounded
-      - [ ] Dependencies and assumptions identified
-      
-      ## Feature Readiness
-      
-      - [ ] All functional requirements have clear acceptance criteria
-      - [ ] User scenarios cover primary flows
-      - [ ] Feature meets measurable outcomes defined in Success Criteria
-      - [ ] No implementation details leak into specification
-      
-      ## Notes
-      
-      - Items marked incomplete require spec updates before `/speckit.clarify` or `/speckit.plan`
-      ```
-
-   b. **Run Validation Check**: Review the spec against each checklist item:
-      - For each item, determine if it passes or fails
-      - Document specific issues found (quote relevant spec sections)
+   b. **Run Validation Check**: Review the spec against each checklist item
 
    c. **Handle Validation Results**:
+      - **If all items pass**: Mark checklist complete and proceed to step 7
+      - **If items fail**: Fix and re-validate (max 3 iterations)
+      - **If [NEEDS CLARIFICATION] markers remain** (max 3): Present options to user in table format, wait for responses, update spec
 
-      - **If all items pass**: Mark checklist complete and proceed to step 6
-
-      - **If items fail (excluding [NEEDS CLARIFICATION])**:
-        1. List the failing items and specific issues
-        2. Update the spec to address each issue
-        3. Re-run validation until all items pass (max 3 iterations)
-        4. If still failing after 3 iterations, document remaining issues in checklist notes and warn user
-
-      - **If [NEEDS CLARIFICATION] markers remain**:
-        1. Extract all [NEEDS CLARIFICATION: ...] markers from the spec
-        2. **LIMIT CHECK**: If more than 3 markers exist, keep only the 3 most critical (by scope/security/UX impact) and make informed guesses for the rest
-        3. For each clarification needed (max 3), present options to user in this format:
-
-           ```markdown
-           ## Question [N]: [Topic]
-           
-           **Context**: [Quote relevant spec section]
-           
-           **What we need to know**: [Specific question from NEEDS CLARIFICATION marker]
-           
-           **Suggested Answers**:
-           
-           | Option | Answer | Implications |
-           |--------|--------|--------------|
-           | A      | [First suggested answer] | [What this means for the feature] |
-           | B      | [Second suggested answer] | [What this means for the feature] |
-           | C      | [Third suggested answer] | [What this means for the feature] |
-           | Custom | Provide your own answer | [Explain how to provide custom input] |
-           
-           **Your choice**: _[Wait for user response]_
-           ```
-
-        4. **CRITICAL - Table Formatting**: Ensure markdown tables are properly formatted:
-           - Use consistent spacing with pipes aligned
-           - Each cell should have spaces around content: `| Content |` not `|Content|`
-           - Header separator must have at least 3 dashes: `|--------|`
-           - Test that the table renders correctly in markdown preview
-        5. Number questions sequentially (Q1, Q2, Q3 - max 3 total)
-        6. Present all questions together before waiting for responses
-        7. Wait for user to respond with their choices for all questions (e.g., "Q1: A, Q2: Custom - [details], Q3: B")
-        8. Update the spec by replacing each [NEEDS CLARIFICATION] marker with the user's selected or provided answer
-        9. Re-run validation after all clarifications are resolved
-
-   d. **Update Checklist**: After each validation iteration, update the checklist file with current pass/fail status
+   d. **Update Checklist**: After each validation iteration, update the checklist file
 
 7. Report completion with branch name, spec file path, checklist results, and readiness for the next phase (`/speckit.clarify` or `/speckit.plan`).
 
-**NOTE:** The script creates and checks out the new branch and initializes the spec file before writing.
+   **If multiple artifact types were detected in Infrahub Routing**, also remind the user:
+   ```
+   This feature involves additional artifact types after this one.
+   Once you complete the full cycle for this spec, run `/speckit.specify` again for the next artifact.
+   ```
 
-## General Guidelines
+8. **Check for extension hooks**: After reporting completion, check if `.specify/extensions.yml` exists in the project root.
+   - If it exists, read it and look for entries under the `hooks.after_specify` key
+   - Process hooks using the same logic as the pre-execution hooks above.
+   - If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
 
 ## Quick Guidelines
 
@@ -215,24 +249,9 @@ When creating this spec from a user prompt:
 
 1. **Make informed guesses**: Use context, industry standards, and common patterns to fill gaps
 2. **Document assumptions**: Record reasonable defaults in the Assumptions section
-3. **Limit clarifications**: Maximum 3 [NEEDS CLARIFICATION] markers - use only for critical decisions that:
-   - Significantly impact feature scope or user experience
-   - Have multiple reasonable interpretations with different implications
-   - Lack any reasonable default
+3. **Limit clarifications**: Maximum 3 [NEEDS CLARIFICATION] markers
 4. **Prioritize clarifications**: scope > security/privacy > user experience > technical details
 5. **Think like a tester**: Every vague requirement should fail the "testable and unambiguous" checklist item
-6. **Common areas needing clarification** (only if no reasonable default exists):
-   - Feature scope and boundaries (include/exclude specific use cases)
-   - User types and permissions (if multiple conflicting interpretations possible)
-   - Security/compliance requirements (when legally/financially significant)
-
-**Examples of reasonable defaults** (don't ask about these):
-
-- Data retention: Industry-standard practices for the domain
-- Performance targets: Standard web/mobile app expectations unless specified
-- Error handling: User-friendly messages with appropriate fallbacks
-- Authentication method: Standard session-based or OAuth2 for web apps
-- Integration patterns: RESTful APIs unless specified otherwise
 
 ### Success Criteria Guidelines
 
@@ -240,19 +259,5 @@ Success criteria must be:
 
 1. **Measurable**: Include specific metrics (time, percentage, count, rate)
 2. **Technology-agnostic**: No mention of frameworks, languages, databases, or tools
-3. **User-focused**: Describe outcomes from user/business perspective, not system internals
+3. **User-focused**: Describe outcomes from user/business perspective
 4. **Verifiable**: Can be tested/validated without knowing implementation details
-
-**Good examples**:
-
-- "Users can complete checkout in under 3 minutes"
-- "System supports 10,000 concurrent users"
-- "95% of searches return results in under 1 second"
-- "Task completion rate improves by 40%"
-
-**Bad examples** (implementation-focused):
-
-- "API response time is under 200ms" (too technical, use "Users see results instantly")
-- "Database can handle 1000 TPS" (implementation detail, use user-facing metric)
-- "React components render efficiently" (framework-specific)
-- "Redis cache hit rate above 80%" (technology-specific)

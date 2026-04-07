@@ -18,32 +18,18 @@ ConnectorNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges
 ConnectorEndpoints = (
     q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpoints
 )
-EndpointEdge = (
-    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdges
-)
+EndpointEdge = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdges
 _ep = "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNode"
 EndpointIface = getattr(q, f"{_ep}DcimInterface")
 EndpointIfaceName = getattr(q, f"{_ep}DcimInterfaceName")
 EndpointDevice = getattr(q, f"{_ep}DcimInterfaceDevice")
 EndpointNetworkDevice = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimDevice")
-EndpointNetworkDeviceName = getattr(
-    q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceName"
-)
-EndpointNetworkDeviceRole = getattr(
-    q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceRole"
-)
-EndpointGenericDevice = getattr(
-    q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDevice"
-)
-EndpointGenericDeviceName = getattr(
-    q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDeviceName"
-)
-TaggedVlan = (
-    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan
-)
-UntaggedVlan = (
-    q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan
-)
+EndpointNetworkDeviceName = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceName")
+EndpointNetworkDeviceRole = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceRole")
+EndpointGenericDevice = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDevice")
+EndpointGenericDeviceName = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDeviceName")
+TaggedVlan = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan
+UntaggedVlan = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan
 
 
 def _make_uplink_edge(

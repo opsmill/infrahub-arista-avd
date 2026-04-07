@@ -113,13 +113,13 @@ spec:
 
     - name: trigger-backfill-structured-config-update-checksum
       branch_scope: "other_branches"
-      node_kind: AvdArtifact
+      node_kind: AvdStructuredConfigFile
       mutation_action: "updated"
       action: run-backfill-structured-config-generator
       matches:
         kind: CoreNodeTriggerAttributeMatch
         data:
-          - attribute_name: structured_config_checksum
+          - attribute_name: checksum
             value_match: any
 
     - name: trigger-server-cabling-generator-created

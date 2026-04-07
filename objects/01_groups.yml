@@ -12,3 +12,4 @@ spec:
     - name: avd_devices
     - name: servers
     - name: avd_artifacts
+    - name: avd_structured_configs

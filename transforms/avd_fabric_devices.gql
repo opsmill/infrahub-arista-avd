@@ -29,14 +29,16 @@ query AvdFabricDevicesQuery($name: String!) {
         }
         avd_artifact {
           node {
-            hostvar_identifier {
-              value
+            id
+            hostvar_file {
+              node {
+                id
+              }
             }
-            structured_config_checksum {
-              value
-            }
-            structured_config_identifier {
-              value
+            structured_config_file {
+              node {
+                id
+              }
             }
           }
         }

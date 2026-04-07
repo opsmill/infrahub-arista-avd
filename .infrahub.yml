@@ -50,7 +50,7 @@ generator_definitions:
     query: avd_device_hostvar
     targets: avd_devices
     parameters:
-      hostname: name__value
+      name: name__value
     class_name: GenerateAVDDeviceHostvar
     convert_query_response: false
     execute_in_proposed_change: false

@@ -6,10 +6,9 @@ from infrahub_sdk import InfrahubClient
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
-from pyavd._eos_designs.schema import EosDesigns
 
 from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_structured_config_generation
-from solution_ai_dc.protocols import AvdArtifact, NetworkPod
+from solution_ai_dc.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
 
 from .generate_avd_device_inputs_query import (
     GenerateAvdDeviceInputsQuery,
@@ -45,23 +44,23 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
         await pod.devices.fetch()
         await pod.racks.fetch()
 
-        for device_peer in pod.devices.peers:
-            devices.add(device_peer.peer)
+        devices.update(device_peer.peer for device_peer in pod.devices.peers)
 
         for rack_peer in pod.racks.peers:
             rack = rack_peer.peer
             await rack.devices.fetch()
 
-            for device_peer in rack.devices.peers:
-                devices.add(device_peer.peer)
+            devices.update(device_peer.peer for device_peer in rack.devices.peers)
 
     for device in devices:
         if not device.avd_artifact.id:
             return False
 
         await device.avd_artifact.fetch()
+        artifact = device.avd_artifact.peer
 
-        if not device.avd_artifact.peer.hostvar_identifier.value:
+        await artifact.hostvar_file.fetch()
+        if not artifact.hostvar_file.id:
             return False
 
     await set_fabric_avd_hostvars_ready(client, fabric_id, True)
@@ -97,7 +96,9 @@ def extract_uplinks_from_dict(
 
     for edge in interfaces:
         interface = edge.node
-        if not isinstance(interface, GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical):
+        if not isinstance(
+            interface, GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical
+        ):
             continue
         iface_role = interface.role
         if not iface_role or iface_role.value != uplink_role:
@@ -143,9 +144,7 @@ def _sort_server_endpoints(servers: dict[str, ServerEndpoint]) -> list[ServerEnd
     """Sort servers by name and adapters within each server by switch port."""
     sorted_servers = sorted(servers.values(), key=lambda s: s["name"])
     for server in sorted_servers:
-        server["adapters"].sort(
-            key=lambda a: sort_interface_list(a["switch_ports"])[0] if a["switch_ports"] else ""
-        )
+        server["adapters"].sort(key=lambda a: sort_interface_list(a["switch_ports"])[0] if a["switch_ports"] else "")
     return sorted_servers
 
 
@@ -166,7 +165,9 @@ def extract_connected_endpoints(
 
     for edge in interfaces:
         interface = edge.node
-        if not isinstance(interface, GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical):
+        if not isinstance(
+            interface, GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical
+        ):
             continue
         iface_role = interface.role
         if not iface_role or iface_role.value != "server":
@@ -345,24 +346,28 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         print(f"Role: {role} -> AVD type: {avd_type}")
         print(f"Node type key: {node_type_key}")
 
-        print(f"\nNode config:")
+        print("\nNode config:")
         for key, value in node_config.items():
             print(f"  {key}: {value}")
 
-        print(f"\nFull hostvars structure:")
+        print("\nFull hostvars structure:")
         import json
 
         print(json.dumps(hostvars, indent=2))
 
-        response = await self.client.object_store.upload(content=json.dumps(hostvars))
         avd_artifact = await self.client.create(
             AvdArtifact,
             name=hostname,
-            hostvar_checksum=response["checksum"],
-            hostvar_identifier=response["identifier"],
             device=device_id,
             member_of_groups=["avd_artifacts"],
         )
         await avd_artifact.save(allow_upsert=True)
+
+        hostvar_file = await self.client.create(
+            AvdHostvarFile,
+            artifact=avd_artifact,
+        )
+        hostvar_file.upload_from_bytes(content=json.dumps(hostvars, indent=2).encode(), name=f"{hostname}-hostvars.json")
+        await hostvar_file.save(allow_upsert=True)
 
         await check_fabric_hostvars_ready(self.client, fabric.id)

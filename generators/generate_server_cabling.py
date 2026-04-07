@@ -102,12 +102,14 @@ class ServerCablingGenerator(InfrahubGenerator):
         for edge in server_node.get("interfaces", {}).get("edges", []):
             node = edge["node"]
             vlans = self._extract_vlans(node)
-            interfaces.append({
-                "id": node["id"],
-                "name": node["name"]["value"],
-                "tagged_vlan_ids": vlans["tagged"],
-                "untagged_vlan_id": vlans["untagged"],
-            })
+            interfaces.append(
+                {
+                    "id": node["id"],
+                    "name": node["name"]["value"],
+                    "tagged_vlan_ids": vlans["tagged"],
+                    "untagged_vlan_id": vlans["untagged"],
+                }
+            )
         return interfaces
 
     def _extract_vlans(self, interface_node: dict) -> dict[str, Any]:
@@ -154,12 +156,14 @@ class ServerCablingGenerator(InfrahubGenerator):
                 role__values=["server", "storage"],
             )
             for iface in interfaces:
-                result.append({
-                    "id": iface.id,
-                    "leaf_id": leaf.id,
-                    "leaf_hostname": leaf.name.value,
-                    "name": iface.name.value,
-                })
+                result.append(
+                    {
+                        "id": iface.id,
+                        "leaf_id": leaf.id,
+                        "leaf_hostname": leaf.name.value,
+                        "name": iface.name.value,
+                    }
+                )
         return result
 
     def _distribute_interfaces(
@@ -218,7 +222,9 @@ class ServerCablingGenerator(InfrahubGenerator):
         # Re-fetch interfaces after link creation to get updated link relationship
         server_interface = await self.client.get(DcimInterface, id=server_iface["id"], include=["connector"])
         leaf_interface = await self.client.get(
-            DcimInterface, id=leaf_iface_id, include=["connector", "tagged_vlan", "untagged_vlan"],
+            DcimInterface,
+            id=leaf_iface_id,
+            include=["connector", "tagged_vlan", "untagged_vlan"],
         )
 
         # Set interfaces to active
