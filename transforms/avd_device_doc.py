@@ -9,7 +9,7 @@ from typing import Any
 import pyavd
 from infrahub_sdk.transforms import InfrahubTransform
 
-from solution_ai_dc.protocols import AvdArtifact
+from solution_ai_dc.protocols import AvdStructuredConfigFile
 
 from .avd_device_config_query import AvdDeviceConfigQuery
 
@@ -31,12 +31,10 @@ class AvdDeviceDocTransform(InfrahubTransform):
         hostname = device.name.value
 
         artifact_node = device.avd_artifact.node if device.avd_artifact else None
-        if not artifact_node or not artifact_node.structured_config_identifier or not artifact_node.structured_config_identifier.value:
+        if not artifact_node or not artifact_node.structured_config_file.node:
             return f"# No structured config available for {hostname}"
 
-        artifact = await self.client.get(AvdArtifact, id=artifact_node.id)
-        await artifact.structured_config_file.fetch()
-        sc_file = artifact.structured_config_file.peer
+        sc_file = await self.client.get(AvdStructuredConfigFile, id=artifact_node.structured_config_file.node.id)
         content = await sc_file.download_file()
         structured_config_value = json.loads(content)
 
