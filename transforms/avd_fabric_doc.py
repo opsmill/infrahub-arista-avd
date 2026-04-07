@@ -10,7 +10,7 @@ from typing import Any
 import pyavd
 from infrahub_sdk.transforms import InfrahubTransform
 
-from solution_ai_dc.protocols import AvdArtifact
+from solution_ai_dc.protocols import AvdHostvarFile, AvdStructuredConfigFile
 
 from .avd_fabric_devices_query import AvdFabricDevicesQuery
 
@@ -57,21 +57,16 @@ class AvdFabricDocTransform(InfrahubTransform):
 
             artifact_node = device.avd_artifact.node
 
-            has_hostvar = artifact_node.hostvar_identifier and artifact_node.hostvar_identifier.value
-            has_sc = artifact_node.structured_config_identifier and artifact_node.structured_config_identifier.value
+            hostvar_file_node = artifact_node.hostvar_file.node if artifact_node.hostvar_file else None
+            sc_file_node = artifact_node.structured_config_file.node if artifact_node.structured_config_file else None
 
-            if has_hostvar or has_sc:
-                artifact = await self.client.get(AvdArtifact, id=artifact_node.id)
-
-            if has_hostvar:
-                await artifact.hostvar_file.fetch()
-                hv_file = artifact.hostvar_file.peer
+            if hostvar_file_node:
+                hv_file = await self.client.get(AvdHostvarFile, id=hostvar_file_node.id)
                 hostvar_content = await hv_file.download_file()
                 all_hostvars[hostname] = json.loads(hostvar_content)
 
-            if has_sc:
-                await artifact.structured_config_file.fetch()
-                sc_file = artifact.structured_config_file.peer
+            if sc_file_node:
+                sc_file = await self.client.get(AvdStructuredConfigFile, id=sc_file_node.id)
                 sc_content = await sc_file.download_file()
                 structured_configs[hostname] = json.loads(sc_content)
 
