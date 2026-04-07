@@ -1,91 +1,105 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class AvdFabricDevicesQuery(BaseModel):
-    network_fabric: AvdFabricDevicesQueryNetworkFabric = Field(alias="NetworkFabric")
-    dcim_device: AvdFabricDevicesQueryDcimDevice = Field(alias="DcimDevice")
+    network_fabric: "AvdFabricDevicesQueryNetworkFabric" = Field(alias="NetworkFabric")
+    dcim_device: "AvdFabricDevicesQueryDcimDevice" = Field(alias="DcimDevice")
 
 
 class AvdFabricDevicesQueryNetworkFabric(BaseModel):
-    edges: list[AvdFabricDevicesQueryNetworkFabricEdges]
+    edges: list["AvdFabricDevicesQueryNetworkFabricEdges"]
 
 
 class AvdFabricDevicesQueryNetworkFabricEdges(BaseModel):
-    node: AvdFabricDevicesQueryNetworkFabricEdgesNode | None
+    node: Optional["AvdFabricDevicesQueryNetworkFabricEdgesNode"]
 
 
 class AvdFabricDevicesQueryNetworkFabricEdgesNode(BaseModel):
     id: str
-    name: AvdFabricDevicesQueryNetworkFabricEdgesNodeName | None
+    name: Optional["AvdFabricDevicesQueryNetworkFabricEdgesNodeName"]
 
 
 class AvdFabricDevicesQueryNetworkFabricEdgesNodeName(BaseModel):
-    value: str | None
+    value: Optional[str]
 
 
 class AvdFabricDevicesQueryDcimDevice(BaseModel):
-    edges: list[AvdFabricDevicesQueryDcimDeviceEdges]
+    edges: list["AvdFabricDevicesQueryDcimDeviceEdges"]
 
 
 class AvdFabricDevicesQueryDcimDeviceEdges(BaseModel):
-    node: AvdFabricDevicesQueryDcimDeviceEdgesNode | None
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNode"]
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNode(BaseModel):
     id: str
-    name: AvdFabricDevicesQueryDcimDeviceEdgesNodeName | None
-    pod: AvdFabricDevicesQueryDcimDeviceEdgesNodePod
-    avd_artifact: AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact
+    name: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodeName"]
+    pod: "AvdFabricDevicesQueryDcimDeviceEdgesNodePod"
+    avd_artifact: "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact"
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodeName(BaseModel):
-    value: str | None
+    value: Optional[str]
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodePod(BaseModel):
-    node: AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode | None
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode"]
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode(BaseModel):
     id: str
-    parent: AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent
+    parent: "AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent"
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent(BaseModel):
-    node: AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParentNode | None
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParentNode"]
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParentNode(BaseModel):
     typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
         alias="__typename"
     )
-    id: str | None
+    id: Optional[str]
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
-    node: AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode | None
+    node: Optional["AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode"]
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
     id: str
-    hostvar_identifier: AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier | None
-    structured_config_identifier: AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier | None
+    hostvar_file: "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarFile"
+    structured_config_file: (
+        "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile"
+    )
 
 
-class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier(
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarFile(BaseModel):
+    node: Optional[
+        "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarFileNode"
+    ]
+
+
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarFileNode(BaseModel):
+    id: str
+
+
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile(
     BaseModel
 ):
-    value: str | None
+    node: Optional[
+        "AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode"
+    ]
 
 
-class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode(
     BaseModel
 ):
-    value: str | None
+    id: str
 
 
 AvdFabricDevicesQuery.model_rebuild()
@@ -100,3 +114,5 @@ AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode.model_rebuild()
 AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent.model_rebuild()
 AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
 AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarFile.model_rebuild()
+AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile.model_rebuild()
