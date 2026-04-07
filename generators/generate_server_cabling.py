@@ -38,11 +38,6 @@ class ServerCablingGenerator(InfrahubGenerator):
             self.logger.warning("Server %s has no interfaces", server_hostname)
             return
 
-        # Skip if server is already fully cabled
-        if await self._is_server_cabled(server_interfaces):
-            self.logger.info("Server %s is already cabled, skipping", server_hostname)
-            return
-
         # Find leaf switches in the same rack
         leaf_switches = await self.client.filters(kind=DcimDevice, rack__ids=[rack_id], role__value="leaf")
         if not leaf_switches:
@@ -109,7 +104,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             fabric.name.value,
         )
         await set_fabric_avd_hostvars_ready(self.client, fabric.id, False)
-        await trigger_hostvar_generation(self.client)
+        # await trigger_hostvar_generation(self.client)
 
     def _get_server_interfaces(self, server_node: dict) -> list[dict[str, Any]]:
         """Extract server interfaces with their VLANs from the GQL response."""
@@ -191,7 +186,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             leaf_interface = await self.client.get(
                 InterfacePhysical,
                 id=leaf_iface.id,
-                include=["tagged_vlan", "untagged_vlan"],
+                include=["tagged_vlan", "untagged_vlan", "connector"],
             )
 
             if server_iface["tagged_vlan_ids"]:
