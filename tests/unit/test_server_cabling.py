@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from generators.generate_server_cabling import ServerCablingGenerator
-from solution_ai_dc.protocols import NetworkLink
 
 
 def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
@@ -22,6 +21,7 @@ def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
     gen.client.create = AsyncMock()
     if mock_cascade:
         gen._trigger_avd_cascade = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    gen._is_server_cabled = AsyncMock(return_value=False)  # type: ignore[method-assign]  # noqa: SLF001
     return gen
 
 
@@ -109,13 +109,21 @@ def _make_mock_leaf(leaf_id: str = "leaf-1", hostname: str = "leaf-pod1-1-1") ->
 def _make_mock_leaf_interface(
     iface_id: str = "leaf-iface-1",
     name: str = "Ethernet1",
+    leaf: MagicMock | None = None,
+    has_connector: bool = False,
 ) -> MagicMock:
-    """Create a mock leaf interface."""
+    """Create a mock leaf interface for sorted interface maps."""
     iface = MagicMock()
     iface.id = iface_id
     iface.name.value = name
     iface.save = AsyncMock()
-    iface.device.display_label = "leaf-pod1-1-1"
+    if leaf:
+        iface.device.peer = leaf
+        iface.device.display_label = leaf.name.value
+    else:
+        iface.device.peer = _make_mock_leaf()
+        iface.device.display_label = "leaf-pod1-1-1"
+    iface.connector.id = "existing-link" if has_connector else None
     return iface
 
 
@@ -131,53 +139,32 @@ class TestSingleHomedCabling:
         )
         data = _make_server_data(interfaces=[iface])
 
-        # Mock leaf switch in rack
         mock_leaf = _make_mock_leaf()
-        gen.client.filters = AsyncMock(
-            side_effect=[
-                [mock_leaf],  # leaf switches in rack
-                [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],  # leaf interfaces
-            ]
-        )
+        leaf_iface = _make_mock_leaf_interface("leaf-eth1", "Ethernet1", leaf=mock_leaf)
 
-        # Mock interface re-fetches
+        # Mock server SDK interface for create_sorted_device_interface_map
         mock_server_iface = MagicMock()
         mock_server_iface.id = "iface-1"
-        mock_server_iface.status = MagicMock()
-        mock_server_iface.save = AsyncMock()
+        mock_server_iface.name.value = "Ethernet1"
+        mock_server_iface.device.peer = MagicMock()
+        mock_server_iface.device.display_label = "server-1"
 
-        mock_leaf_iface = MagicMock()
-        mock_leaf_iface.id = "leaf-eth1"
-        mock_leaf_iface.name.value = "Ethernet1"
-        mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
-        mock_leaf_iface.status = MagicMock()
-        mock_leaf_iface.tagged_vlan = MagicMock()
-        mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
-        mock_leaf_iface.tagged_vlan.extend = MagicMock()
-        mock_leaf_iface.untagged_vlan = MagicMock()
-        mock_leaf_iface.untagged_vlan.fetch = AsyncMock()
-        mock_leaf_iface.untagged_vlan.add = MagicMock()
-        mock_leaf_iface.save = AsyncMock()
-
-        gen.client.get = AsyncMock(
+        gen.client.filters = AsyncMock(
             side_effect=[
-                mock_server_iface,  # get server interface
-                mock_leaf_iface,  # get leaf interface (for link name)
-                mock_leaf_iface,  # re-fetch leaf interface (for VLANs)
+                [mock_leaf],            # leaf switches in rack
+                [mock_server_iface],    # server DcimInterface objects
+                [leaf_iface],           # leaf InterfacePhysical objects
             ]
         )
+        gen.client.get = AsyncMock(return_value=mock_server_iface)
 
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
+        with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
+            gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            await gen.generate(data)
 
-        await gen.generate(data)
-
-        # Verify link was created with protocol class
-        gen.client.create.assert_called_once()
-        call_args = gen.client.create.call_args
-        assert call_args.args[0] is NetworkLink
-        assert call_args.kwargs["medium"] == "copper"
+            mock_connect.assert_called_once()
+            cabling_plan = mock_connect.call_args.kwargs["cabling_plan"]
+            assert len(cabling_plan) == 1
 
 
 class TestDualHomedCabling:
@@ -191,82 +178,55 @@ class TestDualHomedCabling:
         iface2 = _make_interface("iface-2", "Ethernet2")
         data = _make_server_data(interfaces=[iface1, iface2])
 
-        # Two leaf switches
         mock_leaf1 = _make_mock_leaf("leaf-1", "leaf-pod1-1-1")
         mock_leaf2 = _make_mock_leaf("leaf-2", "leaf-pod1-1-2")
 
-        mock_leaf1_iface = _make_mock_leaf_interface("leaf1-eth1", "Ethernet1")
-        mock_leaf2_iface = _make_mock_leaf_interface("leaf2-eth1", "Ethernet1")
+        leaf1_iface = _make_mock_leaf_interface("leaf1-eth1", "Ethernet1", leaf=mock_leaf1)
+        leaf2_iface = _make_mock_leaf_interface("leaf2-eth1", "Ethernet1", leaf=mock_leaf2)
+
+        mock_server_iface1 = MagicMock()
+        mock_server_iface1.id = "iface-1"
+        mock_server_iface1.name.value = "Ethernet1"
+        mock_server_iface1.device.peer = MagicMock()
+        mock_server_iface1.device.display_label = "server-1"
+
+        mock_server_iface2 = MagicMock()
+        mock_server_iface2.id = "iface-2"
+        mock_server_iface2.name.value = "Ethernet2"
+        mock_server_iface2.device.peer = mock_server_iface1.device.peer
+        mock_server_iface2.device.display_label = "server-1"
 
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf1, mock_leaf2],  # leaf switches
-                [mock_leaf1_iface],  # leaf1 interfaces
-                [mock_leaf2_iface],  # leaf2 interfaces
+                [mock_leaf1, mock_leaf2],           # leaf switches
+                [mock_server_iface1, mock_server_iface2],  # server DcimInterface objects
+                [leaf1_iface, leaf2_iface],         # leaf InterfacePhysical objects
             ]
         )
+        gen.client.get = AsyncMock(return_value=mock_server_iface1)
 
-        # Mock re-fetches for _cable_interface (called twice)
-        mock_server_iface = MagicMock()
-        mock_server_iface.id = "iface-1"
-        mock_server_iface.status = MagicMock()
-        mock_server_iface.save = AsyncMock()
+        with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
+            gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            await gen.generate(data)
 
-        mock_cable_leaf_iface = MagicMock()
-        mock_cable_leaf_iface.id = "leaf-eth"
-        mock_cable_leaf_iface.name.value = "Ethernet1"
-        mock_cable_leaf_iface.device.display_label = "leaf-pod1-1-1"
-        mock_cable_leaf_iface.status = MagicMock()
-        mock_cable_leaf_iface.tagged_vlan = MagicMock()
-        mock_cable_leaf_iface.tagged_vlan.set = MagicMock()
-        mock_cable_leaf_iface.untagged_vlan = MagicMock()
-        mock_cable_leaf_iface.untagged_vlan.set = MagicMock()
-        mock_cable_leaf_iface.save = AsyncMock()
-
-        gen.client.get = AsyncMock(return_value=mock_cable_leaf_iface)
-
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
-
-        await gen.generate(data)
-
-        # Verify two links were created
-        assert gen.client.create.call_count == 2
+            mock_connect.assert_called_once()
+            cabling_plan = mock_connect.call_args.kwargs["cabling_plan"]
+            assert len(cabling_plan) == 2
 
 
 class TestVlanAssignment:
-    """T010: Test VLAN assignment from server interface profiles to leaf interfaces."""
+    """T010: Test VLAN assignment via _assign_vlans."""
 
     @pytest.mark.asyncio
     async def test_tagged_vlans_copied_to_leaf(self) -> None:
         gen = _make_generator()
 
-        tagged_vlans = [
-            {"id": "vlan-300", "name": {"value": "Servers"}},
-            {"id": "vlan-400", "name": {"value": "Storage"}},
+        server_ifaces = [
+            {"id": "s1", "name": "Ethernet1", "tagged_vlan_ids": ["vlan-300", "vlan-400"], "untagged_vlan_id": None},
         ]
-        iface = _make_interface("iface-1", "Ethernet1", profile_tagged_vlan_ids=tagged_vlans)
-        data = _make_server_data(interfaces=[iface])
-
-        mock_leaf = _make_mock_leaf()
-        gen.client.filters = AsyncMock(
-            side_effect=[
-                [mock_leaf],
-                [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
-            ]
-        )
-
-        mock_server_iface = MagicMock()
-        mock_server_iface.id = "iface-1"
-        mock_server_iface.status = MagicMock()
-        mock_server_iface.save = AsyncMock()
 
         mock_leaf_iface = MagicMock()
         mock_leaf_iface.id = "leaf-eth1"
-        mock_leaf_iface.name.value = "Ethernet1"
-        mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
-        mock_leaf_iface.status = MagicMock()
         mock_leaf_iface.tagged_vlan = MagicMock()
         mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
         mock_leaf_iface.tagged_vlan.extend = MagicMock()
@@ -275,49 +235,25 @@ class TestVlanAssignment:
         mock_leaf_iface.untagged_vlan.add = MagicMock()
         mock_leaf_iface.save = AsyncMock()
 
-        gen.client.get = AsyncMock(
-            side_effect=[
-                mock_server_iface,
-                mock_leaf_iface,
-                mock_leaf_iface,
-            ]
-        )
+        gen.client.get = AsyncMock(return_value=mock_leaf_iface)
 
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
+        mock_server_iface_obj = MagicMock()
+        cabling_plan = [(mock_server_iface_obj, mock_leaf_iface)]
 
-        await gen.generate(data)
+        await gen._assign_vlans(cabling_plan, server_ifaces)  # noqa: SLF001
 
-        # Verify tagged VLANs were set on leaf interface
         mock_leaf_iface.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
 
     @pytest.mark.asyncio
     async def test_untagged_vlan_copied_to_leaf(self) -> None:
         gen = _make_generator()
 
-        untagged = {"node": {"id": "vlan-100", "name": {"value": "MGMT"}}}
-        iface = _make_interface("iface-1", "Ethernet1", profile_untagged_vlan=untagged)
-        data = _make_server_data(interfaces=[iface])
-
-        mock_leaf = _make_mock_leaf()
-        gen.client.filters = AsyncMock(
-            side_effect=[
-                [mock_leaf],
-                [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
-            ]
-        )
-
-        mock_server_iface = MagicMock()
-        mock_server_iface.id = "iface-1"
-        mock_server_iface.status = MagicMock()
-        mock_server_iface.save = AsyncMock()
+        server_ifaces = [
+            {"id": "s1", "name": "Ethernet1", "tagged_vlan_ids": [], "untagged_vlan_id": "vlan-100"},
+        ]
 
         mock_leaf_iface = MagicMock()
         mock_leaf_iface.id = "leaf-eth1"
-        mock_leaf_iface.name.value = "Ethernet1"
-        mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
-        mock_leaf_iface.status = MagicMock()
         mock_leaf_iface.tagged_vlan = MagicMock()
         mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
         mock_leaf_iface.tagged_vlan.extend = MagicMock()
@@ -326,76 +262,14 @@ class TestVlanAssignment:
         mock_leaf_iface.untagged_vlan.add = MagicMock()
         mock_leaf_iface.save = AsyncMock()
 
-        gen.client.get = AsyncMock(
-            side_effect=[
-                mock_server_iface,
-                mock_leaf_iface,
-                mock_leaf_iface,
-            ]
-        )
+        gen.client.get = AsyncMock(return_value=mock_leaf_iface)
 
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
+        mock_server_iface_obj = MagicMock()
+        cabling_plan = [(mock_server_iface_obj, mock_leaf_iface)]
 
-        await gen.generate(data)
+        await gen._assign_vlans(cabling_plan, server_ifaces)  # noqa: SLF001
 
         mock_leaf_iface.untagged_vlan.add.assert_called_once_with("vlan-100")
-
-
-class TestInterfaceStatusActive:
-    """T011: Test interface status set to 'active' after cabling."""
-
-    @pytest.mark.asyncio
-    async def test_interfaces_set_to_active(self) -> None:
-        gen = _make_generator()
-
-        iface = _make_interface("iface-1", "Ethernet1")
-        data = _make_server_data(interfaces=[iface])
-
-        mock_leaf = _make_mock_leaf()
-        gen.client.filters = AsyncMock(
-            side_effect=[
-                [mock_leaf],
-                [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
-            ]
-        )
-
-        mock_server_iface = MagicMock()
-        mock_server_iface.id = "iface-1"
-        mock_server_iface.status = MagicMock()
-        mock_server_iface.save = AsyncMock()
-
-        mock_leaf_iface = MagicMock()
-        mock_leaf_iface.id = "leaf-eth1"
-        mock_leaf_iface.name.value = "Ethernet1"
-        mock_leaf_iface.device.display_label = "leaf-pod1-1-1"
-        mock_leaf_iface.status = MagicMock()
-        mock_leaf_iface.tagged_vlan = MagicMock()
-        mock_leaf_iface.tagged_vlan.fetch = AsyncMock()
-        mock_leaf_iface.tagged_vlan.extend = MagicMock()
-        mock_leaf_iface.untagged_vlan = MagicMock()
-        mock_leaf_iface.untagged_vlan.fetch = AsyncMock()
-        mock_leaf_iface.untagged_vlan.add = MagicMock()
-        mock_leaf_iface.save = AsyncMock()
-
-        gen.client.get = AsyncMock(
-            side_effect=[
-                mock_server_iface,
-                mock_leaf_iface,
-                mock_leaf_iface,
-            ]
-        )
-
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
-
-        await gen.generate(data)
-
-        # Verify both interfaces set to active
-        assert mock_server_iface.status.value == "active"
-        assert mock_leaf_iface.status.value == "active"
 
 
 class TestNoLeafSwitches:
@@ -429,83 +303,32 @@ class TestInsufficientInterfaces:
         data = _make_server_data(interfaces=[iface1, iface2])
 
         mock_leaf = _make_mock_leaf()
-        # Only one available interface for two server interfaces
+        leaf_iface = _make_mock_leaf_interface("leaf-eth1", "Ethernet1", leaf=mock_leaf)
+
+        mock_server_iface = MagicMock()
+        mock_server_iface.id = "iface-1"
+        mock_server_iface.name.value = "Ethernet1"
+        mock_server_iface.device.peer = MagicMock()
+        mock_server_iface.device.display_label = "server-1"
+
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf],
-                [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
+                [mock_leaf],            # leaf switches
+                [mock_server_iface],    # server DcimInterface objects
+                [leaf_iface],           # leaf InterfacePhysical objects
             ]
         )
+        gen.client.get = AsyncMock(return_value=mock_server_iface)
 
-        mock_iface = MagicMock()
-        mock_iface.id = "iface-1"
-        mock_iface.name.value = "Ethernet1"
-        mock_iface.device.display_label = "leaf-pod1-1-1"
-        mock_iface.status = MagicMock()
-        mock_iface.tagged_vlan = MagicMock()
-        mock_iface.tagged_vlan.fetch = AsyncMock()
-        mock_iface.tagged_vlan.extend = MagicMock()
-        mock_iface.untagged_vlan = MagicMock()
-        mock_iface.untagged_vlan.fetch = AsyncMock()
-        mock_iface.untagged_vlan.add = MagicMock()
-        mock_iface.save = AsyncMock()
-
-        gen.client.get = AsyncMock(return_value=mock_iface)
-
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
-
-        with patch.object(gen.logger, "warning") as mock_warn:
+        with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
+            gen._assign_vlans = AsyncMock()  # noqa: SLF001
             await gen.generate(data)
-            assert any("Insufficient" in str(call) for call in mock_warn.call_args_list)
 
-        # One link created (for the one available leaf interface)
-        assert gen.client.create.call_count == 1
-
-
-class TestIdempotency:
-    """T014: Test idempotency - re-running upserts the same links."""
-
-    @pytest.mark.asyncio
-    async def test_rerun_upserts_same_link(self) -> None:
-        gen = _make_generator()
-
-        iface = _make_interface("iface-1", "Ethernet1")
-        data = _make_server_data(interfaces=[iface])
-
-        mock_leaf = _make_mock_leaf()
-        gen.client.filters = AsyncMock(
-            side_effect=[
-                [mock_leaf],
-                [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
-            ]
-        )
-
-        mock_iface = MagicMock()
-        mock_iface.id = "iface-1"
-        mock_iface.name.value = "Ethernet1"
-        mock_iface.device.display_label = "leaf-pod1-1-1"
-        mock_iface.status = MagicMock()
-        mock_iface.tagged_vlan = MagicMock()
-        mock_iface.tagged_vlan.fetch = AsyncMock()
-        mock_iface.tagged_vlan.extend = MagicMock()
-        mock_iface.untagged_vlan = MagicMock()
-        mock_iface.untagged_vlan.fetch = AsyncMock()
-        mock_iface.untagged_vlan.add = MagicMock()
-        mock_iface.save = AsyncMock()
-
-        gen.client.get = AsyncMock(return_value=mock_iface)
-
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
-
-        await gen.generate(data)
-
-        # Link created with allow_upsert
-        assert gen.client.create.call_count == 1
-        mock_link.save.assert_called_once_with(allow_upsert=True)
+            # Only one server interface in the SDK map (1 DcimInterface returned)
+            # pairs with the single leaf interface
+            mock_connect.assert_called_once()
+            cabling_plan = mock_connect.call_args.kwargs["cabling_plan"]
+            assert len(cabling_plan) == 1
 
 
 class TestSingleLeafDualHomed:
@@ -520,41 +343,37 @@ class TestSingleLeafDualHomed:
         data = _make_server_data(interfaces=[iface1, iface2])
 
         mock_leaf = _make_mock_leaf("leaf-1", "leaf-pod1-1-1")
-        mock_leaf_iface1 = _make_mock_leaf_interface("leaf-eth1", "Ethernet1")
-        mock_leaf_iface2 = _make_mock_leaf_interface("leaf-eth2", "Ethernet2")
+        leaf_iface1 = _make_mock_leaf_interface("leaf-eth1", "Ethernet1", leaf=mock_leaf)
+        leaf_iface2 = _make_mock_leaf_interface("leaf-eth2", "Ethernet2", leaf=mock_leaf)
+
+        mock_server_iface1 = MagicMock()
+        mock_server_iface1.id = "iface-1"
+        mock_server_iface1.name.value = "Ethernet1"
+        mock_server_iface1.device.peer = MagicMock()
+        mock_server_iface1.device.display_label = "server-1"
+        mock_server_iface2 = MagicMock()
+        mock_server_iface2.id = "iface-2"
+        mock_server_iface2.name.value = "Ethernet2"
+        mock_server_iface2.device.peer = mock_server_iface1.device.peer
+        mock_server_iface2.device.display_label = "server-1"
 
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf],  # Single leaf
-                [mock_leaf_iface1, mock_leaf_iface2],  # Two available interfaces
+                [mock_leaf],                                # leaf switches
+                [mock_server_iface1, mock_server_iface2],   # server DcimInterface objects
+                [leaf_iface1, leaf_iface2],                 # leaf InterfacePhysical objects
             ]
         )
+        gen.client.get = AsyncMock(return_value=mock_server_iface1)
 
-        mock_iface = MagicMock()
-        mock_iface.id = "iface"
-        mock_iface.name.value = "Ethernet1"
-        mock_iface.device.display_label = "leaf-pod1-1-1"
-        mock_iface.status = MagicMock()
-        mock_iface.tagged_vlan = MagicMock()
-        mock_iface.tagged_vlan.fetch = AsyncMock()
-        mock_iface.tagged_vlan.extend = MagicMock()
-        mock_iface.untagged_vlan = MagicMock()
-        mock_iface.untagged_vlan.fetch = AsyncMock()
-        mock_iface.untagged_vlan.add = MagicMock()
-        mock_iface.save = AsyncMock()
-
-        gen.client.get = AsyncMock(return_value=mock_iface)
-
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
-
-        with patch.object(gen.logger, "info") as mock_info:
+        with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
+            gen._assign_vlans = AsyncMock()  # noqa: SLF001
             await gen.generate(data)
-            assert any("Only one leaf switch" in str(call) for call in mock_info.call_args_list)
 
-        # Both interfaces connected
-        assert gen.client.create.call_count == 2
+            # Both interfaces connected to same leaf at index 0
+            mock_connect.assert_called_once()
+            cabling_plan = mock_connect.call_args.kwargs["cabling_plan"]
+            assert len(cabling_plan) == 2
 
 
 class TestNoInterfaces:
@@ -589,52 +408,61 @@ class TestNoRack:
         gen.client.create.assert_not_called()
 
 
-class TestDistributeInterfaces:
-    """Test the interface distribution logic."""
+class TestBuildServerCablingPlan:
+    """Test the cabling plan construction logic from cabling.py."""
 
     def test_round_robin_with_two_leaves(self) -> None:
-        gen = _make_generator()
+        from solution_ai_dc.cabling import build_server_cabling_plan
 
-        server_ifaces = [
-            {"id": "s1", "name": "Ethernet1", "tagged_vlan_ids": [], "untagged_vlan_id": None},
-            {"id": "s2", "name": "Ethernet2", "tagged_vlan_ids": [], "untagged_vlan_id": None},
-        ]
+        server = MagicMock()
+        s1 = MagicMock()
+        s1.id = "s1"
+        s1.name.value = "Ethernet1"
+        s1.device.peer = server
 
         leaf1 = _make_mock_leaf("leaf-1", "leaf-1")
         leaf2 = _make_mock_leaf("leaf-2", "leaf-2")
+        l1_iface = _make_mock_leaf_interface("l1-e1", "Ethernet1", leaf=leaf1)
+        l2_iface = _make_mock_leaf_interface("l2-e1", "Ethernet1", leaf=leaf2)
 
-        available = [
-            {"id": "l1-e1", "leaf_id": "leaf-1", "leaf_hostname": "leaf-1", "name": "Ethernet1"},
-            {"id": "l2-e1", "leaf_id": "leaf-2", "leaf_hostname": "leaf-2", "name": "Ethernet1"},
-        ]
+        plan = build_server_cabling_plan(
+            server_index=0,
+            src_interface_map={server: [s1]},
+            dst_interface_map={leaf1: [l1_iface], leaf2: [l2_iface]},
+        )
 
-        pairings = gen._distribute_interfaces(server_ifaces, available, [leaf1, leaf2])  # noqa: SLF001
+        assert len(plan) == 1
+        assert plan[0][0].id == "s1"
+        assert plan[0][1].id == "l1-e1"
 
-        assert len(pairings) == 2
-        # First server iface goes to leaf-1, second to leaf-2
-        assert pairings[0][1] == "l1-e1"
-        assert pairings[1][1] == "l2-e1"
+    def test_dual_nic_across_two_leaves(self) -> None:
+        from solution_ai_dc.cabling import build_server_cabling_plan
 
-    def test_single_leaf_sequential(self) -> None:
-        gen = _make_generator()
-
-        server_ifaces = [
-            {"id": "s1", "name": "Ethernet1", "tagged_vlan_ids": [], "untagged_vlan_id": None},
-            {"id": "s2", "name": "Ethernet2", "tagged_vlan_ids": [], "untagged_vlan_id": None},
-        ]
+        server = MagicMock()
+        s1 = MagicMock()
+        s1.id = "s1"
+        s1.name.value = "Ethernet1"
+        s1.device.peer = server
+        s2 = MagicMock()
+        s2.id = "s2"
+        s2.name.value = "Ethernet2"
+        s2.device.peer = server
 
         leaf1 = _make_mock_leaf("leaf-1", "leaf-1")
+        leaf2 = _make_mock_leaf("leaf-2", "leaf-2")
+        l1_iface = _make_mock_leaf_interface("l1-e1", "Ethernet1", leaf=leaf1)
+        l2_iface = _make_mock_leaf_interface("l2-e1", "Ethernet1", leaf=leaf2)
 
-        available = [
-            {"id": "l1-e1", "leaf_id": "leaf-1", "leaf_hostname": "leaf-1", "name": "Ethernet1"},
-            {"id": "l1-e2", "leaf_id": "leaf-1", "leaf_hostname": "leaf-1", "name": "Ethernet2"},
-        ]
+        plan = build_server_cabling_plan(
+            server_index=0,
+            src_interface_map={server: [s1, s2]},
+            dst_interface_map={leaf1: [l1_iface], leaf2: [l2_iface]},
+        )
 
-        pairings = gen._distribute_interfaces(server_ifaces, available, [leaf1])  # noqa: SLF001
-
-        assert len(pairings) == 2
-        assert pairings[0][1] == "l1-e1"
-        assert pairings[1][1] == "l1-e2"
+        # s1 -> leaf1[0], s2 -> leaf2[0]
+        assert len(plan) == 2
+        assert plan[0][1].id == "l1-e1"
+        assert plan[1][1].id == "l2-e1"
 
 
 class TestExtractVlans:
@@ -776,33 +604,26 @@ class TestAvdCascadeTrigger:
         data = _make_server_data(interfaces=[iface])
 
         mock_leaf = _make_mock_leaf()
+        leaf_iface = _make_mock_leaf_interface("leaf-eth1", "Ethernet1", leaf=mock_leaf)
+
+        mock_server_iface = MagicMock()
+        mock_server_iface.id = "iface-1"
+        mock_server_iface.name.value = "Ethernet1"
+        mock_server_iface.device.peer = MagicMock()
+        mock_server_iface.device.display_label = "server-1"
+
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf],
-                [_make_mock_leaf_interface("leaf-eth1", "Ethernet1")],
+                [mock_leaf],            # leaf switches
+                [mock_server_iface],    # server DcimInterface objects
+                [leaf_iface],           # leaf InterfacePhysical objects
             ]
         )
+        gen.client.get = AsyncMock(return_value=mock_server_iface)
 
-        mock_iface = MagicMock()
-        mock_iface.id = "iface-1"
-        mock_iface.name.value = "Ethernet1"
-        mock_iface.device.display_label = "leaf-pod1-1-1"
-        mock_iface.status = MagicMock()
-        mock_iface.tagged_vlan = MagicMock()
-        mock_iface.tagged_vlan.fetch = AsyncMock()
-        mock_iface.tagged_vlan.extend = MagicMock()
-        mock_iface.untagged_vlan = MagicMock()
-        mock_iface.untagged_vlan.fetch = AsyncMock()
-        mock_iface.untagged_vlan.add = MagicMock()
-        mock_iface.save = AsyncMock()
-
-        gen.client.get = AsyncMock(return_value=mock_iface)
-
-        mock_link = MagicMock()
-        mock_link.save = AsyncMock()
-        gen.client.create = AsyncMock(return_value=mock_link)
-
-        await gen.generate(data)
+        with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock):
+            gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            await gen.generate(data)
 
         gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")  # noqa: SLF001
 

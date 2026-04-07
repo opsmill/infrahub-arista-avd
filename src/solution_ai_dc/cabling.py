@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .protocols import DcimDevice, DcimInterface
+from .protocols import DcimDevice, DcimInterface, InterfacePhysical
 
 if TYPE_CHECKING:
     import logging
@@ -61,21 +61,47 @@ def build_rack_cabling_plan(
     return cabling_plan
 
 
+def build_server_cabling_plan(
+    server_index: int,
+    src_interface_map: dict[DcimDevice, list[DcimInterface]],
+    dst_interface_map: dict[DcimDevice, list[DcimInterface]],
+) -> list[tuple[DcimInterface, DcimInterface]]:
+    """Builds a cabling plan connecting server interfaces to leaf switch interfaces.
+
+    Each server interface is paired with a leaf at the given index position,
+    round-robin across leaves. Follows the same index-based pattern as
+    build_pod_cabling_plan and build_rack_cabling_plan.
+    """
+    dst_devices = list(dst_interface_map.keys())
+    cabling_plan: list[tuple[DcimInterface, DcimInterface]] = []
+
+    for src_interfaces in src_interface_map.values():
+        for i, src_interface in enumerate(src_interfaces):
+            dst_device = dst_devices[i % len(dst_devices)]
+            dst_interface = dst_interface_map[dst_device][server_index]
+            cabling_plan.append((src_interface, dst_interface))
+
+    return cabling_plan
+
+
 async def connect_interface_maps(
     client: InfrahubClient, logger: logging.Logger, cabling_plan: list[tuple[DcimInterface, DcimInterface]]
 ) -> None:
     for src_interface, dst_interface in cabling_plan:
         name = f"{src_interface.device.display_label}-{src_interface.name.value}__{dst_interface.device.display_label}-{dst_interface.name.value}"
-        network_link = await client.create(
-            kind="NetworkLink", name=name, medium="copper", connected_endpoints=[src_interface, dst_interface]
-        )
+        network_link = await client.create(kind="NetworkLink", name=name, medium="copper")
         await network_link.save(allow_upsert=True)
 
-        src_interface = await client.get(DcimInterface, id=src_interface.id, include=["connector"])
-        dst_interface = await client.get(DcimInterface, id=dst_interface.id, include=["connector"])
+        # Set connector on both interfaces using InterfacePhysical (concrete type
+        # that exposes the connector relationship from DcimEndpoint)
+        src = await client.get(InterfacePhysical, id=src_interface.id, include=["connector"])
+        src.connector = network_link
+        src.status.value = "active"
+        await src.save(allow_upsert=True)
 
-        src_interface.status.value = "active"
-        dst_interface.status.value = "active"
-        await src_interface.save(allow_upsert=True)
-        await dst_interface.save(allow_upsert=True)
+        dst = await client.get(InterfacePhysical, id=dst_interface.id, include=["connector"])
+        dst.connector = network_link
+        dst.status.value = "active"
+        await dst.save(allow_upsert=True)
+
         logger.info(f"Connected {name}")
