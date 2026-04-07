@@ -105,7 +105,7 @@ generator_definitions:
     query: backfill_structured_config
     targets: avd_artifacts
     parameters:
-      device_hostname: device__name__value
+      name: name__value
     class_name: BackfillStructuredConfigGenerator
     convert_query_response: false
     execute_in_proposed_change: false

@@ -1,5 +1,5 @@
-query BackfillStructuredConfigQuery($device_hostname: String!) {
-  AvdArtifact(device__name__value: $device_hostname) {
+query BackfillStructuredConfigQuery($name: String!) {
+  AvdArtifact(name__value: $name) {
     edges {
       node {
         id
@@ -22,6 +22,7 @@ query BackfillStructuredConfigQuery($device_hostname: String!) {
               interfaces {
                 edges {
                   node {
+                    __typename
                     id
                     name {
                       value
