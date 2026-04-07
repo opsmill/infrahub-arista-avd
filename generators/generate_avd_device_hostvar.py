@@ -367,7 +367,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             AvdHostvarFile,
             artifact=avd_artifact,
         )
-        hostvar_file.upload_from_bytes(content=json.dumps(hostvars).encode(), name=f"{hostname}-hostvars.json")
+        hostvar_file.upload_from_bytes(content=json.dumps(hostvars, indent=2).encode(), name=f"{hostname}-hostvars.json")
         await hostvar_file.save(allow_upsert=True)
 
         await check_fabric_hostvars_ready(self.client, fabric.id)

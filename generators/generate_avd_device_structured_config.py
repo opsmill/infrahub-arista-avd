@@ -160,7 +160,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     member_of_groups=["avd_structured_configs"],
                 )
                 sc_file.upload_from_bytes(
-                    content=json.dumps(structured_config_dict).encode(),
+                    content=json.dumps(structured_config_dict, indent=2).encode(),
                     name=f"{hostname}-structured-config.json",
                 )
                 await sc_file.save(allow_upsert=True)

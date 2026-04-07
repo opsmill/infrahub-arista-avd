@@ -1,5 +1,5 @@
-query GenerateAvdDeviceInputsQuery($hostname: String!) {
-  DcimDevice(name__value: $hostname) {
+query GenerateAvdDeviceInputsQuery($name: String!) {
+  DcimDevice(name__value: $name) {
     edges {
       node {
         __typename
