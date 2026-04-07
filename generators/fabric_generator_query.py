@@ -1,64 +1,60 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class FabricGeneratorQuery(BaseModel):
-    network_fabric: "FabricGeneratorQueryNetworkFabric" = Field(alias="NetworkFabric")
+    network_fabric: FabricGeneratorQueryNetworkFabric = Field(alias="NetworkFabric")
 
 
 class FabricGeneratorQueryNetworkFabric(BaseModel):
-    edges: list["FabricGeneratorQueryNetworkFabricEdges"]
+    edges: list[FabricGeneratorQueryNetworkFabricEdges]
 
 
 class FabricGeneratorQueryNetworkFabricEdges(BaseModel):
-    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNode"]
+    node: FabricGeneratorQueryNetworkFabricEdgesNode | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNode(BaseModel):
     id: str
-    name: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeName"]
-    amount_of_super_spines: Optional[
-        "FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines"
-    ]
+    name: FabricGeneratorQueryNetworkFabricEdgesNodeName | None
+    amount_of_super_spines: FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines | None
     super_spine_switch_template: (
-        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate"
+        FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate
     )
-    mgmt_gateway: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway"]
-    asn_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool"
-    node_id_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool"
-    mgmt_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool"
+    mgmt_gateway: FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway | None
+    asn_pool: FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool
+    node_id_pool: FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool
+    mgmt_pool: FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate(BaseModel):
-    node: Optional[
-        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode"
-    ]
+    node: FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode(BaseModel):
     typename__: Literal[
         "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
     ] = Field(alias="__typename")
-    id: Optional[str]
+    id: str | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool(BaseModel):
-    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeAsnPoolNode"]
+    node: FabricGeneratorQueryNetworkFabricEdgesNodeAsnPoolNode | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeAsnPoolNode(BaseModel):
@@ -66,7 +62,7 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeAsnPoolNode(BaseModel):
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool(BaseModel):
-    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPoolNode"]
+    node: FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPoolNode | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPoolNode(BaseModel):
@@ -74,7 +70,7 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPoolNode(BaseModel):
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool(BaseModel):
-    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPoolNode"]
+    node: FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPoolNode | None
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPoolNode(BaseModel):

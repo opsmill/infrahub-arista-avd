@@ -51,7 +51,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 has_hostvar = False
 
                 avd_artifact = device.avd_artifact.node
-                if avd_artifact and avd_artifact.hostvar_file.node:
+                if avd_artifact and avd_artifact.hostvar_identifier and avd_artifact.hostvar_identifier.value:
                     has_hostvar = True
 
                 devices[hostname] = {
@@ -69,7 +69,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     has_hostvar = False
 
                     avd_artifact = device.avd_artifact.node
-                    if avd_artifact and avd_artifact.hostvar_file.node:
+                    if avd_artifact and avd_artifact.hostvar_identifier and avd_artifact.hostvar_identifier.value:
                         has_hostvar = True
 
                     devices[hostname] = {

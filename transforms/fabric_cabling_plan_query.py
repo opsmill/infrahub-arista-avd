@@ -1,40 +1,32 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 
 class FabricCablingPlanQuery(BaseModel):
-    network_fabric: "FabricCablingPlanQueryNetworkFabric" = Field(alias="NetworkFabric")
+    network_fabric: FabricCablingPlanQueryNetworkFabric = Field(alias="NetworkFabric")
 
 
 class FabricCablingPlanQueryNetworkFabric(BaseModel):
-    edges: list["FabricCablingPlanQueryNetworkFabricEdges"]
+    edges: list[FabricCablingPlanQueryNetworkFabricEdges]
 
 
 class FabricCablingPlanQueryNetworkFabricEdges(BaseModel):
-    node: Optional["FabricCablingPlanQueryNetworkFabricEdgesNode"]
+    node: FabricCablingPlanQueryNetworkFabricEdgesNode | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNode(BaseModel):
-    children: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildren"
+    children: FabricCablingPlanQueryNetworkFabricEdgesNodeChildren
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildren(BaseModel):
-    edges: Optional[list["FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdges"]]
+    edges: list[FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdges] | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdges(BaseModel):
-    node: Optional[
-        Annotated[
-            Union[
-                "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock",
-                "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod",
-            ],
-            Field(discriminator="typename__"),
-        ]
-    ]
+    node: Annotated[FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock | FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod, Field(discriminator="typename__")] | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildingBlock(
@@ -43,7 +35,7 @@ class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkBuildi
     typename__: Literal["NetworkBuildingBlock", "NetworkFabric"] = Field(
         alias="__typename"
     )
-    id: Optional[str]
+    id: str | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod(
@@ -52,7 +44,7 @@ class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod(
     typename__: Literal["NetworkPod"] = Field(alias="__typename")
     id: str
     devices: (
-        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices"
+        FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices
     )
 
 
@@ -60,32 +52,28 @@ class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDev
     BaseModel
 ):
     edges: list[
-        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges"
+        FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges
     ]
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(
     BaseModel
 ):
-    node: Optional[
-        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode"
-    ]
+    node: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode(
     BaseModel
 ):
     id: str
-    rack: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRack"
-    interfaces: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfaces"
+    rack: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRack
+    interfaces: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfaces
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRack(
     BaseModel
 ):
-    node: Optional[
-        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRackNode"
-    ]
+    node: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRackNode | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeRackNode(
@@ -97,25 +85,13 @@ class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDev
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfaces(
     BaseModel
 ):
-    edges: Optional[
-        list[
-            "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdges"
-        ]
-    ]
+    edges: list[FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdges] | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdges(
     BaseModel
 ):
-    node: Optional[
-        Annotated[
-            Union[
-                "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimInterface",
-                "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpoint",
-            ],
-            Field(discriminator="typename__"),
-        ]
-    ]
+    node: Annotated[FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimInterface | FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpoint, Field(discriminator="typename__")] | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimInterface(
@@ -124,30 +100,28 @@ class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDev
     typename__: Literal["DcimInterface", "InterfacePhysical", "InterfaceVirtual"] = (
         Field(alias="__typename")
     )
-    id: Optional[str]
+    id: str | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpoint(
     BaseModel
 ):
     typename__: Literal["DcimEndpoint"] = Field(alias="__typename")
-    id: Optional[str]
-    connector: "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpointConnector"
+    id: str | None
+    connector: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpointConnector
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpointConnector(
     BaseModel
 ):
-    node: Optional[
-        "FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpointConnectorNode"
-    ]
+    node: FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpointConnectorNode | None
 
 
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimEndpointConnectorNode(
     BaseModel
 ):
     typename__: Literal["DcimConnector", "NetworkLink"] = Field(alias="__typename")
-    id: Optional[str]
+    id: str | None
 
 
 FabricCablingPlanQuery.model_rebuild()

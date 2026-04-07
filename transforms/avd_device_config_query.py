@@ -31,15 +31,13 @@ class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
 
 class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
     id: str
-    structured_config_file: AvdDeviceConfigQueryStructuredConfigFile
+    structured_config_identifier: AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier | None
 
 
-class AvdDeviceConfigQueryStructuredConfigFile(BaseModel):
-    node: AvdDeviceConfigQueryStructuredConfigFileNode | None
-
-
-class AvdDeviceConfigQueryStructuredConfigFileNode(BaseModel):
-    id: str
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(
+    BaseModel
+):
+    value: str | None
 
 
 AvdDeviceConfigQuery.model_rebuild()
@@ -48,4 +46,3 @@ AvdDeviceConfigQueryDcimDeviceEdges.model_rebuild()
 AvdDeviceConfigQueryDcimDeviceEdgesNode.model_rebuild()
 AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
 AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()
-AvdDeviceConfigQueryStructuredConfigFile.model_rebuild()

@@ -60,7 +60,9 @@ class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent(BaseModel):
 
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParentNode(BaseModel):
-    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(alias="__typename")
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
+        alias="__typename"
+    )
     id: str | None
 
 
@@ -70,16 +72,20 @@ class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
 
 class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
     id: str
-    hostvar_file: AvdFabricDevicesQueryFileRef
-    structured_config_file: AvdFabricDevicesQueryFileRef
+    hostvar_identifier: AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier | None
+    structured_config_identifier: AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier | None
 
 
-class AvdFabricDevicesQueryFileRef(BaseModel):
-    node: AvdFabricDevicesQueryFileRefNode | None
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeHostvarIdentifier(
+    BaseModel
+):
+    value: str | None
 
 
-class AvdFabricDevicesQueryFileRefNode(BaseModel):
-    id: str
+class AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigIdentifier(
+    BaseModel
+):
+    value: str | None
 
 
 AvdFabricDevicesQuery.model_rebuild()
@@ -94,4 +100,3 @@ AvdFabricDevicesQueryDcimDeviceEdgesNodePodNode.model_rebuild()
 AvdFabricDevicesQueryDcimDeviceEdgesNodePodNodeParent.model_rebuild()
 AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
 AvdFabricDevicesQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()
-AvdFabricDevicesQueryFileRef.model_rebuild()

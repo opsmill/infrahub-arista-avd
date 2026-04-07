@@ -7,7 +7,6 @@ from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_ai_dc import sorting as solution_ai_dc_sorting
-from solution_ai_dc.addressing import assign_ip_addresses_to_p2p_connections
 from solution_ai_dc.cabling import build_pod_cabling_plan, connect_interface_maps
 from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_ai_dc.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
