@@ -53,6 +53,13 @@ class ServerCablingGenerator(InfrahubGenerator):
         server_iface_objects = await self.client.filters(
             kind=DcimInterface, device__name__value=server_hostname
         )
+
+        # Populate the SDK store with the server device using its actual typename
+        # (e.g. ComputePhysicalServer, not DcimDevice) so interface.device.peer resolves
+        if server_iface_objects:
+            device_rel = server_iface_objects[0].device
+            await self.client.get(kind=device_rel.typename, id=device_rel.id)
+
         server_interface_map = create_sorted_device_interface_map(server_iface_objects)
 
         leaf_interfaces = await self.client.filters(
