@@ -12,8 +12,6 @@ from generators.generate_avd_device_structured_config import (
 )
 from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQuery,
-    GenerateAvdInputsQueryFileRef,
-    GenerateAvdInputsQueryFileRefNode,
     GenerateAvdInputsQueryNetworkFabric,
     GenerateAvdInputsQueryNetworkFabricEdges,
     GenerateAvdInputsQueryNetworkFabricEdgesNode,
@@ -26,6 +24,7 @@ from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifact,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode,
+    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarIdentifier,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeName,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdges,
@@ -35,6 +34,7 @@ from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDevice,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifact,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNode,
+    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarIdentifier,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName,
 )
 
@@ -46,16 +46,12 @@ def _make_pod_device(
     hostname: str, device_id: str, has_hostvar: bool = False
 ) -> GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges:
     """Create a pod-level device edge."""
-    hostvar_file = None
-    if has_hostvar:
-        hostvar_file = GenerateAvdInputsQueryFileRef(
-            node=GenerateAvdInputsQueryFileRefNode(id="file-123")
-        )
-
     artifact_node = None
     if has_hostvar:
         artifact_node = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode(
-            hostvar_file=hostvar_file
+            hostvar_identifier=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarIdentifier(
+                value="file-123"
+            )
         )
 
     return GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(
@@ -75,16 +71,12 @@ def _make_rack_device(
     hostname: str, device_id: str, has_hostvar: bool = False
 ) -> GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges:
     """Create a rack-level device edge."""
-    hostvar_file = None
-    if has_hostvar:
-        hostvar_file = GenerateAvdInputsQueryFileRef(
-            node=GenerateAvdInputsQueryFileRefNode(id="file-456")
-        )
-
     artifact_node = None
     if has_hostvar:
         artifact_node = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNode(
-            hostvar_file=hostvar_file
+            hostvar_identifier=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarIdentifier(
+                value="file-456"
+            )
         )
 
     return GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges(

@@ -91,6 +91,7 @@ class TemplateDcimGenericDevice(CoreNode):
     tags: RelationshipManager
 
 class TemplateDcimInterface(CoreNode):
+    description: StringOptional
     mtu: IntegerOptional
     name: String
     role: DropdownOptional
@@ -379,7 +380,6 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     index: Integer
     mgmt_gateway: StringOptional
     mgmt_routes: ListAttributeOptional
-    mgmt_routes1: ListAttributeOptional
     name: String
     spine_interface_sorting_method: DropdownOptional
     artifacts: RelationshipManager
@@ -889,6 +889,7 @@ class ProfileDcimGenericDevice(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileDcimInterface(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
     mtu: IntegerOptional
     name: StringOptional
     profile_name: String
@@ -978,6 +979,7 @@ class ProfileInterfaceLayer3(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileInterfacePhysical(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
     mac_address: StringOptional
@@ -1001,6 +1003,7 @@ class ProfileInterfacePhysical(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileInterfaceVirtual(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
     mac_address: StringOptional
@@ -1158,7 +1161,6 @@ class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
     index: IntegerOptional
     mgmt_gateway: StringOptional
     mgmt_routes: ListAttributeOptional
-    mgmt_routes1: ListAttributeOptional
     profile_name: String
     profile_priority: IntegerOptional
     spine_interface_sorting_method: DropdownOptional
@@ -1415,6 +1417,7 @@ class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcim
 
 
 class TemplateInterfacePhysical(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, TemplateDcimEndpoint, TemplateInterfaceHasSubInterface, CoreNode):
+    description: StringOptional
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
     mac_address: StringOptional
@@ -1442,6 +1445,7 @@ class TemplateInterfacePhysical(LineageSource, CoreObjectComponentTemplate, Temp
 
 
 class TemplateInterfaceVirtual(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, CoreNode):
+    description: StringOptional
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
     mac_address: StringOptional

@@ -3,10 +3,8 @@ query BackfillStructuredConfigQuery($device_hostname: String!) {
     edges {
       node {
         id
-        structured_config_file {
-          node {
-            id
-          }
+        structured_config_identifier {
+          value
         }
         device {
           node {

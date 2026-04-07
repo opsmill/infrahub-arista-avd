@@ -29,10 +29,8 @@ query GenerateAvdInputsQuery($name: String!) {
                               avd_artifact {
                                 node {
                                   __typename
-                                  hostvar_file {
-                                    node {
-                                      id
-                                    }
+                                  hostvar_identifier {
+                                    value
                                   }
                                 }
                               }
@@ -54,10 +52,8 @@ query GenerateAvdInputsQuery($name: String!) {
                       avd_artifact {
                         node {
                           __typename
-                          hostvar_file {
-                            node {
-                              id
-                            }
+                          hostvar_identifier {
+                            value
                           }
                         }
                       }

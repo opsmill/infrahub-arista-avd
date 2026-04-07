@@ -9,10 +9,8 @@ query AvdDeviceConfigQuery($name: String!) {
         avd_artifact {
           node {
             id
-            structured_config_file {
-              node {
-                id
-              }
+            structured_config_identifier {
+              value
             }
           }
         }
