@@ -70,17 +70,23 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
         if self.pod_role in EXCLUDED_POD_ROLES:
             msg = f"Cannot run pod generator on {self.pod_name}-{self.pod_id}: {self.pod_role} is not supported by the generator!"
-            raise ValueError(msg)
+            self.logger.error(msg)
+            return
+            # raise ValueError(msg)
 
         await self.get_super_spine_switches_for_fabric()
 
         if self.fabric_amount_of_super_spines != len(self.super_spine_switches):
             msg = f"Cannot start pod generator on {self.pod_name}-{self.pod_id}: the fabric doesn't seem to be fully generated yet!"
-            raise RuntimeError(msg)
+            self.logger.error(msg)
+            return
+            # raise RuntimeError(msg)
 
         if not self.pod_spine_switch_template:
             msg = f"Cannot start pod generator on {self.pod_name}-{self.pod_id}: no spine switch template defined!"
-            raise RuntimeError(msg)
+            self.logger.error(msg)
+            return
+            # raise RuntimeError(msg)
 
         fabric_interface_sorting_method: str = data.network_pod.edges[
             0
@@ -223,15 +229,6 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         )
 
         await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)
-
-        await assign_ip_addresses_to_p2p_connections(
-            client=self.client,
-            logger=self.logger,
-            connections=created_cabling_plan,
-            prefix_len=31,
-            prefix_role="pod_super_spine_spine",
-            pool=self.pod_prefix_pool,
-        )
 
     async def update_checksum(self) -> None:
         racks = await self.client.filters(kind=LocationRack, pod__ids=[self.pod_id])

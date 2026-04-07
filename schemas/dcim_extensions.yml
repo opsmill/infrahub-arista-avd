@@ -74,10 +74,6 @@ extensions:
       attributes:
         - name: description
           kind: Text
-          computed_attribute:
-            kind: TransformPython
-            transform: computed_interface_description
-          read_only: true
           optional: true
           order_weight: 4000
         - name: role
