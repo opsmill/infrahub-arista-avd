@@ -129,11 +129,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         print(json.dumps(hostvars, indent=2))
 
         for hostname, inputs in hostvars.items():
-            validation_result = validate_inputs(inputs)
-            if validation_result.failed:
+            validated = validate_inputs(inputs)
+            if validated.validation_result.violations:
                 print(f"  ❌ Validation failed for {hostname}:")
-                for error in validation_result.validation_errors:
-                    print(f"     - {error}")
+                for violation in validated.validation_result.violations:
+                    print(f"     - {violation}")
                 return
             print("  ✓ All inputs validated successfully")
 
