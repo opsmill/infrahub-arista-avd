@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from generators.generate_server_cabling import ServerCablingGenerator
-from solution_ai_dc.protocols import DcimConnector
+from solution_ai_dc.protocols import NetworkLink
 
 
 def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
@@ -162,9 +162,8 @@ class TestSingleHomedCabling:
         gen.client.get = AsyncMock(
             side_effect=[
                 mock_server_iface,  # get server interface
-                mock_leaf_iface,  # get leaf interface (with link include)
-                mock_server_iface,  # re-fetch server interface after link
-                mock_leaf_iface,  # re-fetch leaf interface after link
+                mock_leaf_iface,  # get leaf interface (for link name)
+                mock_leaf_iface,  # re-fetch leaf interface (for VLANs)
             ]
         )
 
@@ -177,7 +176,7 @@ class TestSingleHomedCabling:
         # Verify link was created with protocol class
         gen.client.create.assert_called_once()
         call_args = gen.client.create.call_args
-        assert call_args.args[0] is DcimConnector
+        assert call_args.args[0] is NetworkLink
         assert call_args.kwargs["medium"] == "copper"
 
 
@@ -280,7 +279,6 @@ class TestVlanAssignment:
             side_effect=[
                 mock_server_iface,
                 mock_leaf_iface,
-                mock_server_iface,
                 mock_leaf_iface,
             ]
         )
@@ -332,7 +330,6 @@ class TestVlanAssignment:
             side_effect=[
                 mock_server_iface,
                 mock_leaf_iface,
-                mock_server_iface,
                 mock_leaf_iface,
             ]
         )
@@ -386,7 +383,6 @@ class TestInterfaceStatusActive:
             side_effect=[
                 mock_server_iface,
                 mock_leaf_iface,
-                mock_server_iface,
                 mock_leaf_iface,
             ]
         )

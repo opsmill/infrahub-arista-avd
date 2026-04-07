@@ -12,6 +12,7 @@ nodes:
       - DcimConnector
     human_friendly_id:
       - name__value
+    display_label: name__value
 
 extensions:
   nodes:

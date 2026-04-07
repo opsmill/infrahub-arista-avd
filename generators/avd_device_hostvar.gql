@@ -134,6 +134,25 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                               }
                             }
                           }
+                          ... on InterfacePhysical {
+                            name {
+                              value
+                            }
+                            device {
+                              node {
+                                __typename
+                                id
+                                name {
+                                  value
+                                }
+                                ... on DcimDevice {
+                                  role {
+                                    value
+                                  }
+                                }
+                              }
+                            }
+                          }
                         }
                       }
                     }

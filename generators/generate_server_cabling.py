@@ -6,7 +6,7 @@ from typing import Any
 from infrahub_sdk.generator import InfrahubGenerator
 
 from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_hostvar_generation
-from solution_ai_dc.protocols import DcimConnector, DcimDevice, DcimInterface, LocationRack, NetworkPod
+from solution_ai_dc.protocols import DcimDevice, DcimInterface, LocationRack, NetworkLink, NetworkPod
 
 
 class ServerCablingGenerator(InfrahubGenerator):
@@ -212,25 +212,23 @@ class ServerCablingGenerator(InfrahubGenerator):
         # Create the network link
         link_name = f"{server_hostname}-{server_iface['name']}__{leaf_interface.device.display_label}-{leaf_interface.name.value}"
         network_link = await self.client.create(
-            DcimConnector,
+            NetworkLink,
             name=link_name,
             medium="copper",
-            connected_endpoints=[server_interface, leaf_interface],
         )
         await network_link.save(allow_upsert=True)
 
-        # Re-fetch interfaces after link creation to get updated link relationship
-        server_interface = await self.client.get(DcimInterface, id=server_iface["id"], include=["connector"])
+        # Set connector on both interfaces (populates connected_endpoints on link via bidirectional relationship)
+        server_interface.connector = network_link
+        server_interface.status.value = "active"
+        await server_interface.save(allow_upsert=True)
+
         leaf_interface = await self.client.get(
             DcimInterface,
             id=leaf_iface_id,
             include=["connector", "tagged_vlan", "untagged_vlan"],
         )
-
-        # Set interfaces to active
-        server_interface.status.value = "active"
-        await server_interface.save(allow_upsert=True)
-
+        leaf_interface.connector = network_link
         leaf_interface.status.value = "active"
 
         # Assign VLANs from server interface to leaf interface
