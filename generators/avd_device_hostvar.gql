@@ -51,7 +51,7 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   mgmt_gateway {
                     value
                   }
-                  mgmt_routes1 {
+                  mgmt_routes {
                     value
                   }
                   avd_evpn {
