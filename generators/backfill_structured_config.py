@@ -17,7 +17,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.node import NodeProperty
 
 from solution_ai_dc.protocols import (
-    AvdArtifact,
+    AvdStructuredConfigFile,
     CoreAccountGroup,
     DcimInterface,
     IpamIPAddress,
@@ -431,8 +431,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         data: BackfillStructuredConfigQuery = BackfillStructuredConfigQuery(**data)
         artifact = data.avd_artifact.edges[0].node
 
-        # Check if structured config exists
-        if not artifact.structured_config_identifier or not artifact.structured_config_identifier.value:
+        # Get structured config file object
+        sc_file_ref = artifact.structured_config_file
+        if not sc_file_ref or not sc_file_ref.node:
             self.logger.warning("No structured config file on artifact, skipping")
             return
 
@@ -445,11 +446,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         hostname = device.name.value if device.name else "unknown"
         device_id = device.id
 
-        # Fetch structured config from CoreFileObject via SDK relationship
+        # Fetch structured config from CoreFileObject
         try:
-            avd_artifact = await self.client.get(AvdArtifact, id=artifact.id)
-            await avd_artifact.structured_config_file.fetch()
-            sc_file = avd_artifact.structured_config_file.peer
+            sc_file = await self.client.get(AvdStructuredConfigFile, id=sc_file_ref.node.id)
             content = await sc_file.download_file()
         except (OSError, ValueError) as e:
             self.logger.warning(f"[{hostname}] Failed to fetch structured config: {e}")

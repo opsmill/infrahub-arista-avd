@@ -2,7 +2,7 @@
 """Unit tests for AVD device structured config generator."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from pyavd import validate_inputs
@@ -16,7 +16,6 @@ from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQueryNetworkFabricEdges,
     GenerateAvdInputsQueryNetworkFabricEdgesNode,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildren,
-    GenerateAvdInputsQueryNetworkFabricEdgesNodeName,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdges,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices,
@@ -24,7 +23,8 @@ from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNode,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifact,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode,
-    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarIdentifier,
+    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarFile,
+    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarFileNode,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeName,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdges,
@@ -34,10 +34,11 @@ from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDevice,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifact,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNode,
-    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarIdentifier,
+    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarFile,
+    GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarFileNode,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName,
+    GenerateAvdInputsQueryNetworkFabricEdgesNodeName,
 )
-
 
 # --- Helpers to build query data ---
 
@@ -46,12 +47,16 @@ def _make_pod_device(
     hostname: str, device_id: str, has_hostvar: bool = False
 ) -> GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges:
     """Create a pod-level device edge."""
+    hostvar_file = None
+    if has_hostvar:
+        hostvar_file = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarFile(
+            node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarFileNode(id="file-123")
+        )
+
     artifact_node = None
     if has_hostvar:
         artifact_node = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode(
-            hostvar_identifier=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarIdentifier(
-                value="file-123"
-            )
+            hostvar_file=hostvar_file
         )
 
     return GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(
@@ -71,17 +76,21 @@ def _make_rack_device(
     hostname: str, device_id: str, has_hostvar: bool = False
 ) -> GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges:
     """Create a rack-level device edge."""
+    hostvar_file = None
+    if has_hostvar:
+        hostvar_file = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarFile(
+            node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarFileNode(id="file-456")
+        )
+
     artifact_node = None
     if has_hostvar:
         artifact_node = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNode(
-            hostvar_identifier=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarIdentifier(
-                value="file-456"
-            )
+            hostvar_file=hostvar_file
         )
 
     return GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdges(
         node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDevice(
-            **{"__typename": "DcimDevice"},
+            __typename="DcimDevice",
             id=device_id,
             name=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName(
                 value=hostname
@@ -113,7 +122,7 @@ def _make_pod(
     """Create a pod edge with devices and racks."""
     return GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdges(
         node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPod(
-            **{"__typename": "NetworkPod"},
+            __typename="NetworkPod",
             devices=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices(
                 edges=pod_devices or []
             ),

@@ -89,18 +89,6 @@ def _make_saveable_mock() -> MagicMock:
     return mock
 
 
-def _make_artifact_mock(structured_config: dict) -> MagicMock:
-    """Create a mock AvdArtifact with structured_config_file relationship."""
-    mock_artifact = MagicMock()
-    mock_sc_file = MagicMock()
-    mock_sc_file.download_file = AsyncMock(
-        return_value=json.dumps(structured_config).encode()
-    )
-    mock_artifact.structured_config_file.fetch = AsyncMock()
-    mock_artifact.structured_config_file.peer = mock_sc_file
-    return mock_artifact
-
-
 def _build_artifact_query_data(
     hostname: str = "leaf-1",
     interfaces: list | None = None,
@@ -118,7 +106,7 @@ def _build_artifact_query_data(
             "interfaces": {"edges": interfaces or []},
         }
 
-    sc_identifier = {"value": "scf-identifier-1"} if has_sc_file else None
+    sc_file_node = {"id": "scf-1"} if has_sc_file else None
 
     return {
         "AvdArtifact": {
@@ -126,7 +114,7 @@ def _build_artifact_query_data(
                 {
                     "node": {
                         "id": "art-1",
-                        "structured_config_identifier": sc_identifier,
+                        "structured_config_file": {"node": sc_file_node},
                         "device": {"node": device},
                     }
                 }
@@ -146,7 +134,7 @@ class TestQueryModelParsing:
         artifact = data.avd_artifact.edges[0].node
 
         assert artifact.id == "art-1"
-        assert artifact.structured_config_identifier.value == "scf-identifier-1"
+        assert artifact.structured_config_file.node.id == "scf-1"
         device = artifact.device.node
         assert device.id == "dev-1"
         assert device.name.value == "leaf-1"
@@ -154,10 +142,10 @@ class TestQueryModelParsing:
         assert device.interfaces.edges == []
 
     def test_parse_with_no_sc_file(self) -> None:
-        """Test parsing when structured_config_identifier is None."""
+        """Test parsing when structured_config_file node is None."""
         raw = _build_artifact_query_data(has_sc_file=False)
         data = BackfillStructuredConfigQuery(**raw)
-        assert data.avd_artifact.edges[0].node.structured_config_identifier is None
+        assert data.avd_artifact.edges[0].node.structured_config_file.node is None
 
     def test_parse_with_no_device(self) -> None:
         """Test parsing when device node is None."""
@@ -958,7 +946,8 @@ class TestGenerate:
                 {"name": "Ethernet1", "ip_address": "10.0.0.1/31", "mtu": 9214},
             ]
         }
-        mock_artifact = _make_artifact_mock(structured_config)
+        mock_sc_file = MagicMock()
+        mock_sc_file.download_file = AsyncMock(return_value=json.dumps(structured_config).encode())
 
         mock_prefix = _make_saveable_mock()
         mock_ip = _make_saveable_mock()
@@ -968,7 +957,7 @@ class TestGenerate:
         mock_interface_mtu = _make_saveable_mock()
 
         gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
-        gen.client.get = AsyncMock(side_effect=[mock_artifact, mock_avd_group, mock_interface, mock_interface_mtu])
+        gen.client.get = AsyncMock(side_effect=[mock_sc_file, mock_avd_group, mock_interface, mock_interface_mtu])
 
         interfaces = [
             {
@@ -997,11 +986,12 @@ class TestGenerate:
                 {"name": "Ethernet1", "ip_address": "10.0.0.1/31"},
             ]
         }
-        mock_artifact = _make_artifact_mock(structured_config)
+        mock_sc_file = MagicMock()
+        mock_sc_file.download_file = AsyncMock(return_value=json.dumps(structured_config).encode())
         mock_avd_group = MagicMock()
         mock_avd_group.id = "avd-group-id"
         mock_interface = _make_saveable_mock()
-        gen.client.get = AsyncMock(side_effect=[mock_artifact, mock_avd_group, mock_interface])
+        gen.client.get = AsyncMock(side_effect=[mock_sc_file, mock_avd_group, mock_interface])
 
         interfaces = [
             {
@@ -1035,10 +1025,11 @@ class TestGenerate:
                 {"name": "Ethernet99", "ip_address": "10.0.0.1/31"},
             ]
         }
-        mock_artifact = _make_artifact_mock(structured_config)
+        mock_sc_file = MagicMock()
+        mock_sc_file.download_file = AsyncMock(return_value=json.dumps(structured_config).encode())
         mock_avd_group = MagicMock()
         mock_avd_group.id = "avd-group-id"
-        gen.client.get = AsyncMock(side_effect=[mock_artifact, mock_avd_group])
+        gen.client.get = AsyncMock(side_effect=[mock_sc_file, mock_avd_group])
 
         interfaces = [
             {
@@ -1077,12 +1068,13 @@ class TestGenerate:
                 {"destination_address_prefix": "0.0.0.0/0", "gateway": "1.1.1.1"},
             ],
         }
-        mock_artifact = _make_artifact_mock(structured_config)
+        mock_sc_file = MagicMock()
+        mock_sc_file.download_file = AsyncMock(return_value=json.dumps(structured_config).encode())
         mock_obj = _make_saveable_mock()
         mock_avd_group = MagicMock()
         mock_avd_group.id = "avd-group-id"
         gen.client.create = AsyncMock(return_value=mock_obj)
-        gen.client.get = AsyncMock(side_effect=[mock_artifact, mock_avd_group])
+        gen.client.get = AsyncMock(side_effect=[mock_sc_file, mock_avd_group])
 
         data = _build_artifact_query_data()
         await gen.generate(data)
@@ -1318,7 +1310,8 @@ class TestSourceAttributionGracefulDegradation:
                 {"name": "Ethernet1", "ip_address": "10.0.0.1/31"},
             ]
         }
-        mock_artifact = _make_artifact_mock(structured_config)
+        mock_sc_file = MagicMock()
+        mock_sc_file.download_file = AsyncMock(return_value=json.dumps(structured_config).encode())
 
         mock_prefix = _make_saveable_mock()
         mock_ip = _make_saveable_mock()
@@ -1326,9 +1319,9 @@ class TestSourceAttributionGracefulDegradation:
 
         gen.client.create = AsyncMock(side_effect=[mock_prefix, mock_ip])
 
-        # First get call is for AvdArtifact, then CoreAccountGroup (not found), then interface
+        # First get call is for AvdStructuredConfigFile, then CoreAccountGroup (not found), then interface
         gen.client.get = AsyncMock(
-            side_effect=[mock_artifact, NodeNotFoundError(identifier={"name": ["AVD"]}), mock_interface]
+            side_effect=[mock_sc_file, NodeNotFoundError(identifier={"name": ["AVD"]}), mock_interface]
         )
 
         interfaces = [
