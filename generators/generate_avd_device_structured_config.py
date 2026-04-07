@@ -150,6 +150,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             print(f"\n  Generating structured config for {hostname}...")
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
+                structured_config_dict = structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config
 
                 avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
 
@@ -159,11 +160,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     member_of_groups=["avd_structured_configs"],
                 )
                 sc_file.upload_from_bytes(
-                    content=json.dumps(structured_config).encode(),
+                    content=json.dumps(structured_config_dict).encode(),
                     name=f"{hostname}-structured-config.json",
                 )
                 await sc_file.save(allow_upsert=True)
-                print(f"    ✓ Generated structured config with {len(structured_config)} top-level keys")
+                print(f"    ✓ Generated structured config with {len(structured_config_dict)} top-level keys")
             except Exception as e:
                 print(f"    ❌ Failed: {e}")
                 continue
