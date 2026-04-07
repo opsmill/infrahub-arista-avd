@@ -112,7 +112,29 @@ Read the user's input (the text after `/speckit.specify`) and classify which Inf
 - Load the template for the **first** artifact type in the dependency chain
 - Proceed to the **Outline** section using that template
 
-### Step 5: Load the extension template
+### Step 5: Invoke the corresponding Infrahub skill
+
+**MANDATORY — This step MUST NOT be skipped, rationalized around, or deferred.**
+
+Based on the artifact type detected in Step 3, invoke the corresponding Infrahub skill using the Skill tool BEFORE writing any specification content. The skill loads authoritative reference material (schema properties, validation rules, naming conventions, API patterns) that you MUST use when writing the spec.
+
+| Artifact Type | Skill to Invoke | What It Provides |
+|---------------|----------------|-----------------|
+| **Schema** | `infrahub:schema-creator` | Schema property reference, node/generic definitions, attribute kinds, relationship types, CoreFileObject, naming conventions, validation rules |
+| **Transform** | `infrahub:transform-creator` | Transform types (Python/Jinja2), query patterns, artifact definitions, content types |
+| **Check** | `infrahub:check-creator` | Check definition structure, validation logic patterns, proposed change pipeline |
+| **Generator** | `infrahub:generator-creator` | Generator class patterns, target groups, query parameters, idempotent creation |
+| **Menu** | `infrahub:menu-creator` | Menu structure, node organization, sidebar customization |
+
+**If multiple artifact types were detected**: Invoke the skill for the FIRST artifact type (the one being specified in this cycle).
+
+**Anti-rationalization check**: If you think any of the following, you MUST still invoke the skill:
+- "I already know Infrahub schemas" — The skill has curated reference material you don't have in training data
+- "I fetched the docs via WebFetch" — Web docs may be incomplete or outdated vs. the skill's validated reference
+- "This is a simple change" — Simple changes still need correct attribute kinds, relationship cardinalities, naming conventions
+- "I'll invoke it later during planning" — The spec defines entities and requirements that need accurate domain knowledge NOW
+
+### Step 6: Load the extension template
 
 Read the selected template from `.specify/extensions/infrahub/templates/{template-name}.md`.
 

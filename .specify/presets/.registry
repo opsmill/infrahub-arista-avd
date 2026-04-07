@@ -4,16 +4,18 @@
     "infrahub": {
       "version": "1.0.0",
       "source": "local",
-      "manifest_hash": "",
+      "manifest_hash": "sha256:fa399d8c18c6a38a25368fa9fd6827e047b63706535a6e157c32adff496de79b",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
         "claude": [
-          "speckit.specify"
+          "speckit.specify",
+          "speckit.plan",
+          "speckit.implement"
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-03-25T00:00:00Z"
+      "installed_at": "2026-04-01T15:51:07.458149+00:00"
     }
   }
 }
