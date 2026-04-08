@@ -31,6 +31,10 @@ extensions:
               label: Spine
             - name: leaf
               label: Leaf
+            - name: l2leaf
+              label: L2 Leaf
+              description: "L2 Leaf Switch (access layer, no EVPN)"
+              color: "#f0e6fa"
         - name: bgp_asn
           label: BGP ASN
           kind: Number
