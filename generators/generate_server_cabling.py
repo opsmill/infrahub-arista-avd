@@ -87,8 +87,63 @@ class ServerCablingGenerator(InfrahubGenerator):
         # Assign VLANs from server interfaces to their paired leaf interfaces
         await self._assign_vlans(cabling_plan, server_interfaces)
 
+        # For dual-homed servers (connected to 2+ leaf switches), create a port-channel
+        await self._create_server_port_channel(server_hostname, cabling_plan, leaf_switches)
+
         # Trigger AVD hostvar regeneration cascade
         await self._trigger_avd_cascade(rack_id, server_hostname)
+
+    async def _create_server_port_channel(
+        self,
+        server_hostname: str,
+        cabling_plan: list[tuple[DcimInterface, DcimInterface]],
+        leaf_switches: list[DcimDevice],
+    ) -> None:
+        """Create a port-channel on dual-homed servers (connected to 2+ leaf switches).
+
+        This creates an InterfaceLag on the server and assigns the cabled physical
+        interfaces as LAG members, so the hostvar generator can include port_channel
+        config in the connected_endpoints structure for AVD.
+        """
+        if len(cabling_plan) < 2 or len(leaf_switches) < 2:
+            return
+
+        # Check if connections go to multiple leaf switches (dual-homed)
+        connected_leaf_ids = set()
+        server_iface_ids = []
+        for server_iface, leaf_iface in cabling_plan:
+            server_iface_ids.append(server_iface.id)
+            connected_leaf_ids.add(leaf_iface.device.id)
+
+        if len(connected_leaf_ids) < 2:
+            return
+
+        self.logger.info(f"Creating port-channel for dual-homed server {server_hostname}")
+
+        # Get the server device to find its ID
+        server_iface = await self.client.get(InterfacePhysical, id=server_iface_ids[0])
+        server_device_id = server_iface.device.id
+
+        # Create LAG on the server (represents a server-side bond, not a switch Port-Channel)
+        lag = await self.client.create(
+            "InterfaceLag",
+            name="Bond1",
+            device={"id": server_device_id},
+            lacp_mode="active",
+            lacp_rate="fast",
+            status="active",
+        )
+        await lag.save(allow_upsert=True)
+
+        # Assign server physical interfaces as LAG members
+        for iface_id in server_iface_ids:
+            iface = await self.client.get(InterfacePhysical, id=iface_id)
+            iface.lag = {"id": lag.id}  # type: ignore[attr-defined]
+            await iface.save(allow_upsert=True)
+
+        self.logger.info(
+            f"  Bond1 created on {server_hostname} with {len(server_iface_ids)} members"
+        )
 
     async def _trigger_avd_cascade(self, rack_id: str, server_hostname: str) -> None:
         """Navigate from rack to fabric and trigger AVD hostvar regeneration."""

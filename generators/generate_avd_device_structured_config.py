@@ -50,9 +50,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 hostname = device.name.value
                 has_hostvar = False
 
-                avd_artifact = device.avd_artifact.node
-                if avd_artifact and avd_artifact.hostvar_file.node:
-                    has_hostvar = True
+                avd_artifact = getattr(device, "avd_artifact", None)
+                if avd_artifact and avd_artifact.node:
+                    hostvar_file = getattr(avd_artifact.node, "hostvar_file", None)
+                    if hostvar_file and hostvar_file.node:
+                        has_hostvar = True
 
                 devices[hostname] = {
                     "id": device.id,
@@ -68,9 +70,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     hostname = device.name.value
                     has_hostvar = False
 
-                    avd_artifact = device.avd_artifact.node
-                    if avd_artifact and avd_artifact.hostvar_file.node:
-                        has_hostvar = True
+                    avd_artifact = getattr(device, "avd_artifact", None)
+                    if avd_artifact and avd_artifact.node:
+                        hostvar_file = getattr(avd_artifact.node, "hostvar_file", None)
+                        if hostvar_file and hostvar_file.node:
+                            has_hostvar = True
 
                     devices[hostname] = {
                         "id": device.id,
@@ -99,11 +103,17 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
             try:
                 artifact = await self.client.get(AvdArtifact, name__value=hostname)
+                if not artifact.hostvar_file.id:
+                    self.logger.warning(f"No hostvar file for {hostname}, skipping")
+                    continue
                 await artifact.hostvar_file.fetch()
                 hostvar_file = artifact.hostvar_file.peer
+                if not hostvar_file:
+                    self.logger.warning(f"Hostvar file peer not found for {hostname}, skipping")
+                    continue
                 content = await hostvar_file.download_file()
                 result[hostname] = json.loads(content)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.warning(f"Failed to fetch hostvars for {hostname}: {e}")
 
         return result
@@ -122,51 +132,95 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             device_mapping[d["hostname"]] = d["id"]
             print(f"  {status} {d['hostname']}: {'has hostvar' if d['has_hostvar'] else 'no artifact'}")
 
+        # Check all devices have hostvars before proceeding
+        devices_without_hostvars = [d["hostname"] for d in devices if not d["has_hostvar"]]
+        if devices_without_hostvars:
+            self.logger.warning(
+                f"Aborting: {len(devices_without_hostvars)} devices missing hostvars: "
+                f"{', '.join(devices_without_hostvars[:5])}{'...' if len(devices_without_hostvars) > 5 else ''}"
+            )
+            return
+
         # Fetch hostvars from object storage
         hostvars = await self._fetch_hostvars_from_storage(devices)
 
-        print("\nHostvars:")
-        print(json.dumps(hostvars, indent=2))
-
+        validation_errors: list[str] = []
         for hostname, inputs in hostvars.items():
             validated = validate_inputs(inputs)
             if validated.validation_result.violations:
-                print(f"  ⚠ Validation warnings for {hostname}:")
                 for violation in validated.validation_result.violations:
                     msg = getattr(violation, "message", str(violation))
                     path = getattr(violation, "path", "")
-                    print(f"     - {msg} (path: {path})")
+                    validation_errors.append(f"{hostname}: {msg} (path: {path})")
+                self.logger.warning(f"Validation warnings for {hostname}: {len(validated.validation_result.violations)} issues")
             else:
-                print(f"  ✓ {hostname} validated successfully")
+                self.logger.info(f"{hostname} validated successfully")
 
-        print("\nStep 3: Generating AVD facts for all devices...")
-        try:
-            avd_facts = get_avd_facts(hostvars)
-            print(f"  ✓ Generated facts for {len(avd_facts)} devices")
-        except Exception as e:
-            print(f"  ❌ Failed to generate AVD facts: {e}")
+        if validation_errors:
+            for err in validation_errors:
+                self.logger.error(f"Validation error: {err}")
+            self.logger.error(f"pyAVD validation failed for {len(validation_errors)} inputs — aborting structured config generation")
             return
 
-        structured_configs = {}
+        self.logger.info("Generating AVD facts for all devices...")
+        try:
+            avd_facts = get_avd_facts(hostvars)
+            self.logger.info(f"Generated facts for {len(avd_facts)} devices")
+        except (ValueError, KeyError, TypeError):
+            self.logger.exception("AVD facts generation failed")
+            return
+
+        import hashlib
+
+        success_count = 0
+        skipped_count = 0
+        failed_devices: list[str] = []
         for hostname, inputs in hostvars.items():
-            print(f"\n  Generating structured config for {hostname}...")
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
-                structured_config_dict = structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config
+                structured_config_dict = structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config  # noqa: SLF001
+
+                new_content = json.dumps(structured_config_dict, indent=2).encode()
+                new_checksum = hashlib.sha256(new_content).hexdigest()
 
                 avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
 
-                sc_file = await self.client.create(
-                    AvdStructuredConfigFile,
-                    artifact=avd_artifact,
-                    member_of_groups=["avd_structured_configs"],
-                )
-                sc_file.upload_from_bytes(
-                    content=json.dumps(structured_config_dict, indent=2).encode(),
-                    name=f"{hostname}-structured-config.json",
-                )
-                await sc_file.save(allow_upsert=True)
-                print(f"    ✓ Generated structured config with {len(structured_config_dict)} top-level keys")
-            except Exception as e:
-                print(f"    ❌ Failed: {e}")
-                continue
+                # Get existing structured config file if it exists
+                existing_file = None
+                existing_checksum = None
+                if avd_artifact.structured_config_file.id:
+                    try:
+                        await avd_artifact.structured_config_file.fetch()
+                        existing_file = avd_artifact.structured_config_file.peer
+                        if existing_file:
+                            existing_content = await existing_file.download_file()
+                            existing_checksum = hashlib.sha256(existing_content).hexdigest()
+                    except Exception:  # noqa: BLE001
+                        existing_file = None
+
+                # Always upload and save to ensure the file exists on this branch
+                if existing_file:
+                    existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
+                    await existing_file.save(allow_upsert=True)
+                else:
+                    sc_file = await self.client.create(
+                        AvdStructuredConfigFile,
+                        artifact=avd_artifact,
+                        member_of_groups=["avd_structured_configs"],
+                    )
+                    sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
+                    await sc_file.save(allow_upsert=True)
+
+                if existing_checksum == new_checksum:
+                    skipped_count += 1
+                else:
+                    success_count += 1
+            except (ValueError, KeyError, TypeError, AttributeError) as e:
+                self.logger.exception(f"Structured config failed for {hostname}")
+                failed_devices.append(f"{hostname}: {e}")
+
+        self.logger.info(
+            f"Structured config complete: {success_count} updated, {skipped_count} unchanged, {len(failed_devices)} failed"
+        )
+        for failure in failed_devices:
+            self.logger.error(f"  Failed: {failure}")

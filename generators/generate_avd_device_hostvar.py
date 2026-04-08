@@ -56,15 +56,19 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
         if not device.avd_artifact.id:
             return False
 
-        await device.avd_artifact.fetch()
-        artifact = device.avd_artifact.peer
+        try:
+            await device.avd_artifact.fetch()
+            artifact = device.avd_artifact.peer
 
-        await artifact.hostvar_file.fetch()
-        if not artifact.hostvar_file.id:
+            if not artifact.hostvar_file.id:
+                return False
+            await artifact.hostvar_file.fetch()
+            if not artifact.hostvar_file.peer:
+                return False
+        except Exception:  # noqa: BLE001
             return False
 
     await set_fabric_avd_hostvars_ready(client, fabric_id, True)
-    await trigger_structured_config_generation(client)
     return True
 
 
@@ -206,6 +210,11 @@ def extract_connected_endpoints(
             if endpoint.id != interface.id and hasattr(endpoint, "device"):
                 remote_device = endpoint.device.node
                 if remote_device:
+                    # Skip L2 leaf devices — AVD handles them via l2leaf type, not connected_endpoints
+                    remote_role = getattr(remote_device, "role", None)
+                    if remote_role and remote_role.value == "l2leaf":
+                        continue
+
                     server_name = remote_device.name.value
                     endpoint_port = endpoint.name.value
                     switch_port = interface.name.value
@@ -223,6 +232,16 @@ def extract_connected_endpoints(
                         "switch_ports": [switch_port],
                         "switches": [hostname],
                     }
+
+                    # Detect port-channel on the remote (server) endpoint
+                    endpoint_lag = getattr(endpoint, "lag", None)
+                    if endpoint_lag and endpoint_lag.node:
+                        lag_node = endpoint_lag.node
+                        port_channel: dict[str, str] = {"mode": "active"}
+                        lacp_mode = getattr(lag_node, "lacp_mode", None)
+                        if lacp_mode and lacp_mode.value:
+                            port_channel["mode"] = lacp_mode.value
+                        adapter["port_channel"] = port_channel
 
                     # Determine mode and add VLAN config
                     if tagged_vlans:
@@ -356,7 +375,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         uplink = await self._extract_pool_prefix(getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool")
         vtep = await self._extract_pool_prefix(getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool")
         mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
-        mlag_l3 = await self._extract_pool_prefix(getattr(pod, "mlag_l3_pool", None), "CoreIPAddressPool")
+        # Auto-generated Pydantic model renames mlag_l3_pool to mlag_l_3_pool
+        mlag_l3_ref = getattr(pod, "mlag_l_3_pool", None) or getattr(pod, "mlag_l3_pool", None)
+        mlag_l3 = await self._extract_pool_prefix(mlag_l3_ref, "CoreIPAddressPool")
 
         return {
             "uplink_ipv4_pool": uplink or "10.250.0.0/16",
@@ -438,19 +459,27 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         return result
 
     @staticmethod
-    def _extract_mlag_info(device: object) -> dict[str, str | None]:
-        """Extract MLAG domain info for a device."""
+    def _extract_mlag_info(device: object) -> dict[str, Any]:
+        """Extract MLAG domain info for a device, including peer names."""
         device_mlag_domain = getattr(device, "mlag_domain", None)
         if not device_mlag_domain or not device_mlag_domain.node:
-            return {"domain_id": None, "virtual_router_mac": None}
+            return {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
 
         mlag_domain = device_mlag_domain.node
         domain_id = mlag_domain.domain_id.value if mlag_domain.domain_id else None
         vrmac = getattr(mlag_domain, "virtual_router_mac", None)
 
+        # Extract all peer names from the MLAG domain
+        peer_names: list[str] = []
+        if hasattr(mlag_domain, "peers") and mlag_domain.peers:
+            for peer_edge in mlag_domain.peers.edges:
+                if peer_edge.node and peer_edge.node.name:
+                    peer_names.append(peer_edge.node.name.value)
+
         return {
             "domain_id": domain_id,
             "virtual_router_mac": vrmac.value if vrmac else None,
+            "peer_names": peer_names,
         }
 
     @staticmethod
@@ -509,6 +538,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["uplink_switches"] = uplinks["uplink_switches"]
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
 
+        # Extract MLAG peer interfaces for leaf devices (AVD needs mlag_interfaces)
+        if mlag_info["domain_id"] and role == "leaf" and "mlag_peer_interfaces" in mlag_info:
+            node_config["mlag_interfaces"] = mlag_info["mlag_peer_interfaces"]
+
         # Leaf devices with SVIs need virtual_router_mac at node level
         if role == "leaf" and virtual_router_mac and tenants_data:
             node_config["virtual_router_mac_address"] = virtual_router_mac
@@ -565,12 +598,20 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         hostvars[node_type_key] = hostvars.get(node_type_key, {})
         hostvars[node_type_key]["nodes"] = [node_config]
 
-        # Add MLAG node_group for leaf devices
+        # Add MLAG node_group for leaf devices (AVD expects nodes listed inside the group)
         if mlag_info["domain_id"] and role == "leaf":
             effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
             node_group: dict[str, Any] = {"group": mlag_info["domain_id"]}
+            if bgp_asn is not None:
+                node_group["bgp_as"] = str(bgp_asn)
             if effective_vrmac:
                 node_group["virtual_router_mac_address"] = effective_vrmac
+            # Include peer node names in the group
+            group_nodes: list[dict[str, str]] = []
+            for peer_name in mlag_info.get("peer_names", []):
+                group_nodes.append({"name": peer_name})
+            if group_nodes:
+                node_group["nodes"] = group_nodes
             hostvars[node_type_key]["node_groups"] = [node_group]
 
         if tenants_data:
@@ -638,7 +679,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         p2p_uplinks_mtu = None if is_l2leaf else self._get_attr_value(fabric, "p2p_uplinks_mtu")
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
         spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
-        loopback_ipv4_offset = None if is_l2leaf else self._get_attr_value(pod, "loopback_ipv4_offset")
+        # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
+        loopback_offset_attr = getattr(pod, "loopback_ipv_4_offset", None) or getattr(pod, "loopback_ipv4_offset", None)
+        loopback_ipv4_offset = None if is_l2leaf else (loopback_offset_attr.value if loopback_offset_attr else None)
 
         # BGP peer group passwords (not applicable for L2 leafs)
         bgp_passwords: dict[str, str | None] = {"evpn_overlay": None, "underlay": None, "mlag": None}
@@ -664,9 +707,18 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             pools = await self._extract_l3ls_pools(fabric, pod)
 
         # Extract MLAG domain info (only for L3 leaf devices)
-        mlag_info = {"domain_id": None, "virtual_router_mac": None}
+        mlag_info: dict[str, Any] = {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
         if not is_l2leaf:
             mlag_info = self._extract_mlag_info(device)
+            # Extract mlag_peer interface names for AVD mlag_interfaces
+            if mlag_info["domain_id"] and iface_edges:
+                mlag_peer_ifaces = []
+                for edge in iface_edges:
+                    iface = edge.node
+                    if hasattr(iface, "role") and iface.role and iface.role.value == "mlag_peer":
+                        mlag_peer_ifaces.append(iface.name.value)
+                if mlag_peer_ifaces:
+                    mlag_info["mlag_peer_interfaces"] = sorted(mlag_peer_ifaces)
 
         # Fetch EVPN tenants (not applicable for L2 leafs)
         tenants_data: list[dict[str, Any]] = []
@@ -714,26 +766,48 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             error_detail = "; ".join(violation_msgs)
             raise ValueError(f"pyAVD validation failed for {hostname}: {error_detail}")
 
-        # Print for debugging
-        print(f"\n=== AVD Device Hostvar for {hostname} ===")
-        print(f"Device: {hostname}")
-        print(f"Role: {role}")
-        print("\nFull hostvars structure:")
-        print(json.dumps(hostvars, indent=2))
+        import hashlib
 
+        new_content = json.dumps(hostvars, indent=2).encode()
+        new_checksum = hashlib.sha256(new_content).hexdigest()
+
+        artifact_name = hostname
+
+        # Get or create the artifact
         avd_artifact = await self.client.create(
             AvdArtifact,
-            name=hostname,
+            name=artifact_name,
             device=device_id,
             member_of_groups=["avd_artifacts"],
         )
         await avd_artifact.save(allow_upsert=True)
 
-        hostvar_file = await self.client.create(
-            AvdHostvarFile,
-            artifact=avd_artifact,
-        )
-        hostvar_file.upload_from_bytes(content=json.dumps(hostvars, indent=2).encode(), name=f"{hostname}-hostvars.json")
-        await hostvar_file.save(allow_upsert=True)
+        # Re-fetch to get the relationship IDs populated
+        avd_artifact = await self.client.get(AvdArtifact, name__value=artifact_name)
 
-        await check_fabric_hostvars_ready(self.client, fabric.id)
+        # Get existing hostvar file if it exists
+        existing_file = None
+        existing_checksum = None
+        if avd_artifact.hostvar_file.id:
+            try:
+                await avd_artifact.hostvar_file.fetch()
+                existing_file = avd_artifact.hostvar_file.peer
+                if existing_file:
+                    existing_content = await existing_file.download_file()
+                    existing_checksum = hashlib.sha256(existing_content).hexdigest()
+            except Exception:  # noqa: BLE001
+                existing_file = None
+
+        # Always upload and save to ensure the file exists on this branch
+        if existing_file:
+            existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
+            await existing_file.save(allow_upsert=True)
+        else:
+            hostvar_file = await self.client.create(AvdHostvarFile, artifact=avd_artifact)
+            hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
+            await hostvar_file.save(allow_upsert=True)
+
+        if existing_checksum == new_checksum:
+            self.logger.info(f"Hostvars unchanged for {hostname}")
+        else:
+            self.logger.info(f"Hostvars updated for {hostname}")

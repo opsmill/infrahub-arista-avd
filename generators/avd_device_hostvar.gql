@@ -257,6 +257,20 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                             name {
                               value
                             }
+                            lag {
+                              node {
+                                __typename
+                                id
+                                name {
+                                  value
+                                }
+                                ... on InterfaceLag {
+                                  lacp_mode {
+                                    value
+                                  }
+                                }
+                              }
+                            }
                             device {
                               node {
                                 __typename
