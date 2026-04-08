@@ -132,11 +132,17 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             device_mapping[d["hostname"]] = d["id"]
             print(f"  {status} {d['hostname']}: {'has hostvar' if d['has_hostvar'] else 'no artifact'}")
 
+        # Check all devices have hostvars before proceeding
+        devices_without_hostvars = [d["hostname"] for d in devices if not d["has_hostvar"]]
+        if devices_without_hostvars:
+            self.logger.warning(
+                f"Aborting: {len(devices_without_hostvars)} devices missing hostvars: "
+                f"{', '.join(devices_without_hostvars[:5])}{'...' if len(devices_without_hostvars) > 5 else ''}"
+            )
+            return
+
         # Fetch hostvars from object storage
         hostvars = await self._fetch_hostvars_from_storage(devices)
-
-        print("\nHostvars:")
-        print(json.dumps(hostvars, indent=2))
 
         validation_errors: list[str] = []
         for hostname, inputs in hostvars.items():
