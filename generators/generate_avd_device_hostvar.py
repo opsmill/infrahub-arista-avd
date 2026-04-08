@@ -772,7 +772,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         new_content = json.dumps(hostvars, indent=2).encode()
         new_checksum = hashlib.sha256(new_content).hexdigest()
 
-        artifact_name = f"{hostname}_avd"
+        artifact_name = hostname
         avd_artifact = await self.client.create(
             AvdArtifact,
             name=artifact_name,
@@ -793,13 +793,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         except Exception:  # noqa: BLE001
             pass
 
+        hostvar_file = await self.client.create(
+            AvdHostvarFile,
+            artifact=avd_artifact,
+        )
+
         if existing_checksum == new_checksum:
-            self.logger.info(f"Hostvars unchanged for {hostname}, skipping upload")
+            # Content unchanged — save object for tracking but don't re-upload
+            await hostvar_file.save(allow_upsert=True)
+            self.logger.info(f"Hostvars unchanged for {hostname}")
         else:
-            hostvar_file = await self.client.create(
-                AvdHostvarFile,
-                artifact=avd_artifact,
-            )
             hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
             await hostvar_file.save(allow_upsert=True)
             self.logger.info(f"Hostvars updated for {hostname}")

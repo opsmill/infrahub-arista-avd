@@ -102,7 +102,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 continue
 
             try:
-                artifact = await self.client.get(AvdArtifact, name__value=f"{hostname}_avd")
+                artifact = await self.client.get(AvdArtifact, name__value=hostname)
                 if not artifact.hostvar_file.id:
                     self.logger.warning(f"No hostvar file for {hostname}, skipping")
                     continue
@@ -177,7 +177,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 new_content = json.dumps(structured_config_dict, indent=2).encode()
                 new_checksum = hashlib.sha256(new_content).hexdigest()
 
-                avd_artifact = await self.client.get(AvdArtifact, name__value=f"{hostname}_avd")
+                avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
 
                 # Check if existing structured config has the same content
                 existing_checksum = None
@@ -190,18 +190,20 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 except Exception:  # noqa: BLE001
                     pass
 
-                if existing_checksum == new_checksum:
-                    skipped_count += 1
-                    continue
-
                 sc_file = await self.client.create(
                     AvdStructuredConfigFile,
                     artifact=avd_artifact,
                     member_of_groups=["avd_structured_configs"],
                 )
-                sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
-                await sc_file.save(allow_upsert=True)
-                success_count += 1
+
+                if existing_checksum == new_checksum:
+                    # Content unchanged — save the object for tracking but don't re-upload
+                    await sc_file.save(allow_upsert=True)
+                    skipped_count += 1
+                else:
+                    sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
+                    await sc_file.save(allow_upsert=True)
+                    success_count += 1
             except (ValueError, KeyError, TypeError, AttributeError) as e:
                 self.logger.exception(f"Structured config failed for {hostname}")
                 failed_devices.append(f"{hostname}: {e}")
