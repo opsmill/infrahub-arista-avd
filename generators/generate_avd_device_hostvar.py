@@ -69,7 +69,6 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
             return False
 
     await set_fabric_avd_hostvars_ready(client, fabric_id, True)
-    await trigger_structured_config_generation(client)
     return True
 
 
@@ -799,10 +798,17 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 self.client.group_context.add_related_nodes(ids=[existing_artifact.hostvar_file.id])
             self.logger.info(f"Hostvars unchanged for {hostname}")
         else:
-            hostvar_file = await self.client.create(
-                AvdHostvarFile,
-                artifact=avd_artifact,
-            )
+            # Reuse existing file object if it exists, otherwise create new
+            hostvar_file = None
+            if existing_artifact and existing_artifact.hostvar_file.id:
+                hostvar_file = existing_artifact.hostvar_file.peer
+
+            if not hostvar_file:
+                hostvar_file = await self.client.create(
+                    AvdHostvarFile,
+                    artifact=avd_artifact,
+                )
+
             hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
             await hostvar_file.save(allow_upsert=True)
             self.logger.info(f"Hostvars updated for {hostname}")

@@ -196,11 +196,19 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                         self.client.group_context.add_related_nodes(ids=[avd_artifact.structured_config_file.id])
                     skipped_count += 1
                 else:
-                    sc_file = await self.client.create(
-                        AvdStructuredConfigFile,
-                        artifact=avd_artifact,
-                        member_of_groups=["avd_structured_configs"],
-                    )
+                    # Reuse existing file object if it exists, otherwise create new
+                    sc_file = None
+                    if avd_artifact.structured_config_file.id:
+                        await avd_artifact.structured_config_file.fetch()
+                        sc_file = avd_artifact.structured_config_file.peer
+
+                    if not sc_file:
+                        sc_file = await self.client.create(
+                            AvdStructuredConfigFile,
+                            artifact=avd_artifact,
+                            member_of_groups=["avd_structured_configs"],
+                        )
+
                     sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
                     await sc_file.save(allow_upsert=True)
                     success_count += 1
