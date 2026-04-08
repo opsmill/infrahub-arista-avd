@@ -13,14 +13,6 @@ generics:
         kind: Text
         description: "Name of the interface"
         order_weight: 1000
-    relationships:
-      - name: bundle_members
-        label: Bundle members
-        peer: InterfacePhysical
-        cardinality: many
-        kind: Attribute
-        description: "Physical Interfaces that are members of this aggregate"
-        order_weight: 1800
 
 nodes:
   - name: Lag
@@ -78,11 +70,11 @@ extensions:
   nodes:
     - kind: InterfacePhysical
       relationships:
-        - name: bundle
-          label: Interface Bundle
-          peer: GenericInterfaceBundle
+        - name: lag
+          label: LAG Interface
+          peer: InterfaceLag
           optional: true
           cardinality: one
           kind: Attribute
-          description: "Interface Bundle using this Physical Interface"
+          description: "LAG interface this physical interface is a member of"
           order_weight: 1800
