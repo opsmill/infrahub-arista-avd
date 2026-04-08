@@ -206,6 +206,11 @@ def extract_connected_endpoints(
             if endpoint.id != interface.id and hasattr(endpoint, "device"):
                 remote_device = endpoint.device.node
                 if remote_device:
+                    # Skip L2 leaf devices — AVD handles them via l2leaf type, not connected_endpoints
+                    remote_role = getattr(remote_device, "role", None)
+                    if remote_role and remote_role.value == "l2leaf":
+                        continue
+
                     server_name = remote_device.name.value
                     endpoint_port = endpoint.name.value
                     switch_port = interface.name.value
