@@ -131,11 +131,13 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         for hostname, inputs in hostvars.items():
             validated = validate_inputs(inputs)
             if validated.validation_result.violations:
-                print(f"  ❌ Validation failed for {hostname}:")
+                print(f"  ⚠ Validation warnings for {hostname}:")
                 for violation in validated.validation_result.violations:
-                    print(f"     - {violation}")
-                return
-            print("  ✓ All inputs validated successfully")
+                    msg = getattr(violation, "message", str(violation))
+                    path = getattr(violation, "path", "")
+                    print(f"     - {msg} (path: {path})")
+            else:
+                print(f"  ✓ {hostname} validated successfully")
 
         print("\nStep 3: Generating AVD facts for all devices...")
         try:

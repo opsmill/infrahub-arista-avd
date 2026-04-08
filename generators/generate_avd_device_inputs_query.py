@@ -141,6 +141,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode(BaseModel):
     name: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeName"]
     mlag_peer_pool: Optional[_OptionalNodeRef] = None
     mlag_l3_pool: Optional[_OptionalNodeRef] = None
+    loopback_ipv4_offset: Optional[_SimpleValue] = None
     parent: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParent"
 
 
@@ -182,6 +183,19 @@ class _SimpleValue(BaseModel):
     value: Optional[Any]
 
 
+class _GenericNode(BaseModel):
+    """Generic node that accepts any fields from GraphQL."""
+    model_config = {"extra": "allow"}
+
+
+class _GenericNodeEdge(BaseModel):
+    node: Optional[_GenericNode] = None
+
+
+class _EdgesListSimple(BaseModel):
+    edges: list[_GenericNodeEdge] = []
+
+
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabric(
     BaseModel
 ):
@@ -200,8 +214,16 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     underlay_routing_protocol: Optional[_SimpleValue] = None
     overlay_routing_protocol: Optional[_SimpleValue] = None
     p2p_uplinks_mtu: Optional[_SimpleValue] = None
+    spanning_tree_mode: Optional[_SimpleValue] = None
+    spanning_tree_priority: Optional[_SimpleValue] = None
+    bgp_evpn_overlay_password: Optional[_SimpleValue] = None
+    bgp_underlay_password: Optional[_SimpleValue] = None
+    bgp_mlag_password: Optional[_SimpleValue] = None
     uplink_pool: Optional[_OptionalNodeRef] = None
     vtep_pool: Optional[_OptionalNodeRef] = None
+    dns_servers: Optional["_EdgesListSimple"] = None
+    ntp_servers: Optional["_EdgesListSimple"] = None
+    local_users: Optional["_EdgesListSimple"] = None
     avd_evpn: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdEvpn"
 
 
