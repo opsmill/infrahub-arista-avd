@@ -198,23 +198,22 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     except Exception:  # noqa: BLE001
                         existing_file = None
 
-                if existing_checksum == new_checksum and existing_file:
-                    # Content unchanged — register with tracker so it's not deleted
-                    self.client.group_context.add_related_nodes(ids=[existing_file.id])
+                # Always upload and save to ensure the file exists on this branch
+                if existing_file:
+                    existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
+                    await existing_file.save(allow_upsert=True)
+                else:
+                    sc_file = await self.client.create(
+                        AvdStructuredConfigFile,
+                        artifact=avd_artifact,
+                        member_of_groups=["avd_structured_configs"],
+                    )
+                    sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
+                    await sc_file.save(allow_upsert=True)
+
+                if existing_checksum == new_checksum:
                     skipped_count += 1
                 else:
-                    # Upload new content to existing file or create new one
-                    if existing_file:
-                        existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
-                        await existing_file.save(allow_upsert=True)
-                    else:
-                        sc_file = await self.client.create(
-                            AvdStructuredConfigFile,
-                            artifact=avd_artifact,
-                            member_of_groups=["avd_structured_configs"],
-                        )
-                        sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
-                        await sc_file.save(allow_upsert=True)
                     success_count += 1
             except (ValueError, KeyError, TypeError, AttributeError) as e:
                 self.logger.exception(f"Structured config failed for {hostname}")

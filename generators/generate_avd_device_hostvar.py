@@ -798,17 +798,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             except Exception:  # noqa: BLE001
                 existing_file = None
 
-        if existing_checksum == new_checksum and existing_file:
-            # Content unchanged — register with tracker so it's not deleted
-            self.client.group_context.add_related_nodes(ids=[existing_file.id])
+        # Always upload and save to ensure the file exists on this branch
+        if existing_file:
+            existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
+            await existing_file.save(allow_upsert=True)
+        else:
+            hostvar_file = await self.client.create(AvdHostvarFile, artifact=avd_artifact)
+            hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
+            await hostvar_file.save(allow_upsert=True)
+
+        if existing_checksum == new_checksum:
             self.logger.info(f"Hostvars unchanged for {hostname}")
         else:
-            # Upload new content to existing file or create new one
-            if existing_file:
-                existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
-                await existing_file.save(allow_upsert=True)
-            else:
-                hostvar_file = await self.client.create(AvdHostvarFile, artifact=avd_artifact)
-                hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
-                await hostvar_file.save(allow_upsert=True)
             self.logger.info(f"Hostvars updated for {hostname}")
