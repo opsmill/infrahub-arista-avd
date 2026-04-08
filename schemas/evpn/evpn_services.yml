@@ -1,0 +1,170 @@
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+nodes:
+  - name: Tenant
+    namespace: Evpn
+    description: "EVPN network services tenant with VNI base mapping"
+    label: EVPN Tenant
+    icon: mdi:account-group
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: name__value
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        order_weight: 1000
+      - name: mac_vrf_vni_base
+        label: MAC VRF VNI Base
+        kind: Number
+        description: "Base VNI number for MAC VRFs in this tenant (VLAN VNI = base + VLAN ID)"
+        order_weight: 1100
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 1200
+    relationships:
+      - name: fabrics
+        label: "Fabrics"
+        peer: NetworkFabric
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: "Fabrics this tenant is deployed on"
+        order_weight: 900
+      - name: vrfs
+        label: "VRFs"
+        peer: IpamVRF
+        cardinality: many
+        kind: Generic
+        identifier: "tenant__vrfs"
+        order_weight: 1300
+      - name: l2vlans
+        label: "L2 VLANs"
+        peer: EvpnL2Vlan
+        cardinality: many
+        kind: Component
+        identifier: "tenant__l2vlans"
+        order_weight: 1400
+      - name: tags
+        peer: BuiltinTag
+        optional: true
+        cardinality: many
+        kind: Attribute
+        order_weight: 3000
+
+  - name: Svi
+    namespace: Evpn
+    description: "SVI (Switched Virtual Interface) within a VRF for EVPN anycast gateway"
+    label: EVPN SVI
+    icon: mdi:ip-network
+    human_friendly_id:
+      - vrf__name__value
+      - name__value
+    order_by:
+      - vrf__name__value
+      - svi_id__value
+    display_label: name__value
+    uniqueness_constraints:
+      - [vrf, svi_id__value]
+    attributes:
+      - name: name
+        kind: Text
+        description: "Name of the SVI"
+        order_weight: 1000
+      - name: svi_id
+        label: SVI ID
+        kind: Number
+        description: "VLAN/SVI ID number"
+        order_weight: 1050
+      - name: ip_address_virtual
+        label: Virtual IP Address
+        kind: IPHost
+        description: "Anycast gateway virtual IP address (e.g. 10.10.10.1/24)"
+        order_weight: 1100
+      - name: enabled
+        kind: Boolean
+        default_value: true
+        description: "Whether this SVI is enabled"
+        order_weight: 1200
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 1300
+    relationships:
+      - name: vrf
+        label: "VRF"
+        peer: IpamVRF
+        cardinality: one
+        kind: Parent
+        optional: false
+        identifier: "vrf__svis"
+        description: "VRF this SVI belongs to"
+        order_weight: 900
+      - name: vlan
+        label: "VLAN"
+        peer: IpamVLAN
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: "VLAN this SVI maps to"
+        order_weight: 950
+
+  - name: L2Vlan
+    namespace: Evpn
+    description: "Pure L2 VLAN within a tenant (no IP gateway), for EVPN with VNI mapping"
+    label: EVPN L2 VLAN
+    icon: mdi:lan-pending
+    human_friendly_id:
+      - tenant__name__value
+      - name__value
+    order_by:
+      - tenant__name__value
+      - vlan_id__value
+    display_label: name__value
+    uniqueness_constraints:
+      - [tenant, vlan_id__value]
+    attributes:
+      - name: name
+        kind: Text
+        description: "Name of the L2 VLAN"
+        order_weight: 1000
+      - name: vlan_id
+        label: VLAN ID
+        kind: Number
+        description: "VLAN ID number"
+        order_weight: 1050
+      - name: vni_override
+        label: VNI Override
+        kind: Number
+        optional: true
+        description: "Override the auto-calculated VNI (default: mac_vrf_vni_base + vlan_id)"
+        order_weight: 1100
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 1200
+    relationships:
+      - name: tenant
+        label: "Tenant"
+        peer: EvpnTenant
+        cardinality: one
+        kind: Parent
+        optional: false
+        identifier: "tenant__l2vlans"
+        description: "Tenant this L2 VLAN belongs to"
+        order_weight: 900
+      - name: vlan
+        label: "VLAN"
+        peer: IpamVLAN
+        cardinality: one
+        kind: Attribute
+        optional: true
+        description: "Underlying VLAN object"
+        order_weight: 950

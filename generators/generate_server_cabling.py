@@ -38,11 +38,6 @@ class ServerCablingGenerator(InfrahubGenerator):
             self.logger.warning("Server %s has no interfaces", server_hostname)
             return
 
-        # Skip if server is already fully cabled
-        if await self._is_server_cabled(server_interfaces):
-            self.logger.info("Server %s is already cabled, skipping", server_hostname)
-            return
-
         # Find leaf switches in the same rack
         leaf_switches = await self.client.filters(kind=DcimDevice, rack__ids=[rack_id], role__value="leaf")
         if not leaf_switches:
@@ -53,12 +48,19 @@ class ServerCablingGenerator(InfrahubGenerator):
         server_iface_objects = await self.client.filters(
             kind=DcimInterface, device__name__value=server_hostname
         )
+
+        # Populate the SDK store with the server device using its actual typename
+        # (e.g. ComputePhysicalServer, not DcimDevice) so interface.device.peer resolves
+        if server_iface_objects:
+            device_rel = server_iface_objects[0].device
+            await self.client.get(kind=device_rel.typename, id=device_rel.id)
+
         server_interface_map = create_sorted_device_interface_map(server_iface_objects)
 
         leaf_interfaces = await self.client.filters(
             kind=InterfacePhysical,
             device__ids=[leaf.id for leaf in leaf_switches],
-            role__values=["server", "storage"],
+            role__value="server",
         )
         leaf_interface_map = create_sorted_device_interface_map(leaf_interfaces)
 
@@ -184,7 +186,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             leaf_interface = await self.client.get(
                 InterfacePhysical,
                 id=leaf_iface.id,
-                include=["tagged_vlan", "untagged_vlan"],
+                include=["tagged_vlan", "untagged_vlan", "connector"],
             )
 
             if server_iface["tagged_vlan_ids"]:

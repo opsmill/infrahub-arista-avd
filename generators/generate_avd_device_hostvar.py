@@ -242,6 +242,208 @@ def extract_connected_endpoints(
 
 
 class GenerateAVDDeviceHostvar(InfrahubGenerator):
+    async def _build_tenants_hostvars(self, fabric_id: str) -> list[dict[str, Any]]:
+        """Build AVD-compatible tenants structure from EVPN data.
+
+        Queries EvpnTenants assigned to the given fabric and builds
+        the tenants/VRFs/SVIs/L2VLANs structure AVD expects.
+        """
+        try:
+            tenants = await self.client.filters(kind="EvpnTenant", fabrics__ids=[fabric_id])
+        except (AttributeError, KeyError):
+            return []
+
+        if not tenants:
+            return []
+
+        tenants_list: list[dict[str, Any]] = []
+        for tenant in tenants:
+            tenant_data: dict[str, Any] = {
+                "name": tenant.name.value,
+                "mac_vrf_vni_base": tenant.mac_vrf_vni_base.value,
+            }
+
+            # Fetch VRFs for this tenant
+            await tenant.vrfs.fetch()
+            vrfs_list: list[dict[str, Any]] = []
+            for vrf_peer in tenant.vrfs.peers:
+                vrf = vrf_peer.peer
+                vrf_data: dict[str, Any] = {"name": vrf.name.value}
+
+                vrf_vni = getattr(vrf, "vrf_vni", None)
+                if vrf_vni and vrf_vni.value is not None:
+                    vrf_data["vrf_vni"] = vrf_vni.value
+
+                vtep_diag_lo = getattr(vrf, "vtep_diagnostic_loopback", None)
+                vtep_diag_ip = getattr(vrf, "vtep_diagnostic_loopback_ip_range", None)
+                if vtep_diag_lo and vtep_diag_lo.value is not None:
+                    vrf_data["vtep_diagnostic"] = {"loopback": vtep_diag_lo.value}
+                    if vtep_diag_ip and vtep_diag_ip.value:
+                        vrf_data["vtep_diagnostic"]["loopback_ip_range"] = str(vtep_diag_ip.value)
+
+                # Fetch SVIs for this VRF
+                await vrf.svis.fetch()
+                svis_list: list[dict[str, Any]] = []
+                for svi_peer in vrf.svis.peers:
+                    svi = svi_peer.peer
+                    svi_data: dict[str, Any] = {
+                        "id": svi.svi_id.value,
+                        "name": svi.name.value,
+                        "enabled": svi.enabled.value,
+                    }
+                    if svi.ip_address_virtual and svi.ip_address_virtual.value:
+                        svi_data["ip_address_virtual"] = str(svi.ip_address_virtual.value)
+                    svis_list.append(svi_data)
+
+                if svis_list:
+                    vrf_data["svis"] = svis_list
+                vrfs_list.append(vrf_data)
+
+            if vrfs_list:
+                tenant_data["vrfs"] = vrfs_list
+
+            # Fetch L2 VLANs for this tenant
+            await tenant.l2vlans.fetch()
+            l2vlans_list: list[dict[str, Any]] = []
+            for l2v_peer in tenant.l2vlans.peers:
+                l2vlan = l2v_peer.peer
+                l2v_data: dict[str, Any] = {"id": l2vlan.vlan_id.value}
+                vni_override = getattr(l2vlan, "vni_override", None)
+                if vni_override and vni_override.value is not None:
+                    l2v_data["vni"] = vni_override.value
+                l2vlans_list.append(l2v_data)
+
+            if l2vlans_list:
+                tenant_data["l2vlans"] = l2vlans_list
+
+            tenants_list.append(tenant_data)
+
+        return tenants_list
+
+    async def _extract_pool_name(self, pool_ref: object, pool_kind: str) -> str | None:
+        """Extract pool name from a relationship reference."""
+        if pool_ref and pool_ref.node:
+            pool = await self.client.get(kind=pool_kind, id=pool_ref.node.id)
+            return pool.name.value if hasattr(pool, "name") else None
+        return None
+
+    @staticmethod
+    def _get_attr_value(obj: object, attr_name: str) -> str | int | bool | None:
+        """Safely get an attribute value from a GraphQL node."""
+        attr = getattr(obj, attr_name, None)
+        return attr.value if attr else None
+
+    async def _extract_l3ls_pools(self, fabric: object, pod: object) -> dict[str, str | None]:
+        """Extract configurable IP pools from fabric/pod with hardcoded fallbacks."""
+        uplink = await self._extract_pool_name(getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool")
+        vtep = await self._extract_pool_name(getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool")
+        mlag_peer = await self._extract_pool_name(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
+        mlag_l3 = await self._extract_pool_name(getattr(pod, "mlag_l3_pool", None), "CoreIPAddressPool")
+
+        return {
+            "uplink_ipv4_pool": uplink or "10.250.0.0/16",
+            "vtep_loopback_ipv4_pool": vtep or "10.251.0.0/24",
+            "mlag_peer_ipv4_pool": mlag_peer,
+            "mlag_peer_l3_ipv4_pool": mlag_l3,
+        }
+
+    @staticmethod
+    def _extract_mlag_info(device: object) -> dict[str, str | None]:
+        """Extract MLAG domain info for a device."""
+        device_mlag_domain = getattr(device, "mlag_domain", None)
+        if not device_mlag_domain or not device_mlag_domain.node:
+            return {"domain_id": None, "virtual_router_mac": None}
+
+        mlag_domain = device_mlag_domain.node
+        domain_id = mlag_domain.domain_id.value if mlag_domain.domain_id else None
+        vrmac = getattr(mlag_domain, "virtual_router_mac", None)
+
+        return {
+            "domain_id": domain_id,
+            "virtual_router_mac": vrmac.value if vrmac else None,
+        }
+
+    @staticmethod
+    def _build_hostvars(
+        *,
+        hostname: str,
+        role: str,
+        bgp_asn: int | None,
+        node_id: int | None,
+        loopback_ip: str | None,
+        mgmt_ip: str | None,
+        fabric_name: str,
+        mgmt_gateway: str | None,
+        virtual_router_mac: str | None,
+        underlay_routing_protocol: str | None,
+        overlay_routing_protocol: str | None,
+        p2p_uplinks_mtu: int | None,
+        pools: dict[str, str | None],
+        uplinks: UplinkData,
+        mlag_info: dict[str, str | None],
+        tenants_data: list[dict[str, Any]],
+        connected_endpoints: list[ServerEndpoint],
+    ) -> dict[str, Any]:
+        """Build the complete pyAVD hostvars structure."""
+        avd_type = ROLE_TO_AVD_TYPE.get(role, role)
+        node_type_key = "super_spine" if role == "super_spine" else avd_type
+
+        # Build node config
+        node_config: dict[str, Any] = {"name": hostname}
+        if node_id is not None:
+            node_config["id"] = node_id
+        if bgp_asn is not None:
+            node_config["bgp_as"] = str(bgp_asn)
+        if loopback_ip:
+            node_config["loopback_ipv4_address"] = loopback_ip
+            node_config["loopback_ipv4_pool"] = "10.255.0.0/24"
+        if mgmt_ip:
+            node_config["mgmt_ip"] = mgmt_ip
+
+        node_config["uplink_ipv4_pool"] = pools["uplink_ipv4_pool"]
+        node_config["vtep_loopback_ipv4_pool"] = pools["vtep_loopback_ipv4_pool"]
+
+        if pools["mlag_peer_ipv4_pool"]:
+            node_config["mlag_peer_ipv4_pool"] = pools["mlag_peer_ipv4_pool"]
+        if pools["mlag_peer_l3_ipv4_pool"]:
+            node_config["mlag_peer_l3_ipv4_pool"] = pools["mlag_peer_l3_ipv4_pool"]
+
+        if uplinks["uplink_interfaces"]:
+            node_config["uplink_interfaces"] = uplinks["uplink_interfaces"]
+            node_config["uplink_switches"] = uplinks["uplink_switches"]
+            node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
+
+        # Build hostvars
+        hostvars: dict[str, Any] = {"type": avd_type, "fabric_name": fabric_name}
+
+        if mgmt_gateway:
+            hostvars["mgmt_gateway"] = mgmt_gateway
+        if virtual_router_mac:
+            hostvars["virtual_router_mac_address"] = virtual_router_mac
+        if underlay_routing_protocol:
+            hostvars["underlay_routing_protocol"] = underlay_routing_protocol
+        if overlay_routing_protocol:
+            hostvars["overlay_routing_protocol"] = overlay_routing_protocol
+        if p2p_uplinks_mtu:
+            hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
+
+        hostvars[node_type_key] = {"nodes": [node_config]}
+
+        # Add MLAG node_group for leaf devices
+        if mlag_info["domain_id"] and role == "leaf":
+            effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
+            node_group: dict[str, Any] = {"group": mlag_info["domain_id"]}
+            if effective_vrmac:
+                node_group["virtual_router_mac_address"] = effective_vrmac
+            hostvars[node_type_key]["node_groups"] = [node_group]
+
+        if tenants_data:
+            hostvars["tenants"] = tenants_data
+        if connected_endpoints:
+            hostvars["servers"] = connected_endpoints
+
+        return hostvars
+
     async def generate(self, data: dict) -> None:
         data: GenerateAvdDeviceInputsQuery = GenerateAvdDeviceInputsQuery(**data)
         device = data.dcim_device.edges[0].node
@@ -283,76 +485,53 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract uplinks
         iface_edges = device.interfaces.edges or []
-        uplinks = extract_uplinks_from_dict(
-            iface_edges,
-            uplink_role,
-            device_id,
-        )
+        uplinks = extract_uplinks_from_dict(iface_edges, uplink_role, device_id)
 
         # Extract connected endpoints (servers)
-        connected_endpoints = extract_connected_endpoints(
-            iface_edges,
-            hostname,
+        connected_endpoints = extract_connected_endpoints(iface_edges, hostname)
+
+        # Extract fabric L3LS settings (with backwards-compatible fallbacks)
+        virtual_router_mac = self._get_attr_value(fabric, "virtual_router_mac")
+        underlay_routing_protocol = self._get_attr_value(fabric, "underlay_routing_protocol")
+        overlay_routing_protocol = self._get_attr_value(fabric, "overlay_routing_protocol")
+        p2p_uplinks_mtu = self._get_attr_value(fabric, "p2p_uplinks_mtu")
+
+        # Extract configurable IP pools
+        pools = await self._extract_l3ls_pools(fabric, pod)
+
+        # Extract MLAG domain info for leaf devices
+        mlag_info = self._extract_mlag_info(device)
+
+        # Fetch EVPN tenants for this fabric
+        tenants_data = await self._build_tenants_hostvars(fabric.id)
+
+        hostvars = self._build_hostvars(
+            hostname=hostname,
+            role=role,
+            bgp_asn=bgp_asn,
+            node_id=node_id,
+            loopback_ip=loopback_ip,
+            mgmt_ip=mgmt_ip,
+            fabric_name=fabric_name,
+            mgmt_gateway=mgmt_gateway,
+            virtual_router_mac=virtual_router_mac,
+            underlay_routing_protocol=underlay_routing_protocol,
+            overlay_routing_protocol=overlay_routing_protocol,
+            p2p_uplinks_mtu=p2p_uplinks_mtu,
+            pools=pools,
+            uplinks=uplinks,
+            mlag_info=mlag_info,
+            tenants_data=tenants_data,
+            connected_endpoints=connected_endpoints,
         )
 
-        # Map role to AVD type (node_type_key)
-        avd_type = ROLE_TO_AVD_TYPE.get(role, role)
-        # AVD uses different keys: super_spine (underscore) for the key, but "super-spine" for type value
-        node_type_key = "super_spine" if role == "super_spine" else avd_type
-
-        # Build node config (goes in node_type_key.nodes array)
-        node_config: dict[str, Any] = {"name": hostname}
-
-        if node_id is not None:
-            node_config["id"] = node_id
-        if bgp_asn is not None:
-            node_config["bgp_as"] = str(bgp_asn)
-        if loopback_ip:
-            node_config["loopback_ipv4_address"] = loopback_ip
-            node_config["loopback_ipv4_pool"] = "10.255.0.0/24"
-        if mgmt_ip:
-            node_config["mgmt_ip"] = mgmt_ip
-
-        node_config["uplink_ipv4_pool"] = "10.250.0.0/16"
-        node_config["vtep_loopback_ipv4_pool"] = "10.251.0.0/24"  # Move to auto generated when creating devices
-
-        # Add uplink configuration for spine and leaf devices
-        if uplinks["uplink_interfaces"]:
-            node_config["uplink_interfaces"] = uplinks["uplink_interfaces"]
-            node_config["uplink_switches"] = uplinks["uplink_switches"]
-            node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
-
-        # Build complete pyAVD hostvars structure
-        hostvars: dict[str, Any] = {
-            "type": avd_type,
-            "fabric_name": fabric_name,
-        }
-
-        if mgmt_gateway:
-            hostvars["mgmt_gateway"] = mgmt_gateway
-
-        # Add node type configuration
-        hostvars[node_type_key] = {
-            "nodes": [node_config],
-        }
-
-        # Add connected endpoints (servers) if any
-        if connected_endpoints:
-            hostvars["servers"] = connected_endpoints
-
         # Print for debugging
-        print(f"\n=== AVD Device Hostvar for {hostname} ===")
-        print(f"Device: {hostname}")
-        print(f"Role: {role} -> AVD type: {avd_type}")
-        print(f"Node type key: {node_type_key}")
-
-        print("\nNode config:")
-        for key, value in node_config.items():
-            print(f"  {key}: {value}")
-
-        print("\nFull hostvars structure:")
         import json
 
+        print(f"\n=== AVD Device Hostvar for {hostname} ===")
+        print(f"Device: {hostname}")
+        print(f"Role: {role}")
+        print("\nFull hostvars structure:")
         print(json.dumps(hostvars, indent=2))
 
         avd_artifact = await self.client.create(

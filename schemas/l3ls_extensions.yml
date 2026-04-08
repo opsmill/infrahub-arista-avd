@@ -1,0 +1,157 @@
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+# Extensions for L3LS topology support: adds AVD-specific attributes to
+# fabric, pod, MLAG domain, VRF, and device nodes.
+version: "1.0"
+
+extensions:
+  nodes:
+    # --- NetworkFabric: L3LS fabric-wide settings ---
+    - kind: NetworkFabric
+      attributes:
+        - name: virtual_router_mac
+          label: Virtual Router MAC
+          kind: Text
+          optional: true
+          description: "Virtual router MAC address for VXLAN anycast gateway (e.g. 00:1c:73:00:00:99)"
+          order_weight: 10000
+        - name: underlay_routing_protocol
+          label: Underlay Routing Protocol
+          kind: Dropdown
+          optional: true
+          default_value: ebgp
+          choices:
+            - name: ebgp
+              label: eBGP
+              description: "External BGP for underlay routing"
+              color: "#A9CCE3"
+            - name: ospf
+              label: OSPF
+              description: "OSPF for underlay routing"
+              color: "#A9DFBF"
+          order_weight: 10100
+        - name: overlay_routing_protocol
+          label: Overlay Routing Protocol
+          kind: Dropdown
+          optional: true
+          default_value: ebgp
+          choices:
+            - name: ebgp
+              label: eBGP
+              description: "External BGP for overlay EVPN"
+              color: "#A9CCE3"
+            - name: ibgp
+              label: iBGP
+              description: "Internal BGP for overlay EVPN"
+              color: "#D2B4DE"
+          order_weight: 10200
+        - name: p2p_uplinks_mtu
+          label: P2P Uplinks MTU
+          kind: Number
+          optional: true
+          default_value: 9214
+          description: "MTU for point-to-point uplink interfaces"
+          order_weight: 10300
+      relationships:
+        - name: uplink_pool
+          label: Uplink IP Pool
+          peer: CoreIPPrefixPool
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "fabric__uplink_pool"
+          description: "IP prefix pool for P2P uplink addressing"
+          order_weight: 10400
+        - name: vtep_pool
+          label: VTEP Loopback Pool
+          peer: CoreIPPrefixPool
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "fabric__vtep_pool"
+          description: "IP prefix pool for VTEP loopback addresses"
+          order_weight: 10500
+
+    # --- NetworkPod: MLAG IP pool relationships ---
+    - kind: NetworkPod
+      relationships:
+        - name: mlag_peer_pool
+          label: MLAG Peer Pool
+          peer: CoreIPAddressPool
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "pod__mlag_peer_pool"
+          description: "IP address pool for MLAG peer-link addressing"
+          order_weight: 8000
+        - name: mlag_l3_pool
+          label: MLAG L3 Peering Pool
+          peer: CoreIPAddressPool
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "pod__mlag_l3_pool"
+          description: "IP address pool for MLAG L3 peering (Vlan4093)"
+          order_weight: 8100
+
+    # --- MlagDomain: AVD-specific extensions ---
+    - kind: MlagDomain
+      attributes:
+        - name: virtual_router_mac
+          label: Virtual Router MAC
+          kind: Text
+          optional: true
+          description: "Override fabric-level virtual router MAC for this MLAG pair"
+          order_weight: 1700
+      relationships:
+        - name: pod
+          label: Pod
+          peer: NetworkPod
+          kind: Attribute
+          cardinality: one
+          optional: true
+          description: "Pod this MLAG domain belongs to"
+          order_weight: 1000
+
+    # --- IpamVRF: EVPN-specific extensions ---
+    - kind: IpamVRF
+      attributes:
+        - name: vrf_vni
+          label: VRF VNI
+          kind: Number
+          optional: true
+          description: "VNI number for this VRF in the EVPN fabric"
+          order_weight: 1100
+        - name: vtep_diagnostic_loopback
+          label: VTEP Diagnostic Loopback
+          kind: Number
+          optional: true
+          description: "Loopback interface number for VTEP diagnostics"
+          order_weight: 1300
+        - name: vtep_diagnostic_loopback_ip_range
+          label: VTEP Diagnostic Loopback IP Range
+          kind: IPNetwork
+          optional: true
+          description: "IP range for VTEP diagnostic loopback allocation"
+          order_weight: 1400
+      relationships:
+        - name: tenant
+          label: Tenant
+          peer: EvpnTenant
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "tenant__vrfs"
+          description: "EVPN tenant this VRF belongs to"
+          order_weight: 900
+        - name: svis
+          label: SVIs
+          peer: EvpnSvi
+          kind: Component
+          cardinality: many
+          optional: true
+          identifier: "vrf__svis"
+          description: "SVIs within this VRF"
+          order_weight: 1500
+
+    # Note: l2leaf role is added to DcimDevice in dcim_extensions.yml

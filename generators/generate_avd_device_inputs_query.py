@@ -25,6 +25,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNode(BaseModel):
     node_id: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeNodeId"]
     loopback_ip: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIp"
     mgmt_ip: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIp"
+    mlag_domain: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain"] = None
     pod: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePod"
     interfaces: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces"
 
@@ -75,13 +76,71 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIpNodeAddress(BaseModel
     value: Optional[str]
 
 
+# --- MLAG Domain models ---
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain(BaseModel):
+    node: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNode"] = None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNode(BaseModel):
+    id: str
+    domain_id: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeDomainId"] = None
+    virtual_router_mac: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeVirtualRouterMac"] = None
+    peers: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeers"] = None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeDomainId(BaseModel):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeVirtualRouterMac(BaseModel):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeers(BaseModel):
+    edges: list["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdges"]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdges(BaseModel):
+    node: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNode"] = None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNode(BaseModel):
+    id: str
+    name: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNodeName"] = None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNodeName(BaseModel):
+    value: Optional[str]
+
+
+# --- Pod models ---
+
+
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePod(BaseModel):
     node: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode"]
+
+
+class _OptionalNodeRef(BaseModel):
+    """Reusable model for optional { node { id, name { value } } } refs."""
+    node: Optional["_OptionalNodeRefNode"] = None
+
+
+class _OptionalNodeRefNode(BaseModel):
+    id: str
+    name: Optional["_OptionalNodeRefNodeName"] = None
+
+
+class _OptionalNodeRefNodeName(BaseModel):
+    value: Optional[str]
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode(BaseModel):
     id: str
     name: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeName"]
+    mlag_peer_pool: Optional[_OptionalNodeRef] = None
+    mlag_l3_pool: Optional[_OptionalNodeRef] = None
     parent: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParent"
 
 
@@ -119,6 +178,10 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkBui
     value: Optional[str]
 
 
+class _SimpleValue(BaseModel):
+    value: Optional[Any]
+
+
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabric(
     BaseModel
 ):
@@ -133,6 +196,12 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     mgmt_routes: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricMgmtRoutes"
     ]
+    virtual_router_mac: Optional[_SimpleValue] = None
+    underlay_routing_protocol: Optional[_SimpleValue] = None
+    overlay_routing_protocol: Optional[_SimpleValue] = None
+    p2p_uplinks_mtu: Optional[_SimpleValue] = None
+    uplink_pool: Optional[_OptionalNodeRef] = None
+    vtep_pool: Optional[_OptionalNodeRef] = None
     avd_evpn: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdEvpn"
 
 
@@ -206,7 +275,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges(BaseModel):
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeDcimInterface(
     BaseModel
 ):
-    typename__: Literal["DcimInterface", "InterfaceVirtual"] = Field(alias="__typename")
+    typename__: Literal["DcimInterface", "InterfaceVirtual", "InterfaceLag", "MlagInterface"] = Field(alias="__typename")
     id: Optional[str]
 
 
@@ -516,6 +585,13 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIp.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIp.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIpNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeers.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNode.model_rebuild()
+_OptionalNodeRef.model_rebuild()
+_OptionalNodeRefNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePod.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParent.model_rebuild()

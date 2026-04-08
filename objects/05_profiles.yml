@@ -18,3 +18,6 @@ spec:
     - profile_name: "profile-interface-super-spine"
       role: "super_spine"
       mtu: 9200
+    - profile_name: "profile-interface-mlag-peer"
+      role: "mlag_peer"
+      mtu: 9200

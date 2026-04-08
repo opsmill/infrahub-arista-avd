@@ -691,6 +691,5 @@ class TestAvdCascadeTrigger:
 
         await gen._trigger_avd_cascade("rack-1", "server-1")  # noqa: SLF001
 
-        # Verify hostvars set to False and hostvar generation triggered
+        # Verify hostvars set to False
         mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)
-        mock_trigger.assert_awaited_once_with(gen.client)

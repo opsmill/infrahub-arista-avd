@@ -73,12 +73,14 @@ def build_server_cabling_plan(
     build_pod_cabling_plan and build_rack_cabling_plan.
     """
     dst_devices = list(dst_interface_map.keys())
+    dst_device_count = len(dst_devices)
     cabling_plan: list[tuple[DcimInterface, DcimInterface]] = []
 
     for src_interfaces in src_interface_map.values():
         for i, src_interface in enumerate(src_interfaces):
-            dst_device = dst_devices[i % len(dst_devices)]
-            dst_interface = dst_interface_map[dst_device][server_index]
+            dst_device = dst_devices[i % dst_device_count]
+            dst_offset = server_index + (i // dst_device_count)
+            dst_interface = dst_interface_map[dst_device][dst_offset]
             cabling_plan.append((src_interface, dst_interface))
 
     return cabling_plan

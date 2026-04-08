@@ -50,6 +50,15 @@ class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile
     BaseModel
 ):
     id: str
+    checksum: Optional[
+        "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNodeChecksum"
+    ]
+
+
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNodeChecksum(
+    BaseModel
+):
+    value: Optional[str]
 
 
 AvdDeviceConfigQuery.model_rebuild()
@@ -59,3 +68,4 @@ AvdDeviceConfigQueryDcimDeviceEdgesNode.model_rebuild()
 AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
 AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()
 AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile.model_rebuild()
+AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode.model_rebuild()

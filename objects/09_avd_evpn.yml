@@ -1,0 +1,10 @@
+---
+# AVD EVPN settings for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: AvdEvpn
+  data:
+    - name: "Fabric-A-EVPN"
+      ebgp_multihop: 3
+      overlay_bgp_rtc: false

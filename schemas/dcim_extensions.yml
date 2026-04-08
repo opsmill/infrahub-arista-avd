@@ -31,6 +31,10 @@ extensions:
               label: Spine
             - name: leaf
               label: Leaf
+            - name: l2leaf
+              label: L2 Leaf
+              description: "L2 Leaf Switch (access layer, no EVPN)"
+              color: "#f0e6fa"
         - name: bgp_asn
           label: BGP ASN
           kind: Number
@@ -97,6 +101,10 @@ extensions:
               label: Server
             - name: storage
               label: Storage
+            - name: mlag_peer
+              label: MLAG Peer
+              description: "Interface used for MLAG peer-link"
+              color: "#d4a9e6"
           order_weight: 3000
         - name: mtu
           label: MTU
