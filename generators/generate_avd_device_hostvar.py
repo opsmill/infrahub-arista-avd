@@ -56,11 +56,16 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
         if not device.avd_artifact.id:
             return False
 
-        await device.avd_artifact.fetch()
-        artifact = device.avd_artifact.peer
+        try:
+            await device.avd_artifact.fetch()
+            artifact = device.avd_artifact.peer
 
-        await artifact.hostvar_file.fetch()
-        if not artifact.hostvar_file.id:
+            if not artifact.hostvar_file.id:
+                return False
+            await artifact.hostvar_file.fetch()
+            if not artifact.hostvar_file.peer:
+                return False
+        except Exception:  # noqa: BLE001
             return False
 
     await set_fabric_avd_hostvars_ready(client, fabric_id, True)
@@ -780,11 +785,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         existing_checksum = None
         try:
             existing_artifact = await self.client.get(AvdArtifact, name__value=artifact_name)
-            await existing_artifact.hostvar_file.fetch()
-            if existing_artifact.hostvar_file.peer:
-                existing_content = await existing_artifact.hostvar_file.peer.download_file()
-                existing_checksum = hashlib.sha256(existing_content).hexdigest()
-        except (AttributeError, KeyError):
+            if existing_artifact.hostvar_file.id:
+                await existing_artifact.hostvar_file.fetch()
+                if existing_artifact.hostvar_file.peer:
+                    existing_content = await existing_artifact.hostvar_file.peer.download_file()
+                    existing_checksum = hashlib.sha256(existing_content).hexdigest()
+        except Exception:  # noqa: BLE001
             pass
 
         if existing_checksum == new_checksum:

@@ -50,9 +50,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 hostname = device.name.value
                 has_hostvar = False
 
-                avd_artifact = device.avd_artifact.node
-                if avd_artifact and avd_artifact.hostvar_file.node:
-                    has_hostvar = True
+                avd_artifact = getattr(device, "avd_artifact", None)
+                if avd_artifact and avd_artifact.node:
+                    hostvar_file = getattr(avd_artifact.node, "hostvar_file", None)
+                    if hostvar_file and hostvar_file.node:
+                        has_hostvar = True
 
                 devices[hostname] = {
                     "id": device.id,
@@ -68,9 +70,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     hostname = device.name.value
                     has_hostvar = False
 
-                    avd_artifact = device.avd_artifact.node
-                    if avd_artifact and avd_artifact.hostvar_file.node:
-                        has_hostvar = True
+                    avd_artifact = getattr(device, "avd_artifact", None)
+                    if avd_artifact and avd_artifact.node:
+                        hostvar_file = getattr(avd_artifact.node, "hostvar_file", None)
+                        if hostvar_file and hostvar_file.node:
+                            has_hostvar = True
 
                     devices[hostname] = {
                         "id": device.id,
@@ -99,11 +103,17 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
             try:
                 artifact = await self.client.get(AvdArtifact, name__value=f"{hostname}_avd")
+                if not artifact.hostvar_file.id:
+                    self.logger.warning(f"No hostvar file for {hostname}, skipping")
+                    continue
                 await artifact.hostvar_file.fetch()
                 hostvar_file = artifact.hostvar_file.peer
+                if not hostvar_file:
+                    self.logger.warning(f"Hostvar file peer not found for {hostname}, skipping")
+                    continue
                 content = await hostvar_file.download_file()
                 result[hostname] = json.loads(content)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.warning(f"Failed to fetch hostvars for {hostname}: {e}")
 
         return result
@@ -171,13 +181,14 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
                 # Check if existing structured config has the same content
                 existing_checksum = None
-                await avd_artifact.structured_config_file.fetch()
-                if avd_artifact.structured_config_file.peer:
-                    try:
-                        existing_content = await avd_artifact.structured_config_file.peer.download_file()
-                        existing_checksum = hashlib.sha256(existing_content).hexdigest()
-                    except (AttributeError, KeyError):
-                        pass
+                try:
+                    if avd_artifact.structured_config_file.id:
+                        await avd_artifact.structured_config_file.fetch()
+                        if avd_artifact.structured_config_file.peer:
+                            existing_content = await avd_artifact.structured_config_file.peer.download_file()
+                            existing_checksum = hashlib.sha256(existing_content).hexdigest()
+                except Exception:  # noqa: BLE001
+                    pass
 
                 if existing_checksum == new_checksum:
                     skipped_count += 1
