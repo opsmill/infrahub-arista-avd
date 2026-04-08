@@ -88,6 +88,20 @@ spec:
           - template_name: "LeafSwitchStorageEthernet[11-16]"
             name: "Ethernet[11-16]"
             profiles: ["profile-interface-spine"]
+    - template_name: "l2leaf-switch"
+      role: "l2leaf"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "L2LeafSwitchEthernet[1-22]"
+            name: "Ethernet[1-22]"
+            profiles: ["profile-interface-server"]
+          - template_name: "L2LeafSwitchEthernet[23-24]"
+            name: "Ethernet[23-24]"
+            profiles: ["profile-interface-l3leaf-uplink"]
+
     - template_name: "dell-z9864f-on-spine-switch"
       device_type: ["Dell", "PowerSwitch Z9864F-ON"]
       role: "spine"

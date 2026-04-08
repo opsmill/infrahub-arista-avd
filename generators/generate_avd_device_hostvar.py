@@ -617,6 +617,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             uplink_role = "super_spine"
         elif role == "leaf":
             uplink_role = "spine"
+        elif role == "l2leaf":
+            uplink_role = "leaf"
 
         # Extract uplinks
         iface_edges = device.interfaces.edges or []

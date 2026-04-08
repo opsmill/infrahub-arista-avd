@@ -24,6 +24,15 @@ query RackGeneratorQuery($name: String!) {
 						id
 					}
 				}
+				amount_of_l2leafs {
+					value
+				}
+				l2leaf_switch_template {
+					node {
+						__typename
+						id
+					}
+				}
 				parent {
 					node {
 						__typename

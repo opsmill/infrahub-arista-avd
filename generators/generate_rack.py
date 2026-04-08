@@ -61,6 +61,16 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.rack_leaf_switch_template: str = data.location_rack.edges[0].node.leaf_switch_template.node.id
         self.rack_amount_of_leafs: int = data.location_rack.edges[0].node.amount_of_leafs.value
         self.leaf_switches = []
+        self.l2leaf_switches: list[DcimDevice] = []
+
+        # L2 leaf fields (optional - may not exist on older schemas)
+        rack_node = data.location_rack.edges[0].node
+        l2leaf_count_attr = getattr(rack_node, "amount_of_l2leafs", None)
+        self.rack_amount_of_l2leafs: int = l2leaf_count_attr.value if l2leaf_count_attr and l2leaf_count_attr.value else 0
+        l2leaf_template_attr = getattr(rack_node, "l2leaf_switch_template", None)
+        self.rack_l2leaf_switch_template: str | None = (
+            l2leaf_template_attr.node.id if l2leaf_template_attr and l2leaf_template_attr.node else None
+        )
 
         self.pod_id: str = data.location_rack.edges[0].node.pod.node.id
         self.pod_index: int = data.location_rack.edges[0].node.pod.node.index.value
@@ -122,6 +132,10 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         await self.create_mlag_pairs()
 
         await self.connect_leafs_to_spine()
+
+        await self.create_l2leaf_switches()
+
+        await self.connect_l2leafs_to_leafs()
 
         # Mark this rack as generation complete
         rack = await self.client.get(kind=LocationRack, id=self.rack_id)
@@ -259,6 +273,66 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             rack_index=self.rack_index,
             src_interface_map=leaf_interface_map,
             dst_interface_map=spine_interface_map,
+        )
+
+        await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)
+
+    async def create_l2leaf_switches(self) -> None:
+        """Create L2 leaf switches in this rack (access-only, no EVPN)."""
+        if self.rack_amount_of_l2leafs == 0 or not self.rack_l2leaf_switch_template:
+            return
+
+        self.logger.info(f"Creating {self.rack_amount_of_l2leafs} L2 leaf switches in {self.rack_name}")
+
+        for index in range(1, self.rack_amount_of_l2leafs + 1):
+            device_kwargs: dict = {
+                "name": f"l2leaf-{self.pod_name}-{self.rack_index}-{index}",
+                "status": "provisioning",
+                "object_template": {"id": self.rack_l2leaf_switch_template},
+                "pod": {"id": self.pod_id},
+                "rack": {"id": self.rack_id},
+                "index": index,
+                "role": "l2leaf",
+                "member_of_groups": ["avd_devices"],
+            }
+
+            if self.node_id_pool:
+                device_kwargs["node_id"] = self.node_id_pool
+            if self.mgmt_pool:
+                device_kwargs["mgmt_ip"] = self.mgmt_pool
+
+            l2leaf = await self.client.create(DcimDevice, **device_kwargs)
+            await l2leaf.save(allow_upsert=True)
+            self.l2leaf_switches.append(l2leaf)
+            self.logger.info(f"  Created L2 leaf {l2leaf.name.value}")
+
+    async def connect_l2leafs_to_leafs(self) -> None:
+        """Connect L2 leaf uplinks to the L3 leaf pair in the same rack."""
+        if not self.l2leaf_switches or not self.leaf_switches:
+            return
+
+        self.logger.info(f"Connecting {len(self.l2leaf_switches)} L2 leafs to L3 leaf pair")
+
+        # L2 leaf interfaces with role "leaf" are uplinks to the L3 leaf pair
+        l2leaf_uplink_interfaces = await self.client.filters(
+            kind=DcimInterface,
+            device__ids=[l2leaf.id for l2leaf in self.l2leaf_switches],
+            role__value="leaf",
+        )
+        l2leaf_interface_map = self.leaf_interface_sorting_function(l2leaf_uplink_interfaces)
+
+        # L3 leaf "server" interfaces are the downlinks to L2 leafs
+        leaf_downlink_interfaces = await self.client.filters(
+            kind=DcimInterface,
+            device__ids=[leaf.id for leaf in self.leaf_switches],
+            role__value="server",
+        )
+        leaf_interface_map = self.leaf_interface_sorting_function(leaf_downlink_interfaces)
+
+        created_cabling_plan: list[tuple[DcimInterface, DcimInterface]] = build_rack_cabling_plan(
+            rack_index=self.rack_index,
+            src_interface_map=l2leaf_interface_map,
+            dst_interface_map=leaf_interface_map,
         )
 
         await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)

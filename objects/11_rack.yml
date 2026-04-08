@@ -20,6 +20,8 @@ spec:
       parent: "Hall-A1"
       amount_of_leafs: 2
       leaf_switch_template: leaf-switch-compute
+      amount_of_l2leafs: 1
+      l2leaf_switch_template: l2leaf-switch
       member_of_groups: ["racks"]
     - name: "Rack-A2-2"
       index: 2
@@ -36,6 +38,8 @@ spec:
       parent: "Hall-A1"
       amount_of_leafs: 2
       leaf_switch_template: leaf-switch-compute
+      amount_of_l2leafs: 1
+      l2leaf_switch_template: l2leaf-switch
       member_of_groups: ["racks"]
     - name: "Rack-A2-4"
       index: 4

@@ -21,3 +21,6 @@ spec:
     - profile_name: "profile-interface-mlag-peer"
       role: "mlag_peer"
       mtu: 9200
+    - profile_name: "profile-interface-l3leaf-uplink"
+      role: "leaf"
+      mtu: 9200
