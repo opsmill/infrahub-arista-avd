@@ -495,9 +495,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if mgmt_ip:
             node_config["mgmt_ip"] = mgmt_ip
 
-        node_config["uplink_ipv4_pool"] = pools["uplink_ipv4_pool"]
-        node_config["vtep_loopback_ipv4_pool"] = pools["vtep_loopback_ipv4_pool"]
-
+        if pools["uplink_ipv4_pool"]:
+            node_config["uplink_ipv4_pool"] = pools["uplink_ipv4_pool"]
+        if pools["vtep_loopback_ipv4_pool"]:
+            node_config["vtep_loopback_ipv4_pool"] = pools["vtep_loopback_ipv4_pool"]
         if pools["mlag_peer_ipv4_pool"]:
             node_config["mlag_peer_ipv4_pool"] = pools["mlag_peer_ipv4_pool"]
         if pools["mlag_peer_l3_ipv4_pool"]:
@@ -627,33 +628,50 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         # Extract connected endpoints (servers)
         connected_endpoints = extract_connected_endpoints(iface_edges, hostname)
 
+        is_l2leaf = role == "l2leaf"
+
         # Extract fabric L3LS settings (with backwards-compatible fallbacks)
-        virtual_router_mac = self._get_attr_value(fabric, "virtual_router_mac")
-        underlay_routing_protocol = self._get_attr_value(fabric, "underlay_routing_protocol")
-        overlay_routing_protocol = self._get_attr_value(fabric, "overlay_routing_protocol")
-        p2p_uplinks_mtu = self._get_attr_value(fabric, "p2p_uplinks_mtu")
+        # L2 leafs don't participate in EVPN/BGP/VXLAN so skip most L3 settings
+        virtual_router_mac = None if is_l2leaf else self._get_attr_value(fabric, "virtual_router_mac")
+        underlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "underlay_routing_protocol")
+        overlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "overlay_routing_protocol")
+        p2p_uplinks_mtu = None if is_l2leaf else self._get_attr_value(fabric, "p2p_uplinks_mtu")
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
         spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
-        loopback_ipv4_offset = self._get_attr_value(pod, "loopback_ipv4_offset")
+        loopback_ipv4_offset = None if is_l2leaf else self._get_attr_value(pod, "loopback_ipv4_offset")
 
-        # Extract BGP peer group passwords
-        bgp_passwords = {
-            "evpn_overlay": self._get_attr_value(fabric, "bgp_evpn_overlay_password"),
-            "underlay": self._get_attr_value(fabric, "bgp_underlay_password"),
-            "mlag": self._get_attr_value(fabric, "bgp_mlag_password"),
-        }
+        # BGP peer group passwords (not applicable for L2 leafs)
+        bgp_passwords: dict[str, str | None] = {"evpn_overlay": None, "underlay": None, "mlag": None}
+        if not is_l2leaf:
+            bgp_passwords = {
+                "evpn_overlay": self._get_attr_value(fabric, "bgp_evpn_overlay_password"),
+                "underlay": self._get_attr_value(fabric, "bgp_underlay_password"),
+                "mlag": self._get_attr_value(fabric, "bgp_mlag_password"),
+            }
 
-        # Extract management settings from fabric
+        # Extract management settings from fabric (applies to all device types)
         management = self._extract_management_settings(fabric)
 
-        # Extract configurable IP pools
-        pools = await self._extract_l3ls_pools(fabric, pod)
+        # Extract configurable IP pools (not applicable for L2 leafs)
+        if is_l2leaf:
+            pools: dict[str, str | None] = {
+                "uplink_ipv4_pool": None,
+                "vtep_loopback_ipv4_pool": None,
+                "mlag_peer_ipv4_pool": None,
+                "mlag_peer_l3_ipv4_pool": None,
+            }
+        else:
+            pools = await self._extract_l3ls_pools(fabric, pod)
 
-        # Extract MLAG domain info for leaf devices
-        mlag_info = self._extract_mlag_info(device)
+        # Extract MLAG domain info (only for L3 leaf devices)
+        mlag_info = {"domain_id": None, "virtual_router_mac": None}
+        if not is_l2leaf:
+            mlag_info = self._extract_mlag_info(device)
 
-        # Fetch EVPN tenants for this fabric
-        tenants_data = await self._build_tenants_hostvars(fabric.id)
+        # Fetch EVPN tenants (not applicable for L2 leafs)
+        tenants_data: list[dict[str, Any]] = []
+        if not is_l2leaf:
+            tenants_data = await self._build_tenants_hostvars(fabric.id)
 
         hostvars = self._build_hostvars(
             hostname=hostname,
