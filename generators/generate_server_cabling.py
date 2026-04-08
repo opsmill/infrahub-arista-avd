@@ -104,7 +104,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             fabric.name.value,
         )
         await set_fabric_avd_hostvars_ready(self.client, fabric.id, False)
-        # await trigger_hostvar_generation(self.client)
+        await trigger_hostvar_generation(self.client)
 
     def _get_server_interfaces(self, server_node: dict) -> list[dict[str, Any]]:
         """Extract server interfaces with their VLANs from the GQL response."""
