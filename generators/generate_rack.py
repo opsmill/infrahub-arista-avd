@@ -119,6 +119,8 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.create_leaf_switches()
 
+        await self.create_mlag_pairs()
+
         await self.connect_leafs_to_spine()
 
         # Mark this rack as generation complete
@@ -169,6 +171,76 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             loopback_interface.status.value = "active"
             loopback_interface.ip_address = device.loopback_ip.id
             await loopback_interface.save(allow_upsert=True)
+
+    async def _create_peer_link_lag(self, leaf: DcimDevice) -> str:
+        """Create a LAG peer-link on a leaf and assign mlag_peer interfaces as members.
+
+        Returns the LAG node ID.
+        """
+        lag = await self.client.create(
+            "InterfaceLag",
+            name="Port-Channel1",
+            device={"id": leaf.id},
+            lacp_rate="fast",
+            lacp_mode="active",
+            status="active",
+            role="mlag_peer",
+        )
+        await lag.save(allow_upsert=True)
+
+        # Find PHYSICAL interfaces with role=mlag_peer and set their bundle to this LAG
+        # Must use InterfacePhysical (not DcimInterface) to avoid matching the LAG itself
+        mlag_peer_interfaces = await self.client.filters(
+            kind="InterfacePhysical", device__ids=[leaf.id], role__value="mlag_peer"
+        )
+        for iface in mlag_peer_interfaces:
+            iface.bundle = {"id": lag.id}  # type: ignore[attr-defined]
+            await iface.save(allow_upsert=True)
+
+        if mlag_peer_interfaces:
+            self.logger.info(
+                f"  Assigned {len(mlag_peer_interfaces)} mlag_peer interfaces as Port-Channel1 members on {leaf.name.value}"
+            )
+        else:
+            self.logger.warning(f"  No mlag_peer interfaces found on {leaf.name.value}")
+
+        return lag.id
+
+    async def create_mlag_pairs(self) -> None:
+        """Create MLAG domains pairing consecutive leaf switches.
+
+        For every pair of consecutive leafs (0+1, 2+3, ...):
+        - Create InterfaceLag peer-link on each leaf with mlag_peer physical members
+        - Create MlagDomain with both leafs as peers and LAGs as peer_links
+        """
+        if len(self.leaf_switches) < 2:
+            self.logger.info(f"Rack {self.rack_name}: fewer than 2 leafs, skipping MLAG pair creation")
+            return
+
+        for pair_idx in range(0, len(self.leaf_switches) - 1, 2):
+            leaf_a = self.leaf_switches[pair_idx]
+            leaf_b = self.leaf_switches[pair_idx + 1]
+
+            pair_suffix = f"-{pair_idx // 2 + 1}" if len(self.leaf_switches) > 2 else ""
+            domain_id = f"mlag-{self.rack_name}{pair_suffix}"
+
+            self.logger.info(f"Creating MLAG pair {domain_id}: {leaf_a.name.value} + {leaf_b.name.value}")
+
+            # Create LAG peer-link interfaces with physical bundle members
+            lag_a_id = await self._create_peer_link_lag(leaf_a)
+            lag_b_id = await self._create_peer_link_lag(leaf_b)
+
+            # Create MLAG domain with both leafs as peers and LAGs as peer-links
+            mlag_domain = await self.client.create(
+                "MlagDomain",
+                domain_id=domain_id,
+                peers=[{"id": leaf_a.id}, {"id": leaf_b.id}],
+                peer_links=[{"id": lag_a_id}, {"id": lag_b_id}],
+                pod={"id": self.pod_id},
+            )
+            await mlag_domain.save(allow_upsert=True)
+
+            self.logger.info(f"MLAG domain {domain_id} created successfully")
 
     async def connect_leafs_to_spine(self) -> None:
         spine_interfaces = await self.client.filters(

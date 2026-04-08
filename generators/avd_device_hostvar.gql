@@ -34,11 +34,50 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             }
           }
         }
+        mlag_domain {
+          node {
+            __typename
+            id
+            domain_id {
+              value
+            }
+            virtual_router_mac {
+              value
+            }
+            peers {
+              edges {
+                node {
+                  __typename
+                  id
+                  name {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
         pod {
           node {
             id
             name {
               value
+            }
+            mlag_peer_pool {
+              node {
+                id
+                name {
+                  value
+                }
+              }
+            }
+            mlag_l3_pool {
+              node {
+                id
+                name {
+                  value
+                }
+              }
             }
             parent {
               node {
@@ -53,6 +92,40 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   }
                   mgmt_routes {
                     value
+                  }
+                  virtual_router_mac {
+                    value
+                  }
+                  underlay_routing_protocol {
+                    value
+                  }
+                  overlay_routing_protocol {
+                    value
+                  }
+                  p2p_uplinks_mtu {
+                    value
+                  }
+                  uplink_pool {
+                    node {
+                      id
+                      name {
+                        value
+                      }
+                      default_prefix_length {
+                        value
+                      }
+                    }
+                  }
+                  vtep_pool {
+                    node {
+                      id
+                      name {
+                        value
+                      }
+                      default_prefix_length {
+                        value
+                      }
+                    }
                   }
                   avd_evpn {
                     node {
