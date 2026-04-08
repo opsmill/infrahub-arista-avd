@@ -194,7 +194,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             kind="InterfacePhysical", device__ids=[leaf.id], role__value="mlag_peer"
         )
         for iface in mlag_peer_interfaces:
-            iface.bundle = {"id": lag.id}  # type: ignore[attr-defined]
+            iface.lag = {"id": lag.id}  # type: ignore[attr-defined]
             await iface.save(allow_upsert=True)
 
         if mlag_peer_interfaces:

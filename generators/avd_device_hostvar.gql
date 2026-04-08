@@ -79,6 +79,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                 }
               }
             }
+            loopback_ipv4_offset {
+              value
+            }
             parent {
               node {
                 __typename
@@ -124,6 +127,49 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                       }
                       default_prefix_length {
                         value
+                      }
+                    }
+                  }
+                  spanning_tree_mode {
+                    value
+                  }
+                  spanning_tree_priority {
+                    value
+                  }
+                  bgp_evpn_overlay_password {
+                    value
+                  }
+                  bgp_underlay_password {
+                    value
+                  }
+                  bgp_mlag_password {
+                    value
+                  }
+                  dns_servers {
+                    edges {
+                      node {
+                        name { value }
+                        ip_address { value }
+                        vrf { value }
+                      }
+                    }
+                  }
+                  ntp_servers {
+                    edges {
+                      node {
+                        name { value }
+                        server_vrf { value }
+                      }
+                    }
+                  }
+                  local_users {
+                    edges {
+                      node {
+                        name { value }
+                        privilege { value }
+                        role { value }
+                        password_type { value }
+                        password { value }
                       }
                     }
                   }

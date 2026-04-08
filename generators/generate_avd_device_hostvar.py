@@ -236,6 +236,9 @@ def extract_connected_endpoints(
                         adapter["mode"] = "access"
                         adapter["vlans"] = str(untagged_vlan)
 
+                    # Add spanning tree portfast for server ports
+                    adapter["spanning_tree_portfast"] = "edge"
+
                     servers[server_name]["adapters"].append(adapter)
 
     return _sort_server_endpoints(servers)
@@ -307,7 +310,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             l2vlans_list: list[dict[str, Any]] = []
             for l2v_peer in tenant.l2vlans.peers:
                 l2vlan = l2v_peer.peer
-                l2v_data: dict[str, Any] = {"id": l2vlan.vlan_id.value}
+                l2v_data: dict[str, Any] = {
+                    "id": l2vlan.vlan_id.value,
+                    "name": l2vlan.name.value,
+                }
                 vni_override = getattr(l2vlan, "vni_override", None)
                 if vni_override and vni_override.value is not None:
                     l2v_data["vni"] = vni_override.value
@@ -320,11 +326,23 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return tenants_list
 
-    async def _extract_pool_name(self, pool_ref: object, pool_kind: str) -> str | None:
-        """Extract pool name from a relationship reference."""
-        if pool_ref and pool_ref.node:
-            pool = await self.client.get(kind=pool_kind, id=pool_ref.node.id)
-            return pool.name.value if hasattr(pool, "name") else None
+    async def _extract_pool_prefix(self, pool_ref: object, pool_kind: str) -> str | None:
+        """Extract the first resource prefix from a pool relationship reference."""
+        if not pool_ref or not pool_ref.node:
+            return None
+
+        pool = await self.client.get(kind=pool_kind, id=pool_ref.node.id, include=["resources"])
+        await pool.resources.fetch()
+
+        for resource_peer in pool.resources.peers:
+            resource = resource_peer.peer
+            # CoreIPPrefixPool resources are IpamPrefix nodes with a prefix attribute
+            if hasattr(resource, "prefix"):
+                return str(resource.prefix.value)
+            # CoreIPAddressPool resources also have prefix
+            if hasattr(resource, "address"):
+                return str(resource.address.value)
+
         return None
 
     @staticmethod
@@ -335,10 +353,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
     async def _extract_l3ls_pools(self, fabric: object, pod: object) -> dict[str, str | None]:
         """Extract configurable IP pools from fabric/pod with hardcoded fallbacks."""
-        uplink = await self._extract_pool_name(getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool")
-        vtep = await self._extract_pool_name(getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool")
-        mlag_peer = await self._extract_pool_name(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
-        mlag_l3 = await self._extract_pool_name(getattr(pod, "mlag_l3_pool", None), "CoreIPAddressPool")
+        uplink = await self._extract_pool_prefix(getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool")
+        vtep = await self._extract_pool_prefix(getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool")
+        mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
+        mlag_l3 = await self._extract_pool_prefix(getattr(pod, "mlag_l3_pool", None), "CoreIPAddressPool")
 
         return {
             "uplink_ipv4_pool": uplink or "10.250.0.0/16",
@@ -346,6 +364,78 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             "mlag_peer_ipv4_pool": mlag_peer,
             "mlag_peer_l3_ipv4_pool": mlag_l3,
         }
+
+    @staticmethod
+    def _gql_val(node: object, field: str) -> Any | None:
+        """Get a value from a GQL node that may be a Pydantic model or raw dict."""
+        attr = getattr(node, field, None)
+        if attr is None:
+            return None
+        if isinstance(attr, dict):
+            return attr.get("value")
+        return attr.value if hasattr(attr, "value") else None
+
+    @classmethod
+    def _extract_management_settings(cls, fabric: object) -> dict[str, Any]:
+        """Extract DNS, NTP, and local user settings from fabric."""
+        result: dict[str, Any] = {}
+
+        dns_servers_rel = getattr(fabric, "dns_servers", None)
+        if dns_servers_rel and hasattr(dns_servers_rel, "edges"):
+            dns_list = []
+            for edge in dns_servers_rel.edges:
+                node = edge.node
+                if node:
+                    ip = cls._gql_val(node, "ip_address")
+                    if ip:
+                        entry: dict[str, Any] = {"ip_address": str(ip).split("/")[0]}
+                        vrf = cls._gql_val(node, "vrf")
+                        if vrf:
+                            entry["vrf"] = vrf
+                        dns_list.append(entry)
+            if dns_list:
+                result["dns_servers"] = dns_list
+
+        ntp_servers_rel = getattr(fabric, "ntp_servers", None)
+        if ntp_servers_rel and hasattr(ntp_servers_rel, "edges"):
+            ntp_list = []
+            for edge in ntp_servers_rel.edges:
+                node = edge.node
+                if node:
+                    name = cls._gql_val(node, "name")
+                    if name:
+                        entry: dict[str, Any] = {"name": name}
+                        server_vrf = cls._gql_val(node, "server_vrf")
+                        if server_vrf:
+                            entry["server_vrf"] = server_vrf
+                        ntp_list.append(entry)
+            if ntp_list:
+                result["ntp_servers"] = ntp_list
+
+        local_users_rel = getattr(fabric, "local_users", None)
+        if local_users_rel and hasattr(local_users_rel, "edges"):
+            users_list = []
+            for edge in local_users_rel.edges:
+                node = edge.node
+                if node:
+                    name = cls._gql_val(node, "name")
+                    if name:
+                        user: dict[str, Any] = {
+                            "name": name,
+                            "privilege": cls._gql_val(node, "privilege") or 15,
+                            "role": cls._gql_val(node, "role") or "network-admin",
+                        }
+                        pw_type = cls._gql_val(node, "password_type")
+                        pw_value = cls._gql_val(node, "password")
+                        if pw_type == "sha512" and pw_value:
+                            user["sha512_password"] = pw_value
+                        elif pw_value:
+                            user["no_password"] = True
+                        users_list.append(user)
+            if users_list:
+                result["local_users"] = users_list
+
+        return result
 
     @staticmethod
     def _extract_mlag_info(device: object) -> dict[str, str | None]:
@@ -378,6 +468,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         underlay_routing_protocol: str | None,
         overlay_routing_protocol: str | None,
         p2p_uplinks_mtu: int | None,
+        spanning_tree_mode: str | None,
+        spanning_tree_priority: int | None,
+        loopback_ipv4_offset: int | None,
+        bgp_passwords: dict[str, str | None],
+        management: dict[str, Any],
         pools: dict[str, str | None],
         uplinks: UplinkData,
         mlag_info: dict[str, str | None],
@@ -413,6 +508,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["uplink_switches"] = uplinks["uplink_switches"]
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
 
+        # Leaf devices with SVIs need virtual_router_mac at node level
+        if role == "leaf" and virtual_router_mac and tenants_data:
+            node_config["virtual_router_mac_address"] = virtual_router_mac
+
         # Build hostvars
         hostvars: dict[str, Any] = {"type": avd_type, "fabric_name": fabric_name}
 
@@ -426,8 +525,44 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars["overlay_routing_protocol"] = overlay_routing_protocol
         if p2p_uplinks_mtu:
             hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
+        if spanning_tree_mode:
+            hostvars["spanning_tree_mode"] = spanning_tree_mode
+        if spanning_tree_priority is not None:
+            hostvars["spanning_tree_priority"] = spanning_tree_priority
 
-        hostvars[node_type_key] = {"nodes": [node_config]}
+        # Loopback offset for leaf devices
+        if loopback_ipv4_offset and role == "leaf":
+            hostvars.setdefault(node_type_key, {})
+            hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
+            hostvars[node_type_key]["defaults"]["loopback_ipv4_offset"] = loopback_ipv4_offset
+
+        # BGP peer group passwords
+        bgp_peer_groups: dict[str, Any] = {}
+        if bgp_passwords.get("evpn_overlay"):
+            bgp_peer_groups["evpn_overlay_peers"] = {"password": bgp_passwords["evpn_overlay"]}
+        if bgp_passwords.get("underlay"):
+            bgp_peer_groups["ipv4_underlay_peers"] = {"password": bgp_passwords["underlay"]}
+        if bgp_passwords.get("mlag"):
+            bgp_peer_groups["mlag_ipv4_underlay_peer"] = {"password": bgp_passwords["mlag"]}
+        if bgp_peer_groups:
+            hostvars["bgp_peer_groups"] = bgp_peer_groups
+
+        # Management settings
+        if management.get("dns_servers"):
+            hostvars["dns_settings"] = {"servers": management["dns_servers"]}
+        if management.get("ntp_servers"):
+            ntp_settings: dict[str, Any] = {"servers": []}
+            for srv in management["ntp_servers"]:
+                ntp_settings["servers"].append({"name": srv["name"]})
+                # server_vrf goes at the ntp_settings level, not per-server
+                if "server_vrf" in srv and "server_vrf" not in ntp_settings:
+                    ntp_settings["server_vrf"] = srv["server_vrf"]
+            hostvars["ntp_settings"] = ntp_settings
+        if management.get("local_users"):
+            hostvars["aaa_settings"] = {"local_users": management["local_users"]}
+
+        hostvars[node_type_key] = hostvars.get(node_type_key, {})
+        hostvars[node_type_key]["nodes"] = [node_config]
 
         # Add MLAG node_group for leaf devices
         if mlag_info["domain_id"] and role == "leaf":
@@ -495,6 +630,19 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         underlay_routing_protocol = self._get_attr_value(fabric, "underlay_routing_protocol")
         overlay_routing_protocol = self._get_attr_value(fabric, "overlay_routing_protocol")
         p2p_uplinks_mtu = self._get_attr_value(fabric, "p2p_uplinks_mtu")
+        spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
+        spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
+        loopback_ipv4_offset = self._get_attr_value(pod, "loopback_ipv4_offset")
+
+        # Extract BGP peer group passwords
+        bgp_passwords = {
+            "evpn_overlay": self._get_attr_value(fabric, "bgp_evpn_overlay_password"),
+            "underlay": self._get_attr_value(fabric, "bgp_underlay_password"),
+            "mlag": self._get_attr_value(fabric, "bgp_mlag_password"),
+        }
+
+        # Extract management settings from fabric
+        management = self._extract_management_settings(fabric)
 
         # Extract configurable IP pools
         pools = await self._extract_l3ls_pools(fabric, pod)
@@ -518,6 +666,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             underlay_routing_protocol=underlay_routing_protocol,
             overlay_routing_protocol=overlay_routing_protocol,
             p2p_uplinks_mtu=p2p_uplinks_mtu,
+            spanning_tree_mode=spanning_tree_mode,
+            spanning_tree_priority=spanning_tree_priority,
+            loopback_ipv4_offset=loopback_ipv4_offset,
+            bgp_passwords=bgp_passwords,
+            management=management,
             pools=pools,
             uplinks=uplinks,
             mlag_info=mlag_info,
@@ -525,9 +678,23 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             connected_endpoints=connected_endpoints,
         )
 
-        # Print for debugging
+        # Validate hostvars against pyAVD schema before saving
         import json
 
+        from pyavd import validate_inputs
+
+        validated = validate_inputs(hostvars)
+        if validated.validation_result.violations:
+            violation_msgs = []
+            for v in validated.validation_result.violations:
+                msg = getattr(v, "message", str(v))
+                path = getattr(v, "path", "")
+                violation_msgs.append(f"{msg} (path: {path})")
+
+            error_detail = "; ".join(violation_msgs)
+            raise ValueError(f"pyAVD validation failed for {hostname}: {error_detail}")
+
+        # Print for debugging
         print(f"\n=== AVD Device Hostvar for {hostname} ===")
         print(f"Device: {hostname}")
         print(f"Role: {role}")

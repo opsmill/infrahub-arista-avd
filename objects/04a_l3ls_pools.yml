@@ -5,7 +5,7 @@ kind: Object
 spec:
   kind: IpamPrefix
   data:
-    - prefix: 10.255.255.0/26
+    - prefix: 10.255.252.0/22
       role: pod_leaf_spine
 ---
 # P2P Uplink Pool for Fabric-A
@@ -20,7 +20,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.255.0/26"
+        - "10.255.252.0/22"
 ---
 # VTEP Loopback Prefix for Fabric-A
 apiVersion: infrahub.app/v1

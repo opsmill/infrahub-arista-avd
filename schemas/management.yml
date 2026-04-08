@@ -1,0 +1,107 @@
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+nodes:
+  - name: DnsServer
+    namespace: Network
+    description: "DNS server for fabric device management"
+    label: DNS Server
+    icon: mdi:dns
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: name__value
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        order_weight: 1000
+      - name: ip_address
+        label: IP Address
+        kind: IPHost
+        description: "DNS server IP address"
+        order_weight: 1100
+      - name: vrf
+        label: VRF
+        kind: Text
+        optional: true
+        description: "VRF for DNS server reachability (blank = default VRF)"
+        order_weight: 1200
+
+  - name: NtpServer
+    namespace: Network
+    description: "NTP server for fabric device time synchronization"
+    label: NTP Server
+    icon: mdi:clock-outline
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: name__value
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: "NTP server hostname or IP"
+        order_weight: 1000
+      - name: server_vrf
+        label: Server VRF
+        kind: Text
+        optional: true
+        description: "VRF for NTP server reachability (or 'use_mgmt_interface_vrf')"
+        order_weight: 1100
+
+  - name: LocalUser
+    namespace: Network
+    description: "Local user account for fabric device access"
+    label: Local User
+    icon: mdi:account
+    human_friendly_id:
+      - name__value
+    order_by:
+      - name__value
+    display_label: name__value
+    uniqueness_constraints:
+      - [name__value]
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+        description: "Username"
+        order_weight: 1000
+      - name: privilege
+        kind: Number
+        default_value: 15
+        description: "Privilege level (0-15)"
+        order_weight: 1100
+      - name: role
+        kind: Dropdown
+        choices:
+          - name: network-admin
+            label: Network Admin
+            color: "#A9CCE3"
+          - name: network-operator
+            label: Network Operator
+            color: "#A9DFBF"
+        default_value: network-admin
+        order_weight: 1200
+      - name: password_type
+        label: Password Type
+        kind: Dropdown
+        choices:
+          - name: sha512
+            label: SHA-512
+          - name: type7
+            label: Type 7
+        default_value: sha512
+        order_weight: 1300
+      - name: password
+        kind: Text
+        description: "Password hash (sha512 or type7 encoded)"
+        order_weight: 1400

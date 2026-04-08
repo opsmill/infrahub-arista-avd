@@ -52,6 +52,48 @@ extensions:
           default_value: 9214
           description: "MTU for point-to-point uplink interfaces"
           order_weight: 10300
+        - name: spanning_tree_mode
+          label: Spanning Tree Mode
+          kind: Dropdown
+          optional: true
+          choices:
+            - name: mstp
+              label: MSTP
+              description: "Multiple Spanning Tree Protocol"
+              color: "#A9CCE3"
+            - name: rstp
+              label: RSTP
+              description: "Rapid Spanning Tree Protocol"
+              color: "#A9DFBF"
+            - name: rapid-pvst
+              label: Rapid PVST+
+              description: "Rapid Per-VLAN Spanning Tree Plus"
+              color: "#D2B4DE"
+          order_weight: 10400
+        - name: spanning_tree_priority
+          label: Spanning Tree Priority
+          kind: Number
+          optional: true
+          description: "STP priority (must be multiple of 4096, e.g. 4096, 8192, 16384)"
+          order_weight: 10500
+        - name: bgp_evpn_overlay_password
+          label: BGP EVPN Overlay Password
+          kind: Text
+          optional: true
+          description: "Password hash for EVPN overlay BGP peer group"
+          order_weight: 11000
+        - name: bgp_underlay_password
+          label: BGP Underlay Password
+          kind: Text
+          optional: true
+          description: "Password hash for underlay BGP peer group"
+          order_weight: 11100
+        - name: bgp_mlag_password
+          label: BGP MLAG iBGP Password
+          kind: Text
+          optional: true
+          description: "Password hash for MLAG iBGP peer group"
+          order_weight: 11200
       relationships:
         - name: uplink_pool
           label: Uplink IP Pool
@@ -72,8 +114,41 @@ extensions:
           description: "IP prefix pool for VTEP loopback addresses"
           order_weight: 10500
 
-    # --- NetworkPod: MLAG IP pool relationships ---
+        - name: dns_servers
+          label: DNS Servers
+          peer: NetworkDnsServer
+          kind: Attribute
+          cardinality: many
+          optional: true
+          description: "DNS servers for devices in this fabric"
+          order_weight: 12000
+        - name: ntp_servers
+          label: NTP Servers
+          peer: NetworkNtpServer
+          kind: Attribute
+          cardinality: many
+          optional: true
+          description: "NTP servers for devices in this fabric"
+          order_weight: 12100
+        - name: local_users
+          label: Local Users
+          peer: NetworkLocalUser
+          kind: Attribute
+          cardinality: many
+          optional: true
+          description: "Local user accounts for devices in this fabric"
+          order_weight: 12200
+
+    # --- NetworkPod: MLAG IP pool relationships + loopback offset ---
     - kind: NetworkPod
+      attributes:
+        - name: loopback_ipv4_offset
+          label: Loopback IPv4 Offset
+          kind: Number
+          optional: true
+          default_value: 0
+          description: "Offset for leaf loopback IDs to avoid overlap with spines"
+          order_weight: 9000
       relationships:
         - name: mlag_peer_pool
           label: MLAG Peer Pool
@@ -153,5 +228,26 @@ extensions:
           identifier: "vrf__svis"
           description: "SVIs within this VRF"
           order_weight: 1500
+
+    # --- LocationRack: L2 leaf support ---
+    - kind: LocationRack
+      attributes:
+        - name: amount_of_l2leafs
+          label: Amount of L2 Leaf switches
+          kind: Number
+          optional: true
+          default_value: 0
+          description: "Number of L2 leaf switches in this rack"
+          order_weight: 9500
+      relationships:
+        - name: l2leaf_switch_template
+          label: L2 Leaf Switch Template
+          peer: CoreObjectTemplate
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "rack__l2leaf_template"
+          description: "Template for L2 leaf switches in this rack"
+          order_weight: 9600
 
     # Note: l2leaf role is added to DcimDevice in dcim_extensions.yml
