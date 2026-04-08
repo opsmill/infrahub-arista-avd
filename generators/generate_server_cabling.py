@@ -60,7 +60,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         leaf_interfaces = await self.client.filters(
             kind=InterfacePhysical,
             device__ids=[leaf.id for leaf in leaf_switches],
-            role__values=["server", "storage"],
+            role__value="server",
         )
         leaf_interface_map = create_sorted_device_interface_map(leaf_interfaces)
 
