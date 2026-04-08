@@ -12,6 +12,9 @@ query AvdDeviceConfigQuery($name: String!) {
             structured_config_file {
               node {
                 id
+                checksum {
+                  value
+                }
               }
             }
           }
