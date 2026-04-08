@@ -190,17 +190,17 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 except Exception:  # noqa: BLE001
                     pass
 
-                sc_file = await self.client.create(
-                    AvdStructuredConfigFile,
-                    artifact=avd_artifact,
-                    member_of_groups=["avd_structured_configs"],
-                )
-
                 if existing_checksum == new_checksum:
-                    # Content unchanged — save the object for tracking but don't re-upload
-                    await sc_file.save(allow_upsert=True)
+                    # Content unchanged — register with tracker so it's not deleted
+                    if avd_artifact.structured_config_file.id:
+                        self.client.group_context.add_related_nodes(ids=[avd_artifact.structured_config_file.id])
                     skipped_count += 1
                 else:
+                    sc_file = await self.client.create(
+                        AvdStructuredConfigFile,
+                        artifact=avd_artifact,
+                        member_of_groups=["avd_structured_configs"],
+                    )
                     sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
                     await sc_file.save(allow_upsert=True)
                     success_count += 1
