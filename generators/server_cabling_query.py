@@ -74,7 +74,9 @@ class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdges(BaseModel)
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeDcimInterface(
     BaseModel
 ):
-    typename__: Literal["DcimInterface", "InterfaceVirtual"] = Field(alias="__typename")
+    typename__: Literal["DcimInterface", "InterfaceLag", "InterfaceVirtual"] = Field(
+        alias="__typename"
+    )
     id: Optional[str]
 
 
@@ -230,8 +232,14 @@ class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfa
         "ProfileDcimGenericDevice",
         "ProfileDcimPhysicalDevice",
         "ProfileDcimPlatform",
+        "ProfileEvpnL2Vlan",
+        "ProfileEvpnSvi",
+        "ProfileEvpnTenant",
         "ProfileGeneratorTarget",
+        "ProfileGenericInterfaceBundle",
+        "ProfileGenericMlagDomain",
         "ProfileInterfaceHasSubInterface",
+        "ProfileInterfaceLag",
         "ProfileInterfaceLayer2",
         "ProfileInterfaceLayer3",
         "ProfileInterfacePhysical",
@@ -240,14 +248,21 @@ class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfa
         "ProfileIpamL2Domain",
         "ProfileIpamNamespace",
         "ProfileIpamPrefix",
+        "ProfileIpamRouteTarget",
         "ProfileIpamVLAN",
+        "ProfileIpamVRF",
         "ProfileLocationGeneric",
         "ProfileLocationHall",
         "ProfileLocationHosting",
         "ProfileLocationRack",
+        "ProfileMlagDomain",
+        "ProfileMlagInterface",
         "ProfileNetworkBuildingBlock",
+        "ProfileNetworkDnsServer",
         "ProfileNetworkFabric",
         "ProfileNetworkLink",
+        "ProfileNetworkLocalUser",
+        "ProfileNetworkNtpServer",
         "ProfileNetworkPod",
         "ProfileOrganizationGeneric",
         "ProfileOrganizationManufacturer",

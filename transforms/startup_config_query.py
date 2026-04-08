@@ -48,9 +48,9 @@ class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdges(BaseModel):
 
 
 class StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNode(BaseModel):
-    typename__: Literal["DcimInterface", "InterfacePhysical", "InterfaceVirtual"] = (
-        Field(alias="__typename")
-    )
+    typename__: Literal[
+        "DcimInterface", "InterfaceLag", "InterfacePhysical", "InterfaceVirtual"
+    ] = Field(alias="__typename")
     name: Optional["StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeName"]
     description: Optional[
         "StartupConfigQueryDcimDeviceEdgesNodeInterfacesEdgesNodeDescription"

@@ -25,6 +25,12 @@ class RackGeneratorQueryLocationRackEdgesNode(BaseModel):
     rack_type: Optional["RackGeneratorQueryLocationRackEdgesNodeRackType"]
     amount_of_leafs: Optional["RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs"]
     leaf_switch_template: "RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate"
+    amount_of_l_2_leafs: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs"
+    ] = Field(alias="amount_of_l2leafs")
+    l_2_leaf_switch_template: "RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate" = Field(
+        alias="l2leaf_switch_template"
+    )
     parent: "RackGeneratorQueryLocationRackEdgesNodeParent"
     pod: "RackGeneratorQueryLocationRackEdgesNodePod"
 
@@ -54,6 +60,21 @@ class RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate(BaseModel):
 
 
 class RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplateNode(BaseModel):
+    typename__: Literal[
+        "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
+    ] = Field(alias="__typename")
+    id: Optional[str]
+
+
+class RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs(BaseModel):
+    value: Optional[Any]
+
+
+class RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate(BaseModel):
+    node: Optional["RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplateNode"]
+
+
+class RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplateNode(BaseModel):
     typename__: Literal[
         "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
     ] = Field(alias="__typename")
@@ -216,6 +237,7 @@ RackGeneratorQueryLocationRack.model_rebuild()
 RackGeneratorQueryLocationRackEdges.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNode.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodeParent.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodeParentNode.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePod.model_rebuild()

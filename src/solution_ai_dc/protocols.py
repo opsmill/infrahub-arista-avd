@@ -167,7 +167,6 @@ class DcimGenericDevice(CoreNode):
 class TemplateGenericInterfaceBundle(CoreNode):
     name: String
     template_name: String
-    bundle_members: RelationshipManager
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
@@ -215,7 +214,6 @@ class DcimInterface(CoreNode):
 
 class GenericInterfaceBundle(CoreNode):
     name: String
-    bundle_members: RelationshipManager
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
@@ -388,6 +386,15 @@ class DcimDeviceType(CoreNode):
     tags: RelationshipManager
 
 
+class NetworkDnsServer(CoreNode):
+    ip_address: IPHost
+    name: String
+    vrf: StringOptional
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class MlagDomain(GenericMlagDomain):
     domain_id: String
     reload_delay: IntegerOptional
@@ -414,6 +421,9 @@ class AvdEvpn(CoreNode):
 class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     amount_of_super_spines: IntegerOptional
     avd_hostvars_ready: BooleanOptional
+    bgp_evpn_overlay_password: StringOptional
+    bgp_mlag_password: StringOptional
+    bgp_underlay_password: StringOptional
     fabric_interface_sorting_method: DropdownOptional
     index: Integer
     mgmt_gateway: StringOptional
@@ -421,6 +431,8 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     name: String
     overlay_routing_protocol: DropdownOptional
     p2p_uplinks_mtu: IntegerOptional
+    spanning_tree_mode: DropdownOptional
+    spanning_tree_priority: IntegerOptional
     spine_interface_sorting_method: DropdownOptional
     underlay_routing_protocol: DropdownOptional
     virtual_router_mac: StringOptional
@@ -428,9 +440,12 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     asn_pool: RelatedNode
     avd_evpn: RelatedNode
     children: RelationshipManager
+    dns_servers: RelationshipManager
+    local_users: RelationshipManager
     member_of_groups: RelationshipManager
     mgmt_pool: RelatedNode
     node_id_pool: RelatedNode
+    ntp_servers: RelationshipManager
     parent: RelatedNode
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
@@ -484,7 +499,6 @@ class MlagInterface(InterfaceLayer2, GenericInterfaceBundle):
     name: String
     role: DropdownOptional
     status: DropdownOptional
-    bundle_members: RelationshipManager
     member_of_groups: RelationshipManager
     mlag_domain: RelatedNode
     profiles: RelationshipManager
@@ -523,7 +537,6 @@ class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHas
     name: String
     role: DropdownOptional
     status: DropdownOptional
-    bundle_members: RelationshipManager
     device: RelatedNode
     ip_address: RelatedNode
     ip_addresses: RelationshipManager
@@ -547,6 +560,17 @@ class NetworkLink(DcimConnector):
     subscriber_of_groups: RelationshipManager
 
 
+class NetworkLocalUser(CoreNode):
+    name: String
+    password: String
+    password_type: DropdownOptional
+    privilege: IntegerOptional
+    role: DropdownOptional
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class OrganizationManufacturer(OrganizationGeneric):
     description: StringOptional
     name: String
@@ -556,6 +580,14 @@ class OrganizationManufacturer(OrganizationGeneric):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
     tags: RelationshipManager
+
+
+class NetworkNtpServer(CoreNode):
+    name: String
+    server_vrf: StringOptional
+    member_of_groups: RelationshipManager
+    profiles: RelationshipManager
+    subscriber_of_groups: RelationshipManager
 
 
 class InterfacePhysical(DcimInterface, InterfaceLayer2, InterfaceLayer3, DcimEndpoint, InterfaceHasSubInterface):
@@ -568,11 +600,11 @@ class InterfacePhysical(DcimInterface, InterfaceLayer2, InterfaceLayer3, DcimEnd
     name: String
     role: DropdownOptional
     status: DropdownOptional
-    bundle: RelatedNode
     connector: RelatedNode
     device: RelatedNode
     ip_address: RelatedNode
     ip_addresses: RelationshipManager
+    lag: RelatedNode
     member_of_groups: RelationshipManager
     profiles: RelationshipManager
     sub_interfaces: RelationshipManager
@@ -621,6 +653,7 @@ class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
     checksum: StringOptional
     index: Integer
     leaf_interface_sorting_method: DropdownOptional
+    loopback_ipv4_offset: IntegerOptional
     name: String
     role: DropdownOptional
     spine_interface_sorting_method: DropdownOptional
@@ -694,6 +727,7 @@ class OrganizationProvider(OrganizationGeneric):
 
 
 class LocationRack(LocationGeneric, LocationHosting, GeneratorTarget):
+    amount_of_l2leafs: IntegerOptional
     amount_of_leafs: IntegerOptional
     checksum: StringOptional
     description: StringOptional
@@ -704,6 +738,7 @@ class LocationRack(LocationGeneric, LocationHosting, GeneratorTarget):
     shortname: StringOptional
     children: RelationshipManager
     devices: RelationshipManager
+    l2leaf_switch_template: RelatedNode
     leaf_switch_template: RelatedNode
     member_of_groups: RelationshipManager
     parent: RelatedNode
@@ -1145,7 +1180,6 @@ class ProfileGenericInterfaceBundle(LineageSource, CoreProfile, CoreNode):
     name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
-    bundle_members: RelationshipManager
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     related_templates: RelationshipManager
@@ -1185,7 +1219,6 @@ class ProfileInterfaceLag(LineageSource, CoreProfile, CoreNode):
     profile_priority: IntegerOptional
     role: DropdownOptional
     status: DropdownOptional
-    bundle_members: RelationshipManager
     ip_address: RelatedNode
     ip_addresses: RelationshipManager
     lag_members: RelationshipManager
@@ -1233,10 +1266,10 @@ class ProfileInterfacePhysical(LineageSource, CoreProfile, CoreNode):
     profile_priority: IntegerOptional
     role: DropdownOptional
     status: DropdownOptional
-    bundle: RelatedNode
     connector: RelatedNode
     ip_address: RelatedNode
     ip_addresses: RelationshipManager
+    lag: RelatedNode
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     related_templates: RelationshipManager
@@ -1284,6 +1317,7 @@ class ProfileIpamIPAddress(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileIpamL2Domain(LineageSource, CoreProfile, CoreNode):
+    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     member_of_groups: RelationshipManager
@@ -1333,6 +1367,7 @@ class ProfileIpamRouteTarget(LineageSource, CoreProfile, CoreNode):
 
 class ProfileIpamVLAN(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
+    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1363,6 +1398,7 @@ class ProfileIpamVRF(LineageSource, CoreProfile, CoreNode):
 
 class ProfileLocationGeneric(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
+    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     shortname: StringOptional
@@ -1375,6 +1411,7 @@ class ProfileLocationGeneric(LineageSource, CoreProfile, CoreNode):
 class ProfileLocationHall(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     index: IntegerOptional
+    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     shortname: StringOptional
@@ -1396,16 +1433,19 @@ class ProfileLocationHosting(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileLocationRack(LineageSource, CoreProfile, CoreNode):
+    amount_of_l2leafs: IntegerOptional
     amount_of_leafs: IntegerOptional
     checksum: StringOptional
     description: StringOptional
     generation_complete: BooleanOptional
     index: IntegerOptional
+    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     rack_type: DropdownOptional
     shortname: StringOptional
     devices: RelationshipManager
+    l2leaf_switch_template: RelatedNode
     leaf_switch_template: RelatedNode
     member_of_groups: RelationshipManager
     prefixes: RelationshipManager
@@ -1436,7 +1476,6 @@ class ProfileMlagInterface(LineageSource, CoreProfile, CoreNode):
     profile_priority: IntegerOptional
     role: DropdownOptional
     status: DropdownOptional
-    bundle_members: RelationshipManager
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager
@@ -1451,9 +1490,22 @@ class ProfileNetworkBuildingBlock(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager
 
 
+class ProfileNetworkDnsServer(LineageSource, CoreProfile, CoreNode):
+    ip_address: IPHostOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    vrf: StringOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
     amount_of_super_spines: IntegerOptional
     avd_hostvars_ready: BooleanOptional
+    bgp_evpn_overlay_password: StringOptional
+    bgp_mlag_password: StringOptional
+    bgp_underlay_password: StringOptional
     fabric_interface_sorting_method: DropdownOptional
     index: IntegerOptional
     mgmt_gateway: StringOptional
@@ -1462,15 +1514,20 @@ class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
     p2p_uplinks_mtu: IntegerOptional
     profile_name: String
     profile_priority: IntegerOptional
+    spanning_tree_mode: DropdownOptional
+    spanning_tree_priority: IntegerOptional
     spine_interface_sorting_method: DropdownOptional
     underlay_routing_protocol: DropdownOptional
     virtual_router_mac: StringOptional
     artifacts: RelationshipManager
     asn_pool: RelatedNode
     avd_evpn: RelatedNode
+    dns_servers: RelationshipManager
+    local_users: RelationshipManager
     member_of_groups: RelationshipManager
     mgmt_pool: RelatedNode
     node_id_pool: RelatedNode
+    ntp_servers: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager
     super_spine_switch_template: RelatedNode
@@ -1488,11 +1545,33 @@ class ProfileNetworkLink(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager
 
 
+class ProfileNetworkLocalUser(LineageSource, CoreProfile, CoreNode):
+    password: StringOptional
+    password_type: DropdownOptional
+    privilege: IntegerOptional
+    profile_name: String
+    profile_priority: IntegerOptional
+    role: DropdownOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
+class ProfileNetworkNtpServer(LineageSource, CoreProfile, CoreNode):
+    profile_name: String
+    profile_priority: IntegerOptional
+    server_vrf: StringOptional
+    member_of_groups: RelationshipManager
+    related_nodes: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class ProfileNetworkPod(LineageSource, CoreProfile, CoreNode):
     amount_of_spines: IntegerOptional
     checksum: StringOptional
     index: IntegerOptional
     leaf_interface_sorting_method: DropdownOptional
+    loopback_ipv4_offset: IntegerOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1734,7 +1813,6 @@ class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateD
     role: DropdownOptional
     status: DropdownOptional
     template_name: String
-    bundle_members: RelationshipManager
     device: RelatedNode
     dot1q_id_from_resource_pool: RelatedNode
     ip_address: RelatedNode
@@ -1764,7 +1842,6 @@ class TemplateInterfacePhysical(LineageSource, CoreObjectComponentTemplate, Temp
     role: DropdownOptional
     status: DropdownOptional
     template_name: String
-    bundle: RelatedNode
     connector: RelatedNode
     device: RelatedNode
     dot1q_id_from_resource_pool: RelatedNode
@@ -1772,6 +1849,7 @@ class TemplateInterfacePhysical(LineageSource, CoreObjectComponentTemplate, Temp
     ip_address_from_resource_pool: RelatedNode
     ip_addresses: RelationshipManager
     ip_addresses_from_resource_pool: RelatedNode
+    lag: RelatedNode
     member_of_groups: RelationshipManager
     mtu_from_resource_pool: RelatedNode
     profiles: RelationshipManager

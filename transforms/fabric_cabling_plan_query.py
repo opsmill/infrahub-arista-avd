@@ -121,9 +121,9 @@ class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDev
 class FabricCablingPlanQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeDcimInterface(
     BaseModel
 ):
-    typename__: Literal["DcimInterface", "InterfacePhysical", "InterfaceVirtual"] = (
-        Field(alias="__typename")
-    )
+    typename__: Literal[
+        "DcimInterface", "InterfaceLag", "InterfacePhysical", "InterfaceVirtual"
+    ] = Field(alias="__typename")
     id: Optional[str]
 
 
