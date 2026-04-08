@@ -772,6 +772,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         new_checksum = hashlib.sha256(new_content).hexdigest()
 
         artifact_name = hostname
+
+        # Get or create the artifact
         avd_artifact = await self.client.create(
             AvdArtifact,
             name=artifact_name,
@@ -780,35 +782,33 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         )
         await avd_artifact.save(allow_upsert=True)
 
-        # Check if existing hostvar file has the same content
-        existing_checksum = None
-        try:
-            existing_artifact = await self.client.get(AvdArtifact, name__value=artifact_name)
-            if existing_artifact.hostvar_file.id:
-                await existing_artifact.hostvar_file.fetch()
-                if existing_artifact.hostvar_file.peer:
-                    existing_content = await existing_artifact.hostvar_file.peer.download_file()
-                    existing_checksum = hashlib.sha256(existing_content).hexdigest()
-        except Exception:  # noqa: BLE001
-            pass
+        # Re-fetch to get the relationship IDs populated
+        avd_artifact = await self.client.get(AvdArtifact, name__value=artifact_name)
 
-        if existing_checksum == new_checksum:
-            # Content unchanged — register existing file with tracker so it's not deleted
-            if existing_artifact and existing_artifact.hostvar_file.id:
-                self.client.group_context.add_related_nodes(ids=[existing_artifact.hostvar_file.id])
+        # Get existing hostvar file if it exists
+        existing_file = None
+        existing_checksum = None
+        if avd_artifact.hostvar_file.id:
+            try:
+                await avd_artifact.hostvar_file.fetch()
+                existing_file = avd_artifact.hostvar_file.peer
+                if existing_file:
+                    existing_content = await existing_file.download_file()
+                    existing_checksum = hashlib.sha256(existing_content).hexdigest()
+            except Exception:  # noqa: BLE001
+                existing_file = None
+
+        if existing_checksum == new_checksum and existing_file:
+            # Content unchanged — register with tracker so it's not deleted
+            self.client.group_context.add_related_nodes(ids=[existing_file.id])
             self.logger.info(f"Hostvars unchanged for {hostname}")
         else:
-            # Reuse existing file object if it exists, otherwise create new
-            hostvar_file = None
-            if existing_artifact and existing_artifact.hostvar_file.id:
-                hostvar_file = existing_artifact.hostvar_file.peer
-
-            if not hostvar_file:
-                hostvar_file = await self.client.create(
-                    AvdHostvarFile,
-                    artifact=avd_artifact,
-                )
-
-            hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
-            await hostvar_file.save(allow_upsert=True)
+            # Upload new content to existing file or create new one
+            if existing_file:
+                existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
+                await existing_file.save(allow_upsert=True)
+            else:
+                hostvar_file = await self.client.create(AvdHostvarFile, artifact=avd_artifact)
+                hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
+                await hostvar_file.save(allow_upsert=True)
             self.logger.info(f"Hostvars updated for {hostname}")

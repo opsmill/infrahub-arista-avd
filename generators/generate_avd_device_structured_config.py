@@ -185,38 +185,36 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
                 avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
 
-                # Check if existing structured config has the same content
+                # Get existing structured config file if it exists
+                existing_file = None
                 existing_checksum = None
-                try:
-                    if avd_artifact.structured_config_file.id:
+                if avd_artifact.structured_config_file.id:
+                    try:
                         await avd_artifact.structured_config_file.fetch()
-                        if avd_artifact.structured_config_file.peer:
-                            existing_content = await avd_artifact.structured_config_file.peer.download_file()
+                        existing_file = avd_artifact.structured_config_file.peer
+                        if existing_file:
+                            existing_content = await existing_file.download_file()
                             existing_checksum = hashlib.sha256(existing_content).hexdigest()
-                except Exception:  # noqa: BLE001
-                    pass
+                    except Exception:  # noqa: BLE001
+                        existing_file = None
 
-                if existing_checksum == new_checksum:
+                if existing_checksum == new_checksum and existing_file:
                     # Content unchanged — register with tracker so it's not deleted
-                    if avd_artifact.structured_config_file.id:
-                        self.client.group_context.add_related_nodes(ids=[avd_artifact.structured_config_file.id])
+                    self.client.group_context.add_related_nodes(ids=[existing_file.id])
                     skipped_count += 1
                 else:
-                    # Reuse existing file object if it exists, otherwise create new
-                    sc_file = None
-                    if avd_artifact.structured_config_file.id:
-                        await avd_artifact.structured_config_file.fetch()
-                        sc_file = avd_artifact.structured_config_file.peer
-
-                    if not sc_file:
+                    # Upload new content to existing file or create new one
+                    if existing_file:
+                        existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
+                        await existing_file.save(allow_upsert=True)
+                    else:
                         sc_file = await self.client.create(
                             AvdStructuredConfigFile,
                             artifact=avd_artifact,
                             member_of_groups=["avd_structured_configs"],
                         )
-
-                    sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
-                    await sc_file.save(allow_upsert=True)
+                        sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
+                        await sc_file.save(allow_upsert=True)
                     success_count += 1
             except (ValueError, KeyError, TypeError, AttributeError) as e:
                 self.logger.exception(f"Structured config failed for {hostname}")
