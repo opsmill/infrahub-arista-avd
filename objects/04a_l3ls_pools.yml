@@ -1,0 +1,109 @@
+---
+# P2P Uplink Prefix for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.255.255.0/26
+      role: pod_leaf_spine
+---
+# P2P Uplink Pool for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-A-Uplink-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.255.255.0/26"
+---
+# VTEP Loopback Prefix for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.255.1.0/27
+      role: loopback-vtep
+---
+# VTEP Loopback Pool for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-A-VTEP-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - "10.255.1.0/27"
+---
+# MLAG Peer-Link Prefix for Fabric-A Pod-A2
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.255.1.64/27
+      role: technical
+    - prefix: 10.255.1.96/27
+      role: technical
+---
+# MLAG Peer Pool for Fabric-A Pod-A2
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-A-Pod-A2-MLAG-Peer-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.255.1.64/27"
+---
+# MLAG L3 Peering Pool for Fabric-A Pod-A2
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-A-Pod-A2-MLAG-L3-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.255.1.96/27"
+---
+# MLAG Peer Pool for Fabric-A Pod-A3
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-A-Pod-A3-MLAG-Peer-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.255.1.64/27"
+---
+# MLAG L3 Peering Pool for Fabric-A Pod-A3
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-A-Pod-A3-MLAG-L3-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.255.1.96/27"
