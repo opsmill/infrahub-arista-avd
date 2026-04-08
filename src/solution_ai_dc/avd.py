@@ -13,6 +13,7 @@ ROLE_TO_AVD_TYPE: dict[str, str] = {
     "super_spine": "super-spine",
     "spine": "spine",
     "leaf": "l3leaf",
+    "l2leaf": "l2leaf",
 }
 
 

@@ -85,7 +85,7 @@ nodes:
         order_weight: 1050
       - name: ip_address_virtual
         label: Virtual IP Address
-        kind: IPNetwork
+        kind: IPHost
         description: "Anycast gateway virtual IP address (e.g. 10.10.10.1/24)"
         order_weight: 1100
       - name: enabled

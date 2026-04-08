@@ -101,6 +101,10 @@ extensions:
               label: Server
             - name: storage
               label: Storage
+            - name: mlag_peer
+              label: MLAG Peer
+              description: "Interface used for MLAG peer-link"
+              color: "#d4a9e6"
           order_weight: 3000
         - name: mtu
           label: MTU
