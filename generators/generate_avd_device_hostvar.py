@@ -224,6 +224,16 @@ def extract_connected_endpoints(
                         "switches": [hostname],
                     }
 
+                    # Detect port-channel on the remote (server) endpoint
+                    endpoint_lag = getattr(endpoint, "lag", None)
+                    if endpoint_lag and endpoint_lag.node:
+                        lag_node = endpoint_lag.node
+                        port_channel: dict[str, str] = {"mode": "active"}
+                        lacp_mode = getattr(lag_node, "lacp_mode", None)
+                        if lacp_mode and lacp_mode.value:
+                            port_channel["mode"] = lacp_mode.value
+                        adapter["port_channel"] = port_channel
+
                     # Determine mode and add VLAN config
                     if tagged_vlans:
                         adapter["mode"] = "trunk"
@@ -356,7 +366,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         uplink = await self._extract_pool_prefix(getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool")
         vtep = await self._extract_pool_prefix(getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool")
         mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
-        mlag_l3 = await self._extract_pool_prefix(getattr(pod, "mlag_l3_pool", None), "CoreIPAddressPool")
+        # Auto-generated Pydantic model renames mlag_l3_pool to mlag_l_3_pool
+        mlag_l3_ref = getattr(pod, "mlag_l_3_pool", None) or getattr(pod, "mlag_l3_pool", None)
+        mlag_l3 = await self._extract_pool_prefix(mlag_l3_ref, "CoreIPAddressPool")
 
         return {
             "uplink_ipv4_pool": uplink or "10.250.0.0/16",
@@ -438,19 +450,27 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         return result
 
     @staticmethod
-    def _extract_mlag_info(device: object) -> dict[str, str | None]:
-        """Extract MLAG domain info for a device."""
+    def _extract_mlag_info(device: object) -> dict[str, Any]:
+        """Extract MLAG domain info for a device, including peer names."""
         device_mlag_domain = getattr(device, "mlag_domain", None)
         if not device_mlag_domain or not device_mlag_domain.node:
-            return {"domain_id": None, "virtual_router_mac": None}
+            return {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
 
         mlag_domain = device_mlag_domain.node
         domain_id = mlag_domain.domain_id.value if mlag_domain.domain_id else None
         vrmac = getattr(mlag_domain, "virtual_router_mac", None)
 
+        # Extract all peer names from the MLAG domain
+        peer_names: list[str] = []
+        if hasattr(mlag_domain, "peers") and mlag_domain.peers:
+            for peer_edge in mlag_domain.peers.edges:
+                if peer_edge.node and peer_edge.node.name:
+                    peer_names.append(peer_edge.node.name.value)
+
         return {
             "domain_id": domain_id,
             "virtual_router_mac": vrmac.value if vrmac else None,
+            "peer_names": peer_names,
         }
 
     @staticmethod
@@ -509,6 +529,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["uplink_switches"] = uplinks["uplink_switches"]
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
 
+        # Extract MLAG peer interfaces for leaf devices (AVD needs mlag_interfaces)
+        if mlag_info["domain_id"] and role == "leaf" and "mlag_peer_interfaces" in mlag_info:
+            node_config["mlag_interfaces"] = mlag_info["mlag_peer_interfaces"]
+
         # Leaf devices with SVIs need virtual_router_mac at node level
         if role == "leaf" and virtual_router_mac and tenants_data:
             node_config["virtual_router_mac_address"] = virtual_router_mac
@@ -565,12 +589,20 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         hostvars[node_type_key] = hostvars.get(node_type_key, {})
         hostvars[node_type_key]["nodes"] = [node_config]
 
-        # Add MLAG node_group for leaf devices
+        # Add MLAG node_group for leaf devices (AVD expects nodes listed inside the group)
         if mlag_info["domain_id"] and role == "leaf":
             effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
             node_group: dict[str, Any] = {"group": mlag_info["domain_id"]}
+            if bgp_asn is not None:
+                node_group["bgp_as"] = str(bgp_asn)
             if effective_vrmac:
                 node_group["virtual_router_mac_address"] = effective_vrmac
+            # Include peer node names in the group
+            group_nodes: list[dict[str, str]] = []
+            for peer_name in mlag_info.get("peer_names", []):
+                group_nodes.append({"name": peer_name})
+            if group_nodes:
+                node_group["nodes"] = group_nodes
             hostvars[node_type_key]["node_groups"] = [node_group]
 
         if tenants_data:
@@ -638,7 +670,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         p2p_uplinks_mtu = None if is_l2leaf else self._get_attr_value(fabric, "p2p_uplinks_mtu")
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
         spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
-        loopback_ipv4_offset = None if is_l2leaf else self._get_attr_value(pod, "loopback_ipv4_offset")
+        # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
+        loopback_offset_attr = getattr(pod, "loopback_ipv_4_offset", None) or getattr(pod, "loopback_ipv4_offset", None)
+        loopback_ipv4_offset = None if is_l2leaf else (loopback_offset_attr.value if loopback_offset_attr else None)
 
         # BGP peer group passwords (not applicable for L2 leafs)
         bgp_passwords: dict[str, str | None] = {"evpn_overlay": None, "underlay": None, "mlag": None}
@@ -664,9 +698,18 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             pools = await self._extract_l3ls_pools(fabric, pod)
 
         # Extract MLAG domain info (only for L3 leaf devices)
-        mlag_info = {"domain_id": None, "virtual_router_mac": None}
+        mlag_info: dict[str, Any] = {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
         if not is_l2leaf:
             mlag_info = self._extract_mlag_info(device)
+            # Extract mlag_peer interface names for AVD mlag_interfaces
+            if mlag_info["domain_id"] and iface_edges:
+                mlag_peer_ifaces = []
+                for edge in iface_edges:
+                    iface = edge.node
+                    if hasattr(iface, "role") and iface.role and iface.role.value == "mlag_peer":
+                        mlag_peer_ifaces.append(iface.name.value)
+                if mlag_peer_ifaces:
+                    mlag_info["mlag_peer_interfaces"] = sorted(mlag_peer_ifaces)
 
         # Fetch EVPN tenants (not applicable for L2 leafs)
         tenants_data: list[dict[str, Any]] = []

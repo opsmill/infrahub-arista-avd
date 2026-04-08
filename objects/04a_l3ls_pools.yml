@@ -51,9 +51,9 @@ kind: Object
 spec:
   kind: IpamPrefix
   data:
-    - prefix: 10.255.1.64/27
+    - prefix: 10.255.1.64/25
       role: technical
-    - prefix: 10.255.1.96/27
+    - prefix: 10.255.2.0/25
       role: technical
 ---
 # MLAG Peer Pool for Fabric-A Pod-A2
@@ -67,7 +67,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.1.64/27"
+        - "10.255.1.64/25"
 ---
 # MLAG L3 Peering Pool for Fabric-A Pod-A2
 apiVersion: infrahub.app/v1
@@ -80,7 +80,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.1.96/27"
+        - "10.255.2.0/25"
 ---
 # MLAG Peer Pool for Fabric-A Pod-A3
 apiVersion: infrahub.app/v1
@@ -93,7 +93,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.1.64/27"
+        - "10.255.1.64/25"
 ---
 # MLAG L3 Peering Pool for Fabric-A Pod-A3
 apiVersion: infrahub.app/v1
@@ -106,4 +106,4 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.1.96/27"
+        - "10.255.2.0/25"

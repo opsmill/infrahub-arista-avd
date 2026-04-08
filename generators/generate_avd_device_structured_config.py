@@ -128,31 +128,38 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         print("\nHostvars:")
         print(json.dumps(hostvars, indent=2))
 
+        validation_errors: list[str] = []
         for hostname, inputs in hostvars.items():
             validated = validate_inputs(inputs)
             if validated.validation_result.violations:
-                print(f"  ⚠ Validation warnings for {hostname}:")
                 for violation in validated.validation_result.violations:
                     msg = getattr(violation, "message", str(violation))
                     path = getattr(violation, "path", "")
-                    print(f"     - {msg} (path: {path})")
+                    validation_errors.append(f"{hostname}: {msg} (path: {path})")
+                self.logger.warning(f"Validation warnings for {hostname}: {len(validated.validation_result.violations)} issues")
             else:
-                print(f"  ✓ {hostname} validated successfully")
+                self.logger.info(f"{hostname} validated successfully")
 
-        print("\nStep 3: Generating AVD facts for all devices...")
-        try:
-            avd_facts = get_avd_facts(hostvars)
-            print(f"  ✓ Generated facts for {len(avd_facts)} devices")
-        except Exception as e:
-            print(f"  ❌ Failed to generate AVD facts: {e}")
+        if validation_errors:
+            for err in validation_errors:
+                self.logger.error(f"Validation error: {err}")
+            self.logger.error(f"pyAVD validation failed for {len(validation_errors)} inputs — aborting structured config generation")
             return
 
-        structured_configs = {}
+        self.logger.info("Generating AVD facts for all devices...")
+        try:
+            avd_facts = get_avd_facts(hostvars)
+            self.logger.info(f"Generated facts for {len(avd_facts)} devices")
+        except (ValueError, KeyError, TypeError):
+            self.logger.exception("AVD facts generation failed")
+            return
+
+        success_count = 0
+        failed_devices: list[str] = []
         for hostname, inputs in hostvars.items():
-            print(f"\n  Generating structured config for {hostname}...")
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
-                structured_config_dict = structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config
+                structured_config_dict = structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config  # noqa: SLF001
 
                 avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
 
@@ -166,7 +173,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     name=f"{hostname}-structured-config.json",
                 )
                 await sc_file.save(allow_upsert=True)
-                print(f"    ✓ Generated structured config with {len(structured_config_dict)} top-level keys")
-            except Exception as e:
-                print(f"    ❌ Failed: {e}")
-                continue
+                success_count += 1
+            except (ValueError, KeyError, TypeError, AttributeError) as e:
+                self.logger.exception(f"Structured config failed for {hostname}")
+                failed_devices.append(f"{hostname}: {e}")
+
+        self.logger.info(f"Structured config complete: {success_count} succeeded, {len(failed_devices)} failed")
+        for failure in failed_devices:
+            self.logger.error(f"  Failed: {failure}")

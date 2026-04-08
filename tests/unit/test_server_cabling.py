@@ -207,6 +207,7 @@ class TestDualHomedCabling:
 
         with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
             gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            gen._create_server_port_channel = AsyncMock()  # noqa: SLF001
             await gen.generate(data)
 
             mock_connect.assert_called_once()
