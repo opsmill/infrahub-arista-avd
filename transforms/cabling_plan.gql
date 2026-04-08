@@ -25,11 +25,51 @@ query FabricCablingPlanQuery($name: String!) {
                           node {
                             __typename
                             id
-                            ... on DcimEndpoint {
+                            ... on InterfacePhysical {
                               connector {
                                 node {
                                   __typename
                                   id
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                racks {
+                  edges {
+                    node {
+                      __typename
+                      id
+                      devices {
+                        edges {
+                          node {
+                            __typename
+                            id
+                            ... on DcimDevice {
+                              rack {
+                                node {
+                                  __typename
+                                  id
+                                }
+                              }
+                              interfaces {
+                                edges {
+                                  node {
+                                    __typename
+                                    id
+                                    ... on DcimEndpoint {
+                                      connector {
+                                        node {
+                                          __typename
+                                          id
+                                        }
+                                      }
+                                    }
+                                  }
                                 }
                               }
                             }
