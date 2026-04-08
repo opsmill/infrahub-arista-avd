@@ -812,5 +812,3 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
             await hostvar_file.save(allow_upsert=True)
             self.logger.info(f"Hostvars updated for {hostname}")
-
-        await check_fabric_hostvars_ready(self.client, fabric.id)
