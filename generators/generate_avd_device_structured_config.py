@@ -98,7 +98,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 continue
 
             try:
-                artifact = await self.client.get(AvdArtifact, name__value=hostname)
+                artifact = await self.client.get(AvdArtifact, name__value=f"{hostname}_avd")
                 await artifact.hostvar_file.fetch()
                 hostvar_file = artifact.hostvar_file.peer
                 content = await hostvar_file.download_file()
@@ -154,30 +154,49 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             self.logger.exception("AVD facts generation failed")
             return
 
+        import hashlib
+
         success_count = 0
+        skipped_count = 0
         failed_devices: list[str] = []
         for hostname, inputs in hostvars.items():
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
                 structured_config_dict = structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config  # noqa: SLF001
 
-                avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
+                new_content = json.dumps(structured_config_dict, indent=2).encode()
+                new_checksum = hashlib.sha256(new_content).hexdigest()
+
+                avd_artifact = await self.client.get(AvdArtifact, name__value=f"{hostname}_avd")
+
+                # Check if existing structured config has the same content
+                existing_checksum = None
+                await avd_artifact.structured_config_file.fetch()
+                if avd_artifact.structured_config_file.peer:
+                    try:
+                        existing_content = await avd_artifact.structured_config_file.peer.download_file()
+                        existing_checksum = hashlib.sha256(existing_content).hexdigest()
+                    except (AttributeError, KeyError):
+                        pass
+
+                if existing_checksum == new_checksum:
+                    skipped_count += 1
+                    continue
 
                 sc_file = await self.client.create(
                     AvdStructuredConfigFile,
                     artifact=avd_artifact,
                     member_of_groups=["avd_structured_configs"],
                 )
-                sc_file.upload_from_bytes(
-                    content=json.dumps(structured_config_dict, indent=2).encode(),
-                    name=f"{hostname}-structured-config.json",
-                )
+                sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
                 await sc_file.save(allow_upsert=True)
                 success_count += 1
             except (ValueError, KeyError, TypeError, AttributeError) as e:
                 self.logger.exception(f"Structured config failed for {hostname}")
                 failed_devices.append(f"{hostname}: {e}")
 
-        self.logger.info(f"Structured config complete: {success_count} succeeded, {len(failed_devices)} failed")
+        self.logger.info(
+            f"Structured config complete: {success_count} updated, {skipped_count} unchanged, {len(failed_devices)} failed"
+        )
         for failure in failed_devices:
             self.logger.error(f"  Failed: {failure}")

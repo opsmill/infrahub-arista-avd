@@ -762,26 +762,40 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             error_detail = "; ".join(violation_msgs)
             raise ValueError(f"pyAVD validation failed for {hostname}: {error_detail}")
 
-        # Print for debugging
-        print(f"\n=== AVD Device Hostvar for {hostname} ===")
-        print(f"Device: {hostname}")
-        print(f"Role: {role}")
-        print("\nFull hostvars structure:")
-        print(json.dumps(hostvars, indent=2))
+        import hashlib
 
+        new_content = json.dumps(hostvars, indent=2).encode()
+        new_checksum = hashlib.sha256(new_content).hexdigest()
+
+        artifact_name = f"{hostname}_avd"
         avd_artifact = await self.client.create(
             AvdArtifact,
-            name=hostname,
+            name=artifact_name,
             device=device_id,
             member_of_groups=["avd_artifacts"],
         )
         await avd_artifact.save(allow_upsert=True)
 
-        hostvar_file = await self.client.create(
-            AvdHostvarFile,
-            artifact=avd_artifact,
-        )
-        hostvar_file.upload_from_bytes(content=json.dumps(hostvars, indent=2).encode(), name=f"{hostname}-hostvars.json")
-        await hostvar_file.save(allow_upsert=True)
+        # Check if existing hostvar file has the same content
+        existing_checksum = None
+        try:
+            existing_artifact = await self.client.get(AvdArtifact, name__value=artifact_name)
+            await existing_artifact.hostvar_file.fetch()
+            if existing_artifact.hostvar_file.peer:
+                existing_content = await existing_artifact.hostvar_file.peer.download_file()
+                existing_checksum = hashlib.sha256(existing_content).hexdigest()
+        except (AttributeError, KeyError):
+            pass
+
+        if existing_checksum == new_checksum:
+            self.logger.info(f"Hostvars unchanged for {hostname}, skipping upload")
+        else:
+            hostvar_file = await self.client.create(
+                AvdHostvarFile,
+                artifact=avd_artifact,
+            )
+            hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
+            await hostvar_file.save(allow_upsert=True)
+            self.logger.info(f"Hostvars updated for {hostname}")
 
         await check_fabric_hostvars_ready(self.client, fabric.id)
