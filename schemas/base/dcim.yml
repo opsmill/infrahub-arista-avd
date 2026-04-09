@@ -8,6 +8,7 @@ generics:
     description: Generic Device object.
     label: Device
     icon: mdi:server
+    include_in_menu: false
     human_friendly_id:
       - name__value
     order_by:
@@ -308,6 +309,7 @@ nodes:
     description: A model of device
     label: Device Type
     icon: mdi:poll
+    include_in_menu: false
     human_friendly_id:
       - manufacturer__name__value
       - name__value
@@ -371,6 +373,7 @@ nodes:
     description: A Platform represent the type of software running on a device.
     label: Platform
     icon: mdi:application-cog-outline
+    include_in_menu: false
     human_friendly_id:
       - name__value
     display_label: name__value
@@ -424,6 +427,7 @@ nodes:
     label: Network Device
     description: A configurable network device for managing and directing data traffic, including routers, switches...
     icon: clarity:network-switch-solid
+    include_in_menu: false
     generate_template: true
     namespace: Dcim
     inherit_from:

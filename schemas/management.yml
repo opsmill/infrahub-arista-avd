@@ -8,6 +8,7 @@ nodes:
     description: "DNS server for fabric device management"
     label: DNS Server
     icon: mdi:dns
+    include_in_menu: false
     human_friendly_id:
       - name__value
     order_by:
@@ -37,6 +38,7 @@ nodes:
     description: "NTP server for fabric device time synchronization"
     label: NTP Server
     icon: mdi:clock-outline
+    include_in_menu: false
     human_friendly_id:
       - name__value
     order_by:
@@ -62,6 +64,7 @@ nodes:
     description: "Local user account for fabric device access"
     label: Local User
     icon: mdi:account
+    include_in_menu: false
     human_friendly_id:
       - name__value
     order_by:

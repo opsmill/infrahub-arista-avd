@@ -24,7 +24,7 @@ nodes:
     namespace: Compute
     description: A physical server with fixed resources and specific hardware characteristics.
     label: Physical Server
-    include_in_menu: true
+    include_in_menu: false
     icon: mdi:server
     generate_template: true
     inherit_from:
@@ -75,6 +75,7 @@ nodes:
     description: A virtual machine hosted on a server or a cluster.
     label: Virtual Machine
     icon: carbon:virtual-machine
+    include_in_menu: false
     inherit_from:
       - ComputeGenericUnit
     attributes:

@@ -8,6 +8,7 @@ nodes:
     description: "A physical cable or connection between two endpoints"
     label: Network Link
     icon: mdi:cable-data
+    include_in_menu: false
     inherit_from:
       - DcimConnector
     human_friendly_id:

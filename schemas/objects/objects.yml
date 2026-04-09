@@ -5,7 +5,7 @@ version: "1.0"
 nodes:
   - name: Artifact
     namespace: Avd
-    include_in_menu: true
+    include_in_menu: false
     display_label: name__value
     human_friendly_id:
       - name__value

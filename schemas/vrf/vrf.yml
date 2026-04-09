@@ -9,6 +9,7 @@ nodes:
     description: A VRF is isolated layer three domain
     label: VRF
     icon: mdi:router
+    include_in_menu: false
     human_friendly_id:
       - name__value
     order_by:
@@ -53,6 +54,7 @@ nodes:
     description: Route Target (RFC 4360)
     label: Route Target
     icon: mdi:target
+    include_in_menu: false
     menu_placement: IpamVRF
     human_friendly_id:
       - name__value
