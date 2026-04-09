@@ -177,7 +177,7 @@ def init_semaphore(
     print("=== Semaphore init complete ===")
 
 
-@task
+@task(pre=[init_semaphore])
 def load(ctx: Context) -> None:
     load_schema(ctx)
     load_menu(ctx)
@@ -296,7 +296,7 @@ def lint_all(ctx: Context) -> None:
 
 
 @task
-def start(ctx: Context, pre=[init_semaphore]) -> None:
+def start(ctx: Context) -> None:
     """
     Start the services using docker-compose in detached mode.
     """
