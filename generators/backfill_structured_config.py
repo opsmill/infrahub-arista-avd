@@ -131,9 +131,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         await ip_address.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Ensured IP address {ip_iface}")
 
-        interface = await self.client.get(DcimInterface, id=interface_node.id, include=["connector"])
+        interface = await self.client.get(DcimInterface, id=interface_node.id)
         interface.ip_address = ip_address
-        await interface.save(allow_upsert=True)
+        await interface.save()
         self.logger.info(f"[{hostname}] Assigned {ip_iface} to {iface_name}")
 
     async def _update_mtu(
@@ -150,7 +150,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         interface.mtu.value = mtu
         if avd_source and hasattr(interface.mtu, "source"):
             interface.mtu.source = NodeProperty(avd_source)
-        await interface.save(allow_upsert=True)
+        await interface.save()
         self.logger.info(f"[{hostname}] Ensured MTU {mtu} on {iface_name}")
 
     # --- BGP backfill ---
