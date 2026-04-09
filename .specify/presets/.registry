@@ -12,10 +12,15 @@
           "speckit.specify",
           "speckit.plan",
           "speckit.implement"
+        ],
+        "codex": [
+          "speckit.specify",
+          "speckit.plan",
+          "speckit.implement"
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-04-01T15:51:07.458149+00:00"
+      "installed_at": "2026-04-09T09:58:38.601169+00:00"
     }
   }
 }
