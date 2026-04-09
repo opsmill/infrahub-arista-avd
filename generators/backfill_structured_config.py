@@ -20,6 +20,9 @@ from solution_ai_dc.protocols import (
     AvdStructuredConfigFile,
     CoreAccountGroup,
     DcimInterface,
+    InterfaceLag,
+    InterfacePhysical,
+    InterfaceVirtual,
     IpamIPAddress,
     IpamPrefix,
     RoutingBGPNeighbor,
@@ -35,6 +38,12 @@ from .backfill_structured_config_query import (
     BackfillStructuredConfigQuery,
     BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
 )
+
+INTERFACE_KIND_MAP: dict[str, type] = {
+    "InterfacePhysical": InterfacePhysical,
+    "InterfaceVirtual": InterfaceVirtual,
+    "InterfaceLag": InterfaceLag,
+}
 
 INTERFACE_SECTIONS = ["ethernet_interfaces", "loopback_interfaces", "management_interfaces"]
 
@@ -131,7 +140,8 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         await ip_address.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Ensured IP address {ip_iface}")
 
-        interface = await self.client.get(DcimInterface, id=interface_node.id, include=["connector"])
+        iface_kind = INTERFACE_KIND_MAP.get(interface_node.typename__, DcimInterface)
+        interface = await self.client.get(iface_kind, id=interface_node.id)
         interface.ip_address = ip_address
         await interface.save(allow_upsert=True)
         self.logger.info(f"[{hostname}] Assigned {ip_iface} to {iface_name}")
@@ -146,7 +156,8 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         """Update interface MTU."""
         iface_name = interface_node.name.value if interface_node.name else "unknown"
 
-        interface = await self.client.get(DcimInterface, id=interface_node.id)
+        iface_kind = INTERFACE_KIND_MAP.get(interface_node.typename__, DcimInterface)
+        interface = await self.client.get(iface_kind, id=interface_node.id)
         interface.mtu.value = mtu
         if avd_source and hasattr(interface.mtu, "source"):
             interface.mtu.source = NodeProperty(avd_source)
