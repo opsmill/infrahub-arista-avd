@@ -130,15 +130,14 @@ def main() -> None:
         if tenants:
             tenant_data = []
             for t in tenants:
-                fabric_names = ", ".join(
-                    e["node"]["name"]["value"]
-                    for e in t.get("fabrics", {}).get("edges", [])
+                fabric_names = ", ".join(e["node"]["name"]["value"] for e in t.get("fabrics", {}).get("edges", []))
+                tenant_data.append(
+                    {
+                        "Tenant": t.get("name", {}).get("value", ""),
+                        "VNI Base": t.get("mac_vrf_vni_base", {}).get("value", ""),
+                        "Fabrics": fabric_names,
+                    }
                 )
-                tenant_data.append({
-                    "Tenant": t.get("name", {}).get("value", ""),
-                    "VNI Base": t.get("mac_vrf_vni_base", {}).get("value", ""),
-                    "Fabrics": fabric_names,
-                })
             st.dataframe(tenant_data, use_container_width=True, hide_index=True)
             st.caption(f"Found {len(tenants)} tenant(s)")
         else:
@@ -159,11 +158,13 @@ def main() -> None:
             vrf_data = []
             for v in vrfs:
                 tenant_node = (v.get("tenant") or {}).get("node") or {}
-                vrf_data.append({
-                    "VRF": v.get("name", {}).get("value", ""),
-                    "VNI": v.get("vrf_vni", {}).get("value", ""),
-                    "Tenant": (tenant_node.get("name") or {}).get("value", ""),
-                })
+                vrf_data.append(
+                    {
+                        "VRF": v.get("name", {}).get("value", ""),
+                        "VNI": v.get("vrf_vni", {}).get("value", ""),
+                        "Tenant": (tenant_node.get("name") or {}).get("value", ""),
+                    }
+                )
             st.dataframe(vrf_data, use_container_width=True, hide_index=True)
             st.caption(f"Found {len(vrfs)} VRF(s)")
         else:

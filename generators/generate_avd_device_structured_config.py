@@ -152,14 +152,18 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     msg = getattr(violation, "message", str(violation))
                     path = getattr(violation, "path", "")
                     validation_errors.append(f"{hostname}: {msg} (path: {path})")
-                self.logger.warning(f"Validation warnings for {hostname}: {len(validated.validation_result.violations)} issues")
+                self.logger.warning(
+                    f"Validation warnings for {hostname}: {len(validated.validation_result.violations)} issues"
+                )
             else:
                 self.logger.info(f"{hostname} validated successfully")
 
         if validation_errors:
             for err in validation_errors:
                 self.logger.error(f"Validation error: {err}")
-            self.logger.error(f"pyAVD validation failed for {len(validation_errors)} inputs — aborting structured config generation")
+            self.logger.error(
+                f"pyAVD validation failed for {len(validation_errors)} inputs — aborting structured config generation"
+            )
             return
 
         self.logger.info("Generating AVD facts for all devices...")
@@ -178,7 +182,9 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         for hostname, inputs in hostvars.items():
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
-                structured_config_dict = structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config  # noqa: SLF001
+                structured_config_dict = (
+                    structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config
+                )
 
                 new_content = json.dumps(structured_config_dict, indent=2).encode()
                 new_checksum = hashlib.sha256(new_content).hexdigest()

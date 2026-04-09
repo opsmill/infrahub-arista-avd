@@ -133,10 +133,7 @@ def main() -> None:
                 )
 
             pc_url = client.get_proposed_change_url(pc["id"])
-            server_url = (
-                f"{INFRAHUB_UI_URL}/objects/ComputePhysicalServer/{server['id']}"
-                f"?branch={branch_name}"
-            )
+            server_url = f"{INFRAHUB_UI_URL}/objects/ComputePhysicalServer/{server['id']}?branch={branch_name}"
 
             display_success(f"Server '{server_name}' created successfully!")
             col1, col2 = st.columns(2)

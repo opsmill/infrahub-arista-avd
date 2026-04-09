@@ -151,9 +151,9 @@ class TestSingleHomedCabling:
 
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf],            # leaf switches in rack
-                [mock_server_iface],    # server DcimInterface objects
-                [leaf_iface],           # leaf InterfacePhysical objects
+                [mock_leaf],  # leaf switches in rack
+                [mock_server_iface],  # server DcimInterface objects
+                [leaf_iface],  # leaf InterfacePhysical objects
             ]
         )
         gen.client.get = AsyncMock(return_value=mock_server_iface)
@@ -198,9 +198,9 @@ class TestDualHomedCabling:
 
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf1, mock_leaf2],           # leaf switches
+                [mock_leaf1, mock_leaf2],  # leaf switches
                 [mock_server_iface1, mock_server_iface2],  # server DcimInterface objects
-                [leaf1_iface, leaf2_iface],         # leaf InterfacePhysical objects
+                [leaf1_iface, leaf2_iface],  # leaf InterfacePhysical objects
             ]
         )
         gen.client.get = AsyncMock(return_value=mock_server_iface1)
@@ -314,9 +314,9 @@ class TestInsufficientInterfaces:
 
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf],            # leaf switches
-                [mock_server_iface],    # server DcimInterface objects
-                [leaf_iface],           # leaf InterfacePhysical objects
+                [mock_leaf],  # leaf switches
+                [mock_server_iface],  # server DcimInterface objects
+                [leaf_iface],  # leaf InterfacePhysical objects
             ]
         )
         gen.client.get = AsyncMock(return_value=mock_server_iface)
@@ -360,9 +360,9 @@ class TestSingleLeafDualHomed:
 
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf],                                # leaf switches
-                [mock_server_iface1, mock_server_iface2],   # server DcimInterface objects
-                [leaf_iface1, leaf_iface2],                 # leaf InterfacePhysical objects
+                [mock_leaf],  # leaf switches
+                [mock_server_iface1, mock_server_iface2],  # server DcimInterface objects
+                [leaf_iface1, leaf_iface2],  # leaf InterfacePhysical objects
             ]
         )
         gen.client.get = AsyncMock(return_value=mock_server_iface1)
@@ -615,9 +615,9 @@ class TestAvdCascadeTrigger:
 
         gen.client.filters = AsyncMock(
             side_effect=[
-                [mock_leaf],            # leaf switches
-                [mock_server_iface],    # server DcimInterface objects
-                [leaf_iface],           # leaf InterfacePhysical objects
+                [mock_leaf],  # leaf switches
+                [mock_server_iface],  # server DcimInterface objects
+                [leaf_iface],  # leaf InterfacePhysical objects
             ]
         )
         gen.client.get = AsyncMock(return_value=mock_server_iface)

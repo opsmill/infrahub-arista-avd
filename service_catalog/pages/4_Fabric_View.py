@@ -15,7 +15,6 @@ from utils import (
     display_success,
 )
 from utils.api import InfrahubAPIError, InfrahubConnectionError, InfrahubGraphQLError
-from utils.api import InfrahubConnectionError, InfrahubGraphQLError
 
 if "infrahub_url" not in st.session_state:
     st.session_state.infrahub_url = INFRAHUB_ADDRESS
@@ -96,15 +95,21 @@ def _fetch_fabric_topology(client: InfrahubClient, fabric_name: str, branch: str
 def _make_node(nid: str, x: int, y: int, label: str, color: str, w: int = 100) -> "StreamlitFlowNode":
     """Create a compact styled node."""
     from streamlit_flow.elements import StreamlitFlowNode
+
     return StreamlitFlowNode(
-        id=nid, pos=(x, y),
+        id=nid,
+        pos=(x, y),
         data={"content": label},
         node_type="default",
         style={
-            "background": color, "color": "#fff",
-            "padding": "4px 8px", "borderRadius": "6px",
-            "fontSize": "11px", "textAlign": "center",
-            "width": w, "minHeight": "30px",
+            "background": color,
+            "color": "#fff",
+            "padding": "4px 8px",
+            "borderRadius": "6px",
+            "fontSize": "11px",
+            "textAlign": "center",
+            "width": w,
+            "minHeight": "30px",
             "border": f"1px solid {color}",
         },
     )
@@ -161,10 +166,15 @@ def _render_topology(data: dict[str, Any]) -> None:
         else:
             nodes.append(_make_node(pid, pcx, Y_POD, f"{pn}\n{spines} spines", "#059669", W))
 
-        edges.append(StreamlitFlowEdge(
-            id=f"f-{pid}", source="fabric", target=pid,
-            animated=True, style={"stroke": "#64748b"},
-        ))
+        edges.append(
+            StreamlitFlowEdge(
+                id=f"f-{pid}",
+                source="fabric",
+                target=pid,
+                animated=True,
+                style={"stroke": "#64748b"},
+            )
+        )
 
         for ri, re in enumerate(p.get("racks", {}).get("edges", [])):
             r = re["node"]
@@ -182,18 +192,26 @@ def _render_topology(data: dict[str, Any]) -> None:
             tag = f"{lc}L3" + (f"+{l2c}L2" if l2c else "")
             rc = {"compute": "#b45309", "storage": "#b91c1c"}.get(rt, "#4b5563")
             nodes.append(_make_node(rid, rx, Y_RACK, f"{rn}\n{rt} | {tag}", rc, W))
-            edges.append(StreamlitFlowEdge(
-                id=f"{pid}-{rid}", source=pid, target=rid,
-                style={"stroke": "#64748b"},
-            ))
+            edges.append(
+                StreamlitFlowEdge(
+                    id=f"{pid}-{rid}",
+                    source=pid,
+                    target=rid,
+                    style={"stroke": "#64748b"},
+                )
+            )
 
             for l2 in l2s:
                 l2id = l2.replace("-", "_")
                 nodes.append(_make_node(l2id, rx, Y_L2, f"{l2}\nL2 leaf", "#4b5563", W))
-                edges.append(StreamlitFlowEdge(
-                    id=f"{rid}-{l2id}", source=rid, target=l2id,
-                    style={"stroke": "#6b7280", "strokeDasharray": "4"},
-                ))
+                edges.append(
+                    StreamlitFlowEdge(
+                        id=f"{rid}-{l2id}",
+                        source=rid,
+                        target=l2id,
+                        style={"stroke": "#6b7280", "strokeDasharray": "4"},
+                    )
+                )
 
         cursor += pi["w"]
 
@@ -255,7 +273,10 @@ def _fetch_cabling_data(_client: InfrahubClient, fabric_name: str, branch: str) 
     link_ids = set()
     for pod_edge in result["NetworkFabric"]["edges"][0]["node"]["children"]["edges"]:
         pod = pod_edge["node"]
-        for src in [pod.get("devices", {}), *[r["node"].get("devices", {}) for r in pod.get("racks", {}).get("edges", [])]]:
+        for src in [
+            pod.get("devices", {}),
+            *[r["node"].get("devices", {}) for r in pod.get("racks", {}).get("edges", [])],
+        ]:
             for dev_edge in src.get("edges", []):
                 dev = dev_edge["node"]
                 for iface_edge in dev.get("interfaces", {}).get("edges", []):
@@ -305,7 +326,7 @@ def _fetch_cabling_data(_client: InfrahubClient, fabric_name: str, branch: str) 
     batch_ids = list(link_ids)
     for i in range(0, len(batch_ids), 10):
         try:
-            result = _client.execute_graphql(links_query, {"ids": batch_ids[i:i + 10]}, branch=branch)
+            result = _client.execute_graphql(links_query, {"ids": batch_ids[i : i + 10]}, branch=branch)
         except Exception:
             continue
         for edge in result.get("NetworkLink", {}).get("edges", []):
@@ -316,14 +337,16 @@ def _fetch_cabling_data(_client: InfrahubClient, fabric_name: str, branch: str) 
                 src_dev = (src.get("device") or {}).get("node") or {}
                 dst_dev = (dst.get("device") or {}).get("node") or {}
                 if src_dev.get("name") and dst_dev.get("name"):
-                    links.append({
-                        "src_device": src_dev["name"]["value"],
-                        "src_role": src_dev.get("role", {}).get("value", ""),
-                        "src_interface": (src.get("name") or {}).get("value", ""),
-                        "dst_device": dst_dev["name"]["value"],
-                        "dst_role": dst_dev.get("role", {}).get("value", ""),
-                        "dst_interface": (dst.get("name") or {}).get("value", ""),
-                    })
+                    links.append(
+                        {
+                            "src_device": src_dev["name"]["value"],
+                            "src_role": src_dev.get("role", {}).get("value", ""),
+                            "src_interface": (src.get("name") or {}).get("value", ""),
+                            "dst_device": dst_dev["name"]["value"],
+                            "dst_role": dst_dev.get("role", {}).get("value", ""),
+                            "dst_interface": (dst.get("name") or {}).get("value", ""),
+                        }
+                    )
     return links
 
 
@@ -385,40 +408,44 @@ def _render_cabling_topology(client: InfrahubClient, fabric_name: str, branch: s
 
         for i, name in enumerate(sorted(devs)):
             short = name.split("-")[-1] if len(name) > 15 else name
-            nodes.append(StreamlitFlowNode(
-                id=name,
-                pos=(start_x + i * slot, y),
-                data={"content": f"**{name}**\n{role}"},
-                node_type="default",
-                style={
-                    "background": color,
-                    "color": "white",
-                    "padding": "6px",
-                    "borderRadius": "6px",
-                    "width": node_w,
-                    "fontSize": "9px",
-                },
-            ))
+            nodes.append(
+                StreamlitFlowNode(
+                    id=name,
+                    pos=(start_x + i * slot, y),
+                    data={"content": f"**{name}**\n{role}"},
+                    node_type="default",
+                    style={
+                        "background": color,
+                        "color": "white",
+                        "padding": "6px",
+                        "borderRadius": "6px",
+                        "width": node_w,
+                        "fontSize": "9px",
+                    },
+                )
+            )
 
     # Also add non-fabric devices (servers etc) that appear in links
     other_devs = {name for name, role in devices.items() if role not in role_order}
     if other_devs:
         start_x = (max_width * slot - len(other_devs) * slot) // 2
         for i, name in enumerate(sorted(other_devs)):
-            nodes.append(StreamlitFlowNode(
-                id=name,
-                pos=(start_x + i * slot, 800),
-                data={"content": f"**{name}**\nserver"},
-                node_type="default",
-                style={
-                    "background": "#374151",
-                    "color": "white",
-                    "padding": "6px",
-                    "borderRadius": "6px",
-                    "width": node_w,
-                    "fontSize": "9px",
-                },
-            ))
+            nodes.append(
+                StreamlitFlowNode(
+                    id=name,
+                    pos=(start_x + i * slot, 800),
+                    data={"content": f"**{name}**\nserver"},
+                    node_type="default",
+                    style={
+                        "background": "#374151",
+                        "color": "white",
+                        "padding": "6px",
+                        "borderRadius": "6px",
+                        "width": node_w,
+                        "fontSize": "9px",
+                    },
+                )
+            )
 
     # Build edges from links (dedupe by device pair)
     seen_pairs: set[tuple[str, str]] = set()
@@ -431,8 +458,7 @@ def _render_cabling_topology(client: InfrahubClient, fabric_name: str, branch: s
         seen_pairs.add(pair)
 
         # Count total links between this pair
-        count = sum(1 for l in links
-                    if tuple(sorted([l["src_device"], l["dst_device"]])) == pair)
+        count = sum(1 for l in links if tuple(sorted([l["src_device"], l["dst_device"]])) == pair)
 
         edge_label = f"{count}x" if count > 1 else ""
         # Determine direction: source should be the higher-tier device
@@ -444,15 +470,17 @@ def _render_cabling_topology(client: InfrahubClient, fabric_name: str, branch: s
         if src_tier > tgt_tier:
             src, tgt = tgt, src
 
-        flow_edges.append(StreamlitFlowEdge(
-            id=f"{src}-{tgt}",
-            source=src,
-            target=tgt,
-            source_handle="bottom",
-            target_handle="top",
-            label=edge_label,
-            style={"stroke": "#4b5563", "strokeWidth": min(count, 4)},
-        ))
+        flow_edges.append(
+            StreamlitFlowEdge(
+                id=f"{src}-{tgt}",
+                source=src,
+                target=tgt,
+                source_handle="bottom",
+                target_handle="top",
+                label=edge_label,
+                style={"stroke": "#4b5563", "strokeWidth": min(count, 4)},
+            )
+        )
 
     st.caption(f"{len(devices)} devices, {len(seen_pairs)} connections ({len(links)} total links)")
 
@@ -562,11 +590,13 @@ def _render_tenants(data: dict[str, Any]) -> None:
                 vrf_data = []
                 for vrf_edge in vrfs:
                     vrf = vrf_edge["node"]
-                    vrf_data.append({
-                        "VRF": vrf["name"]["value"],
-                        "VNI": vrf.get("vrf_vni", {}).get("value", "—"),
-                        "SVIs": vrf.get("svis", {}).get("count", 0),
-                    })
+                    vrf_data.append(
+                        {
+                            "VRF": vrf["name"]["value"],
+                            "VNI": vrf.get("vrf_vni", {}).get("value", "—"),
+                            "SVIs": vrf.get("svis", {}).get("count", 0),
+                        }
+                    )
                 st.dataframe(vrf_data, use_container_width=True, hide_index=True)
 
             if l2vlan_count:
@@ -579,7 +609,9 @@ def _render_generate_action(client: InfrahubClient, fabric_name: str, current_br
 
     with col1:
         st.markdown("**Generate Fabric**")
-        st.caption("Create a new branch, run the fabric generator (creates devices, cabling, hostvars, configs), and open a proposed change.")
+        st.caption(
+            "Create a new branch, run the fabric generator (creates devices, cabling, hostvars, configs), and open a proposed change."
+        )
 
     with col2:
         from datetime import datetime

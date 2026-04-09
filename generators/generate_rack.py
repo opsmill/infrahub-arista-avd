@@ -66,7 +66,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         # L2 leaf fields (optional)
         rack_node = data.location_rack.edges[0].node
         l2leaf_count_attr = getattr(rack_node, "amount_of_l_2_leafs", None)
-        self.rack_amount_of_l2leafs: int = l2leaf_count_attr.value if l2leaf_count_attr and l2leaf_count_attr.value else 0
+        self.rack_amount_of_l2leafs: int = (
+            l2leaf_count_attr.value if l2leaf_count_attr and l2leaf_count_attr.value else 0
+        )
         l2leaf_template_attr = getattr(rack_node, "l_2_leaf_switch_template", None)
         self.rack_l2leaf_switch_template: str | None = (
             l2leaf_template_attr.node.id if l2leaf_template_attr and l2leaf_template_attr.node else None

@@ -120,14 +120,16 @@ class CablingPlan(InfrahubTransform):
                 dst_rack_name = (dst_rack.get("name") or {}).get("value", "")
 
                 if src_dev_name and dst_dev_name:
-                    all_rows.append({
-                        "src_rack": src_rack_name,
-                        "src_device": src_dev_name,
-                        "src_interface": src_name,
-                        "dst_rack": dst_rack_name,
-                        "dst_device": dst_dev_name,
-                        "dst_interface": dst_name,
-                    })
+                    all_rows.append(
+                        {
+                            "src_rack": src_rack_name,
+                            "src_device": src_dev_name,
+                            "src_interface": src_name,
+                            "dst_rack": dst_rack_name,
+                            "dst_device": dst_dev_name,
+                            "dst_interface": dst_name,
+                        }
+                    )
 
         return all_rows
 

@@ -79,11 +79,15 @@ def main() -> None:
             vrf_vni = st.number_input("VRF VNI", min_value=1, max_value=16777215, value=100)
 
             l2domain_options = {d["id"]: d["name"]["value"] for d in l2domains}
-            l2domain_id = st.selectbox(
-                "L2 Domain",
-                options=list(l2domain_options.keys()),
-                format_func=lambda x: l2domain_options[x],
-            ) if l2domains else None
+            l2domain_id = (
+                st.selectbox(
+                    "L2 Domain",
+                    options=list(l2domain_options.keys()),
+                    format_func=lambda x: l2domain_options[x],
+                )
+                if l2domains
+                else None
+            )
 
             fabric_options = {f["id"]: f["name"]["value"] for f in fabrics}
             fabric_id = st.selectbox(
@@ -124,11 +128,15 @@ def main() -> None:
                     }) { ok object { id } }
                 }
                 """
-                vlan_result = client.execute_graphql(vlan_mutation, {
-                    "name": segment_name,
-                    "vlan_id": vlan_id,
-                    "l2domain": l2domain_id,
-                }, branch=branch_name)
+                vlan_result = client.execute_graphql(
+                    vlan_mutation,
+                    {
+                        "name": segment_name,
+                        "vlan_id": vlan_id,
+                        "l2domain": l2domain_id,
+                    },
+                    branch=branch_name,
+                )
                 vlan_obj_id = vlan_result["IpamVLANCreate"]["object"]["id"]
             st.info(f"VLAN {vlan_id} ({segment_name}) created")
 
@@ -146,11 +154,15 @@ def main() -> None:
                         }) { ok object { id } }
                     }
                     """
-                    vrf_result = client.execute_graphql(vrf_mutation, {
-                        "name": vrf_name,
-                        "vrf_vni": vrf_vni,
-                        "tenant": tenant_id,
-                    }, branch=branch_name)
+                    vrf_result = client.execute_graphql(
+                        vrf_mutation,
+                        {
+                            "name": vrf_name,
+                            "vrf_vni": vrf_vni,
+                            "tenant": tenant_id,
+                        },
+                        branch=branch_name,
+                    )
                     vrf_id = vrf_result["IpamVRFCreate"]["object"]["id"]
                 st.info(f"VRF {vrf_name} (VNI {vrf_vni}) created")
             else:
@@ -172,13 +184,17 @@ def main() -> None:
                         }) { ok object { id } }
                     }
                     """
-                    client.execute_graphql(svi_mutation, {
-                        "name": segment_name,
-                        "svi_id": vlan_id,
-                        "ip": gateway_ip,
-                        "vrf": vrf_id,
-                        "vlan": vlan_obj_id,
-                    }, branch=branch_name)
+                    client.execute_graphql(
+                        svi_mutation,
+                        {
+                            "name": segment_name,
+                            "svi_id": vlan_id,
+                            "ip": gateway_ip,
+                            "vrf": vrf_id,
+                            "vlan": vlan_obj_id,
+                        },
+                        branch=branch_name,
+                    )
                 st.info(f"SVI {vlan_id} with gateway {gateway_ip} created in {vrf_name}")
 
             # Step 5: Run AVD generators (hostvars + structured config)

@@ -1,7 +1,5 @@
 """UI utilities and shared components for the Infrahub Service Catalog."""
 
-from typing import Optional
-
 import streamlit as st
 
 
@@ -10,7 +8,7 @@ def display_logo() -> None:
     st.sidebar.markdown("### Infrahub Service Catalog")
 
 
-def display_error(message: str, details: Optional[str] = None) -> None:
+def display_error(message: str, details: str | None = None) -> None:
     """Display an error message with optional details."""
     st.error(message)
     if details:

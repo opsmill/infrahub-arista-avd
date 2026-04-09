@@ -1,6 +1,6 @@
 """Infrahub API client for the Service Catalog."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from infrahub_sdk import Config, InfrahubClientSync
 
@@ -8,13 +8,9 @@ from infrahub_sdk import Config, InfrahubClientSync
 class InfrahubAPIError(Exception):
     """Base exception for Infrahub API errors."""
 
-    pass
-
 
 class InfrahubConnectionError(InfrahubAPIError):
     """Exception raised when connection to Infrahub fails."""
-
-    pass
 
 
 class InfrahubHTTPError(InfrahubAPIError):
@@ -29,7 +25,7 @@ class InfrahubHTTPError(InfrahubAPIError):
 class InfrahubGraphQLError(InfrahubAPIError):
     """Exception raised for GraphQL errors from Infrahub."""
 
-    def __init__(self, message: str, errors: List[Dict[str, Any]]):
+    def __init__(self, message: str, errors: list[dict[str, Any]]):
         super().__init__(message)
         self.errors = errors
 
@@ -40,9 +36,9 @@ class InfrahubClient:
     def __init__(
         self,
         base_url: str,
-        api_token: Optional[str] = None,
+        api_token: str | None = None,
         timeout: int = 60,
-        ui_url: Optional[str] = None,
+        ui_url: str | None = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.ui_url = (ui_url or base_url).rstrip("/")
@@ -52,7 +48,7 @@ class InfrahubClient:
         config = Config(timeout=timeout, api_token=api_token or None)
         self._client = InfrahubClientSync(address=base_url, config=config)
 
-    def get_branches(self) -> List[Dict[str, Any]]:
+    def get_branches(self) -> list[dict[str, Any]]:
         """Fetch all branches from Infrahub."""
         try:
             branches_dict = self._client.branch.all()
@@ -68,22 +64,22 @@ class InfrahubClient:
                 )
             return branches
         except Exception as e:
-            raise InfrahubConnectionError(f"Failed to fetch branches: {str(e)}")
+            raise InfrahubConnectionError(f"Failed to fetch branches: {e!s}")
 
     def execute_graphql(
         self,
         query: str,
-        variables: Optional[Dict[str, Any]] = None,
+        variables: dict[str, Any] | None = None,
         branch: str = "main",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a GraphQL query or mutation."""
         try:
             result = self._client.execute_graphql(query=query, variables=variables, branch_name=branch)
             return result
         except Exception as e:
-            raise InfrahubGraphQLError(f"GraphQL error: {str(e)}", [])
+            raise InfrahubGraphQLError(f"GraphQL error: {e!s}", [])
 
-    def get_fabrics(self, branch: str = "main") -> List[Dict[str, Any]]:
+    def get_fabrics(self, branch: str = "main") -> list[dict[str, Any]]:
         """Fetch NetworkFabric objects."""
         try:
             query = """
@@ -112,9 +108,9 @@ class InfrahubClient:
                 )
             return fabrics
         except Exception as e:
-            raise InfrahubAPIError(f"Failed to fetch fabrics: {str(e)}")
+            raise InfrahubAPIError(f"Failed to fetch fabrics: {e!s}")
 
-    def get_organizations(self, branch: str = "main") -> List[Dict[str, Any]]:
+    def get_organizations(self, branch: str = "main") -> list[dict[str, Any]]:
         """Fetch OrganizationGeneric objects."""
         try:
             query = """
@@ -143,10 +139,9 @@ class InfrahubClient:
                 )
             return organizations
         except Exception as e:
-            raise InfrahubAPIError(f"Failed to fetch organizations: {str(e)}")
+            raise InfrahubAPIError(f"Failed to fetch organizations: {e!s}")
 
-
-    def create_branch(self, branch_name: str, sync_with_git: bool = False) -> Dict[str, Any]:
+    def create_branch(self, branch_name: str, sync_with_git: bool = False) -> dict[str, Any]:
         """Create a new branch in Infrahub, or return it if it already exists."""
         try:
             branch = self._client.branch.create(branch_name=branch_name, sync_with_git=sync_with_git)
@@ -165,11 +160,11 @@ class InfrahubClient:
                         "id": branch.id,
                         "is_default": branch.is_default,
                     }
-            raise InfrahubAPIError(f"Failed to create branch: {str(e)}")
+            raise InfrahubAPIError(f"Failed to create branch: {e!s}")
 
     def create_proposed_change(
         self, branch: str, name: str, description: str, destination_branch: str = "main"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a proposed change for a branch."""
         try:
             pc = self._client.create(
@@ -183,13 +178,13 @@ class InfrahubClient:
             pc.save(allow_upsert=True)
             return {"id": pc.id, "name": name}
         except Exception as e:
-            raise InfrahubAPIError(f"Failed to create proposed change: {str(e)}")
+            raise InfrahubAPIError(f"Failed to create proposed change: {e!s}")
 
     def get_proposed_change_url(self, pc_id: str) -> str:
         """Get the URL for a proposed change."""
         return f"{self.ui_url}/proposed-changes/{pc_id}"
 
-    def get_tenants(self, branch: str = "main") -> List[Dict[str, Any]]:
+    def get_tenants(self, branch: str = "main") -> list[dict[str, Any]]:
         """Fetch EvpnTenant objects."""
         query = """
         query { EvpnTenant { edges { node {
@@ -200,7 +195,7 @@ class InfrahubClient:
         result = self.execute_graphql(query, branch=branch)
         return [e["node"] for e in result.get("EvpnTenant", {}).get("edges", [])]
 
-    def get_vrfs(self, branch: str = "main") -> List[Dict[str, Any]]:
+    def get_vrfs(self, branch: str = "main") -> list[dict[str, Any]]:
         """Fetch IpamVRF objects."""
         query = """
         query { IpamVRF { edges { node {
@@ -211,7 +206,7 @@ class InfrahubClient:
         result = self.execute_graphql(query, branch=branch)
         return [e["node"] for e in result.get("IpamVRF", {}).get("edges", [])]
 
-    def get_vlans(self, branch: str = "main") -> List[Dict[str, Any]]:
+    def get_vlans(self, branch: str = "main") -> list[dict[str, Any]]:
         """Fetch IpamVLAN objects."""
         query = """
         query { IpamVLAN { edges { node {
@@ -222,7 +217,7 @@ class InfrahubClient:
         result = self.execute_graphql(query, branch=branch)
         return [e["node"] for e in result.get("IpamVLAN", {}).get("edges", [])]
 
-    def get_l2domains(self, branch: str = "main") -> List[Dict[str, Any]]:
+    def get_l2domains(self, branch: str = "main") -> list[dict[str, Any]]:
         """Fetch IpamL2Domain objects."""
         query = """
         query { IpamL2Domain { edges { node { id display_label name { value } } } } }
@@ -230,7 +225,7 @@ class InfrahubClient:
         result = self.execute_graphql(query, branch=branch)
         return [e["node"] for e in result.get("IpamL2Domain", {}).get("edges", [])]
 
-    def _resolve_target_id(self, name: str, branch: str = "main") -> Optional[str]:
+    def _resolve_target_id(self, name: str, branch: str = "main") -> str | None:
         """Resolve a node name to its ID by searching common types."""
         for kind in ["NetworkFabric", "NetworkPod", "LocationRack", "DcimDevice"]:
             try:
@@ -317,16 +312,14 @@ class InfrahubClient:
         except _httpx.TimeoutException:
             return False
 
-    def run_avd_pipeline(self, branch: str = "main") -> Dict[str, bool]:
+    def run_avd_pipeline(self, branch: str = "main") -> dict[str, bool]:
         """Run the full AVD pipeline: hostvars then structured config.
 
         Blocks until each generator completes. Returns status for each step.
         """
-        results: Dict[str, bool] = {}
+        results: dict[str, bool] = {}
 
-        results["hostvars"] = self._run_generator(
-            "generate-avd-device-hostvar", branch=branch, timeout=600
-        )
+        results["hostvars"] = self._run_generator("generate-avd-device-hostvar", branch=branch, timeout=600)
 
         results["structured_config"] = self._run_generator(
             "generate-avd-device-structured-config", branch=branch, timeout=600

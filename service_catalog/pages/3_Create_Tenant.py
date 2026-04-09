@@ -52,8 +52,13 @@ def main() -> None:
 
         with col1:
             tenant_name = st.text_input("Tenant Name", placeholder="e.g. ACME-Corp")
-            vni_base = st.number_input("MAC VRF VNI Base", min_value=1, max_value=16777000, value=20000,
-                                       help="Base VNI number. VLAN VNI = base + VLAN ID")
+            vni_base = st.number_input(
+                "MAC VRF VNI Base",
+                min_value=1,
+                max_value=16777000,
+                value=20000,
+                help="Base VNI number. VLAN VNI = base + VLAN ID",
+            )
 
         with col2:
             fabric_options = {f["id"]: f["name"]["value"] for f in fabrics}
@@ -93,11 +98,15 @@ def main() -> None:
                 }
                 """
                 fabric_refs = [{"id": fid} for fid in selected_fabrics]
-                client.execute_graphql(mutation, {
-                    "name": tenant_name,
-                    "vni_base": vni_base,
-                    "fabrics": fabric_refs,
-                }, branch=branch_name)
+                client.execute_graphql(
+                    mutation,
+                    {
+                        "name": tenant_name,
+                        "vni_base": vni_base,
+                        "fabrics": fabric_refs,
+                    },
+                    branch=branch_name,
+                )
             st.info(f"Tenant {tenant_name} (VNI base {vni_base}) created on {', '.join(fabric_names)}")
 
             # Run AVD generators
