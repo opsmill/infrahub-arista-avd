@@ -103,9 +103,9 @@ generator_definitions:
   - name: backfill-structured-config
     file_path: "./generators/backfill_structured_config.py"
     query: backfill_structured_config
-    targets: avd_artifacts
+    targets: avd_structured_configs
     parameters:
-      name: name__value
+      name: artifact__name__value
     class_name: BackfillStructuredConfigGenerator
     convert_query_response: false
     execute_in_proposed_change: false
