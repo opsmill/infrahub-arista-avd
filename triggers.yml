@@ -122,6 +122,12 @@ spec:
           - attribute_name: checksum
             value_match: any
 
+    - name: trigger-backfill-structured-config-created
+      branch_scope: "other_branches"
+      node_kind: AvdStructuredConfigFile
+      mutation_action: "created"
+      action: run-backfill-structured-config-generator
+
     - name: trigger-server-cabling-generator-created
       branch_scope: "other_branches"
       node_kind: ComputePhysicalServer
