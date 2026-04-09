@@ -50,13 +50,17 @@ def _make_pod_device(
     hostvar_file = None
     if has_hostvar:
         hostvar_file = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarFile(
-            node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarFileNode(id="file-123")
+            node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNodeHostvarFileNode(
+                id="file-123"
+            )
         )
 
     artifact_node = None
     if has_hostvar:
-        artifact_node = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode(
-            hostvar_file=hostvar_file
+        artifact_node = (
+            GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdgesNodeAvdArtifactNode(
+                hostvar_file=hostvar_file
+            )
         )
 
     return GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevicesEdges(
@@ -79,7 +83,9 @@ def _make_rack_device(
     hostvar_file = None
     if has_hostvar:
         hostvar_file = GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarFile(
-            node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarFileNode(id="file-456")
+            node=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceAvdArtifactNodeHostvarFileNode(
+                id="file-456"
+            )
         )
 
     artifact_node = None
@@ -126,9 +132,7 @@ def _make_pod(
             devices=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodDevices(
                 edges=pod_devices or []
             ),
-            racks=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks(
-                edges=racks or []
-            ),
+            racks=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacks(edges=racks or []),
         )
     )
 
@@ -144,9 +148,7 @@ def _make_fabric_query(
                     node=GenerateAvdInputsQueryNetworkFabricEdgesNode(
                         id="fabric-1",
                         name=GenerateAvdInputsQueryNetworkFabricEdgesNodeName(value="Fabric-A"),
-                        children=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildren(
-                            edges=pods
-                        ),
+                        children=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildren(edges=pods),
                     )
                 )
             ]
@@ -167,9 +169,7 @@ def _make_generator() -> AvdDeviceStructuredConfigGenerator:
 class TestExtractDevicesFromFabric:
     def test_empty_fabric(self):
         gen = _make_generator()
-        data = GenerateAvdInputsQuery(
-            NetworkFabric=GenerateAvdInputsQueryNetworkFabric(edges=[])
-        )
+        data = GenerateAvdInputsQuery(NetworkFabric=GenerateAvdInputsQueryNetworkFabric(edges=[]))
         result = gen._extract_devices_from_fabric(data)
         assert result == []
 
@@ -302,9 +302,7 @@ class TestFetchHostvarsFromStorage:
         hostvars_data = {"hostname": "spine-1", "router_bgp": {"as": "65001"}}
 
         mock_artifact = AsyncMock()
-        mock_artifact.hostvar_file.peer.download_file = AsyncMock(
-            return_value=json.dumps(hostvars_data)
-        )
+        mock_artifact.hostvar_file.peer.download_file = AsyncMock(return_value=json.dumps(hostvars_data))
         gen.client.get = AsyncMock(return_value=mock_artifact)
 
         devices = [

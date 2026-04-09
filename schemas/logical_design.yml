@@ -70,6 +70,7 @@ nodes:
         kind: Boolean
         optional: true
         default_value: false
+        branch: aware
     relationships:
       - name: super_spine_switch_template
         branch: aware

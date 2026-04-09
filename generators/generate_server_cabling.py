@@ -45,9 +45,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             return
 
         # Build sorted interface maps (same pattern as pod/rack generators)
-        server_iface_objects = await self.client.filters(
-            kind=DcimInterface, device__name__value=server_hostname
-        )
+        server_iface_objects = await self.client.filters(kind=DcimInterface, device__name__value=server_hostname)
 
         # Populate the SDK store with the server device using its actual typename
         # (e.g. ComputePhysicalServer, not DcimDevice) so interface.device.peer resolves
@@ -141,9 +139,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             iface.lag = {"id": lag.id}  # type: ignore[attr-defined]
             await iface.save(allow_upsert=True)
 
-        self.logger.info(
-            f"  Bond1 created on {server_hostname} with {len(server_iface_ids)} members"
-        )
+        self.logger.info(f"  Bond1 created on {server_hostname} with {len(server_iface_ids)} members")
 
     async def _trigger_avd_cascade(self, rack_id: str, server_hostname: str) -> None:
         """Navigate from rack to fabric and trigger AVD hostvar regeneration."""
@@ -221,8 +217,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         max_len = max(len(ifaces) for ifaces in leaf_interface_map.values())
         for idx in range(max_len):
             all_available = all(
-                idx < len(ifaces) and not ifaces[idx].connector.id
-                for ifaces in leaf_interface_map.values()
+                idx < len(ifaces) and not ifaces[idx].connector.id for ifaces in leaf_interface_map.values()
             )
             if all_available:
                 return idx

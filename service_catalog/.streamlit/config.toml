@@ -1,0 +1,13 @@
+[server]
+# Server configuration
+headless = true
+port = 8501
+address = "0.0.0.0"
+
+[ui]
+# Hide the hamburger menu
+hideTopBar = false
+
+[runner]
+# Faster script reruns
+fastReruns = true

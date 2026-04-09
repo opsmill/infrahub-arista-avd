@@ -7,7 +7,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 
-from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_structured_config_generation
+from solution_ai_dc.generator import set_fabric_avd_hostvars_ready
 from solution_ai_dc.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
 
 from .generate_avd_device_inputs_query import (
