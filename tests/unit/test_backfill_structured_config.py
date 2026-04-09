@@ -382,7 +382,7 @@ class TestBackfillIp:
         # Verify interface assignment
         gen.client.get.assert_awaited_once()
         assert mock_interface.ip_address == mock_ip
-        mock_interface.save.assert_awaited_once_with()
+        mock_interface.save.assert_awaited_once_with(allow_upsert=True)
 
     async def test_backfill_skips_invalid_ip(self) -> None:
         """Test that invalid IP format is skipped without error."""
@@ -426,7 +426,7 @@ class TestUpdateMtu:
 
         gen.client.get.assert_awaited_once()
         assert mock_interface.mtu.value == 9214
-        mock_interface.save.assert_awaited_once_with()
+        mock_interface.save.assert_awaited_once_with(allow_upsert=True)
 
     async def test_upserts_mtu_when_same(self) -> None:
         """Test that MTU is always saved even when current equals target."""
@@ -439,7 +439,7 @@ class TestUpdateMtu:
         await gen._update_mtu(iface, 9214, "leaf-1")
 
         gen.client.get.assert_awaited_once()
-        mock_interface.save.assert_awaited_once_with()
+        mock_interface.save.assert_awaited_once_with(allow_upsert=True)
 
 
 # --- BGP backfill ---
