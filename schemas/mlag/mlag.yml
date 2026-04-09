@@ -128,6 +128,7 @@ nodes:
     label: MLAG Domain
     description: "MLAG (Multi-Chassis Link Aggregation Group) Domain"
     icon: mingcute:cloud-line
+    include_in_menu: false
     inherit_from:
       - GenericMlagDomain
     relationships:

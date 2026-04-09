@@ -8,6 +8,7 @@ nodes:
     description: "EVPN network services tenant with VNI base mapping"
     label: EVPN Tenant
     icon: mdi:account-group
+    include_in_menu: false
     human_friendly_id:
       - name__value
     order_by:
@@ -64,6 +65,7 @@ nodes:
     description: "SVI (Switched Virtual Interface) within a VRF for EVPN anycast gateway"
     label: EVPN SVI
     icon: mdi:ip-network
+    include_in_menu: false
     human_friendly_id:
       - vrf__name__value
       - name__value
@@ -121,6 +123,7 @@ nodes:
     description: "Pure L2 VLAN within a tenant (no IP gateway), for EVPN with VNI mapping"
     label: EVPN L2 VLAN
     icon: mdi:lan-pending
+    include_in_menu: false
     human_friendly_id:
       - tenant__name__value
       - name__value

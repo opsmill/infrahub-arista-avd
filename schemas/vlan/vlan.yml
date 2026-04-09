@@ -8,6 +8,7 @@ nodes:
     description: A VLAN is isolated layer two domain
     label: VLAN
     icon: mdi:lan-pending
+    include_in_menu: false
     menu_placement: IpamL2Domain
     uniqueness_constraints:
       - [vlan_id__value, l2domain]
@@ -76,6 +77,7 @@ nodes:
     description: Represents layer 2 domain.
     label: Layer 2 Domain
     icon: mdi:domain-switch
+    include_in_menu: false
     human_friendly_id:
       - name__value
     display_label: name__value

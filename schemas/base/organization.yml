@@ -13,7 +13,7 @@ generics:
       - name__value
     display_label: name__value
     icon: mdi:domain
-    include_in_menu: true
+    include_in_menu: false
     attributes:
       - name: name
         kind: Text
@@ -38,7 +38,7 @@ nodes:
     icon: mdi:domain
     inherit_from:
       - OrganizationGeneric
-    include_in_menu: true
+    include_in_menu: false
     menu_placement: OrganizationGeneric
     relationships:
       - name: device_type
@@ -56,5 +56,5 @@ nodes:
     icon: mdi:domain
     inherit_from:
       - OrganizationGeneric
-    include_in_menu: true
+    include_in_menu: false
     menu_placement: OrganizationGeneric

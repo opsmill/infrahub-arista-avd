@@ -1,66 +1,169 @@
+# yaml-language-server:
+#   $schema=https://schema.infrahub.app/infrahub/menu/latest.json
+#
+# Register this file in .infrahub.yml:
+#
+#   menus:
+#     - menus/menu.yml
+#
+# To prevent duplicate menu entries, set
+# include_in_menu: false on schema nodes that
+# appear in this menu.
 ---
 apiVersion: infrahub.app/v1
 kind: Menu
 spec:
   data:
+    # --------- Fabric Design ---------
     - namespace: Network
-      name: MainMenu
-      label: Network
-      icon: "mdi:domain"
-      kind: OrganizationGeneric
+      name: FabricDesignMenu
+      label: Fabric Design
+      icon: "mdi:lan"
       children:
         data:
           - namespace: Network
             name: Fabric
             label: Fabrics
             kind: NetworkFabric
-            icon: "lucide:network"
+            icon: "mdi:lan"
 
           - namespace: Network
             name: Pod
             label: Pods
             kind: NetworkPod
-            icon: "clarity:pod-line"
+            icon: "mdi:hexagon-multiple"
 
-          - namespace: Network
-            name: Device
-            label: Devices
+          - namespace: Avd
+            name: AvdEvpn
+            label: AVD Configuration
+            kind: AvdEvpn
+            icon: "mdi:cog-transfer"
+
+          - namespace: Avd
+            name: AvdArtifacts
+            label: AVD Artifacts
+            kind: AvdArtifact
+            icon: "mdi:file-document-outline"
+
+    # --------- Devices ---------
+    - namespace: Dcim
+      name: DeviceMenu
+      label: Devices
+      icon: "mdi:server"
+      children:
+        data:
+          - namespace: Dcim
+            name: AllDevices
+            label: All Devices
             kind: DcimDevice
             icon: "mdi:server"
 
-          - namespace: Network
-            name: DeviceType
-            label: Device Types
-            kind: DcimDeviceType
-            icon: "mdi:server"
+          - namespace: Interface
+            name: InterfacesMenu
+            label: Interfaces
+            icon: "mdi:ethernet"
+            children:
+              data:
+                - namespace: Interface
+                  name: PhysicalInterfaces
+                  label: Physical Interfaces
+                  kind: InterfacePhysical
+                  icon: "mdi:ethernet"
+
+                - namespace: Interface
+                  name: VirtualInterfaces
+                  label: Virtual Interfaces
+                  kind: InterfaceVirtual
+                  icon: "mdi:lan-pending"
+
+                - namespace: Interface
+                  name: LagInterfaces
+                  label: LAG Interfaces
+                  kind: InterfaceLag
+                  icon: "mdi:drag-horizontal-variant"
+
+          - namespace: Mlag
+            name: MlagDomains
+            label: MLAG Domains
+            kind: MlagDomain
+            icon: "mdi:link-variant"
 
           - namespace: Network
-            name: Link
+            name: Connections
             label: Connections
-            kind: DcimConnector
-            icon: "material-symbols:cable"
+            kind: NetworkLink
+            icon: "mdi:cable-data"
 
-    - namespace: Location
-      name: Menu
-      label: Location
-      kind: LocationGeneric
-      icon: "mingcute:location-line"
+          - namespace: Dcim
+            name: TypesAndModelsMenu
+            label: Types & Models
+            icon: "mdi:package-variant"
+            children:
+              data:
+                - namespace: Dcim
+                  name: DeviceTypes
+                  label: Device Types
+                  kind: DcimDeviceType
+                  icon: "mdi:package-variant"
+
+                - namespace: Dcim
+                  name: Platforms
+                  label: Platforms
+                  kind: DcimPlatform
+                  icon: "mdi:chip"
+
+                - namespace: Organization
+                  name: Manufacturers
+                  label: Manufacturers
+                  kind: OrganizationManufacturer
+                  icon: "mdi:factory"
+
+    # --------- IPAM ---------
+    - namespace: Ipam
+      name: IpamMenu
+      label: IPAM
+      icon: "mdi:ip-network"
       children:
         data:
-          - namespace: Location
-            name: Hall
-            label: Hall
-            kind: LocationHall
-            icon: "mdi:building"
+          - namespace: Ipam
+            name: Prefixes
+            label: Prefixes
+            kind: IpamPrefix
+            icon: "mdi:ip-network"
 
-          - namespace: Location
-            name: Rack
-            label: Rack
-            kind: LocationRack
-            icon: "clarity:rack-server-solid"
+          - namespace: Ipam
+            name: IPAddresses
+            label: IP Addresses
+            kind: IpamIPAddress
+            icon: "mdi:ip"
 
+          - namespace: Ipam
+            name: VLANs
+            label: VLANs
+            kind: IpamVLAN
+            icon: "mdi:tag-outline"
+
+          - namespace: Ipam
+            name: L2Domains
+            label: L2 Domains
+            kind: IpamL2Domain
+            icon: "mdi:vector-square"
+
+          - namespace: Ipam
+            name: VRFs
+            label: VRFs
+            kind: IpamVRF
+            icon: "mdi:table-network"
+
+          - namespace: Ipam
+            name: RouteTargets
+            label: Route Targets
+            kind: IpamRouteTarget
+            icon: "mdi:bullseye-arrow"
+
+    # --------- Routing ---------
     - namespace: Routing
-      name: Menu
+      name: RoutingMenu
       label: Routing
       icon: "mdi:router"
       children:
@@ -95,14 +198,97 @@ spec:
             kind: RoutingStaticRoute
             icon: "mdi:routes"
 
-    - namespace: Organization
-      name: Menu
-      label: Organization
-      icon: "mdi:domain"
+    # --------- EVPN Services ---------
+    - namespace: Evpn
+      name: EvpnMenu
+      label: EVPN Services
+      icon: "mdi:cloud-outline"
       children:
         data:
+          - namespace: Evpn
+            name: Tenants
+            label: Tenants
+            kind: EvpnTenant
+            icon: "mdi:account-group"
+
+          - namespace: Evpn
+            name: SVIs
+            label: SVIs
+            kind: EvpnSvi
+            icon: "mdi:lan-connect"
+
+          - namespace: Evpn
+            name: L2VLANs
+            label: L2 VLANs
+            kind: EvpnL2Vlan
+            icon: "mdi:tag-multiple"
+
+    # --------- Locations ---------
+    - namespace: Location
+      name: LocationMenu
+      label: Locations
+      icon: "mdi:map-marker"
+      children:
+        data:
+          - namespace: Location
+            name: Hall
+            label: Halls
+            kind: LocationHall
+            icon: "mdi:office-building"
+
+          - namespace: Location
+            name: Rack
+            label: Racks
+            kind: LocationRack
+            icon: "mdi:server-network"
+
           - namespace: Organization
-            name: Manufacturer
-            label: Manufacturer
-            kind: OrganizationManufacturer
-            icon: "mdi:domain"
+            name: Providers
+            label: Providers
+            kind: OrganizationProvider
+            icon: "mdi:handshake"
+
+    # --------- Compute ---------
+    - namespace: Compute
+      name: ComputeMenu
+      label: Compute
+      icon: "mdi:chip"
+      children:
+        data:
+          - namespace: Compute
+            name: PhysicalServers
+            label: Physical Servers
+            kind: ComputePhysicalServer
+            icon: "mdi:server"
+
+          - namespace: Virtualization
+            name: VirtualMachines
+            label: Virtual Machines
+            kind: VirtualizationVirtualMachine
+            icon: "mdi:monitor-dashboard"
+
+    # --------- Management ---------
+    - namespace: Network
+      name: ManagementMenu
+      label: Management
+      icon: "mdi:shield-lock"
+      children:
+        data:
+          - namespace: Network
+            name: DnsServers
+            label: DNS Servers
+            kind: NetworkDnsServer
+            icon: "mdi:dns"
+
+          - namespace: Network
+            name: NtpServers
+            label: NTP Servers
+            kind: NetworkNtpServer
+            icon: "mdi:clock-outline"
+
+          - namespace: Network
+            name: LocalUsers
+            label: Local Users
+            kind: NetworkLocalUser
+            icon: "mdi:account-key"
+

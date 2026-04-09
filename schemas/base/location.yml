@@ -8,7 +8,7 @@ generics:
     description: Generic Location, could be a country, city ...
     label: Location
     icon: mingcute:location-line
-    include_in_menu: true
+    include_in_menu: false
     hierarchical: true
     human_friendly_id:
       - name__value
