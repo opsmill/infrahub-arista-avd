@@ -11,6 +11,7 @@ CURRENT_DIRECTORY = Path(__file__).resolve()
 MAIN_DIRECTORY_PATH = Path(__file__).parent
 
 COMPOSE_FILES = "-f docker-compose.yml -f docker-compose.override.yml"
+INFRAHUB_ADDRESS = os.getenv("INFRAHUB_ADDRESS", "http://localhost:8000")
 SEMAPHORE_URL = "http://localhost:3000"
 SEMAPHORE_ADMIN = "admin"
 SEMAPHORE_ADMIN_PASSWORD = "semaphore"  # noqa: S105
@@ -177,6 +178,43 @@ def init_semaphore(
     print("=== Semaphore init complete ===")
 
 
+def wait_for_repository_sync(name: str, timeout: int = 300, interval: int = 5) -> None:
+    """Poll Infrahub until the named repository reaches 'in_sync' status."""
+    query = """
+    query CheckRepoSync($name: String!) {
+      CoreRepository(name__value: $name) {
+        edges {
+          node {
+            sync_status { value }
+          }
+        }
+      }
+    }
+    """
+    elapsed = 0
+    while elapsed < timeout:
+        try:
+            resp = httpx.post(
+                f"{INFRAHUB_ADDRESS}/graphql",
+                json={"query": query, "variables": {"name": name}},
+                timeout=10,
+            )
+            data = resp.json()
+            edges = data.get("data", {}).get("CoreRepository", {}).get("edges", [])
+            if edges:
+                status = edges[0]["node"]["sync_status"]["value"]
+                print(f"Repository '{name}' sync_status: {status}")
+                if status == "in_sync":
+                    return
+        except httpx.HTTPError as exc:
+            print(f"Waiting for Infrahub API ({exc})")
+        sleep(interval)
+        elapsed += interval
+
+    msg = f"Repository '{name}' did not reach 'in_sync' within {timeout}s"
+    raise TimeoutError(msg)
+
+
 @task(pre=[init_semaphore])
 def load(ctx: Context) -> None:
     load_schema(ctx)
@@ -184,6 +222,8 @@ def load(ctx: Context) -> None:
     sleep(5)
     ctx.run("infrahubctl object load objects/")
     ctx.run("infrahubctl object load repository.yml")
+    wait_for_repository_sync("test-repository")
+    ctx.run("infrahubctl object load triggers.yml")
 
 
 @task
