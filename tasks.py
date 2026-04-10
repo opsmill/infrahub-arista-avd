@@ -204,7 +204,7 @@ def wait_for_repository_sync(name: str, timeout: int = 300, interval: int = 5) -
             if edges:
                 status = edges[0]["node"]["sync_status"]["value"]
                 print(f"Repository '{name}' sync_status: {status}")
-                if status == "in_sync":
+                if status == "in-sync":
                     return
         except httpx.HTTPError as exc:
             print(f"Waiting for Infrahub API ({exc})")
