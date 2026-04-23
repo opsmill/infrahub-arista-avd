@@ -2,7 +2,7 @@
 
 import pytest
 
-from solution_ai_dc.avd import (
+from solution_arista_avd.avd import (
     ROLE_TO_AVD_TYPE,
     AvdInputsBuilder,
     get_avd_type,

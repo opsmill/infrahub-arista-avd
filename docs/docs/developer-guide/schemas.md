@@ -1,4 +1,15 @@
+---
+title: Schemas
+description: All Infrahub schema definitions in this solution.
+audience: developer
+sidebar_position: 2
+---
+
 # Schemas
+
+:::info Developer Guide
+This page is part of the developer guide. It documents the YAML schema files that define the data model.
+:::
 
 This document describes all Infrahub schema definitions in this solution.
 
@@ -337,3 +348,18 @@ Physical:
 - `management` - OOB management
 - `interconnect` - Point-to-point links
 - `server` - Server addressing
+
+## Source
+
+- [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas) — all schema definitions.
+- [`schemas/device.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/device.yml) — `NetworkDevice`, `NetworkInterface`, `NetworkLink`, `DeviceType`.
+- [`schemas/logical_design.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/logical_design.yml) — `NetworkFabric`, `NetworkPod`.
+- [`schemas/physical_location.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/physical_location.yml) — `LocationHall`, `LocationRack`.
+- [`schemas/ipam.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/ipam.yml) — IPAM nodes.
+- [`schemas/avd/avd.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/avd/avd.yml) — `AvdEvpn` and related AVD-specific nodes.
+- [`schemas/objects/objects.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/objects/objects.yml) — `AvdArtifact`, `AvdHostvarFile`, `AvdStructuredConfigFile` (see [AvdArtifact & File Storage](./avd/artifacts.md) for the full reference).
+- Generated protocols: [`src/solution_arista_avd/protocols.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/protocols.py) — regenerate after any schema change with:
+  ```bash
+  uv run infrahubctl protocols --out src/solution_arista_avd/protocols.py
+  ```
+  Note the `--out` flag (not `--output`) and the explicit path — the default would drop `schema_protocols.py` in the current directory instead of overwriting the checked-in file.

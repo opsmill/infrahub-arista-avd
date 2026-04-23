@@ -5,8 +5,8 @@ import logging
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
-from solution_ai_dc.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
-from solution_ai_dc.protocols import DcimDevice, DcimInterface, NetworkPod
+from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
+from solution_arista_avd.protocols import DcimDevice, DcimInterface, NetworkPod
 
 from .fabric_generator_query import FabricGeneratorQuery
 

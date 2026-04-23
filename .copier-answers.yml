@@ -6,7 +6,7 @@ generators: true
 menus: true
 objects: true
 package_mode: false
-project_name: solution-ai-dc
+project_name: solution-arista-avd
 scripts: false
 tests: true
 transforms: true

@@ -21,12 +21,12 @@ uv sync --all-packages
 ### Step 1: Regenerate protocol classes
 
 ```bash
-infrahubctl protocols --output src/solution_ai_dc/protocols.py
+infrahubctl protocols --output src/solution_arista_avd/protocols.py
 ```
 
 Verify the new Routing protocol classes exist:
 ```bash
-grep -c "class Routing" src/solution_ai_dc/protocols.py
+grep -c "class Routing" src/solution_arista_avd/protocols.py
 ```
 
 Expected: 7 (one per Routing node type).
@@ -59,10 +59,10 @@ grep 'kind="' generators/*.py       # Zero string-kind matches
 
 | File | Role |
 | ---- | ---- |
-| `src/solution_ai_dc/protocols.py` | Generated protocol classes (regenerate first) |
+| `src/solution_arista_avd/protocols.py` | Generated protocol classes (regenerate first) |
 | `generators/backfill_structured_config.py` | Main target: 10 string-kind → protocol |
 | `generators/generate_avd_device_hostvar.py` | Minor fix: 1 string-kind → protocol |
 | `transforms/avd_fabric_doc.py` | Dict access → Pydantic models |
 | `transforms/avd_fabric_devices.gql` | GraphQL query to fix |
 | `transforms/avd_fabric_devices_query.py` | Pydantic models to update |
-| `src/solution_ai_dc/avd.py` | Dead code cleanup |
+| `src/solution_arista_avd/avd.py` | Dead code cleanup |

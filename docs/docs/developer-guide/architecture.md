@@ -1,4 +1,15 @@
+---
+title: Architecture Overview
+description: System architecture and data flow for the Infrahub Arista AVD solution.
+audience: developer
+sidebar_position: 1
+---
+
 # Architecture Overview
+
+:::info Developer Guide
+This page is part of the developer guide. It assumes familiarity with Infrahub and Python. If you only want to *use* the system, switch to the [user guide](/user-guide/).
+:::
 
 This document describes the system architecture of the AVD Workshop Infrahub solution.
 
@@ -29,7 +40,7 @@ This document describes the system architecture of the AVD Workshop Infrahub sol
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
 │  │  Object Data    │  │     Queries     │  │   Core Library          │  │
-│  │   (Seed YAML)   │  │    (GraphQL)    │  │   (src/solution_ai_dc)  │  │
+│  │   (Seed YAML)   │  │    (GraphQL)    │  │   (src/solution_arista_avd)  │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -171,3 +182,12 @@ services:
         ↓
 7. Run generators via UI
 ```
+
+## Source
+
+- Infrahub configuration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — canonical list of queries, generators, transforms, and artifact definitions.
+- Schemas: [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas) — the data model.
+- Generators: [`generators/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/generators) — Python generator classes.
+- Transforms: [`transforms/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/transforms) — Python and Jinja2 transforms.
+- Core library: [`src/solution_arista_avd/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/src/solution_arista_avd) — shared protocols, AVD utilities, sorting, addressing.
+- Service portal: [`service_catalog/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/service_catalog) — Streamlit UI that orchestrates the portal workflows.

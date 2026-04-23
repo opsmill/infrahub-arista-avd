@@ -413,7 +413,7 @@ class TestBuildServerCablingPlan:
     """Test the cabling plan construction logic from cabling.py."""
 
     def test_round_robin_with_two_leaves(self) -> None:
-        from solution_ai_dc.cabling import build_server_cabling_plan
+        from solution_arista_avd.cabling import build_server_cabling_plan
 
         server = MagicMock()
         s1 = MagicMock()
@@ -437,7 +437,7 @@ class TestBuildServerCablingPlan:
         assert plan[0][1].id == "l1-e1"
 
     def test_dual_nic_across_two_leaves(self) -> None:
-        from solution_ai_dc.cabling import build_server_cabling_plan
+        from solution_arista_avd.cabling import build_server_cabling_plan
 
         server = MagicMock()
         s1 = MagicMock()

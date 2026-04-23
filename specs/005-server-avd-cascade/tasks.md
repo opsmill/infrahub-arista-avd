@@ -5,7 +5,7 @@
 **Description**: After the server cabling generator finishes creating links, navigate from the server's rack to the fabric and trigger the AVD hostvar regeneration cascade.
 
 **Changes**:
-- `generators/generate_server_cabling.py`: Import `set_fabric_avd_hostvars_ready` and `trigger_hostvar_generation` from `solution_ai_dc.generator`. After the cabling loop, fetch rack → pod → fabric, set `avd_hostvars_ready = False`, then call `trigger_hostvar_generation()`.
+- `generators/generate_server_cabling.py`: Import `set_fabric_avd_hostvars_ready` and `trigger_hostvar_generation` from `solution_arista_avd.generator`. After the cabling loop, fetch rack → pod → fabric, set `avd_hostvars_ready = False`, then call `trigger_hostvar_generation()`.
 
 **Dependencies**: None
 

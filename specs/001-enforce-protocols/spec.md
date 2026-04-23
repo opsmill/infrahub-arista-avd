@@ -3,7 +3,7 @@
 **Feature Branch**: `001-enforce-protocols`
 **Created**: 2026-02-10
 **Status**: Draft
-**Input**: User description: "I need to ensure all generators and transforms use protocols generated from infrahubctl protocols --out src/solution_ai_dc/protocols.py"
+**Input**: User description: "I need to ensure all generators and transforms use protocols generated from infrahubctl protocols --out src/solution_arista_avd/protocols.py"
 
 ## Clarifications
 
@@ -74,7 +74,7 @@ Currently, `avd.py` uses `Sequence[Any]` for parameters that represent network i
 
 **Why this priority**: Utility modules are shared across multiple generators and transforms. Improving their type signatures multiplies the benefit across all consumers, but requires the higher-priority generator and transform work to be aligned first.
 
-**Independent Test**: Can be verified by running mypy against `src/solution_ai_dc/avd.py` and confirming protocol-typed function signatures pass without errors.
+**Independent Test**: Can be verified by running mypy against `src/solution_arista_avd/avd.py` and confirming protocol-typed function signatures pass without errors.
 
 **Acceptance Scenarios**:
 

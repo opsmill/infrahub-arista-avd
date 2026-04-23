@@ -16,7 +16,7 @@ from infrahub_sdk.exceptions import NodeNotFoundError
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.node import NodeProperty
 
-from solution_ai_dc.protocols import (
+from solution_arista_avd.protocols import (
     AvdStructuredConfigFile,
     CoreAccountGroup,
     DcimInterface,

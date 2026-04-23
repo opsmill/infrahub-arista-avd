@@ -1,4 +1,15 @@
+---
+title: Generators
+description: The infrastructure generators that create devices, interfaces, cabling, and AVD inputs.
+audience: developer
+sidebar_position: 3
+---
+
 # Generators
+
+:::info Developer Guide
+This page is part of the developer guide. It explains how the generators are structured. To *run* generators as an operator, switch to the [user guide](/user-guide/).
+:::
 
 This document describes the infrastructure generators in this solution.
 
@@ -195,7 +206,7 @@ infrahubctl generator run generate-rack --target <rack-id>
 
 ## GeneratorMixin
 
-All generators use `GeneratorMixin` from `src/solution_ai_dc/generator.py`:
+All generators use `GeneratorMixin` from `src/solution_arista_avd/generator.py`:
 
 ```python
 class GeneratorMixin:
@@ -232,10 +243,18 @@ class FabricGenerator(GeneratorMixin, InfrahubGenerator):
 
 ## Query Classes (Pydantic)
 
-Each generator has a corresponding query class for type-safe parsing:
+Each generator has a corresponding query class for type-safe parsing. **These `*_query.py` files are generated, not hand-written** — regenerate them whenever the `.gql` query or the schema changes:
+
+```bash
+uv run infrahubctl graphql generate-return-types generators/generate_fabric.gql
+```
+
+This reads `schema.graphql` at the repo root (refresh with `uv run infrahubctl graphql export-schema --out schema.graphql` when needed) and emits the matching `*_query.py` next to the query file.
+
+Shape of a typical generated class:
 
 ```python
-# generators/fabric_generator_query.py
+# generators/fabric_generator_query.py  (generated)
 
 from pydantic import BaseModel
 
@@ -294,3 +313,16 @@ generators/
 ├── generate_avd_inputs_query.py    # AVD fabric Pydantic models
 └── generate_avd_device_inputs_query.py  # AVD device Pydantic models
 ```
+
+## Source
+
+- Generator framework: [`src/solution_arista_avd/generator.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/generator.py) — `GeneratorMixin` with checksum-based change detection.
+- Infrastructure generators:
+  - [`generators/generate_fabric.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_fabric.py) — `FabricGenerator`.
+  - [`generators/generate_pod.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_pod.py) — `PodGenerator`.
+  - [`generators/generate_rack.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_rack.py) — `RackGenerator`.
+- AVD generators (documented in detail in the [AVD Integration sub-section](./avd/overview.md)):
+  - [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) — `GenerateAVDDeviceHostvar`.
+  - [`generators/generate_avd_device_structured_config.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_structured_config.py) — `AvdDeviceStructuredConfigGenerator`.
+- Registration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — `generator_definitions:` block.
+- Tests: [`tests/unit/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/tests/unit) and [`tests/integration/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/tests/integration).

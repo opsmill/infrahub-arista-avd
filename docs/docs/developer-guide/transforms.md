@@ -1,4 +1,15 @@
+---
+title: Transforms
+description: Data transforms and artifact generation — how Infrahub data becomes configs, docs, and CSVs.
+audience: developer
+sidebar_position: 4
+---
+
 # Transforms
+
+:::info Developer Guide
+This page is part of the developer guide. It documents the transform implementations. To *view* artifacts as an operator, switch to the [user guide](/user-guide/).
+:::
 
 This document describes the data transforms and artifact generation in this solution.
 
@@ -149,10 +160,18 @@ router ospf 1
 
 ## Query Classes
 
-Each transform has Pydantic models for type-safe query parsing:
+Each transform has Pydantic models for type-safe query parsing. **These `*_query.py` files are generated, not hand-written** — regenerate them whenever the `.gql` query or the schema changes:
+
+```bash
+uv run infrahubctl graphql generate-return-types transforms/computed_interface_description.gql
+```
+
+This reads `schema.graphql` at the repo root (refresh with `uv run infrahubctl graphql export-schema --out schema.graphql` when needed) and emits the matching `*_query.py` next to the query file.
+
+Shape of a typical generated class:
 
 ```python
-# transforms/computed_interface_description_query.py
+# transforms/computed_interface_description_query.py  (generated)
 
 class InterfaceLink(BaseModel):
     interface_a: InterfaceNode
@@ -337,3 +356,15 @@ jinja2_transforms:
     template_path: "./transforms/templates/my_template.j2"
     query: my_query
 ```
+
+## Source
+
+- Python transforms:
+  - [`transforms/avd_eos_config.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/avd_eos_config.py) — `AvdEosConfigTransform`.
+  - [`transforms/avd_fabric_doc.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/avd_fabric_doc.py) — `AvdFabricDocTransform`.
+  - [`transforms/avd_device_doc.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/avd_device_doc.py) — `AvdDeviceDocTransform`.
+  - [`transforms/computed_interface_description.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/computed_interface_description.py) — `ComputedInterfaceDescription`.
+  - [`transforms/cabling_plan.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/cabling_plan.py) — `CablingPlan`.
+- Jinja2 transforms: [`transforms/templates/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/transforms/templates).
+- Registration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — `python_transforms:`, `jinja2_transforms:`, and `artifact_definitions:` blocks.
+- The AVD transforms are documented in detail on the [AVD Transforms](./avd/transforms.md) page.

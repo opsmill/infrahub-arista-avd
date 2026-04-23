@@ -5,10 +5,10 @@ from typing import Any
 
 from infrahub_sdk.generator import InfrahubGenerator
 
-from solution_ai_dc.cabling import build_server_cabling_plan, connect_interface_maps
-from solution_ai_dc.generator import set_fabric_avd_hostvars_ready, trigger_hostvar_generation
-from solution_ai_dc.protocols import DcimDevice, DcimInterface, InterfacePhysical, LocationRack, NetworkPod
-from solution_ai_dc.sorting import create_sorted_device_interface_map
+from solution_arista_avd.cabling import build_server_cabling_plan, connect_interface_maps
+from solution_arista_avd.generator import set_fabric_avd_hostvars_ready, trigger_hostvar_generation
+from solution_arista_avd.protocols import DcimDevice, DcimInterface, InterfacePhysical, LocationRack, NetworkPod
+from solution_arista_avd.sorting import create_sorted_device_interface_map
 
 
 class ServerCablingGenerator(InfrahubGenerator):

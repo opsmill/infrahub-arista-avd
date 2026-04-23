@@ -13,7 +13,7 @@ from typing import Any
 from infrahub_sdk.generator import InfrahubGenerator
 from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 
-from solution_ai_dc.protocols import AvdArtifact, AvdStructuredConfigFile
+from solution_arista_avd.protocols import AvdArtifact, AvdStructuredConfigFile
 
 from .generate_avd_inputs_query import GenerateAvdInputsQuery
 

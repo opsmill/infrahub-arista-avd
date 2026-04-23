@@ -70,7 +70,7 @@ objects/
 triggers.yml                       # Modified: watch AvdStructuredConfigFile.checksum
 .infrahub.yml                      # Modified: backfill generator targets
 pyproject.toml                     # Modified: infrahub-sdk >=1.19.0
-src/solution_ai_dc/protocols.py    # Regenerated after schema change
+src/solution_arista_avd/protocols.py    # Regenerated after schema change
 
 tests/unit/
 ├── test_backfill_structured_config.py  # Modified: updated for new query model
@@ -124,7 +124,7 @@ Full data model in [data-model.md](./data-model.md). Key entities:
 | 1. SDK Upgrade | `pyproject.toml` |
 | 2. Schema Changes | `schemas/objects/objects.yml` |
 | 3. Group & Config | `objects/01_groups.yml`, `.infrahub.yml`, `triggers.yml` |
-| 4. Protocols | `src/solution_ai_dc/protocols.py` |
+| 4. Protocols | `src/solution_arista_avd/protocols.py` |
 | 5. Hostvar Generator | `generators/generate_avd_device_hostvar.py` |
 | 6. Structured Config Generator | `generators/generate_avd_device_structured_config.py` |
 | 7. Backfill Generator | `generators/backfill_structured_config.py`, `generators/backfill_structured_config.gql`, `generators/backfill_structured_config_query.py` |

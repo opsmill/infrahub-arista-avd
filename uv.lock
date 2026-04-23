@@ -2125,7 +2125,7 @@ wheels = [
 ]
 
 [[package]]
-name = "solution-ai-dc"
+name = "solution-arista-avd"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
