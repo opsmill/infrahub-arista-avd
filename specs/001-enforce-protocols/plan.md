@@ -54,7 +54,7 @@ specs/001-enforce-protocols/
 ### Source Code (repository root)
 
 ```text
-src/solution_ai_dc/
+src/solution_arista_avd/
 ├── protocols.py          # REGENERATE: add 7 Routing protocol classes
 └── avd.py                # MODIFY: remove/type dead code with Any types
 
@@ -80,7 +80,7 @@ No constitution violations to justify.
 
 **Prerequisite**: Running Infrahub instance with all schemas loaded.
 
-1. Run `infrahubctl protocols --output src/solution_ai_dc/protocols.py`
+1. Run `infrahubctl protocols --output src/solution_arista_avd/protocols.py`
 2. Verify 7 new Routing protocol classes are generated
 3. Verify existing IPAM protocol classes (`IpamIPPrefix`, `IpamIPAddress`) are preserved
 4. Run `inv lint-mypy` to confirm the regenerated file passes
@@ -109,7 +109,7 @@ Replace 10 string-kind calls with protocol class imports:
 
 Add imports:
 ```python
-from solution_ai_dc.protocols import (
+from solution_arista_avd.protocols import (
     IpamIPAddress,
     IpamIPPrefix,
     NetworkInterface,
@@ -131,7 +131,7 @@ Replace 1 string-kind call:
 | ---- | ------- | ------ |
 | 27 | `kind="NetworkPod"` | `NetworkPod` |
 
-Add `NetworkPod` to existing imports from `solution_ai_dc.protocols`.
+Add `NetworkPod` to existing imports from `solution_arista_avd.protocols`.
 
 ### Phase 3: Fix Transform Typed Access (FR-002, FR-008)
 
@@ -170,7 +170,7 @@ Follow the pattern established in `avd_eos_config.py` and `avd_device_doc.py` fo
 
 **Depends on**: None (independent)
 
-In `src/solution_ai_dc/avd.py`:
+In `src/solution_arista_avd/avd.py`:
 
 Two functions have `Any` types but are **dead code** (not called anywhere):
 - `extract_uplink_info()` — `Sequence[Any]` parameter

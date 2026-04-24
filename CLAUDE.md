@@ -10,7 +10,7 @@ This is an Infrahub repository solution for AI datacenter infrastructure managem
 
 ```
 avd-workshop/
-├── src/solution_ai_dc/    # Core Python library (protocols, AVD utils, helpers)
+├── src/solution_arista_avd/    # Core Python library (protocols, AVD utils, helpers)
 ├── generators/            # Infrahub generators (infrastructure creation)
 ├── transforms/            # Data transforms (computed attributes, artifacts)
 ├── schemas/               # Infrahub schema definitions (YAML)
@@ -124,7 +124,7 @@ Generators create infrastructure hierarchically:
 3. `RackGenerator` → creates leaf devices per rack
 4. `AvdDeviceStructuredConfigGenerator` → populates AVD configs
 
-Each generator extends `InfrahubGenerator` and uses `GeneratorMixin` (from `src/solution_ai_dc/generator.py`). The `calculate_checksum()` method tracks related node changes for idempotent regeneration.
+Each generator extends `InfrahubGenerator` and uses `GeneratorMixin` (from `src/solution_arista_avd/generator.py`). The `calculate_checksum()` method tracks related node changes for idempotent regeneration.
 
 **Generator File Structure:**
 - `generate_<entity>.py` - Generator class implementation
@@ -150,7 +150,7 @@ Each generator extends `InfrahubGenerator` and uses `GeneratorMixin` (from `src/
 - `<transform>_query.py` - Pydantic query models
 - `<transform>.gql` - GraphQL query definition
 
-### Core Library (`src/solution_ai_dc/`)
+### Core Library (`src/solution_arista_avd/`)
 
 | Module | Purpose |
 |--------|---------|
@@ -177,7 +177,7 @@ Numbered YAML files loaded in order:
 ## AVD Integration
 
 ### Role Mapping
-Infrahub device roles map to AVD device types (defined in `src/solution_ai_dc/avd.py`):
+Infrahub device roles map to AVD device types (defined in `src/solution_arista_avd/avd.py`):
 - `super_spine` → `super-spine`
 - `spine` → `spine`
 - `leaf` → `l3leaf`
@@ -247,12 +247,14 @@ All `*_query.py` files define Pydantic models matching GraphQL response structur
 
 When schema changes, regenerate type-safe protocol classes:
 ```bash
-infrahubctl protocols --output src/solution_ai_dc/protocols.py
+infrahubctl protocols --out src/solution_arista_avd/protocols.py
 ```
 
 ## Active Technologies
 - Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0 (001-enforce-protocols)
 - Neo4j (via Infrahub), PostgreSQL, Redis, RabbitMQ (001-enforce-protocols)
+- Markdown (CommonMark + MDX) authored against Docusaurus 3.10 + `@docusaurus/core@^3.10.0`, `@docusaurus/preset-classic@^3.10.0`, `@docusaurus/theme-mermaid@^3.10.0` (already installed; no new deps) (012-enhance-docs)
+- Files on disk under `docs/docs/`; sidebar in `docs/sidebars.ts` (012-enhance-docs)
 
 ## Recent Changes
 - 001-enforce-protocols: Added Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0

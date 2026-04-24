@@ -152,5 +152,5 @@
 - Schema changes require `generate_template: true` on ComputePhysicalServer to create TemplateComputePhysicalServer
 - Protocols will need regeneration (`infrahubctl protocols`) after schema changes, but unit tests use mocks
 - The `TemplateNetworkInterface` already has `tagged_vlan` and `untagged_vlan` relationships from the vlan.yml extensions
-- Existing `connect_interface_maps()` in `src/solution_ai_dc/cabling.py` handles link creation and status setting - can be reused or adapted
+- Existing `connect_interface_maps()` in `src/solution_arista_avd/cabling.py` handles link creation and status setting - can be reused or adapted
 - The `ProfileNetworkInterface` also already has VLAN relationship support from schema extensions

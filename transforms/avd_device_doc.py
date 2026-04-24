@@ -9,7 +9,7 @@ from typing import Any
 import pyavd
 from infrahub_sdk.transforms import InfrahubTransform
 
-from solution_ai_dc.protocols import AvdStructuredConfigFile
+from solution_arista_avd.protocols import AvdStructuredConfigFile
 
 from .avd_device_config_query import AvdDeviceConfigQuery
 

@@ -1,5 +1,5 @@
 [project]
-name = "solution-ai-dc"
+name = "solution-arista-avd"
 version = "0.1.0"
 description = "Infrahub Repository"
 authors = []
@@ -86,7 +86,7 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint.isort]
-known-first-party = ["solution_ai_dc"]
+known-first-party = ["solution_arista_avd"]
 
 [tool.ruff.lint.pycodestyle]
 max-line-length = 150

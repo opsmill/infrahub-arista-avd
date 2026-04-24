@@ -1,7 +1,7 @@
 {
     "python-envs.pythonProjects": [
         {
-            "path": "solution-ai-dc",
+            "path": "solution-arista-avd",
             "envManager": "ms-python.python:venv",
             "packageManager": "ms-python.python:pip"
         }

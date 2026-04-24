@@ -6,7 +6,7 @@
 
 **Decision**: IpamIPPrefix and IpamIPAddress protocol classes already exist in `protocols.py`. Only the 7 Routing namespace types (`RoutingBGPPeerGroup`, `RoutingBGPNeighbor`, `RoutingPrefixList`, `RoutingPrefixListEntry`, `RoutingRouteMap`, `RoutingRouteMapEntry`, `RoutingStaticRoute`) need to be generated.
 
-**Rationale**: Verified by reading `src/solution_ai_dc/protocols.py` — IPAM protocols exist at lines 200-231; Routing types are defined in `schemas/routing/routing.yml` but have no corresponding protocol classes. `NetworkPod` also already exists (used by hostvar generator fix).
+**Rationale**: Verified by reading `src/solution_arista_avd/protocols.py` — IPAM protocols exist at lines 200-231; Routing types are defined in `schemas/routing/routing.yml` but have no corresponding protocol classes. `NetworkPod` also already exists (used by hostvar generator fix).
 
 **Alternatives considered**: None — `infrahubctl protocols` is the canonical generation method per constitution.
 

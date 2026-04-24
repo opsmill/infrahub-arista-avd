@@ -19,8 +19,8 @@
 
 **CRITICAL**: US1 cannot begin until this phase is complete. US2 and US3 have no dependency on this phase.
 
-- [ ] T001 Regenerate protocol classes by running `infrahubctl protocols --output src/solution_ai_dc/protocols.py`. If Infrahub is not running, hand-write the 7 Routing protocol classes (`RoutingBGPPeerGroup`, `RoutingBGPNeighbor`, `RoutingPrefixList`, `RoutingPrefixListEntry`, `RoutingRouteMap`, `RoutingRouteMapEntry`, `RoutingStaticRoute`) in `src/solution_ai_dc/protocols.py` following the existing `@runtime_checkable` pattern. See `specs/001-enforce-protocols/data-model.md` for entity attributes.
-- [ ] T002 Verify and format regenerated `src/solution_ai_dc/protocols.py`: confirm 7 Routing types exist (`grep -c "class Routing" src/solution_ai_dc/protocols.py` should return 7), confirm existing IPAM types preserved (`IpamIPPrefix`, `IpamIPAddress`), run `inv format` to normalize formatting, run `inv lint-mypy` on the file.
+- [ ] T001 Regenerate protocol classes by running `infrahubctl protocols --output src/solution_arista_avd/protocols.py`. If Infrahub is not running, hand-write the 7 Routing protocol classes (`RoutingBGPPeerGroup`, `RoutingBGPNeighbor`, `RoutingPrefixList`, `RoutingPrefixListEntry`, `RoutingRouteMap`, `RoutingRouteMapEntry`, `RoutingStaticRoute`) in `src/solution_arista_avd/protocols.py` following the existing `@runtime_checkable` pattern. See `specs/001-enforce-protocols/data-model.md` for entity attributes.
+- [ ] T002 Verify and format regenerated `src/solution_arista_avd/protocols.py`: confirm 7 Routing types exist (`grep -c "class Routing" src/solution_arista_avd/protocols.py` should return 7), confirm existing IPAM types preserved (`IpamIPPrefix`, `IpamIPAddress`), run `inv format` to normalize formatting, run `inv lint-mypy` on the file.
 
 **Checkpoint**: Protocol classes for all schema-defined types now exist. Generator work can begin.
 
@@ -34,8 +34,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T003 [P] [US1] Replace 10 string-kind calls with protocol class references in `generators/backfill_structured_config.py`. Update imports to add `IpamIPAddress`, `IpamIPPrefix`, `RoutingBGPNeighbor`, `RoutingBGPPeerGroup`, `RoutingPrefixList`, `RoutingPrefixListEntry`, `RoutingRouteMap`, `RoutingRouteMapEntry`, `RoutingStaticRoute` from `solution_ai_dc.protocols`. Replace each `kind="TypeName"` with the protocol class (e.g., `await self.client.create(kind="IpamIPPrefix", ...)` becomes `await self.client.create(IpamIPPrefix, ...)`). Lines: 74, 82, 146, 174, 203, 217, 240, 265, 302.
-- [ ] T004 [P] [US1] Replace 1 string-kind call in `generators/generate_avd_device_hostvar.py`. Add `NetworkPod` to imports from `solution_ai_dc.protocols` (line 11). Replace `kind="NetworkPod"` with `NetworkPod` on line 27: `await client.filters(NetworkPod, parent__ids=[fabric_id])`.
+- [ ] T003 [P] [US1] Replace 10 string-kind calls with protocol class references in `generators/backfill_structured_config.py`. Update imports to add `IpamIPAddress`, `IpamIPPrefix`, `RoutingBGPNeighbor`, `RoutingBGPPeerGroup`, `RoutingPrefixList`, `RoutingPrefixListEntry`, `RoutingRouteMap`, `RoutingRouteMapEntry`, `RoutingStaticRoute` from `solution_arista_avd.protocols`. Replace each `kind="TypeName"` with the protocol class (e.g., `await self.client.create(kind="IpamIPPrefix", ...)` becomes `await self.client.create(IpamIPPrefix, ...)`). Lines: 74, 82, 146, 174, 203, 217, 240, 265, 302.
+- [ ] T004 [P] [US1] Replace 1 string-kind call in `generators/generate_avd_device_hostvar.py`. Add `NetworkPod` to imports from `solution_arista_avd.protocols` (line 11). Replace `kind="NetworkPod"` with `NetworkPod` on line 27: `await client.filters(NetworkPod, parent__ids=[fabric_id])`.
 - [ ] T005 [US1] Verify generator compliance: run `grep 'kind="' generators/*.py` (expect zero matches), run `inv lint-mypy` on `generators/backfill_structured_config.py` and `generators/generate_avd_device_hostvar.py`, run `pytest tests/unit/test_backfill_structured_config.py` to confirm behavioral equivalence.
 
 **Checkpoint**: All generators use protocol classes for client operations. SC-001 satisfied.
@@ -63,12 +63,12 @@
 
 **Goal**: Remove dead code with `Any` type annotations from `avd.py`. The two functions with `Any` types (`extract_uplink_info` and `build_fabric_hostvars`) are unused — confirmed by grep showing zero callers.
 
-**Independent Test**: `inv lint-mypy` passes on `src/solution_ai_dc/avd.py`; no `Sequence[Any]` patterns remain in function signatures.
+**Independent Test**: `inv lint-mypy` passes on `src/solution_arista_avd/avd.py`; no `Sequence[Any]` patterns remain in function signatures.
 
 ### Implementation for User Story 3
 
-- [ ] T010 [US3] Remove dead functions `extract_uplink_info()` and `build_fabric_hostvars()` from `src/solution_ai_dc/avd.py`. These functions use `Sequence[Any]` parameters and have zero callers in the codebase (verified by grep). Also remove any imports that become unused after removal (e.g., `Sequence` from `typing` if no longer needed). If the user prefers to keep them, replace `Sequence[Any]` with `Sequence[NetworkInterface]` and `Sequence[NetworkDevice]` respectively, adding imports from `solution_ai_dc.protocols`.
-- [ ] T011 [US3] Verify utility module compliance: run `inv lint-mypy` on `src/solution_ai_dc/avd.py`, run `pytest tests/unit/test_avd.py` to confirm existing tests still pass (tests cover `build_device_hostvars`, not the removed functions).
+- [ ] T010 [US3] Remove dead functions `extract_uplink_info()` and `build_fabric_hostvars()` from `src/solution_arista_avd/avd.py`. These functions use `Sequence[Any]` parameters and have zero callers in the codebase (verified by grep). Also remove any imports that become unused after removal (e.g., `Sequence` from `typing` if no longer needed). If the user prefers to keep them, replace `Sequence[Any]` with `Sequence[NetworkInterface]` and `Sequence[NetworkDevice]` respectively, adding imports from `solution_arista_avd.protocols`.
+- [ ] T011 [US3] Verify utility module compliance: run `inv lint-mypy` on `src/solution_arista_avd/avd.py`, run `pytest tests/unit/test_avd.py` to confirm existing tests still pass (tests cover `build_device_hostvars`, not the removed functions).
 
 **Checkpoint**: Core utility modules use typed access throughout. SC-004 satisfied for avd.py.
 

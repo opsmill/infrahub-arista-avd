@@ -38,7 +38,7 @@ from generators.backfill_structured_config_query import (
 from generators.backfill_structured_config_query import (
     BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNodeRole as Role,
 )
-from solution_ai_dc.protocols import (
+from solution_arista_avd.protocols import (
     CoreAccountGroup,
     IpamIPAddress,
     IpamPrefix,

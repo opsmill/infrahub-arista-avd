@@ -36,7 +36,7 @@
 - [x] T006 Add `avd_structured_configs` group definition to objects/01_groups.yml for AvdStructuredConfigFile nodes (used as backfill generator target)
 - [x] T007 [P] Update .infrahub.yml — change backfill-structured-config generator `targets` from `avd_artifacts` to `avd_structured_configs`, update `parameters` to `device_hostname: artifact__device__name__value`
 - [x] T008 [P] Update triggers.yml — change backfill trigger `node_kind` from `AvdArtifact` to `AvdStructuredConfigFile`, change watched attribute from `structured_config_checksum` to `checksum`
-- [ ] T009 Regenerate protocol classes by running `infrahubctl protocols --output src/solution_ai_dc/protocols.py` (requires Infrahub running with updated schema loaded)
+- [ ] T009 Regenerate protocol classes by running `infrahubctl protocols --output src/solution_arista_avd/protocols.py` (requires Infrahub running with updated schema loaded)
 
 **Checkpoint**: Schema loaded, protocols regenerated, config files updated. Generator/transform work can begin.
 

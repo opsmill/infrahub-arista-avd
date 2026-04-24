@@ -2,6 +2,22 @@
 
 An Infrahub repository for datacenter infrastructure management. It models network fabric hierarchies (Fabric > Pod > Rack > Device) with full [Arista Validated Design (AVD)](https://avd.arista.com/) integration, automatic device generation, and configuration rendering.
 
+## Documentation
+
+The documentation site lives under [`docs/`](./docs) and is split into two tracks:
+
+- **[User Guide](https://opsmill.github.io/infrahub-arista-avd/user-guide/)** — for network engineers and operators. Quick start, first-fabric provisioning, service-portal how-tos, artifact viewing, troubleshooting.
+- **[Developer Guide](https://opsmill.github.io/infrahub-arista-avd/developer-guide/)** — for contributors. Architecture, schemas, generators, transforms, and a dedicated AVD Integration sub-section covering the two-phase pipeline, hostvars, role mapping, extending the integration, and debugging.
+
+To build and preview locally:
+
+```bash
+cd docs
+npm install
+npm run start     # hot-reloading preview at http://localhost:3000/infrahub-arista-avd/
+npm run build     # production build; fails on any broken internal link
+```
+
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose

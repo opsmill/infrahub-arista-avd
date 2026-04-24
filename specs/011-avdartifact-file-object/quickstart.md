@@ -11,7 +11,7 @@
 1. **Upgrade SDK**: Update `pyproject.toml` to `infrahub-sdk>=1.19.0`, run `uv sync`
 2. **Update schema**: Add `AvdHostvarFile` and `AvdStructuredConfigFile` nodes to `schemas/objects/objects.yml`, mark old attributes `state: absent`
 3. **Load schema**: `inv load-schema`
-4. **Regenerate protocols**: `infrahubctl protocols --output src/solution_ai_dc/protocols.py`
+4. **Regenerate protocols**: `infrahubctl protocols --output src/solution_arista_avd/protocols.py`
 5. **Update generators**: Replace `client.object_store.upload()` with `upload_from_bytes()` on file object nodes
 6. **Update transforms**: Replace `client.object_store.get()` with `download_file()` on file object nodes
 7. **Update backfill generator**: Retarget to `avd_structured_configs` group, update GQL query
