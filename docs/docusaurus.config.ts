@@ -14,7 +14,6 @@ const config: Config = {
   projectName: 'infrahub-arista-avd',
 
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'throw',
   onDuplicateRoutes: 'throw',
 
   i18n: {
@@ -42,8 +41,32 @@ const config: Config = {
 
   themes: ['@docusaurus/theme-mermaid'],
 
+  plugins: [
+    function suppressMermaidWebpackWarnings() {
+      return {
+        name: 'suppress-mermaid-webpack-warnings',
+        configureWebpack() {
+          return {
+            ignoreWarnings: [
+              (warning) =>
+                /vscode-languageserver-types/.test(
+                  warning.module?.resource ?? '',
+                ) &&
+                /Critical dependency: require function is used/.test(
+                  warning.message ?? '',
+                ),
+            ],
+          };
+        },
+      };
+    },
+  ],
+
   markdown: {
     mermaid: true,
+    hooks: {
+      onBrokenMarkdownLinks: 'throw',
+    },
   },
 
   themeConfig: {

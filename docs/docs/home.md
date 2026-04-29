@@ -7,6 +7,8 @@ hide_table_of_contents: true
 hide_title: true
 ---
 
+import Link from '@docusaurus/Link';
+
 ## Infrahub Arista AVD
 
 An Infrahub solution for AI datacenter infrastructure management. It models network fabric hierarchies (Fabric → Pod → Rack → Device) with full **Arista Validated Design (AVD)** integration, automatic device generation, and configuration rendering.
@@ -25,7 +27,7 @@ An Infrahub solution for AI datacenter infrastructure management. It models netw
           service-portal workflows, and view AVD-rendered configurations and
           documentation. No Python required.
         </p>
-        <a href="/user-guide/"><strong>Open the User Guide →</strong></a>
+        <Link to="/user-guide/"><strong>Open the User Guide →</strong></Link>
       </div>
     </div>
     <div className="col col--6">
@@ -36,7 +38,7 @@ An Infrahub solution for AI datacenter infrastructure management. It models netw
           extend the integration with new device roles or transform outputs,
           and debug pipeline issues.
         </p>
-        <a href="/developer-guide/"><strong>Open the Developer Guide →</strong></a>
+        <Link to="/developer-guide/"><strong>Open the Developer Guide →</strong></Link>
       </div>
     </div>
   </div>
