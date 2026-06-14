@@ -71,9 +71,15 @@ This will, in order:
 5. Register this repository with Infrahub and wait for it to sync
 6. Load event triggers and rules from `triggers.yml`
 
-### 5. Run the fabric generator
+### 5. Create a branch
 
-Open the Infrahub UI at http://localhost:8000 and create a new branch. Then navigate to **Actions > Generator definitions > generate_fabric**, click the run button, and select a target fabric (e.g. `Fabric-A`). The generator must be run on a branch, not on main.
+We'll work on a branch so changes stay isolated until you're ready to bring them into `main`. In the Infrahub UI: top-right branch selector → **+ Create branch**, name it `fabric-a-build`.
+
+You can also create a branch from the CLI with `uv run infrahubctl branch create fabric-a-build`, but you'll need to source `.envrc` first (or otherwise set `INFRAHUB_USERNAME`/`INFRAHUB_PASSWORD` or `INFRAHUB_API_TOKEN`). If you go that route, also switch the UI's branch selector to the new branch so subsequent UI actions are scoped to it.
+
+### 6. Run the fabric generator
+
+On the new branch, in the Infrahub UI navigate to **Actions > Generator definitions > generate_fabric**, click the run button, and select a target fabric (e.g. `Fabric-A`).
 
 This kicks off the generator chain:
 1. **FabricGenerator** creates super-spine devices
@@ -81,7 +87,11 @@ This kicks off the generator chain:
 3. **RackGenerator** creates leaf devices per rack (triggered automatically)
 4. **AvdDeviceStructuredConfigGenerator** populates AVD structured configs
 
-Once the generators finish, AVD artifacts (EOS configs, fabric docs, device docs) are automatically rendered.
+When the chain finishes, the branch contains the new devices, hostvar files, and structured-config files.
+
+### 7. Render the AVD artifacts
+
+The per-device AVD artifacts (EOS configs, device documentation) can be rendered manually from a device's **Artifacts** tab (click **Regenerate**), or — recommended for a full review — open a proposed change from the branch and the CI pipeline renders them for every device in one step. See [Provision Your First Fabric](docs/docs/user-guide/provision-first-fabric.md) for the full walkthrough.
 
 ## Services
 
