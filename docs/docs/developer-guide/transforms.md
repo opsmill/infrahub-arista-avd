@@ -131,33 +131,6 @@ class AvdFabricDocTransform(InfrahubTransform):
 **Input**: NetworkDevice
 **Output**: Markdown documentation for single device
 
-## Jinja2 Transforms
-
-### Startup Config
-
-**File**: `transforms/templates/startup_config.j2`
-
-**Purpose**: Generate OSPF startup configuration
-
-**Input**: NetworkDevice
-**Output**: EOS configuration snippet
-
-```jinja2
-! Startup configuration for {{ device.name }}
-!
-hostname {{ device.name }}
-!
-interface Loopback0
-   ip address {{ device.loopback_ip }}/32
-!
-router ospf 1
-   router-id {{ device.loopback_ip }}
-   passive-interface default
-   no passive-interface Ethernet1
-   network 0.0.0.0/0 area 0
-!
-```
-
 ## Query Classes
 
 Each transform has Pydantic models for type-safe query parsing. **These `*_query.py` files are generated, not hand-written** — regenerate them whenever the `.gql` query or the schema changes:
@@ -194,11 +167,6 @@ Defined in `.infrahub.yml`:
 
 ```yaml
 artifact_definitions:
-  - name: startup_configuration
-    targets: devices
-    transformation: device_startup_config
-    content_type: text/plain
-
   - name: cabling_plan
     targets: fabrics
     transformation: cabling_plan
@@ -258,11 +226,6 @@ python_transforms:
   - name: avd_device_doc
     class_name: AvdDeviceDocTransform
     file_path: "./transforms/avd_device_doc.py"
-
-jinja2_transforms:
-  - name: device_startup_config
-    template_path: "./transforms/templates/startup_config.j2"
-    query: startup_config
 ```
 
 ## File Structure
@@ -281,11 +244,7 @@ transforms/
 ├── avd_fabric_doc.py                      # Fabric documentation
 ├── avd_device_doc.py                      # Device documentation
 ├── avd_fabric_devices.gql                 # Fabric devices query
-├── avd_fabric_devices_query.py            # Pydantic models
-├── startup_config.gql                     # Startup config query
-├── startup_config_query.py                # Pydantic models
-└── templates/
-    └── startup_config.j2                  # Jinja2 template
+└── avd_fabric_devices_query.py            # Pydantic models
 ```
 
 ## Creating New Transforms
