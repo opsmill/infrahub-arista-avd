@@ -142,9 +142,6 @@ Each generator extends `InfrahubGenerator` and uses `GeneratorMixin` (from `src/
 | `AvdFabricDoc` | Generates markdown fabric documentation |
 | `AvdDeviceDoc` | Generates markdown device documentation |
 
-**Jinja2 Transforms:**
-- `templates/startup_config.j2` - OSPF startup configuration template
-
 **Transform File Structure:**
 - `<transform>.py` - Transform class implementation
 - `<transform>_query.py` - Pydantic query models

@@ -8,7 +8,6 @@ spec:
     - name: racks
     - name: fabrics
     - name: pods
-    - name: devices
     - name: avd_devices
     - name: servers
     - name: avd_artifacts
