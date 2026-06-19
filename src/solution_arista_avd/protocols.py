@@ -243,6 +243,14 @@ class TemplateInterfaceLayer3(CoreNode):
     profiles: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
+class CoreKeyValue(CoreNode):
+    description: StringOptional
+    key: String
+    name: String
+    value: String
+    member_of_groups: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
 class InterfaceLayer2(CoreNode):
     l2_mode: DropdownOptional
     member_of_groups: RelationshipManager
@@ -408,6 +416,15 @@ class MlagDomain(GenericMlagDomain):
     subscriber_of_groups: RelationshipManager
 
 
+class CoreEnvKeyValue(CoreKeyValue):
+    description: StringOptional
+    key: String
+    name: String
+    value: String
+    member_of_groups: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class AvdEvpn(CoreNode):
     ebgp_multihop: IntegerOptional
     name: String
@@ -442,6 +459,7 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     children: RelationshipManager
     dns_servers: RelationshipManager
     local_users: RelationshipManager
+    loopback_pool: RelatedNode
     member_of_groups: RelationshipManager
     mgmt_pool: RelatedNode
     node_id_pool: RelatedNode
@@ -779,6 +797,15 @@ class IpamRouteTarget(CoreNode):
     vrf: RelationshipManager
 
 
+class CoreStaticKeyValue(CoreKeyValue):
+    description: StringOptional
+    key: String
+    name: String
+    value: String
+    member_of_groups: RelationshipManager
+    subscriber_of_groups: RelationshipManager
+
+
 class RoutingStaticRoute(CoreNode):
     distance: IntegerOptional
     gateway: StringOptional
@@ -1081,7 +1108,6 @@ class ProfileDcimGenericDevice(LineageSource, CoreProfile, CoreNode):
 class ProfileDcimInterface(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     mtu: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1128,10 +1154,8 @@ class ProfileDcimPlatform(LineageSource, CoreProfile, CoreNode):
 
 class ProfileEvpnL2Vlan(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
-    vlan_id: IntegerOptional
     vni_override: IntegerOptional
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
@@ -1143,10 +1167,8 @@ class ProfileEvpnSvi(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     enabled: BooleanOptional
     ip_address_virtual: IPHostOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
-    svi_id: IntegerOptional
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager
@@ -1214,7 +1236,6 @@ class ProfileInterfaceLag(LineageSource, CoreProfile, CoreNode):
     lacp_rate: DropdownOptional
     mac_address: StringOptional
     mtu: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1261,7 +1282,6 @@ class ProfileInterfacePhysical(LineageSource, CoreProfile, CoreNode):
     l2_mode: DropdownOptional
     mac_address: StringOptional
     mtu: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1286,7 +1306,6 @@ class ProfileInterfaceVirtual(LineageSource, CoreProfile, CoreNode):
     l2_mode: DropdownOptional
     mac_address: StringOptional
     mtu: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1304,7 +1323,6 @@ class ProfileInterfaceVirtual(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileIpamIPAddress(LineageSource, CoreProfile, CoreNode):
-    address: IPHostOptional
     description: StringOptional
     fqdn: StringOptional
     profile_name: String
@@ -1317,7 +1335,6 @@ class ProfileIpamIPAddress(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileIpamL2Domain(LineageSource, CoreProfile, CoreNode):
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     member_of_groups: RelationshipManager
@@ -1340,7 +1357,6 @@ class ProfileIpamPrefix(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     is_pool: BooleanOptional
     member_type: DropdownOptional
-    prefix: IPNetworkOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1367,12 +1383,10 @@ class ProfileIpamRouteTarget(LineageSource, CoreProfile, CoreNode):
 
 class ProfileIpamVLAN(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
     status: DropdownOptional
-    vlan_id: IntegerOptional
     member_of_groups: RelationshipManager
     prefixes: RelationshipManager
     related_nodes: RelationshipManager
@@ -1398,7 +1412,6 @@ class ProfileIpamVRF(LineageSource, CoreProfile, CoreNode):
 
 class ProfileLocationGeneric(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     shortname: StringOptional
@@ -1411,7 +1424,6 @@ class ProfileLocationGeneric(LineageSource, CoreProfile, CoreNode):
 class ProfileLocationHall(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     index: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     shortname: StringOptional
@@ -1438,8 +1450,6 @@ class ProfileLocationRack(LineageSource, CoreProfile, CoreNode):
     checksum: StringOptional
     description: StringOptional
     generation_complete: BooleanOptional
-    index: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     rack_type: DropdownOptional
@@ -1471,7 +1481,6 @@ class ProfileMlagInterface(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     l2_mode: DropdownOptional
     mlag_id: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     role: DropdownOptional
@@ -1524,6 +1533,7 @@ class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
     avd_evpn: RelatedNode
     dns_servers: RelationshipManager
     local_users: RelationshipManager
+    loopback_pool: RelatedNode
     member_of_groups: RelationshipManager
     mgmt_pool: RelatedNode
     node_id_pool: RelatedNode
@@ -1624,7 +1634,6 @@ class ProfileRoutingBGPNeighbor(LineageSource, CoreProfile, CoreNode):
     bfd: BooleanOptional
     description: StringOptional
     ebgp_multihop: IntegerOptional
-    peer_address: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     remote_as: StringOptional
@@ -1642,7 +1651,6 @@ class ProfileRoutingBGPPeerGroup(LineageSource, CoreProfile, CoreNode):
     ebgp_multihop: IntegerOptional
     local_as: StringOptional
     maximum_routes: IntegerOptional
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     remote_as: StringOptional
@@ -1657,7 +1665,6 @@ class ProfileRoutingBGPPeerGroup(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileRoutingPrefixList(LineageSource, CoreProfile, CoreNode):
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     member_of_groups: RelationshipManager
@@ -1669,14 +1676,12 @@ class ProfileRoutingPrefixListEntry(LineageSource, CoreProfile, CoreNode):
     action: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
-    sequence: IntegerOptional
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager
 
 
 class ProfileRoutingRouteMap(LineageSource, CoreProfile, CoreNode):
-    name: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     member_of_groups: RelationshipManager
@@ -1689,7 +1694,6 @@ class ProfileRoutingRouteMapEntry(LineageSource, CoreProfile, CoreNode):
     match: ListAttributeOptional
     profile_name: String
     profile_priority: IntegerOptional
-    sequence: IntegerOptional
     set: ListAttributeOptional
     type: DropdownOptional
     member_of_groups: RelationshipManager
@@ -1702,12 +1706,10 @@ class ProfileRoutingStaticRoute(LineageSource, CoreProfile, CoreNode):
     gateway: StringOptional
     interface: StringOptional
     next_hop: StringOptional
-    prefix: StringOptional
     profile_name: String
     profile_priority: IntegerOptional
     route_name: StringOptional
     tag: IntegerOptional
-    vrf: StringOptional
     member_of_groups: RelationshipManager
     related_nodes: RelationshipManager
     subscriber_of_groups: RelationshipManager

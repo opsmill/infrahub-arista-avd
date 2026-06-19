@@ -20,6 +20,7 @@ spec:
       p2p_uplinks_mtu: 9214
       uplink_pool: "Fabric-A-Uplink-Pool"
       vtep_pool: "Fabric-A-VTEP-Pool"
+      loopback_pool: "Fabric-A-Loopback-Pool"
       # STP settings
       spanning_tree_mode: "mstp"
       spanning_tree_priority: 4096
@@ -68,6 +69,9 @@ spec:
       asn_pool: "Fabric-B-ASN-Pool"
       node_id_pool: "Fabric-B-NodeID-Pool"
       mgmt_pool: "Fabric-B-Mgmt-Pool"
+      uplink_pool: "Fabric-B-Uplink-Pool"
+      vtep_pool: "Fabric-B-VTEP-Pool"
+      loopback_pool: "Fabric-B-Loopback-Pool"
       children:
         kind: NetworkPod
         data:

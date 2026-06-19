@@ -107,3 +107,95 @@ spec:
       ip_namespace: default
       resources:
         - "10.255.5.0/24"
+---
+# Device Loopback Prefix for Fabric-A (distinct from mgmt 10.255.0.0/24)
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.255.2.0/24
+      role: pod_loopback
+---
+# Device Loopback Pool for Fabric-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-A-Loopback-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - "10.255.2.0/24"
+---
+# P2P Uplink Prefix for Fabric-B
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.254.252.0/22
+      role: pod_leaf_spine
+---
+# P2P Uplink Pool for Fabric-B
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-B-Uplink-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.254.252.0/22"
+---
+# VTEP Loopback Prefix for Fabric-B
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.254.1.0/27
+      role: loopback-vtep
+---
+# VTEP Loopback Pool for Fabric-B
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-B-VTEP-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - "10.254.1.0/27"
+---
+# Device Loopback Prefix for Fabric-B (distinct from mgmt 10.255.1.0/24)
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.255.3.0/24
+      role: pod_loopback
+---
+# Device Loopback Pool for Fabric-B
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-B-Loopback-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - "10.255.3.0/24"
