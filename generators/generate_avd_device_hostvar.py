@@ -370,18 +370,51 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         attr = getattr(obj, attr_name, None)
         return attr.value if attr else None
 
+    async def _require_pool_prefix(
+        self, pool_ref: object, pool_kind: str, fabric_name: object, pool_label: str
+    ) -> str:
+        """Resolve a mandatory pool's first prefix, failing loudly if unset or empty.
+
+        The fabric-level pools are mandatory in the schema, so an unset relationship
+        should not occur; this still guards against a pool that is linked but has no
+        resources, rather than silently emitting a hardcoded prefix.
+        """
+        prefix = await self._extract_pool_prefix(pool_ref, pool_kind)
+        if not prefix:
+            raise ValueError(
+                f"Fabric '{fabric_name}': required IP pool '{pool_label}' is unset or has no "
+                f"resources. Assign a {pool_kind} with at least one prefix."
+            )
+        return prefix
+
     async def _extract_l3ls_pools(self, fabric: object, pod: object) -> dict[str, str | None]:
-        """Extract configurable IP pools from fabric/pod with hardcoded fallbacks."""
-        uplink = await self._extract_pool_prefix(getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool")
-        vtep = await self._extract_pool_prefix(getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool")
+        """Extract IP pools from the fabric/pod data model.
+
+        The three fabric-level pools (uplink, vtep, loopback) are mandatory and are
+        resolved with no hardcoded fallback — a missing or empty pool raises a clear
+        error. The pod-level MLAG pools remain optional.
+        """
+        fabric_name = self._get_attr_value(fabric, "name")
+
+        uplink = await self._require_pool_prefix(
+            getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool", fabric_name, "uplink_pool"
+        )
+        vtep = await self._require_pool_prefix(
+            getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool", fabric_name, "vtep_pool"
+        )
+        loopback = await self._require_pool_prefix(
+            getattr(fabric, "loopback_pool", None), "CoreIPPrefixPool", fabric_name, "loopback_pool"
+        )
+
         mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
         # Auto-generated Pydantic model renames mlag_l3_pool to mlag_l_3_pool
         mlag_l3_ref = getattr(pod, "mlag_l_3_pool", None) or getattr(pod, "mlag_l3_pool", None)
         mlag_l3 = await self._extract_pool_prefix(mlag_l3_ref, "CoreIPAddressPool")
 
         return {
-            "uplink_ipv4_pool": uplink or "10.250.0.0/16",
-            "vtep_loopback_ipv4_pool": vtep or "10.251.0.0/24",
+            "uplink_ipv4_pool": uplink,
+            "vtep_loopback_ipv4_pool": vtep,
+            "loopback_ipv4_pool": loopback,
             "mlag_peer_ipv4_pool": mlag_peer,
             "mlag_peer_l3_ipv4_pool": mlag_l3,
         }
@@ -520,7 +553,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["bgp_as"] = str(bgp_asn)
         if loopback_ip:
             node_config["loopback_ipv4_address"] = loopback_ip
-            node_config["loopback_ipv4_pool"] = "10.255.0.0/24"
+            if pools.get("loopback_ipv4_pool"):
+                node_config["loopback_ipv4_pool"] = pools["loopback_ipv4_pool"]
         if mgmt_ip:
             node_config["mgmt_ip"] = mgmt_ip
 
@@ -700,6 +734,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             pools: dict[str, str | None] = {
                 "uplink_ipv4_pool": None,
                 "vtep_loopback_ipv4_pool": None,
+                "loopback_ipv4_pool": None,
                 "mlag_peer_ipv4_pool": None,
                 "mlag_peer_l3_ipv4_pool": None,
             }

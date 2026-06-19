@@ -253,6 +253,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     ] = Field(alias="p2p_uplinks_mtu")
     uplink_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUplinkPool"
     vtep_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPool"
+    loopback_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool"
     spanning_tree_mode: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreeMode"
     ]
@@ -375,6 +376,38 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeDefaultPrefixLength(
+    BaseModel
+):
+    value: Optional[Any]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode(
+    BaseModel
+):
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeName"
+    ]
+    default_prefix_length: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeDefaultPrefixLength"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeDefaultPrefixLength(
     BaseModel
 ):
     value: Optional[Any]
@@ -978,6 +1011,8 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUpl
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUplinkPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPool.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServers.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServersEdges.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServersEdgesNode.model_rebuild()
