@@ -252,6 +252,8 @@ infrahubctl protocols --out src/solution_arista_avd/protocols.py
 - Neo4j (via Infrahub), PostgreSQL, Redis, RabbitMQ (001-enforce-protocols)
 - Markdown (CommonMark + MDX) authored against Docusaurus 3.10 + `@docusaurus/core@^3.10.0`, `@docusaurus/preset-classic@^3.10.0`, `@docusaurus/theme-mermaid@^3.10.0` (already installed; no new deps) (012-enhance-docs)
 - Files on disk under `docs/docs/`; sidebar in `docs/sidebars.ts` (012-enhance-docs)
+- Python >=3.11, <3.14 (no runtime code changes this cycle — schema YAML + seed YAML + protocol regeneration) + `infrahub-sdk==1.18.1` (`infrahubctl` for schema check / protocols), Infrahub 1.9.x server (015-schema-driven-ip-pools)
+- Infrahub (Neo4j graph); IP pools are `CoreIPPrefixPool` / `CoreIPAddressPool` built-ins (015-schema-driven-ip-pools)
 
 ## Recent Changes
 - 001-enforce-protocols: Added Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0

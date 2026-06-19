@@ -100,7 +100,7 @@ extensions:
           peer: CoreIPPrefixPool
           kind: Attribute
           cardinality: one
-          optional: true
+          optional: false
           identifier: "fabric__uplink_pool"
           description: "IP prefix pool for P2P uplink addressing"
           order_weight: 10400
@@ -109,10 +109,19 @@ extensions:
           peer: CoreIPPrefixPool
           kind: Attribute
           cardinality: one
-          optional: true
+          optional: false
           identifier: "fabric__vtep_pool"
           description: "IP prefix pool for VTEP loopback addresses"
           order_weight: 10500
+        - name: loopback_pool
+          label: Loopback IP Pool
+          peer: CoreIPPrefixPool
+          kind: Attribute
+          cardinality: one
+          optional: false
+          identifier: "fabric__loopback_pool"
+          description: "IP prefix pool for device loopback (loopback0) addressing"
+          order_weight: 10600
 
         - name: dns_servers
           label: DNS Servers
