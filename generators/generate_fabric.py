@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
@@ -21,8 +19,6 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
     node_id_pool: CoreNumberPool | None
     mgmt_pool: CoreIPAddressPool | None
 
-    log = logging.getLogger("infrahub.tasks")
-
     async def generate(self, data: dict) -> None:
         data: FabricGeneratorQuery = FabricGeneratorQuery(**data)
 
@@ -34,20 +30,9 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.super_spine_devices: list[DcimDevice] = []
 
         # Get AVD-related pool references
-        asn_pool_node = data.network_fabric.edges[0].node.asn_pool
-        node_id_pool_node = data.network_fabric.edges[0].node.node_id_pool
-        mgmt_pool_node = data.network_fabric.edges[0].node.mgmt_pool
-
-        self.asn_pool = None
-        self.node_id_pool = None
-        self.mgmt_pool = None
-
-        if asn_pool_node and asn_pool_node.node:
-            self.asn_pool = await self.client.get(kind=CoreNumberPool, id=asn_pool_node.node.id)
-        if node_id_pool_node and node_id_pool_node.node:
-            self.node_id_pool = await self.client.get(kind=CoreNumberPool, id=node_id_pool_node.node.id)
-        if mgmt_pool_node and mgmt_pool_node.node:
-            self.mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=mgmt_pool_node.node.id)
+        self.asn_pool, self.node_id_pool, self.mgmt_pool = await self.resolve_avd_pools(
+            data.network_fabric.edges[0].node
+        )
 
         await self.allocate_resource_pools()
 

@@ -24,7 +24,7 @@ dev = [
 ]
 catalog = [
     "streamlit>=1.30.0",
-    "infrahub-sdk>=1.15.1,<2.0.0",
+    "infrahub-sdk>=1.19.0,<2.0.0",
     "pandas>=2.0.0",
     "python-dotenv>=1.0.0",
 ]

@@ -167,6 +167,24 @@ class TestSingleHomedCabling:
             assert len(cabling_plan) == 1
 
 
+class TestIdempotency:
+    """Re-running the generator on an already-cabled server is a no-op."""
+
+    @pytest.mark.asyncio
+    async def test_already_cabled_server_skips(self) -> None:
+        gen = _make_generator()
+        gen._is_server_cabled = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+        iface = _make_interface("iface-1", "Ethernet1")
+        data = _make_server_data(interfaces=[iface])
+
+        with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
+            await gen.generate(data)
+
+        mock_connect.assert_not_called()
+        gen._trigger_avd_cascade.assert_not_awaited()
+
+
 class TestDualHomedCabling:
     """T009: Test dual-homed server cabling (2 interfaces -> 2 different leaves)."""
 

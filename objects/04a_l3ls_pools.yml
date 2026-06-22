@@ -45,15 +45,21 @@ spec:
       resources:
         - "10.255.1.0/27"
 ---
-# MLAG Peer-Link Prefix for Fabric-A Pod-A2
+# MLAG Peer-Link / L3 Peering Prefixes for Fabric-A pods.
+# Each pod gets a disjoint /25 so the per-pod pools never allocate overlapping
+# addresses: peer-links carve out of 10.255.4.0/24, L3 peerings out of 10.255.5.0/24.
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
   kind: IpamPrefix
   data:
-    - prefix: 10.255.4.0/24
+    - prefix: 10.255.4.0/25     # Pod-A2 MLAG peer-link
       role: technical
-    - prefix: 10.255.5.0/24
+    - prefix: 10.255.4.128/25   # Pod-A3 MLAG peer-link
+      role: technical
+    - prefix: 10.255.5.0/25     # Pod-A2 MLAG L3 peering
+      role: technical
+    - prefix: 10.255.5.128/25   # Pod-A3 MLAG L3 peering
       role: technical
 ---
 # MLAG Peer Pool for Fabric-A Pod-A2
@@ -67,7 +73,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.4.0/24"
+        - "10.255.4.0/25"
 ---
 # MLAG L3 Peering Pool for Fabric-A Pod-A2
 apiVersion: infrahub.app/v1
@@ -80,7 +86,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.5.0/24"
+        - "10.255.5.0/25"
 ---
 # MLAG Peer Pool for Fabric-A Pod-A3
 apiVersion: infrahub.app/v1
@@ -93,7 +99,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.4.0/24"
+        - "10.255.4.128/25"
 ---
 # MLAG L3 Peering Pool for Fabric-A Pod-A3
 apiVersion: infrahub.app/v1
@@ -106,7 +112,7 @@ spec:
       default_prefix_length: 31
       ip_namespace: default
       resources:
-        - "10.255.5.0/24"
+        - "10.255.5.128/25"
 ---
 # Device Loopback Prefix for Fabric-A (distinct from mgmt 10.255.0.0/24)
 apiVersion: infrahub.app/v1
@@ -177,13 +183,13 @@ spec:
       resources:
         - "10.254.1.0/27"
 ---
-# Device Loopback Prefix for Fabric-B (distinct from mgmt 10.255.1.0/24)
+# Device Loopback Prefix for Fabric-B (distinct from mgmt 10.254.0.0/24)
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
   kind: IpamPrefix
   data:
-    - prefix: 10.255.3.0/24
+    - prefix: 10.254.2.0/24
       role: pod_loopback
 ---
 # Device Loopback Pool for Fabric-B
@@ -198,4 +204,4 @@ spec:
       default_prefix_length: 32
       ip_namespace: default
       resources:
-        - "10.255.3.0/24"
+        - "10.254.2.0/24"

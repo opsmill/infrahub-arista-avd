@@ -48,48 +48,8 @@ nodes:
     human_friendly_id:
       - prefix__value
       - ip_namespace__name__value
-    attributes:
-      - name: status
-        kind: Dropdown
-        choices:
-          - name: active
-            label: Active
-          - name: deprecated
-            label: Deprecated
-          - name: reserved
-            label: Reserved
-      - name: role
-        kind: Dropdown
-        optional: true
-        choices:
-          - name: loopback
-            label: Loopback
-            description: Represents internal communications.
-            color: "#B0A8B9"
-          - name: management
-            label: Management
-            description: Handles administrative operations.
-            color: "#AEC6CF"
-          - name: public
-            label: Public
-            description: Public facing network.
-            color: "#FDFD96"
-          - name: server
-            label: Server
-            description: Dedicated to server functions.
-            color: "#77DD77"
-          - name: supernet
-            label: Supernet
-            description: Covers multiple networks
-            color: "#FFB347"
-          - name: technical
-            label: Technical
-            description: Focused on technical aspects.
-            color: "#9678B6"
-          - name: loopback-vtep
-            label: Loopback VTEP
-            description: Facilitates virtualized network communications within loopback configurations.
-            color: "#CDB4DB"
+    # NOTE: the `status` and `role` dropdowns for Ipam.Prefix are defined in
+    # schemas/ipam_extensions.yml so there is a single authoritative choice list.
     relationships:
       - name: organization
         peer: OrganizationGeneric

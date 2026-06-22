@@ -21,8 +21,6 @@ from .rack_generator_query import RackGeneratorQuery
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-EXCLUDED_RACK_TYPES = []
-
 
 class RackGenerator(InfrahubGenerator, GeneratorMixin):
     rack_id: str
@@ -57,7 +55,6 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.rack_id: str = data.location_rack.edges[0].node.id
         self.rack_index: int = data.location_rack.edges[0].node.index.value
         self.rack_name: str = data.location_rack.edges[0].node.name.value
-        self.rack_type: str = data.location_rack.edges[0].node.rack_type.value
         self.rack_leaf_switch_template: str = data.location_rack.edges[0].node.leaf_switch_template.node.id
         self.rack_amount_of_leafs: int = data.location_rack.edges[0].node.amount_of_leafs.value
         self.leaf_switches = []
@@ -96,10 +93,6 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         self.spine_switches = await self.client.filters(kind=DcimDevice, pod__ids=[self.pod_id], role__value="spine")
 
-        if self.rack_type in EXCLUDED_RACK_TYPES:
-            msg = f"Cannot run rack generator on {self.rack_name}-{self.rack_id}: {self.rack_type} is not supported by the generator!"
-            raise ValueError(msg)
-
         if self.pod_amount_of_spines != len(self.spine_switches):
             msg = f"Cannot start rack generator on {self.rack_name}-{self.rack_id}: the pod doesn't seem to be fully generated"
             raise RuntimeError(msg)
@@ -121,13 +114,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         pod_node = data.location_rack.edges[0].node.pod.node
         if pod_node.parent and pod_node.parent.node:
-            fabric_node = pod_node.parent.node
-            if hasattr(fabric_node, "asn_pool") and fabric_node.asn_pool and fabric_node.asn_pool.node:
-                self.asn_pool = await self.client.get(kind=CoreNumberPool, id=fabric_node.asn_pool.node.id)
-            if hasattr(fabric_node, "node_id_pool") and fabric_node.node_id_pool and fabric_node.node_id_pool.node:
-                self.node_id_pool = await self.client.get(kind=CoreNumberPool, id=fabric_node.node_id_pool.node.id)
-            if hasattr(fabric_node, "mgmt_pool") and fabric_node.mgmt_pool and fabric_node.mgmt_pool.node:
-                self.mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=fabric_node.mgmt_pool.node.id)
+            self.asn_pool, self.node_id_pool, self.mgmt_pool = await self.resolve_avd_pools(pod_node.parent.node)
 
         await self.create_leaf_switches()
 

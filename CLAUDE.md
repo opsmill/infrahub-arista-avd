@@ -237,7 +237,7 @@ Hierarchical IP allocation:
 |------|---------|
 | `.infrahub.yml` | Defines queries, generators (7), transforms (5), artifact definitions. Note: schemas load via `inv load`/`infrahubctl schema load schemas`, not the (commented-out) `schemas:` key |
 | `repository.yml` | CoreRepository definition for Infrahub |
-| `pyproject.toml` | Python config: deps (pyavd>=5.0.0, infrahub-sdk==1.18.1), ruff, mypy, pytest |
+| `pyproject.toml` | Python config: deps (pyavd>=5.0.0, infrahub-sdk[all]>=1.19.0), ruff, mypy, pytest |
 | `docker-compose.yml` | Service stack: Infrahub, Neo4j, PostgreSQL, Redis, RabbitMQ |
 | `docker-compose.override.yml` | Local development overrides |
 | `Dockerfile` | Custom image based on Infrahub with project code |
@@ -277,7 +277,7 @@ infrahubctl protocols --out src/solution_arista_avd/protocols.py
 ```
 
 ## Active Technologies
-- Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0 (001-enforce-protocols)
+- Python >=3.11, <3.14 + infrahub-sdk[all]>=1.19.0, pyavd>=5.0.0 (001-enforce-protocols)
 - Neo4j (via Infrahub), PostgreSQL, Redis, RabbitMQ (001-enforce-protocols)
 - Markdown (CommonMark + MDX) authored against Docusaurus 3.10 + `@docusaurus/core@^3.10.0`, `@docusaurus/preset-classic@^3.10.0`, `@docusaurus/theme-mermaid@^3.10.0` (already installed; no new deps) (012-enhance-docs)
 - Files on disk under `docs/docs/`; sidebar in `docs/sidebars.ts` (012-enhance-docs)

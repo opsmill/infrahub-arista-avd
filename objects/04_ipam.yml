@@ -90,13 +90,13 @@ spec:
       resources:
         - "10.255.0.0/24"
 ---
-# Management IP Prefix for Fabric-B
+# Management IP Prefix for Fabric-B (Fabric-B lives entirely in 10.254.0.0/16)
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
   kind: IpamPrefix
   data:
-    - prefix: 10.255.1.0/24
+    - prefix: 10.254.0.0/24
       role: management
 ---
 # Management IP Pool for Fabric-B
@@ -110,4 +110,4 @@ spec:
       default_prefix_length: 24
       ip_namespace: default
       resources:
-        - "10.255.1.0/24"
+        - "10.254.0.0/24"

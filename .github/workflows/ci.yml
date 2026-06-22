@@ -6,6 +6,11 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Nightly run of the heavy full-stack integration test (see
+    # integration-tests-full below).
+    - cron: "0 3 * * *"
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
 concurrency:
@@ -43,8 +48,15 @@ jobs:
       - name: Yamllint
         run: uv run yamllint .
 
-      - name: Mypy
+      - name: Mypy (src — enforced)
         run: uv run mypy --show-error-codes src/solution_arista_avd
+
+      # Generators and transforms are not yet fully typed. Surface the mypy
+      # report for visibility without failing the build until they are cleaned
+      # up; remove continue-on-error once the backlog is addressed.
+      - name: Mypy (generators, transforms — non-blocking)
+        run: uv run mypy --show-error-codes generators transforms
+        continue-on-error: true
 
   unit-tests:
     name: Unit tests
@@ -80,7 +92,30 @@ jobs:
         run: uv sync --all-packages
 
       # test_infrahub.py spins up the full Infrahub stack via Docker
-      # testcontainers and is too resource-heavy/slow for hosted runners, so it
-      # is excluded here and run manually/locally instead.
+      # testcontainers and is too resource-heavy/slow for every PR, so it is
+      # excluded here and runs in the integration-tests-full job (nightly /
+      # on-demand) instead.
       - name: Run integration tests
         run: uv run pytest tests/integration --ignore=tests/integration/test_infrahub.py -v
+
+  integration-tests-full:
+    name: Integration tests (full stack)
+    # The Infrahub testcontainers stack is heavy; run it nightly and on demand
+    # rather than on every PR so schema/object/repo regressions are still caught
+    # automatically somewhere.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Run full integration tests
+        run: uv run pytest tests/integration/test_infrahub.py -v

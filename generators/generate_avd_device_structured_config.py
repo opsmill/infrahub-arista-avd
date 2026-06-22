@@ -125,12 +125,10 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         devices = self._extract_devices_from_fabric(data)
 
         self.logger.info(f"Found {len(devices)} devices in fabric")
-        print(f"\nFound {len(devices)} devices:")
         device_mapping: dict[str, str] = {}
         for d in devices:
-            status = "✓" if d["has_hostvar"] else "✗"
             device_mapping[d["hostname"]] = d["id"]
-            print(f"  {status} {d['hostname']}: {'has hostvar' if d['has_hostvar'] else 'no artifact'}")
+            self.logger.info("  %s: %s", d["hostname"], "has hostvar" if d["has_hostvar"] else "no artifact")
 
         # Check all devices have hostvars before proceeding
         devices_without_hostvars = [d["hostname"] for d in devices if not d["has_hostvar"]]
@@ -203,7 +201,12 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                         if existing_file:
                             existing_content = await existing_file.download_file()
                             existing_checksum = hashlib.sha256(existing_content).hexdigest()
-                    except Exception:  # noqa: BLE001
+                    except Exception as exc:  # noqa: BLE001 - treat any fetch/download failure as "no existing file"
+                        self.logger.warning(
+                            "Could not read existing structured config for %s, forcing re-upload: %s",
+                            hostname,
+                            exc,
+                        )
                         existing_file = None
 
                 # Always upload and save to ensure the file exists on this branch
