@@ -152,41 +152,19 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
     async def create_leaf_switches(self) -> None:
         for index in range(1, self.rack_amount_of_leafs + 1):
-            device_kwargs = {
-                "name": f"leaf-{self.pod_name}-{self.rack_index}-{index}",
-                "status": "provisioning",
-                "object_template": {"id": self.rack_leaf_switch_template},
-                "pod": {"id": self.pod_id},
-                "rack": {"id": self.rack_id},
-                "loopback_ip": self.loopback_pool,
-                "index": index,
-                "role": "leaf",
-                "member_of_groups": ["avd_devices"],
-            }
-
-            # Allocate from ASN and Node ID pools if available
-            if self.asn_pool:
-                device_kwargs["bgp_asn"] = self.asn_pool
-            if self.node_id_pool:
-                device_kwargs["node_id"] = self.node_id_pool
-            if self.mgmt_pool:
-                device_kwargs["mgmt_ip"] = self.mgmt_pool
-
-            leaf_switch = await self.client.create(DcimDevice, **device_kwargs)
-            await leaf_switch.save(allow_upsert=True)
-            self.leaf_switches.append(leaf_switch)
-
-            # FIX: seems the id of a related node assigned from a pool is not immediately accessible
-            device = await self.client.get(
-                DcimDevice,
-                id=leaf_switch.id,
-                include=["ip_address"],
-                exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
+            leaf_switch = await self.create_avd_device(
+                name=f"leaf-{self.pod_name}-{self.rack_index}-{index}",
+                role="leaf",
+                object_template_id=self.rack_leaf_switch_template,
+                pod_id=self.pod_id,
+                rack_id=self.rack_id,
+                index=index,
+                loopback_pool=self.loopback_pool,
+                asn_pool=self.asn_pool,
+                node_id_pool=self.node_id_pool,
+                mgmt_pool=self.mgmt_pool,
             )
-            loopback_interface = await self.client.get(DcimInterface, device__ids=[device.id], role__value="loopback")
-            loopback_interface.status.value = "active"
-            loopback_interface.ip_address = device.loopback_ip.id
-            await loopback_interface.save(allow_upsert=True)
+            self.leaf_switches.append(leaf_switch)
 
     async def create_mlag_pairs(self) -> None:
         """Create MLAG domains pairing consecutive leaf switches.
@@ -247,24 +225,17 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.logger.info(f"Creating {self.rack_amount_of_l2leafs} L2 leaf switches in {self.rack_name}")
 
         for index in range(1, self.rack_amount_of_l2leafs + 1):
-            device_kwargs: dict = {
-                "name": f"l2leaf-{self.pod_name}-{self.rack_index}-{index}",
-                "status": "provisioning",
-                "object_template": {"id": self.rack_l2leaf_switch_template},
-                "pod": {"id": self.pod_id},
-                "rack": {"id": self.rack_id},
-                "index": index,
-                "role": "l2leaf",
-                "member_of_groups": ["avd_devices"],
-            }
-
-            if self.node_id_pool:
-                device_kwargs["node_id"] = self.node_id_pool
-            if self.mgmt_pool:
-                device_kwargs["mgmt_ip"] = self.mgmt_pool
-
-            l2leaf = await self.client.create(DcimDevice, **device_kwargs)
-            await l2leaf.save(allow_upsert=True)
+            # L2 leafs have no loopback/BGP — only node-id and mgmt allocations.
+            l2leaf = await self.create_avd_device(
+                name=f"l2leaf-{self.pod_name}-{self.rack_index}-{index}",
+                role="l2leaf",
+                object_template_id=self.rack_l2leaf_switch_template,
+                pod_id=self.pod_id,
+                rack_id=self.rack_id,
+                index=index,
+                node_id_pool=self.node_id_pool,
+                mgmt_pool=self.mgmt_pool,
+            )
             self.l2leaf_switches.append(l2leaf)
             self.logger.info(f"  Created L2 leaf {l2leaf.name.value}")
 

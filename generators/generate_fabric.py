@@ -6,7 +6,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
-from solution_arista_avd.protocols import DcimDevice, DcimInterface, NetworkPod
+from solution_arista_avd.protocols import DcimDevice, NetworkPod
 
 from .fabric_generator_query import FabricGeneratorQuery
 
@@ -59,39 +59,16 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
 
         for idx in range(1, self.amount_of_super_spines + 1):
-            device_kwargs = {
-                "name": f"ss-{self.fabric_name}-{idx}",
-                "status": "provisioning",
-                "object_template": {"id": self.fabric_super_spine_switch_template},
-                "loopback_ip": self.loopback_pool,
-                "role": "super_spine",
-                "pod": fabric_pod,
-                "member_of_groups": ["avd_devices"],
-            }
-
-            # Allocate from ASN and Node ID pools if available
-            if self.asn_pool:
-                device_kwargs["bgp_asn"] = self.asn_pool
-            if self.node_id_pool:
-                device_kwargs["node_id"] = self.node_id_pool
-            if self.mgmt_pool:
-                device_kwargs["mgmt_ip"] = self.mgmt_pool
-
-            device = await self.client.create(DcimDevice, **device_kwargs)
-            await device.save(allow_upsert=True)
-
-            # FIX: seems the id of a related node assigned from a pool is not immediately accessible
-            device = await self.client.get(
-                DcimDevice,
-                id=device.id,
-                include=["ip_address"],
-                exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
+            device = await self.create_avd_device(
+                name=f"ss-{self.fabric_name}-{idx}",
+                role="super_spine",
+                object_template_id=self.fabric_super_spine_switch_template,
+                pod_id=fabric_pod.id,
+                loopback_pool=self.loopback_pool,
+                asn_pool=self.asn_pool,
+                node_id_pool=self.node_id_pool,
+                mgmt_pool=self.mgmt_pool,
             )
-            loopback_interface = await self.client.get(DcimInterface, device__ids=[device.id], role__value="loopback")
-            loopback_interface.status.value = "active"
-            loopback_interface.ip_address = device.loopback_ip.id
-            await loopback_interface.save(allow_upsert=True)
-
             self.super_spine_devices.append(device)
 
     async def allocate_resource_pools(self) -> None:

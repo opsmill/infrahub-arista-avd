@@ -1,4 +1,9 @@
 ---
+# Schemas are intentionally NOT declared here. They are loaded explicitly via
+# `inv load` / `inv load-schema` (`infrahubctl schema load schemas`) so that the
+# load order and timing are controlled during setup. If you want schemas to sync
+# automatically with the repository instead, uncomment the block below — but be
+# aware it will then load on every repository sync.
 # schemas:
 #  - schemas
 

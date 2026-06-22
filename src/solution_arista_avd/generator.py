@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
+
+from .protocols import DcimDevice, DcimInterface
 
 if TYPE_CHECKING:
     from infrahub_sdk import InfrahubClient
+    from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
 
     from .protocols import LocationRack, NetworkPod
 
 logger = logging.getLogger("infrahub.tasks")
+
+# Every generated network device starts life in provisioning and is enrolled in
+# the avd_devices group so the AVD generators pick it up for config generation.
+DEVICE_STATUS_PROVISIONING = "provisioning"
+AVD_DEVICES_GROUP = "avd_devices"
 
 
 async def set_fabric_avd_hostvars_ready(client: InfrahubClient, fabric_id: str, ready: bool) -> None:
@@ -40,6 +48,81 @@ class GeneratorMixin:
         sorted_ids = sorted(related_ids)
         joined = ",".join(sorted_ids)
         return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+    async def create_avd_device(
+        self,
+        *,
+        name: str,
+        role: str,
+        object_template_id: str,
+        pod_id: str,
+        rack_id: str | None = None,
+        index: int | None = None,
+        loopback_pool: CoreIPAddressPool | None = None,
+        asn_pool: CoreNumberPool | None = None,
+        node_id_pool: CoreNumberPool | None = None,
+        mgmt_pool: CoreIPAddressPool | None = None,
+    ) -> DcimDevice:
+        """Create an AVD-managed network device, allocating from the given pools.
+
+        Centralises the device-creation pattern shared by the fabric, pod and
+        rack generators: assemble the common kwargs, allocate from whichever of
+        the ASN / node-id / management / loopback pools are supplied, save, and
+        (when a loopback pool was given) activate the loopback interface.
+
+        Returns the created device with all of its fields populated.
+        """
+        device_kwargs: dict[str, Any] = {
+            "name": name,
+            "status": DEVICE_STATUS_PROVISIONING,
+            "object_template": {"id": object_template_id},
+            "role": role,
+            "pod": {"id": pod_id},
+            "member_of_groups": [AVD_DEVICES_GROUP],
+        }
+        if rack_id is not None:
+            device_kwargs["rack"] = {"id": rack_id}
+        if index is not None:
+            device_kwargs["index"] = index
+        if loopback_pool is not None:
+            device_kwargs["loopback_ip"] = loopback_pool
+        if asn_pool is not None:
+            device_kwargs["bgp_asn"] = asn_pool
+        if node_id_pool is not None:
+            device_kwargs["node_id"] = node_id_pool
+        if mgmt_pool is not None:
+            device_kwargs["mgmt_ip"] = mgmt_pool
+
+        device = await self.client.create(DcimDevice, **device_kwargs)  # type: ignore[type-abstract]
+        await device.save(allow_upsert=True)
+
+        if loopback_pool is not None:
+            await self._activate_loopback_interface(device.id)
+
+        return device
+
+    async def _activate_loopback_interface(self, device_id: str) -> None:
+        """Activate a device's loopback interface and bind its pool-allocated IP.
+
+        The IP assigned from a CoreIPAddressPool is not populated on the node
+        returned by ``create()`` + ``save()`` (the relationship id only resolves
+        on a subsequent read), so the device is re-fetched by id to obtain
+        ``loopback_ip`` before wiring it onto the loopback interface.
+        """
+        device = await self.client.get(
+            DcimDevice,  # type: ignore[type-abstract]
+            id=device_id,
+            include=["ip_address"],
+            exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
+        )
+        loopback_interface = await self.client.get(
+            DcimInterface,  # type: ignore[type-abstract]
+            device__ids=[device_id],
+            role__value="loopback",
+        )
+        loopback_interface.status.value = "active"
+        loopback_interface.ip_address = device.loopback_ip.id  # type: ignore[assignment]
+        await loopback_interface.save(allow_upsert=True)
 
 
 async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> bool:
