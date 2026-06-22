@@ -1,64 +1,50 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
 class AvdDeviceConfigQuery(BaseModel):
-    dcim_device: "AvdDeviceConfigQueryDcimDevice" = Field(alias="DcimDevice")
+    dcim_device: AvdDeviceConfigQueryDcimDevice = Field(alias="DcimDevice")
 
 
 class AvdDeviceConfigQueryDcimDevice(BaseModel):
-    edges: list["AvdDeviceConfigQueryDcimDeviceEdges"]
+    edges: list[AvdDeviceConfigQueryDcimDeviceEdges]
 
 
 class AvdDeviceConfigQueryDcimDeviceEdges(BaseModel):
-    node: Optional["AvdDeviceConfigQueryDcimDeviceEdgesNode"]
+    node: AvdDeviceConfigQueryDcimDeviceEdgesNode | None
 
 
 class AvdDeviceConfigQueryDcimDeviceEdgesNode(BaseModel):
     id: str
-    name: Optional["AvdDeviceConfigQueryDcimDeviceEdgesNodeName"]
-    avd_artifact: "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact"
+    name: AvdDeviceConfigQueryDcimDeviceEdgesNodeName | None
+    avd_artifact: AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact
 
 
 class AvdDeviceConfigQueryDcimDeviceEdgesNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
-    node: Optional["AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode"]
+    node: AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode | None
 
 
 class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
     id: str
-    structured_config_file: (
-        "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile"
-    )
+    structured_config_file: AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile
 
 
-class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile(
-    BaseModel
-):
-    node: Optional[
-        "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode"
-    ]
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile(BaseModel):
+    node: AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode | None
 
 
-class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode(
-    BaseModel
-):
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode(BaseModel):
     id: str
-    checksum: Optional[
-        "AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNodeChecksum"
-    ]
+    checksum: AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNodeChecksum | None
 
 
-class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNodeChecksum(
-    BaseModel
-):
-    value: Optional[str]
+class AvdDeviceConfigQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNodeChecksum(BaseModel):
+    value: str | None
 
 
 AvdDeviceConfigQuery.model_rebuild()

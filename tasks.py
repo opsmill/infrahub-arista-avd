@@ -1,4 +1,6 @@
 import os
+import sys
+import time
 from pathlib import Path
 from time import sleep
 
@@ -313,7 +315,7 @@ def lint_yaml(ctx: Context) -> None:
 def lint_mypy(ctx: Context) -> None:
     """Run Linter to check all Python files."""
     print(" - Check code with mypy")
-    exec_cmd = "mypy --show-error-codes infrahub_sdk"
+    exec_cmd = "mypy --show-error-codes src/solution_arista_avd"
     with ctx.cd(MAIN_DIRECTORY_PATH):
         ctx.run(exec_cmd, pty=True)
 

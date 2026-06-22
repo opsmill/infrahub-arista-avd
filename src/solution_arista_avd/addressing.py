@@ -1,30 +1,36 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .protocols import DcimInterface
 
 if TYPE_CHECKING:
     import logging
-    from collections.abc import Generator
-    from ipaddress import IPv4Address
+    from collections.abc import Iterator
+    from ipaddress import IPv4Address, IPv6Address
 
     from infrahub_sdk import InfrahubClient
     from infrahub_sdk.protocols import CoreIPPrefixPool
+
+    from .protocols import IpamIPAddress, IpamPrefix
 
 
 async def assign_ip_address_to_interface(
     client: InfrahubClient,
     interface: DcimInterface,
     logger: logging.Logger,
-    host_addresses: Generator[IPv4Address],
+    host_addresses: Iterator[IPv4Address] | Iterator[IPv6Address],
     prefix_len: int,
 ) -> None:
-    ip_address = await client.create(kind="IpamIPAddress", address=str(next(host_addresses)) + f"/{prefix_len}")
+    ip_address = cast(
+        "IpamIPAddress",
+        await client.create(kind="IpamIPAddress", address=str(next(host_addresses)) + f"/{prefix_len}"),
+    )
     await ip_address.save(allow_upsert=True)
-    interface = await client.get(DcimInterface, id=interface.id, include=["connector"])
-    interface.ip_address = ip_address
+    # SDK accepts protocol kinds at runtime; assigning a node to a relationship is the SDK pattern.
+    interface = await client.get(DcimInterface, id=interface.id, include=["connector"])  # type: ignore[type-abstract]
+    interface.ip_address = ip_address  # type: ignore[assignment]
     await interface.save(allow_upsert=True)
     logger.info(f"Assigned {ip_address.address.value} to {interface.display_label}")
 
@@ -39,12 +45,15 @@ async def assign_ip_addresses_to_p2p_connections(
 ) -> None:
     for src_interface, dst_interface in connections:
         # allocate a new prefix for the p2p connection
-        prefix = await client.allocate_next_ip_prefix(
-            resource_pool=pool,
-            identifier=src_interface.id + dst_interface.id,
-            member_type="address",
-            prefix_length=prefix_len,
-            data={"role": prefix_role},
+        prefix = cast(
+            "IpamPrefix",
+            await client.allocate_next_ip_prefix(
+                resource_pool=pool,
+                identifier=src_interface.id + dst_interface.id,
+                member_type="address",
+                prefix_length=prefix_len,
+                data={"role": prefix_role},
+            ),
         )
 
         logger.info(

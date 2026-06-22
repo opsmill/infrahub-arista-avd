@@ -105,15 +105,15 @@ class TestAvdGeneratorImports:
     """Test that AVD generator modules are importable."""
 
     def test_import_avd_inputs_generator(self) -> None:
-        """Test AvdInputsGenerator is importable."""
-        from generators.generate_avd_inputs import AvdInputsGenerator
+        """Test the AVD device hostvar generator is importable."""
+        from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar
 
-        assert AvdInputsGenerator is not None
-        assert hasattr(AvdInputsGenerator, "generate")
+        assert GenerateAVDDeviceHostvar is not None
+        assert hasattr(GenerateAVDDeviceHostvar, "generate")
 
     def test_import_avd_structured_config_generator(self) -> None:
-        """Test AvdStructuredConfigGenerator is importable."""
-        from generators.generate_avd_structured_config import AvdStructuredConfigGenerator
+        """Test the AVD device structured config generator is importable."""
+        from generators.generate_avd_device_structured_config import AvdDeviceStructuredConfigGenerator
 
-        assert AvdStructuredConfigGenerator is not None
-        assert hasattr(AvdStructuredConfigGenerator, "generate")
+        assert AvdDeviceStructuredConfigGenerator is not None
+        assert hasattr(AvdDeviceStructuredConfigGenerator, "generate")

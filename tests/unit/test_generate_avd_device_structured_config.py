@@ -1,4 +1,3 @@
-# ruff: noqa: SLF001
 """Unit tests for AVD device structured config generator."""
 
 import json

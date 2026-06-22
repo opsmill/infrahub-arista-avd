@@ -79,7 +79,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             return group.id
 
     @staticmethod
-    def _set_source(node: Any, source_id: str | None) -> None:  # noqa: ANN401
+    def _set_source(node: Any, source_id: str | None) -> None:
         """Set the source property on all attributes of a node.
 
         No-op when *source_id* is ``None``.
