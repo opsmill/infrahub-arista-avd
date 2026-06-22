@@ -15,9 +15,9 @@ def build_pod_cabling_plan(
     src_interface_map: dict[DcimDevice, list[DcimInterface]],
     dst_interface_map: dict[DcimDevice, list[DcimInterface]],
 ) -> list[tuple[DcimInterface, DcimInterface]]:
-    """Builds a cabling plan between source and destination interfaces based on Indexes
+    """Builds a cabling plan between source and destination interfaces based on Indexes.
 
-    TODO Write unit test to validate that the algorithm works as expected
+    See tests/unit/test_cabling.py for the behavioural contract.
     """
     dst_devices = list(dst_interface_map.keys())
     dst_device_count = len(dst_devices)

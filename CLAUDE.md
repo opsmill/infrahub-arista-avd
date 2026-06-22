@@ -94,17 +94,33 @@ NetworkDevice
 
 ### Schema Files (`schemas/`)
 
+Schemas are split into reusable **base** definitions (`base/`) and project
+**extensions** at the root that add roles, pools and AVD-specific attributes on
+top of them, plus feature-specific subdirectories. Loaded via
+`infrahubctl schema load schemas` (see `inv load-schema`).
+
 | File | Purpose |
 |------|---------|
-| `logical_design.yml` | NetworkFabric, NetworkPod, BuildingBlock generic |
-| `device.yml` | NetworkDevice, NetworkInterface, NetworkLink, DeviceType, Manufacturer |
-| `physical_location.yml` | LocationHall, LocationRack, Physical generic |
-| `ipam.yml` | IpamIPAddress, IpamIPPrefix with role dropdown |
-| `generator.yml` | GeneratorTarget generic (checksum tracking) |
-| `vlan/vlan.yml` | VLAN configuration schema |
-| `compute/compute.yml` | ComputeGenericUnit, compute nodes |
-| `avd/avd.yml` | AvdEvpn, AVD-specific configuration |
-| `objects/objects.yml` | Generic template object definitions |
+| `logical_design.yml` | `Network.Fabric`, `Network.Pod`, `Network.BuildingBlock` generic (interface-sorting methods, super-spine counts) |
+| `generator.yml` | `Generator.Target` generic (checksum tracking for idempotent regeneration) |
+| `dcim_extensions.yml` | `Network.Link` plus device extensions (role, bgp_asn, node_id, loopback_ip, mgmt_ip, rack/pod relations) |
+| `l3ls_extensions.yml` | L3LS fabric attributes on the fabric (routing protocols, MTU, spanning-tree, EVPN overlay) |
+| `location_extensions.yml` | `Location.Hall`, `Location.Rack` (rack_type, leaf counts, generation_complete) |
+| `ipam_extensions.yml` | IP prefix/address `role` & `status` dropdowns (fabric_supernet, *_loopback, management, backfill) |
+| `management.yml` | `Network.DnsServer`, `Network.NtpServer`, `Network.LocalUser` |
+| `base/dcim.yml` | `Dcim.GenericDevice`, `Dcim.PhysicalDevice`, interfaces |
+| `base/ipam.yml` | `Ipam.IPAddress`, `Ipam.Prefix` base definitions |
+| `base/location.yml` | `Location.Generic`, `Location.Hosting` base definitions |
+| `base/organization.yml` | `Organization.Generic`, `Organization.Manufacturer`, `Organization.Provider` |
+| `avd/avd.yml` | `Avd.Evpn` AVD-specific configuration |
+| `evpn/evpn_services.yml` | `Evpn.Tenant`, `Evpn.Svi` EVPN service definitions |
+| `lag/lag.yml` | `Interface.Lag`, LAG bundle generic |
+| `mlag/mlag.yml` | `Generic.MlagDomain`, `Mlag.Interface` |
+| `routing/routing.yml` | `Routing.BGPPeerGroup`, BGP neighbors, prefix lists, route maps, static routes |
+| `vlan/vlan.yml` | `Ipam.VLAN` configuration schema |
+| `vrf/vrf.yml` | `Ipam.VRF`, `Ipam.RouteTarget` |
+| `compute/compute.yml` | `Compute.GenericUnit`, `Compute.PhysicalServer`, virtualization hosts |
+| `objects/objects.yml` | `Avd.Artifact`, `Avd.HostvarFile`, `Avd.StructuredConfigFile` |
 
 ### Generator System (`generators/`)
 
@@ -113,18 +129,24 @@ Generators create infrastructure hierarchically:
 | Generator | Target | Purpose |
 |-----------|--------|---------|
 | `FabricGenerator` | Fabric | Creates super-spine switches, allocates IP pools from FabricSupernetPool |
-| `PodGenerator` | Pod | Creates spine switches per pod |
-| `RackGenerator` | Rack | Creates leaf switches per rack |
-| `AvdDeviceHostvarGenerator` | Device | Generates hostvars for pyAVD |
+| `PodGenerator` | Pod | Creates spine switches per pod (skips the `fabric`-role pod) |
+| `RackGenerator` | Rack | Creates leaf + optional l2leaf switches, MLAG pairs, and cabling per rack |
+| `ServerCablingGenerator` | Rack | Cables compute/storage servers to leaf switches (`generate_server_cabling.py`) |
+| `GenerateAVDDeviceHostvar` | Device | Generates pyAVD hostvars per device |
 | `AvdDeviceStructuredConfigGenerator` | Fabric | Populates device AVD inputs & structured config |
+| `BackfillStructuredConfigGenerator` | Fabric | Reconciles AVD structured config back into the Infrahub data model (IPAM, MTU, BGP, prefix lists, route maps, static routes) |
 
 **Generator Execution Flow:**
 1. `FabricGenerator` → creates super-spine devices
 2. `PodGenerator` → creates spine devices per pod
-3. `RackGenerator` → creates leaf devices per rack
+3. `RackGenerator` → creates leaf devices per rack (triggers hostvar generation once all racks are complete)
 4. `AvdDeviceStructuredConfigGenerator` → populates AVD configs
 
-Each generator extends `InfrahubGenerator` and uses `GeneratorMixin` (from `src/solution_arista_avd/generator.py`). The `calculate_checksum()` method tracks related node changes for idempotent regeneration.
+Each generator extends `InfrahubGenerator`. The fabric/pod/rack generators also
+mix in `GeneratorMixin` (from `src/solution_arista_avd/generator.py`), which
+provides `calculate_checksum()` for idempotent regeneration and
+`create_avd_device()` — the shared device-creation helper that allocates from
+the ASN / node-id / management / loopback pools and activates the loopback.
 
 **Generator File Structure:**
 - `generate_<entity>.py` - Generator class implementation
@@ -138,9 +160,9 @@ Each generator extends `InfrahubGenerator` and uses `GeneratorMixin` (from `src/
 |-----------|---------|
 | `ComputedInterfaceDescription` | Generates interface descriptions ("→ device:interface") |
 | `CablingPlan` | Generates CSV cabling documentation for fabric |
-| `AvdEosConfig` | Converts structured config to EOS CLI configuration |
-| `AvdFabricDoc` | Generates markdown fabric documentation |
-| `AvdDeviceDoc` | Generates markdown device documentation |
+| `AvdEosConfigTransform` | Converts structured config to EOS CLI configuration |
+| `AvdFabricDocTransform` | Generates markdown fabric documentation |
+| `AvdDeviceDocTransform` | Generates markdown device documentation |
 
 **Transform File Structure:**
 - `<transform>.py` - Transform class implementation
@@ -156,20 +178,27 @@ Each generator extends `InfrahubGenerator` and uses `GeneratorMixin` (from `src/
 | `cabling.py` | Cabling plan generation from network topology |
 | `addressing.py` | IP address management utilities |
 | `sorting.py` | Interface sorting algorithms for device configuration |
-| `generator.py` | GeneratorMixin class for checksum-based change detection |
+| `generator.py` | `GeneratorMixin`: checksum-based change detection + `create_avd_device()` shared device-creation helper; plus generator-trigger and readiness helpers |
 
 ### Object Data Files (`objects/`)
 
-Numbered YAML files loaded in order:
-1. `01_groups.yml` - Network groups
-2. `02_manufacturer.yml` - Device manufacturers (Arista, Dell, etc.)
-3. `03_device_type.yml` - Device models
-4. `04_ipam.yml` - IP pools (FabricSupernetPool, ASN pools, Node ID pools, Mgmt pools)
-5. `05_profiles.yml` - Infrahub profiles
-6. `06_device_template.yml` - Device object templates (super-spine, spine, leaf)
-7. `07_vlans.yml` - VLAN definitions
-8. `10_fabric.yml` - Fabric instances (Fabric-A, Fabric-B with pods)
-9. `11_rack.yml` - Rack definitions
+Numbered YAML files loaded in order (`infrahubctl object load objects/`):
+1. `00_user_groups.yml` - User account groups
+2. `01_groups.yml` - Network groups
+3. `02_manufacturer.yml` - Device manufacturers (Arista, Dell, etc.)
+4. `03_device_type.yml` - Device models
+5. `04_ipam.yml` - IP pools (FabricSupernetPool, ASN pools, Node ID pools, Mgmt pools)
+6. `04a_l3ls_pools.yml` - L3LS-specific resource pools
+7. `04b_management.yml` - Management network objects (DNS/NTP/users)
+8. `05_profiles.yml` - Infrahub profiles
+9. `06_device_template.yml` - Device object templates (super-spine, spine, leaf)
+10. `07_vlans.yml` - VLAN definitions
+11. `07a_server_profiles.yml` - Server interface/VLAN profiles
+12. `08_server_templates.yml` - Server object templates
+13. `09_avd_evpn.yml` - AVD EVPN configuration objects
+14. `10_fabric.yml` - Fabric instances (Fabric-A, Fabric-B with pods)
+15. `11_rack.yml` - Rack definitions
+16. `12_evpn_services.yml` - EVPN tenants / SVIs / services
 
 ## AVD Integration
 
@@ -206,7 +235,7 @@ Hierarchical IP allocation:
 
 | File | Purpose |
 |------|---------|
-| `.infrahub.yml` | Defines queries, generators (5), transforms (6), artifact definitions (5) |
+| `.infrahub.yml` | Defines queries, generators (7), transforms (5), artifact definitions. Note: schemas load via `inv load`/`infrahubctl schema load schemas`, not the (commented-out) `schemas:` key |
 | `repository.yml` | CoreRepository definition for Infrahub |
 | `pyproject.toml` | Python config: deps (pyavd>=5.0.0, infrahub-sdk==1.18.1), ruff, mypy, pytest |
 | `docker-compose.yml` | Service stack: Infrahub, Neo4j, PostgreSQL, Redis, RabbitMQ |
