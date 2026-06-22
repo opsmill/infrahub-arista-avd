@@ -16,6 +16,10 @@ extensions:
               label: Deprecated
             - name: reserved
               label: Reserved
+        # Authoritative role list for IpamPrefix. This intentionally lives only
+        # here (not on the base Ipam.Prefix node) so there is a single source of
+        # truth; it is the union of the generic and fabric-specific roles used
+        # across the seed data and the generators.
         - name: role
           kind: Dropdown
           optional: false
@@ -34,6 +38,12 @@ extensions:
               label: Pod Super Spine Spine
             - name: pod_leaf_spine
               label: Pod Leaf Spine
+            - name: loopback
+              label: Loopback
+            - name: loopback-vtep
+              label: Loopback VTEP
+            - name: technical
+              label: Technical
             - name: management
               label: Management
             - name: backfill

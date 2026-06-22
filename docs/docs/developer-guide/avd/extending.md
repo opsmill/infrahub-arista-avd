@@ -17,7 +17,7 @@ Scenario: you want to support a new Infrahub role (e.g. `border-leaf`) that maps
 
 **Touch points:**
 
-1. **Schema** — add the role value to the `role` enum attribute of `NetworkDevice` in [`schemas/device.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/device.yml).
+1. **Schema** — add the role value to the `DcimDevice` `role` dropdown in [`schemas/dcim_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/dcim_extensions.yml) (the single authoritative device-role list).
 2. **Reload the schema and regenerate generated files** — none of these files should be hand-edited:
    ```bash
    uv run invoke load-schema                                             # push schema to Infrahub
@@ -97,11 +97,11 @@ Scenario: you want pyAVD to receive an additional input field (e.g. a per-device
    uv run infrahubctl graphql generate-return-types generators/avd_device_hostvar.gql
    ```
    This rewrites `generators/generate_avd_device_inputs_query.py` from the query and the refreshed schema.
-5. **Hostvars builder** — map the new attribute into the pyAVD hostvars dict. Two possibilities:
-    - Simple, role-independent field → add to `AvdInputsBuilder.build_device_hostvars()` in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py).
-    - Role-specific or multi-attribute field → add the logic inline in [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) in the appropriate role branch.
+5. **Hostvars builder** — map the new attribute into the pyAVD hostvars dict in [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py):
+    - Device-level, role-independent field → add it in `_build_hostvars()` (where `type`, `fabric_name`, `bgp_as`, loopback/mgmt basics are assembled).
+    - Role-specific or multi-attribute field → add the logic in the appropriate role branch of the same file.
 6. **Validation** — pyAVD's `validate_inputs()` will flag unknown fields as errors. Confirm the field is in the pyAVD input schema for the version pinned (see [overview](./overview.md#pyavd-version)). If it isn't a standard pyAVD field, look at using `custom_structured_configuration_prefix` or `structured_config` pass-through instead.
-7. **Tests** — add a case in [`tests/unit/test_avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/tests/unit/test_avd.py) for any logic added to `AvdInputsBuilder`.
+7. **Tests** — add a case in [`tests/unit/test_hostvar_ordering.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/tests/unit/test_hostvar_ordering.py) for any hostvars logic added to the generator. (`tests/unit/test_avd.py` covers only the role→type mapping in `src/solution_arista_avd/avd.py`.)
 8. **Docs** — update [Hostvars Reference](./hostvars.md) with the new field and its Infrahub source.
 
 ## Checklist: what to run before opening a PR

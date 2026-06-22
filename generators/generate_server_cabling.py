@@ -38,6 +38,12 @@ class ServerCablingGenerator(InfrahubGenerator):
             self.logger.warning("Server %s has no interfaces", server_hostname)
             return
 
+        # Idempotency: if every server interface is already cabled, there is
+        # nothing to do — skip rather than allocate a fresh set of leaf ports.
+        if await self._is_server_cabled(server_interfaces):
+            self.logger.info("Server %s already cabled — skipping", server_hostname)
+            return
+
         # Find leaf switches in the same rack
         leaf_switches = await self.client.filters(kind=DcimDevice, rack__ids=[rack_id], role__value="leaf")
         if not leaf_switches:

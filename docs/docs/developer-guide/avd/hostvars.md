@@ -25,7 +25,7 @@ This page documents the pyAVD hostvars dict that [`generate-avd-device-hostvar`]
 | `mgmt_ip` | string | `NetworkDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |
 
-The builder for these basics lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py) as `AvdInputsBuilder.build_device_hostvars()`.
+The builder for these basics lives in [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) as `_build_hostvars()`. (The role→AVD-type mapping it uses, `ROLE_TO_AVD_TYPE`, lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py).)
 
 ## Uplink fields — `spine`, `leaf`, `l2leaf`
 
@@ -159,8 +159,9 @@ Common validation failures:
 
 ## Tests
 
-The `AvdInputsBuilder` unit tests exercise the basic hostvars shape and the role→type mapping:
+Unit tests cover the hostvars builder and the role→type mapping:
 
-- [`tests/unit/test_avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/tests/unit/test_avd.py)
+- [`tests/unit/test_hostvar_ordering.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/tests/unit/test_hostvar_ordering.py) — hostvars shape and deterministic ordering from `_build_hostvars()`.
+- [`tests/unit/test_avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/tests/unit/test_avd.py) — the `ROLE_TO_AVD_TYPE` / `get_avd_type()` mapping.
 
 Full hostvars generation is exercised by integration tests under `tests/integration/`.

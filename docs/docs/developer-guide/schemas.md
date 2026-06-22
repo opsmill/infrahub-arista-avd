@@ -352,10 +352,10 @@ Physical:
 ## Source
 
 - [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas) — all schema definitions.
-- [`schemas/device.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/device.yml) — `NetworkDevice`, `NetworkInterface`, `NetworkLink`, `DeviceType`.
+- [`schemas/base/dcim.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/dcim.yml) — base `Dcim.GenericDevice`/`Dcim.PhysicalDevice`/`Dcim.Device`, interfaces, `DeviceType`; project extensions (device `role`, `bgp_asn`, relations) and `Network.Link` live in [`schemas/dcim_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/dcim_extensions.yml).
 - [`schemas/logical_design.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/logical_design.yml) — `NetworkFabric`, `NetworkPod`.
-- [`schemas/physical_location.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/physical_location.yml) — `LocationHall`, `LocationRack`.
-- [`schemas/ipam.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/ipam.yml) — IPAM nodes.
+- [`schemas/base/location.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/location.yml) + [`schemas/location_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/location_extensions.yml) — `Location.Hall`, `Location.Rack`.
+- [`schemas/base/ipam.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/ipam.yml) + [`schemas/ipam_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/ipam_extensions.yml) — IPAM nodes (the `Prefix` `role`/`status` dropdowns live in the extension).
 - [`schemas/avd/avd.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/avd/avd.yml) — `AvdEvpn` and related AVD-specific nodes.
 - [`schemas/objects/objects.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/objects/objects.yml) — `AvdArtifact`, `AvdHostvarFile`, `AvdStructuredConfigFile` (see [AvdArtifact & File Storage](./avd/artifacts.md) for the full reference).
 - Generated protocols: [`src/solution_arista_avd/protocols.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/protocols.py) — regenerate after any schema change with:

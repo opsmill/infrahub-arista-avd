@@ -5,7 +5,6 @@ Note: Full pipeline tests require a complete AVD inventory structure.
 """
 
 import pyavd
-import pytest
 
 
 class TestPyAvdBasics:
@@ -69,18 +68,10 @@ class TestAvdPipelineFunctions:
         result = pyavd.validate_structured_config(minimal_config)
         assert result is not None
 
-    @pytest.mark.skip(reason="Requires full AVD inventory structure from Infrahub")
-    def test_full_pipeline_with_inventory(self) -> None:
-        """Test full pipeline - requires complete AVD inventory.
-
-        This test is skipped because it requires:
-        1. A running Infrahub instance with AVD data
-        2. Complete node type configurations
-        3. Full fabric topology with uplinks/downlinks
-
-        The actual integration is tested when running the generators
-        against a real Infrahub instance.
-        """
+    # NOTE: the full fabric pipeline (generators → structured config → EOS) is
+    # exercised end-to-end by tests/integration/test_infrahub.py, which spins up
+    # a real Infrahub stack (run nightly / on-demand in CI), rather than by an
+    # empty placeholder here.
 
 
 class TestAvdTransformImports:

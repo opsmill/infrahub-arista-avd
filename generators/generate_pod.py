@@ -96,17 +96,9 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         self.spine_interface_sorting_function = getattr(solution_arista_avd_sorting, spine_interface_sorting_method)
 
         # Get AVD-related pool references from parent fabric
-        parent_node = data.network_pod.edges[0].node.parent.node
-        self.asn_pool = None
-        self.node_id_pool = None
-        self.mgmt_pool = None
-
-        if hasattr(parent_node, "asn_pool") and parent_node.asn_pool and parent_node.asn_pool.node:
-            self.asn_pool = await self.client.get(kind=CoreNumberPool, id=parent_node.asn_pool.node.id)
-        if hasattr(parent_node, "node_id_pool") and parent_node.node_id_pool and parent_node.node_id_pool.node:
-            self.node_id_pool = await self.client.get(kind=CoreNumberPool, id=parent_node.node_id_pool.node.id)
-        if hasattr(parent_node, "mgmt_pool") and parent_node.mgmt_pool and parent_node.mgmt_pool.node:
-            self.mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=parent_node.mgmt_pool.node.id)
+        self.asn_pool, self.node_id_pool, self.mgmt_pool = await self.resolve_avd_pools(
+            data.network_pod.edges[0].node.parent.node
+        )
 
         await self.allocate_resource_pools()
 

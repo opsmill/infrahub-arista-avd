@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import logging
 import operator
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -7,6 +9,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 
+from solution_arista_avd.avd import get_avd_type
 from solution_arista_avd.generator import set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
 
@@ -19,6 +22,8 @@ from .generate_avd_device_inputs_query import (
 if TYPE_CHECKING:
     from infrahub_sdk import InfrahubClient
 
+logger = logging.getLogger("infrahub.tasks")
+
 
 class UplinkData(TypedDict):
     uplink_interfaces: list[str]
@@ -29,14 +34,6 @@ class UplinkData(TypedDict):
 class ServerEndpoint(TypedDict):
     name: str
     adapters: list[dict[str, Any]]
-
-
-# Mapping from Infrahub device roles to AVD types
-ROLE_TO_AVD_TYPE: dict[str, str] = {
-    "super_spine": "super-spine",
-    "spine": "spine",
-    "leaf": "l3leaf",
-}
 
 
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
@@ -68,7 +65,8 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
             await artifact.hostvar_file.fetch()
             if not artifact.hostvar_file.peer:
                 return False
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any read failure means "not ready yet"
+            logger.debug("Hostvar readiness check failed for a device: %s", exc)
             return False
 
     await set_fabric_avd_hostvars_ready(client, fabric_id, True)
@@ -200,7 +198,7 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
         untagged_vlan = None
         untagged_vlan_node = interface.untagged_vlan.node
         if untagged_vlan_node:
-            status = untagged_vlan_node.status.node
+            status = untagged_vlan_node.status.value
             if status == "active":
                 untagged_vlan = untagged_vlan_node.vlan_id.value
 
@@ -545,7 +543,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         connected_endpoints: list[ServerEndpoint],
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
-        avd_type = ROLE_TO_AVD_TYPE.get(role, role)
+        avd_type = get_avd_type(role)
         node_type_key = "super_spine" if role == "super_spine" else avd_type
 
         # Build node config
@@ -802,8 +800,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             error_detail = "; ".join(violation_msgs)
             raise ValueError(f"pyAVD validation failed for {hostname}: {error_detail}")
 
-        import hashlib
-
         new_content = json.dumps(hostvars, indent=2).encode()
         new_checksum = hashlib.sha256(new_content).hexdigest()
 
@@ -831,7 +827,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 if existing_file:
                     existing_content = await existing_file.download_file()
                     existing_checksum = hashlib.sha256(existing_content).hexdigest()
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001 - treat any fetch/download failure as "no existing file"
+                self.logger.warning("Could not read existing hostvar file for %s, forcing re-upload: %s", hostname, exc)
                 existing_file = None
 
         # Always upload and save to ensure the file exists on this branch

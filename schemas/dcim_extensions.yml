@@ -25,6 +25,7 @@ extensions:
         - name: role
           kind: Dropdown
           optional: true
+          order_weight: 1400
           choices:
             - name: super_spine
               label: Super spine

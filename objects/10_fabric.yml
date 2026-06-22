@@ -65,7 +65,7 @@ spec:
       member_of_groups: ["fabrics"]
       super_spine_switch_template: "dell-z9864f-on-super-spine-switch"
       amount_of_super_spines: 4
-      mgmt_gateway: "10.255.1.1"
+      mgmt_gateway: "10.254.0.1"
       asn_pool: "Fabric-B-ASN-Pool"
       node_id_pool: "Fabric-B-NodeID-Pool"
       mgmt_pool: "Fabric-B-Mgmt-Pool"

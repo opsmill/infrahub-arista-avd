@@ -4,11 +4,12 @@ import hashlib
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
+
 from .protocols import DcimDevice, DcimInterface
 
 if TYPE_CHECKING:
     from infrahub_sdk import InfrahubClient
-    from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
 
     from .protocols import LocationRack, NetworkPod
 
@@ -48,6 +49,33 @@ class GeneratorMixin:
         sorted_ids = sorted(related_ids)
         joined = ",".join(sorted_ids)
         return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+    async def resolve_avd_pools(
+        self, node: Any
+    ) -> tuple[CoreNumberPool | None, CoreNumberPool | None, CoreIPAddressPool | None]:
+        """Resolve the (asn, node_id, mgmt) AVD pools referenced by a fabric node.
+
+        The fabric/pod/rack generators all read the same three optional pool
+        relationships off the fabric (directly, or via the pod's parent). Each
+        is optional; a missing or unset relationship resolves to ``None``.
+        """
+        asn_pool: CoreNumberPool | None = None
+        node_id_pool: CoreNumberPool | None = None
+        mgmt_pool: CoreIPAddressPool | None = None
+
+        asn_rel = getattr(node, "asn_pool", None)
+        if asn_rel and asn_rel.node:
+            asn_pool = await self.client.get(kind=CoreNumberPool, id=asn_rel.node.id)  # type: ignore[type-abstract]
+
+        node_id_rel = getattr(node, "node_id_pool", None)
+        if node_id_rel and node_id_rel.node:
+            node_id_pool = await self.client.get(kind=CoreNumberPool, id=node_id_rel.node.id)  # type: ignore[type-abstract]
+
+        mgmt_rel = getattr(node, "mgmt_pool", None)
+        if mgmt_rel and mgmt_rel.node:
+            mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=mgmt_rel.node.id)  # type: ignore[type-abstract]
+
+        return asn_pool, node_id_pool, mgmt_pool
 
     async def create_avd_device(
         self,

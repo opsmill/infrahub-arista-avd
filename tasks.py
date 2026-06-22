@@ -37,7 +37,6 @@ def destroy(ctx: Context) -> None:
     """
     Stop and remove containers, networks, and volumes.
     """
-    download_compose_file(ctx, override=False)
     ctx.run(f"docker compose {COMPOSE_FILES} down -v", pty=True)
 
 
@@ -233,7 +232,6 @@ def stop(ctx: Context) -> None:
     """
     Stop containers and remove networks.
     """
-    download_compose_file(ctx, override=False)
     ctx.run(f"docker compose {COMPOSE_FILES} down", pty=True)
 
 
@@ -242,7 +240,6 @@ def restart(ctx: Context, component: str = "") -> None:
     """
     Restart all services or a specific one using docker-compose.
     """
-    download_compose_file(ctx, override=False)
     if component:
         ctx.run(f"docker compose {COMPOSE_FILES} restart {component}", pty=True)
         return
@@ -342,5 +339,4 @@ def start(ctx: Context) -> None:
     """
     Start the services using docker-compose in detached mode.
     """
-    download_compose_file(ctx, override=False)
     ctx.run(f"docker compose {COMPOSE_FILES} up -d", pty=True)
