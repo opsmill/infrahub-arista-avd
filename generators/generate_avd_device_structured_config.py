@@ -183,7 +183,9 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
                 structured_config_dict = (
-                    structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config
+                    structured_config._as_dict()  # noqa: SLF001 — pyAVD model exposes its data only via _as_dict()
+                    if hasattr(structured_config, "_as_dict")
+                    else structured_config
                 )
 
                 new_content = json.dumps(structured_config_dict, indent=2).encode()

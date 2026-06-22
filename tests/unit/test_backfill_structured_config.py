@@ -1,4 +1,3 @@
-# ruff: noqa: SLF001
 """Unit tests for backfill structured config generator."""
 
 import ipaddress

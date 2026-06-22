@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from infrahub_sdk import InfrahubClient
+
+    from .protocols import LocationRack, NetworkPod
 
 logger = logging.getLogger("infrahub.tasks")
 
@@ -29,6 +31,8 @@ async def set_fabric_avd_hostvars_ready(client: InfrahubClient, fabric_id: str, 
 
 
 class GeneratorMixin:
+    client: InfrahubClient
+
     def calculate_checksum(self) -> str:
         """Calculates a checksum of the generator based on the related ids during the session"""
 
@@ -42,7 +46,8 @@ async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> b
     """Check if all racks across all non-fabric pods have generation_complete set to True."""
     pods = await client.filters(kind="NetworkPod", parent__ids=[fabric_id])
 
-    for pod in pods:
+    for pod_node in pods:
+        pod = cast("NetworkPod", pod_node)
         if hasattr(pod, "role") and pod.role.value == "fabric":
             continue
 
@@ -50,7 +55,8 @@ async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> b
         if not racks:
             continue
 
-        for rack in racks:
+        for rack_node in racks:
+            rack = cast("LocationRack", rack_node)
             if not rack.generation_complete.value:
                 logger.info(f"Rack {rack.name.value} not yet generated, waiting...")
                 return False

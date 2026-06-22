@@ -20,8 +20,8 @@ def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
     gen.client.get = AsyncMock()
     gen.client.create = AsyncMock()
     if mock_cascade:
-        gen._trigger_avd_cascade = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
-    gen._is_server_cabled = AsyncMock(return_value=False)  # type: ignore[method-assign]  # noqa: SLF001
+        gen._trigger_avd_cascade = AsyncMock()  # type: ignore[method-assign]
+    gen._is_server_cabled = AsyncMock(return_value=False)  # type: ignore[method-assign]
     return gen
 
 
@@ -159,7 +159,7 @@ class TestSingleHomedCabling:
         gen.client.get = AsyncMock(return_value=mock_server_iface)
 
         with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
-            gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            gen._assign_vlans = AsyncMock()
             await gen.generate(data)
 
             mock_connect.assert_called_once()
@@ -206,8 +206,8 @@ class TestDualHomedCabling:
         gen.client.get = AsyncMock(return_value=mock_server_iface1)
 
         with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
-            gen._assign_vlans = AsyncMock()  # noqa: SLF001
-            gen._create_server_port_channel = AsyncMock()  # noqa: SLF001
+            gen._assign_vlans = AsyncMock()
+            gen._create_server_port_channel = AsyncMock()
             await gen.generate(data)
 
             mock_connect.assert_called_once()
@@ -241,7 +241,7 @@ class TestVlanAssignment:
         mock_server_iface_obj = MagicMock()
         cabling_plan = [(mock_server_iface_obj, mock_leaf_iface)]
 
-        await gen._assign_vlans(cabling_plan, server_ifaces)  # noqa: SLF001
+        await gen._assign_vlans(cabling_plan, server_ifaces)
 
         mock_leaf_iface.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
 
@@ -268,7 +268,7 @@ class TestVlanAssignment:
         mock_server_iface_obj = MagicMock()
         cabling_plan = [(mock_server_iface_obj, mock_leaf_iface)]
 
-        await gen._assign_vlans(cabling_plan, server_ifaces)  # noqa: SLF001
+        await gen._assign_vlans(cabling_plan, server_ifaces)
 
         mock_leaf_iface.untagged_vlan.add.assert_called_once_with("vlan-100")
 
@@ -322,7 +322,7 @@ class TestInsufficientInterfaces:
         gen.client.get = AsyncMock(return_value=mock_server_iface)
 
         with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
-            gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            gen._assign_vlans = AsyncMock()
             await gen.generate(data)
 
             # Only one server interface in the SDK map (1 DcimInterface returned)
@@ -368,7 +368,7 @@ class TestSingleLeafDualHomed:
         gen.client.get = AsyncMock(return_value=mock_server_iface1)
 
         with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
-            gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            gen._assign_vlans = AsyncMock()
             await gen.generate(data)
 
             # Both interfaces connected to same leaf at index 0
@@ -483,7 +483,7 @@ class TestExtractVlans:
             "profiles": {"edges": []},
         }
 
-        result = gen._extract_vlans(interface_node)  # noqa: SLF001
+        result = gen._extract_vlans(interface_node)
         assert result["tagged"] == ["vlan-300", "vlan-400"]
         assert result["untagged"] is None
 
@@ -512,7 +512,7 @@ class TestExtractVlans:
             },
         }
 
-        result = gen._extract_vlans(interface_node)  # noqa: SLF001
+        result = gen._extract_vlans(interface_node)
         assert result["tagged"] == ["vlan-300", "vlan-400"]
 
     def test_merges_vlans_from_interface_and_profile(self) -> None:
@@ -540,7 +540,7 @@ class TestExtractVlans:
             },
         }
 
-        result = gen._extract_vlans(interface_node)  # noqa: SLF001
+        result = gen._extract_vlans(interface_node)
         assert result["tagged"] == ["vlan-300", "vlan-400"]  # no duplicates
 
     def test_extracts_untagged_vlan_from_profile(self) -> None:
@@ -563,7 +563,7 @@ class TestExtractVlans:
             },
         }
 
-        result = gen._extract_vlans(interface_node)  # noqa: SLF001
+        result = gen._extract_vlans(interface_node)
         assert result["untagged"] == "vlan-100"
 
     def test_no_vlans_returns_empty(self) -> None:
@@ -575,7 +575,7 @@ class TestExtractVlans:
             "profiles": {"edges": []},
         }
 
-        result = gen._extract_vlans(interface_node)  # noqa: SLF001
+        result = gen._extract_vlans(interface_node)
         assert result["tagged"] == []
         assert result["untagged"] is None
 
@@ -623,10 +623,10 @@ class TestAvdCascadeTrigger:
         gen.client.get = AsyncMock(return_value=mock_server_iface)
 
         with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock):
-            gen._assign_vlans = AsyncMock()  # noqa: SLF001
+            gen._assign_vlans = AsyncMock()
             await gen.generate(data)
 
-        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")  # noqa: SLF001
+        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")
 
     @pytest.mark.asyncio
     async def test_cascade_not_called_when_no_rack(self) -> None:
@@ -637,7 +637,7 @@ class TestAvdCascadeTrigger:
 
         await gen.generate(data)
 
-        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+        gen._trigger_avd_cascade.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_cascade_not_called_when_no_interfaces(self) -> None:
@@ -648,7 +648,7 @@ class TestAvdCascadeTrigger:
 
         await gen.generate(data)
 
-        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+        gen._trigger_avd_cascade.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_cascade_not_called_when_no_leaf_switches(self) -> None:
@@ -662,7 +662,7 @@ class TestAvdCascadeTrigger:
 
         await gen.generate(data)
 
-        gen._trigger_avd_cascade.assert_not_awaited()  # noqa: SLF001
+        gen._trigger_avd_cascade.assert_not_awaited()
 
     @pytest.mark.asyncio
     @patch("generators.generate_server_cabling.trigger_hostvar_generation", new_callable=AsyncMock)
@@ -690,7 +690,7 @@ class TestAvdCascadeTrigger:
 
         gen.client.get = AsyncMock(side_effect=[mock_rack, mock_pod])
 
-        await gen._trigger_avd_cascade("rack-1", "server-1")  # noqa: SLF001
+        await gen._trigger_avd_cascade("rack-1", "server-1")
 
         # Verify hostvars set to False
         mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)

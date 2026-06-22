@@ -1,134 +1,126 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class RackGeneratorQuery(BaseModel):
-    location_rack: "RackGeneratorQueryLocationRack" = Field(alias="LocationRack")
+    location_rack: RackGeneratorQueryLocationRack = Field(alias="LocationRack")
 
 
 class RackGeneratorQueryLocationRack(BaseModel):
-    edges: list["RackGeneratorQueryLocationRackEdges"]
+    edges: list[RackGeneratorQueryLocationRackEdges]
 
 
 class RackGeneratorQueryLocationRackEdges(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNode"]
+    node: RackGeneratorQueryLocationRackEdgesNode | None
 
 
 class RackGeneratorQueryLocationRackEdgesNode(BaseModel):
     id: str
-    name: Optional["RackGeneratorQueryLocationRackEdgesNodeName"]
-    checksum: Optional["RackGeneratorQueryLocationRackEdgesNodeChecksum"]
-    index: Optional["RackGeneratorQueryLocationRackEdgesNodeIndex"]
-    rack_type: Optional["RackGeneratorQueryLocationRackEdgesNodeRackType"]
-    amount_of_leafs: Optional["RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs"]
-    leaf_switch_template: "RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate"
-    amount_of_l_2_leafs: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs"
-    ] = Field(alias="amount_of_l2leafs")
-    l_2_leaf_switch_template: "RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate" = Field(
+    name: RackGeneratorQueryLocationRackEdgesNodeName | None
+    checksum: RackGeneratorQueryLocationRackEdgesNodeChecksum | None
+    index: RackGeneratorQueryLocationRackEdgesNodeIndex | None
+    rack_type: RackGeneratorQueryLocationRackEdgesNodeRackType | None
+    amount_of_leafs: RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs | None
+    leaf_switch_template: RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate
+    amount_of_l_2_leafs: RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs | None = Field(
+        alias="amount_of_l2leafs"
+    )
+    l_2_leaf_switch_template: RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate = Field(
         alias="l2leaf_switch_template"
     )
-    parent: "RackGeneratorQueryLocationRackEdgesNodeParent"
-    pod: "RackGeneratorQueryLocationRackEdgesNodePod"
+    parent: RackGeneratorQueryLocationRackEdgesNodeParent
+    pod: RackGeneratorQueryLocationRackEdgesNodePod
 
 
 class RackGeneratorQueryLocationRackEdgesNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeChecksum(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeIndex(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeRackType(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplateNode"]
+    node: RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplateNode | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplateNode(BaseModel):
-    typename__: Literal[
-        "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
-    ] = Field(alias="__typename")
-    id: Optional[str]
+    typename__: Literal["CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"] = Field(
+        alias="__typename"
+    )
+    id: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplateNode"]
+    node: RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplateNode | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplateNode(BaseModel):
-    typename__: Literal[
-        "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
-    ] = Field(alias="__typename")
-    id: Optional[str]
+    typename__: Literal["CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"] = Field(
+        alias="__typename"
+    )
+    id: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeParent(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodeParentNode"]
+    node: RackGeneratorQueryLocationRackEdgesNodeParentNode | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeParentNode(BaseModel):
-    typename__: Literal["LocationGeneric", "LocationHall", "LocationRack"] = Field(
-        alias="__typename"
-    )
-    id: Optional[str]
-    name: Optional["RackGeneratorQueryLocationRackEdgesNodeParentNodeName"]
+    typename__: Literal["LocationGeneric", "LocationHall", "LocationRack"] = Field(alias="__typename")
+    id: str | None
+    name: RackGeneratorQueryLocationRackEdgesNodeParentNodeName | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeParentNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePod(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodePodNode"]
+    node: RackGeneratorQueryLocationRackEdgesNodePodNode | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNode(BaseModel):
     id: str
-    name: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeName"]
-    index: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeIndex"]
-    prefix_pool: "RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPool"
-    loopback_pool: "RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPool"
-    amount_of_spines: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines"
-    ]
-    leaf_interface_sorting_method: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod"
-    ]
-    spine_interface_sorting_method: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeSpineInterfaceSortingMethod"
-    ]
-    parent: "RackGeneratorQueryLocationRackEdgesNodePodNodeParent"
+    name: RackGeneratorQueryLocationRackEdgesNodePodNodeName | None
+    index: RackGeneratorQueryLocationRackEdgesNodePodNodeIndex | None
+    prefix_pool: RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPool
+    loopback_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPool
+    amount_of_spines: RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines | None
+    leaf_interface_sorting_method: RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod | None
+    spine_interface_sorting_method: RackGeneratorQueryLocationRackEdgesNodePodNodeSpineInterfaceSortingMethod | None
+    parent: RackGeneratorQueryLocationRackEdgesNodePodNodeParent
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeName(BaseModel):
-    value: Optional[str]
+    value: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeIndex(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPool(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPoolNode"]
+    node: RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPoolNode | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPoolNode(BaseModel):
@@ -136,7 +128,7 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPoolNode(BaseModel):
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPool(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPoolNode"]
+    node: RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPoolNode | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPoolNode(BaseModel):
@@ -144,91 +136,60 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPoolNode(BaseModel):
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines(BaseModel):
-    value: Optional[Any]
+    value: Any | None
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod(
-    BaseModel
-):
-    value: Optional[str]
+class RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod(BaseModel):
+    value: str | None
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeSpineInterfaceSortingMethod(
-    BaseModel
-):
-    value: Optional[str]
+class RackGeneratorQueryLocationRackEdgesNodePodNodeSpineInterfaceSortingMethod(BaseModel):
+    value: str | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeParent(BaseModel):
-    node: Optional[
+    node: (
         Annotated[
-            Union[
-                "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkBuildingBlock",
-                "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric",
-            ],
+            RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkBuildingBlock
+            | RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric,
             Field(discriminator="typename__"),
         ]
-    ]
-
-
-class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkBuildingBlock(
-    BaseModel
-):
-    typename__: Literal["NetworkBuildingBlock", "NetworkPod"] = Field(
-        alias="__typename"
+        | None
     )
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkBuildingBlock(BaseModel):
+    typename__: Literal["NetworkBuildingBlock", "NetworkPod"] = Field(alias="__typename")
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric(BaseModel):
     typename__: Literal["NetworkFabric"] = Field(alias="__typename")
-    asn_pool: (
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool"
-    )
-    node_id_pool: "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPool"
-    mgmt_pool: (
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPool"
-    )
+    asn_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool
+    node_id_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPool
+    mgmt_pool: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPool
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool(
-    BaseModel
-):
-    node: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPoolNode"
-    ]
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool(BaseModel):
+    node: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPoolNode | None
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPoolNode(
-    BaseModel
-):
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPoolNode(BaseModel):
     id: str
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPool(
-    BaseModel
-):
-    node: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPoolNode"
-    ]
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPool(BaseModel):
+    node: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPoolNode | None
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPoolNode(
-    BaseModel
-):
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPoolNode(BaseModel):
     id: str
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPool(
-    BaseModel
-):
-    node: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPoolNode"
-    ]
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPool(BaseModel):
+    node: RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPoolNode | None
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPoolNode(
-    BaseModel
-):
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPoolNode(BaseModel):
     id: str
 
 

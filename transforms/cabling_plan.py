@@ -1,3 +1,4 @@
+import operator
 from typing import Any
 
 from infrahub_sdk.transforms import InfrahubTransform
@@ -140,7 +141,7 @@ class CablingPlan(InfrahubTransform):
         rows = await self._fetch_links_with_details(link_ids)
 
         # Sort by source device then interface
-        rows.sort(key=lambda r: (r["src_device"], r["src_interface"]))
+        rows.sort(key=operator.itemgetter("src_device", "src_interface"))
 
         header = "Source Rack,Source Device,Source Interface,Destination Rack,Destination Device,Destination Interface"
         csv_rows = [

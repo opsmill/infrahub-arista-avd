@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, TypedDict
+import operator
+from typing import TYPE_CHECKING, Any, TypedDict
 
-from infrahub_sdk import InfrahubClient
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
@@ -15,6 +15,9 @@ from .generate_avd_device_inputs_query import (
     GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges,
     GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical,
 )
+
+if TYPE_CHECKING:
+    from infrahub_sdk import InfrahubClient
 
 
 class UplinkData(TypedDict):
@@ -75,7 +78,7 @@ async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) ->
 def extract_uplinks_from_dict(
     interfaces: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges],
     uplink_role: str | None,
-    device_id: str,
+    device_id: str,  # noqa: ARG001 — part of the public signature; retained for callers/tests
 ) -> UplinkData:
     """Extract uplink information from device interfaces (dict format).
 
@@ -146,13 +149,13 @@ def extract_uplinks_from_dict(
 
 def _sort_server_endpoints(servers: dict[str, ServerEndpoint]) -> list[ServerEndpoint]:
     """Sort servers by name and adapters within each server by switch port."""
-    sorted_servers = sorted(servers.values(), key=lambda s: s["name"])
+    sorted_servers = sorted(servers.values(), key=operator.itemgetter("name"))
     for server in sorted_servers:
         server["adapters"].sort(key=lambda a: sort_interface_list(a["switch_ports"])[0] if a["switch_ports"] else "")
     return sorted_servers
 
 
-def extract_connected_endpoints(
+def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inherently branchy
     interfaces: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges],
     hostname: str,
 ) -> list[ServerEndpoint]:
@@ -370,9 +373,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         attr = getattr(obj, attr_name, None)
         return attr.value if attr else None
 
-    async def _require_pool_prefix(
-        self, pool_ref: object, pool_kind: str, fabric_name: object, pool_label: str
-    ) -> str:
+    async def _require_pool_prefix(self, pool_ref: object, pool_kind: str, fabric_name: object, pool_label: str) -> str:
         """Resolve a mandatory pool's first prefix, failing loudly if unset or empty.
 
         The fabric-level pools are mandatory in the schema, so an unset relationship
@@ -430,7 +431,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         return attr.value if hasattr(attr, "value") else None
 
     @classmethod
-    def _extract_management_settings(cls, fabric: object) -> dict[str, Any]:
+    def _extract_management_settings(cls, fabric: object) -> dict[str, Any]:  # noqa: C901 — maps many optional fabric fields
         """Extract DNS, NTP, and local user settings from fabric."""
         result: dict[str, Any] = {}
 
@@ -505,9 +506,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         # Extract all peer names from the MLAG domain
         peer_names: list[str] = []
         if hasattr(mlag_domain, "peers") and mlag_domain.peers:
-            for peer_edge in mlag_domain.peers.edges:
-                if peer_edge.node and peer_edge.node.name:
-                    peer_names.append(peer_edge.node.name.value)
+            peer_names = [
+                peer_edge.node.name.value
+                for peer_edge in mlag_domain.peers.edges
+                if peer_edge.node and peer_edge.node.name
+            ]
 
         return {
             "domain_id": domain_id,
@@ -516,7 +519,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         }
 
     @staticmethod
-    def _build_hostvars(
+    def _build_hostvars(  # noqa: C901 — assembles the full AVD hostvars payload
         *,
         hostname: str,
         role: str,
@@ -641,9 +644,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             if effective_vrmac:
                 node_group["virtual_router_mac_address"] = effective_vrmac
             # Include peer node names in the group
-            group_nodes: list[dict[str, str]] = []
-            for peer_name in mlag_info.get("peer_names", []):
-                group_nodes.append({"name": peer_name})
+            group_nodes: list[dict[str, str]] = [{"name": peer_name} for peer_name in mlag_info.get("peer_names", [])]
             if group_nodes:
                 node_group["nodes"] = group_nodes
             hostvars[node_type_key]["node_groups"] = [node_group]
@@ -655,7 +656,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return hostvars
 
-    async def generate(self, data: dict) -> None:
+    async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
         data: GenerateAvdDeviceInputsQuery = GenerateAvdDeviceInputsQuery(**data)
         device = data.dcim_device.edges[0].node
         pod = device.pod.node

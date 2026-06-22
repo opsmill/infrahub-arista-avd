@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .protocols import DcimDevice, DcimInterface, InterfacePhysical
 
@@ -50,7 +50,7 @@ def build_rack_cabling_plan(
     dst_device_count = len(dst_devices)
 
     for src_device, src_interfaces in src_interface_map.items():
-        src_device_index: int = src_device.index.value
+        src_device_index: int = cast("int", src_device.index.value)
 
         for dst_index, src_interface in enumerate(src_interfaces[:dst_device_count]):
             start = (rack_index * 2) - 2
@@ -96,13 +96,14 @@ async def connect_interface_maps(
 
         # Set connector on both interfaces using InterfacePhysical (concrete type
         # that exposes the connector relationship from DcimEndpoint)
-        src = await client.get(InterfacePhysical, id=src_interface.id, include=["connector"])
-        src.connector = network_link
+        # SDK accepts protocol kinds at runtime; assigning a node to a relationship is the SDK pattern.
+        src = await client.get(InterfacePhysical, id=src_interface.id, include=["connector"])  # type: ignore[type-abstract]
+        src.connector = network_link  # type: ignore[assignment]
         src.status.value = "active"
         await src.save(allow_upsert=True)
 
-        dst = await client.get(InterfacePhysical, id=dst_interface.id, include=["connector"])
-        dst.connector = network_link
+        dst = await client.get(InterfacePhysical, id=dst_interface.id, include=["connector"])  # type: ignore[type-abstract]
+        dst.connector = network_link  # type: ignore[assignment]
         dst.status.value = "active"
         await dst.save(allow_upsert=True)
 

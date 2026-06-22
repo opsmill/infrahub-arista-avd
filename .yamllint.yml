@@ -5,6 +5,7 @@ ignore: |
   /.git
   /.github
   /.venv
+  /.specify
 
 rules:
   new-lines: disable
