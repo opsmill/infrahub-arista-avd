@@ -205,3 +205,72 @@ spec:
       ip_namespace: default
       resources:
         - "10.254.2.0/24"
+---
+# MLAG Peer-Link / L3 Peering Prefixes for Fabric-B pods.
+# Each pod gets a disjoint /25 so the per-pod pools never allocate overlapping
+# addresses: peer-links carve out of 10.254.4.0/24, L3 peerings out of 10.254.5.0/24.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.254.4.0/25     # Pod-B2 MLAG peer-link
+      role: technical
+    - prefix: 10.254.4.128/25   # Pod-B3 MLAG peer-link
+      role: technical
+    - prefix: 10.254.5.0/25     # Pod-B2 MLAG L3 peering
+      role: technical
+    - prefix: 10.254.5.128/25   # Pod-B3 MLAG L3 peering
+      role: technical
+---
+# MLAG Peer Pool for Fabric-B Pod-B2
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-B-Pod-B2-MLAG-Peer-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.254.4.0/25"
+---
+# MLAG L3 Peering Pool for Fabric-B Pod-B2
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-B-Pod-B2-MLAG-L3-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.254.5.0/25"
+---
+# MLAG Peer Pool for Fabric-B Pod-B3
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-B-Pod-B3-MLAG-Peer-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.254.4.128/25"
+---
+# MLAG L3 Peering Pool for Fabric-B Pod-B3
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-B-Pod-B3-MLAG-L3-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - "10.254.5.128/25"
