@@ -37,7 +37,7 @@ uv sync --all-packages
 The project extends the base Infrahub image with project-specific Python dependencies (pyAVD, etc.).
 
 ```bash
-export INFRAHUB_BASE_VERSION=1.8.4
+export INFRAHUB_BASE_VERSION=1.10.0
 uv run invoke build
 ```
 

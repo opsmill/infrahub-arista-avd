@@ -32,7 +32,7 @@ This creates a virtualenv under `.venv/` and installs the project and its depend
 The project extends the base Infrahub image with `pyavd` and project code. Build the image once:
 
 ```bash
-export INFRAHUB_BASE_VERSION=1.8.4
+export INFRAHUB_BASE_VERSION=1.10.0
 uv run invoke build
 ```
 
