@@ -7,15 +7,15 @@ sidebar_position: 5
 
 # Viewing Artifacts
 
-Once generators have run (see [Provision Your First Fabric](./provision-first-fabric.md) or any of the day-2 how-to pages), Infrahub renders three artifact types:
+Once generators have run on a branch and you've opened a proposed change (see [Provision Your First Fabric](./provision-first-fabric.md) or any of the day-2 how-to pages), the proposed-change CI pipeline renders three artifact types:
 
 | Artifact | Attached to | Content type | Purpose |
 |----------|-------------|--------------|---------|
-| **AVD EOS Configuration** | Each `NetworkDevice` | `text/plain` | The Arista EOS CLI configuration for that device. |
-| **AVD Device Documentation** | Each `NetworkDevice` | `text/markdown` | Human-readable documentation describing the device. |
+| **AVD EOS Configuration** | Each `DcimDevice` | `text/plain` | The Arista EOS CLI configuration for that device. |
+| **AVD Device Documentation** | Each `DcimDevice` | `text/markdown` | Human-readable documentation describing the device. |
 | **AVD Fabric Documentation** | Each `NetworkFabric` | `text/markdown` | Fabric-wide topology and design documentation. |
 
-Artifacts are rendered **on demand** when you first open them. If a device changes, the next time you open its artifacts they are regenerated.
+Per-device artifacts (`AVD EOS Configuration`, `AVD Device Documentation`) are rendered as part of the proposed-change CI. If you want to view them outside a proposed change, open them on a device's **Artifacts** tab and click **Regenerate**.
 
 ## Finding a device artifact
 

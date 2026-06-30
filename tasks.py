@@ -14,6 +14,11 @@ MAIN_DIRECTORY_PATH = Path(__file__).parent
 
 COMPOSE_FILES = "-f docker-compose.yml -f docker-compose.override.yml"
 INFRAHUB_ADDRESS = os.getenv("INFRAHUB_ADDRESS", "http://localhost:8000")
+
+os.environ.setdefault("INFRAHUB_USERNAME", "admin")
+os.environ.setdefault("INFRAHUB_PASSWORD", "infrahub")
+os.environ.setdefault("INFRAHUB_ADDRESS", INFRAHUB_ADDRESS)
+
 SEMAPHORE_URL = "http://localhost:3000"
 SEMAPHORE_ADMIN = "admin"
 SEMAPHORE_ADMIN_PASSWORD = "semaphore"  # noqa: S105

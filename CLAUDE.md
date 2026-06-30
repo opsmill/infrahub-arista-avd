@@ -81,11 +81,11 @@ inv format                 # Format code with ruff
 NetworkFabric (top-level)
 ├── NetworkPod (child, GeneratorTarget)
 │   ├── LocationRack (peer relationship)
-│   │   └── NetworkDevice (leaf switches)
-│   └── NetworkDevice (spine switches)
-└── NetworkDevice (super-spine switches)
+│   │   └── DcimDevice (leaf switches)
+│   └── DcimDevice (spine switches)
+└── DcimDevice (super-spine switches)
 
-NetworkDevice
+DcimDevice
 ├── NetworkInterface (components)
 │   ├── NetworkLink (bidirectional connections)
 │   └── IpamIPAddress (IP addressing)
@@ -268,6 +268,10 @@ All `*_query.py` files define Pydantic models matching GraphQL response structur
 - Query classes: `<entity>_generator_query.py` or `<entity>_query.py`
 - GraphQL queries: matching `.gql` files with same base name
 - Node namespaces: `Network.*`, `Location.*`, `Organization.*`, `Ipam.*`, `Avd.*`
+
+## Git worktree caveat
+
+The task-worker container clones `/upstream` via the worktree's `.git` pointer file, which points at a host path outside the mount and fails to resolve inside the container. If you check out this repo as a `git worktree` (rather than a normal `git clone`), bind-mount the parent `.git` directory into the worker by adding to `docker-compose.override.yml` under `task-worker.volumes`: `- /abs/path/to/parent/.git:/abs/path/to/parent/.git:ro`. Standard `git clone` checkouts are unaffected.
 
 ## Regenerating Protocols
 

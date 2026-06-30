@@ -28,7 +28,7 @@ kind: Object
 spec:
   kind: IpamPrefix
   data:
-    - prefix: 10.255.1.0/27
+    - prefix: 10.255.3.0/24
       role: loopback-vtep
 ---
 # VTEP Loopback Pool for Fabric-A
@@ -43,7 +43,7 @@ spec:
       default_prefix_length: 32
       ip_namespace: default
       resources:
-        - "10.255.1.0/27"
+        - "10.255.3.0/24"
 ---
 # MLAG Peer-Link / L3 Peering Prefixes for Fabric-A pods.
 # Each pod gets a disjoint /25 so the per-pod pools never allocate overlapping

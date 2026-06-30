@@ -844,3 +844,5 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             self.logger.info(f"Hostvars unchanged for {hostname}")
         else:
             self.logger.info(f"Hostvars updated for {hostname}")
+
+        await check_fabric_hostvars_ready(self.client, fabric.id)

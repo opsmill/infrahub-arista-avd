@@ -34,13 +34,15 @@ flowchart TD
 
 ## Step 1 — Create a branch
 
-Generators can only run on a branch, not on `main`. In the Infrahub UI:
+We'll do this work on a branch so the changes stay isolated and you can review them as a proposed change before bringing them into `main`. In the Infrahub UI: click the branch selector in the top bar, then **+ Create branch**, and name it something like `generate-fabric-a`.
 
-1. Click the branch selector in the top bar (shows **`main`** by default).
-2. Click **+ Create branch**.
-3. Name the branch something like `generate-fabric-a` and click **Create branch**.
+You can also create a branch from the CLI:
 
-The UI switches to the new branch. Any objects created from here are on the branch and can be reviewed as a proposed change before merging.
+```bash
+uv run infrahubctl branch create generate-fabric-a
+```
+
+The CLI route needs credentials in your shell — either `source .envrc` first or set `INFRAHUB_USERNAME`/`INFRAHUB_PASSWORD` (or `INFRAHUB_API_TOKEN`). If you take the CLI route, also switch the UI's branch selector to the new branch — subsequent UI actions need to be scoped there.
 
 ## Step 2 — Run the fabric generator
 
@@ -76,29 +78,35 @@ Once all tasks complete, open **Network → NetworkDevice** in the menu. You sho
 
 Each device has a BGP ASN, a node ID, a loopback IP, a management IP, and interfaces with IP addresses assigned from the fabric's pools.
 
-## Step 5 — Verify AVD artifacts are rendered
+## Step 5 — Render the AVD artifacts
 
-Navigate to any leaf device (e.g. **Network → NetworkDevice → `leaf-pod-A1-1`**) and open the **Artifacts** tab.
+The per-device AVD artifacts (EOS configs, device documentation) can be rendered two ways:
 
-You should see:
+- **Manually on the branch**: open any device, switch to the **Artifacts** tab, and click **Regenerate** on each artifact. Fine for spot-checking one device.
+- **In a proposed change** (recommended for a full review): open a proposed change from the branch and the pipeline renders artifacts for every device in one step as part of the review.
 
-- **AVD EOS Configuration** — Arista EOS CLI config for the device.
-- **AVD Device Documentation** — Markdown documentation for the device.
-
-Open the fabric (**Network → NetworkFabric → `Fabric-A`**) and its **Artifacts** tab to see:
-
-- **AVD Fabric Documentation** — full fabric markdown documentation.
-
-See [Viewing Artifacts](./viewing-artifacts.md) for how to open and download each artifact.
-
-## Step 6 — Merge the branch (optional)
-
-Your work is on the branch you created in Step 1. To promote it to `main`:
+To open a proposed change:
 
 1. Switch to **Branches** in the menu and select your branch.
 2. Click **Create Proposed Change**.
 3. Fill in a name and description and submit.
-4. Review and merge the proposed change. Once merged, all devices, cabling, and artifacts become part of `main`.
+
+## Step 6 — Verify AVD artifacts are rendered
+
+Open the **Artifacts** tab — either on the proposed change for the full set, or on an individual device — to see:
+
+- **AVD EOS Configuration** — Arista EOS CLI config for the device.
+- **AVD Device Documentation** — Markdown documentation for the device.
+- **AVD Fabric Documentation** — full fabric markdown documentation.
+
+See [Viewing Artifacts](./viewing-artifacts.md) for how to open and download each artifact.
+
+## Step 7 — Merge the branch (optional)
+
+Once you're happy with the results, bring the branch into `main`. Two options:
+
+- **Merge the proposed change** after review — the standard Git-style flow with diff inspection.
+- **Merge the branch directly** — from **Branches → your branch → Merge**, no proposed change needed. Faster but skips the review surface.
 
 You can now move on to day-2 workflows: [Add a Network Segment](./how-to/add-network-segment.md), [Add a Server](./how-to/add-server.md), [Create a Tenant](./how-to/create-tenant.md), or [Regenerate a Fabric](./how-to/regenerate-fabric.md).
 
