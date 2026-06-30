@@ -62,16 +62,39 @@ spec:
             member_of_groups: ["pods"]
     - name: "Fabric-B"
       index: 2
-      member_of_groups: ["fabrics"]
-      super_spine_switch_template: "dell-z9864f-on-super-spine-switch"
       amount_of_super_spines: 4
+      super_spine_switch_template: "dell-z9864f-on-super-spine-switch"
+      fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
       mgmt_gateway: "10.254.0.1"
       asn_pool: "Fabric-B-ASN-Pool"
       node_id_pool: "Fabric-B-NodeID-Pool"
       mgmt_pool: "Fabric-B-Mgmt-Pool"
+      # L3LS settings
+      virtual_router_mac: "00:1c:73:00:00:99"
+      underlay_routing_protocol: "ebgp"
+      overlay_routing_protocol: "ebgp"
+      p2p_uplinks_mtu: 9214
       uplink_pool: "Fabric-B-Uplink-Pool"
       vtep_pool: "Fabric-B-VTEP-Pool"
       loopback_pool: "Fabric-B-Loopback-Pool"
+      # STP settings
+      spanning_tree_mode: "mstp"
+      spanning_tree_priority: 4096
+      # BGP peer group passwords
+      bgp_evpn_overlay_password: "$6$evpn_overlay$examplehash"
+      bgp_underlay_password: "$6$underlay$examplehash"
+      bgp_mlag_password: "$6$mlag$examplehash"
+      # Management
+      dns_servers:
+        - dns-primary
+        - dns-secondary
+      ntp_servers:
+        - 0.pool.ntp.org
+        - 1.pool.ntp.org
+      local_users:
+        - arista
+        - admin
+      member_of_groups: ["fabrics"]
       children:
         kind: NetworkPod
         data:
@@ -82,8 +105,14 @@ spec:
           - name: "Pod-B2"
             index: 2
             spine_switch_template: "dell-z9864f-on-spine-switch"
+            loopback_ipv4_offset: 2
+            mlag_peer_pool: "Fabric-B-Pod-B2-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-B-Pod-B2-MLAG-L3-Pool"
             member_of_groups: ["pods"]
           - name: "Pod-B3"
             index: 3
             spine_switch_template: "dell-z9864f-on-spine-switch"
+            loopback_ipv4_offset: 2
+            mlag_peer_pool: "Fabric-B-Pod-B3-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-B-Pod-B3-MLAG-L3-Pool"
             member_of_groups: ["pods"]
