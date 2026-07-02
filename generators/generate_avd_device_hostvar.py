@@ -336,7 +336,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 }
                 vni_override = getattr(l2vlan, "vni_override", None)
                 if vni_override and vni_override.value is not None:
-                    l2v_data["vni"] = vni_override.value
+                    l2v_data["vni_override"] = vni_override.value
                 l2vlans_list.append(l2v_data)
 
             if l2vlans_list:

@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.11, <3.14"
 dependencies = [
     "httpx>=0.28.1",
-    "pyavd>=5.0.0",
+    "pyavd>=6.2.0",
     "streamlit-flow-component>=1.6.1",
 ]
 
