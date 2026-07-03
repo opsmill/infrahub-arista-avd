@@ -198,9 +198,9 @@ class CVConfigValidationCheck(InfrahubCheck):
 
     async def _track_workspace(self, ws_id: str, ws_name: str, fabric_id: str, status: str) -> None:
         """Create or update the Cv.Workspace tracking node in Infrahub."""
-        try:
-            from infrahub_sdk import NodeNotFoundError
+        from infrahub_sdk.exceptions import NodeNotFoundError, SchemaNotFoundError
 
+        try:
             try:
                 ws_node = await self.client.get(kind="CvWorkspace", workspace_id__value=ws_id)
                 ws_node.status.value = status
@@ -216,6 +216,8 @@ class CVConfigValidationCheck(InfrahubCheck):
                     },
                 )
                 await ws_node.save()
+        except SchemaNotFoundError:
+            LOGGER.warning("CvWorkspace schema not loaded in Infrahub — skipping workspace tracking")
         except (AttributeError, ValueError, RuntimeError):
             LOGGER.exception("Failed to track workspace in Infrahub")
 
