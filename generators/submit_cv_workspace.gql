@@ -1,0 +1,36 @@
+query SubmitCVWorkspace($name: String!) {
+  NetworkFabric(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+      }
+    }
+  }
+  CvWorkspace(status__value: "built") {
+    edges {
+      node {
+        id
+        workspace_id {
+          value
+        }
+        name {
+          value
+        }
+        status {
+          value
+        }
+        fabric {
+          node {
+            id
+            name {
+              value
+            }
+          }
+        }
+      }
+    }
+  }
+}

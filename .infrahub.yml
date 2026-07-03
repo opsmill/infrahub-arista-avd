@@ -51,6 +51,13 @@ queries:
   - name: containerlab_topology
     file_path: "./transforms/containerlab_topology.gql"
 
+  # CloudVision check and generator queries
+  - name: cv_config_check
+    file_path: "./checks/cv_config_check.gql"
+
+  - name: submit_cv_workspace
+    file_path: "./generators/submit_cv_workspace.gql"
+
 
 generator_definitions:
   - name: generate-avd-device-hostvar
@@ -129,6 +136,25 @@ generator_definitions:
     convert_query_response: false
     execute_in_proposed_change: false
     execute_after_merge: false
+
+  - name: submit-cv-workspace
+    file_path: "./generators/submit_cv_workspace.py"
+    query: submit_cv_workspace
+    targets: fabrics
+    parameters:
+      name: name__value
+    class_name: SubmitCVWorkspaceGenerator
+    convert_query_response: false
+    execute_in_proposed_change: false
+    execute_after_merge: true
+
+check_definitions:
+  - name: cv-config-validation
+    file_path: "./checks/cv_config_check.py"
+    class_name: CVConfigValidationCheck
+    targets: fabrics
+    parameters:
+      name: name__value
 
 python_transforms:
   - name: computed_interface_description

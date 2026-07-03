@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+nodes:
+  - name: Workspace
+    namespace: Cv
+    label: CloudVision Workspace
+    description: "Tracks a CloudVision workspace linked to a fabric for proposed change validation"
+    icon: mdi:cloud-check-variant
+    include_in_menu: false
+    human_friendly_id:
+      - workspace_id__value
+    display_label: name__value
+    attributes:
+      - name: name
+        kind: Text
+        description: "Display name of the CloudVision workspace"
+      - name: workspace_id
+        kind: Text
+        unique: true
+        description: "CloudVision workspace UUID"
+      - name: status
+        kind: Dropdown
+        default_value: pending
+        choices:
+          - name: pending
+            label: Pending
+          - name: built
+            label: Built
+          - name: submitted
+            label: Submitted
+          - name: abandoned
+            label: Abandoned
+    relationships:
+      - name: fabric
+        peer: NetworkFabric
+        kind: Attribute
+        cardinality: one
+        identifier: "cv_workspace__fabric"
