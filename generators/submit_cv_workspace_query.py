@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class SubmitCVWorkspaceQuery(BaseModel):
     network_fabric: SubmitCVWorkspaceNetworkFabric = Field(alias="NetworkFabric")
-    cv_workspace: SubmitCVWorkspaceCvWorkspace = Field(alias="CvWorkspace")
+    cv_workspace: SubmitCVWorkspaceCvWorkspace = Field(alias="CloudvisionWorkspace")
 
 
 class SubmitCVWorkspaceNetworkFabric(BaseModel):
@@ -36,6 +36,7 @@ class SubmitCVWorkspaceCvWorkspaceEdge(BaseModel):
 class SubmitCVWorkspaceCvWorkspaceNode(BaseModel):
     id: str
     workspace_id: SubmitCVWorkspaceValueField | None
+    proposed_change_id: SubmitCVWorkspaceValueField | None
     name: SubmitCVWorkspaceValueField | None
     status: SubmitCVWorkspaceValueField | None
     fabric: SubmitCVWorkspaceCvWorkspaceFabric

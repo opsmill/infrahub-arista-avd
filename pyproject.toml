@@ -110,8 +110,8 @@ ignore = [
 # fixture arguments; return-type annotations add no value here.
 "tests/**/*.py" = ["SLF001", "ARG001", "ARG002", "ANN201", "RUF029", "E501"]
 # CloudVision integration uses pyavd._cv internals (no public API exists).
-"checks/cv_*.py" = ["PLC2701", "SLF001"]
-"generators/submit_cv_workspace.py" = ["PLC2701"]
+"checks/cv_*.py" = ["PLC2701", "SLF001", "PLW0717"]
+"generators/submit_cv_workspace.py" = ["PLC2701", "PLW0717"]
 
 
 #https://docs.astral.sh/ruff/formatter/black/

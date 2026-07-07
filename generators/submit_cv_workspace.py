@@ -15,7 +15,7 @@ from pyavd._cv.client import CVClient
 from pyavd._cv.client.exceptions import CVClientException
 from pyavd._cv.workflows.models import CVWorkspace
 
-from checks.cv_helpers import get_cloudvision_config
+from checks.cv_helpers import get_cloudvision_config, get_proposed_change_id
 
 from .submit_cv_workspace_query import SubmitCVWorkspaceQuery
 
@@ -35,6 +35,7 @@ class SubmitCVWorkspaceGenerator(InfrahubGenerator):
         fabric_node = fabric_edges[0].node
         fabric_id = fabric_node.id
         fabric_name = fabric_node.name.value if fabric_node.name else "unknown"
+        proposed_change_id = get_proposed_change_id(self.initializer)
 
         workspaces_to_submit = []
         for edge in parsed.cv_workspace.edges:
@@ -42,6 +43,8 @@ class SubmitCVWorkspaceGenerator(InfrahubGenerator):
             if not ws_node or not ws_node.workspace_id or not ws_node.workspace_id.value:
                 continue
             if not ws_node.fabric.node or ws_node.fabric.node.id != fabric_id:
+                continue
+            if not ws_node.proposed_change_id or ws_node.proposed_change_id.value != proposed_change_id:
                 continue
             workspaces_to_submit.append(ws_node)
 
@@ -103,7 +106,7 @@ class SubmitCVWorkspaceGenerator(InfrahubGenerator):
     async def _update_tracking_node(self, node_id: str, status: str) -> None:
         """Update the Cv.Workspace tracking node status in Infrahub."""
         try:
-            ws_node = await self.client.get(kind="CvWorkspace", id=node_id)
+            ws_node = await self.client.get(kind="CloudvisionWorkspace", id=node_id)
             ws_node.status.value = status
             await ws_node.save()
         except (AttributeError, ValueError, RuntimeError):

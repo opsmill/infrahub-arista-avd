@@ -68,6 +68,18 @@ def get_workspace_name(proposed_change_id: str, fabric_name: str) -> str:
     return f"Infrahub - {fabric_name} - {proposed_change_id[:8]}"
 
 
+def get_proposed_change_id(initializer: object | None) -> str:
+    """Return the proposed-change identifier exposed by Infrahub task context."""
+    if initializer is None:
+        return "local"
+    return (
+        getattr(initializer, "proposed_change_id", None)
+        or getattr(initializer, "proposed_change", None)
+        or getattr(initializer, "proposed_change_name", None)
+        or "local"
+    )
+
+
 async def rollback_workspace(cv_client: CVClient, workspace_id: str) -> WorkspaceConfig:
     """Rollback a built workspace to pending state.
 

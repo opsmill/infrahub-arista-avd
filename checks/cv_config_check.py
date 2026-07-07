@@ -26,7 +26,13 @@ from pyavd._cv.workflows.verify_devices_on_cv import verify_devices_on_cv
 from solution_arista_avd.protocols import AvdStructuredConfigFile
 
 from .cv_config_check_query import CVConfigCheckDcimDeviceNode, CVConfigCheckQuery
-from .cv_helpers import get_cloudvision_config, get_workspace_id, get_workspace_name, rollback_workspace
+from .cv_helpers import (
+    get_cloudvision_config,
+    get_proposed_change_id,
+    get_workspace_id,
+    get_workspace_name,
+    rollback_workspace,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,12 +67,24 @@ class CVConfigValidationCheck(InfrahubCheck):
             self.log_info(message=f"No devices with EOS configs found for fabric {fabric_name}")
             return
 
-        proposed_change_id = getattr(self.initializer, "proposed_change_id", "") or "local"
+        missing_serials = [self._device_name(device) for device in fabric_devices if not self._device_serial(device)]
+        serial_devices = [device for device in fabric_devices if self._device_serial(device)]
+        if not serial_devices:
+            self.log_info(message=f"No serial-numbered CloudVision devices found for fabric {fabric_name}; skipping")
+            return
+        if missing_serials:
+            self.log_error(
+                message=f"CloudVision-managed devices in fabric {fabric_name} are missing serial numbers: "
+                f"{', '.join(missing_serials)}"
+            )
+            return
+
+        proposed_change_id = get_proposed_change_id(self.initializer)
         ws_id = get_workspace_id(proposed_change_id, fabric_name)
         ws_name = get_workspace_name(proposed_change_id, fabric_name)
 
         with tempfile.TemporaryDirectory(prefix="infrahub_cv_") as tmp_dir:
-            eos_configs = await self._collect_eos_configs(fabric_devices, tmp_dir)
+            eos_configs = await self._collect_eos_configs(serial_devices, tmp_dir)
             if not eos_configs:
                 self.log_info(message=f"No EOS configurations available for fabric {fabric_name}")
                 return
@@ -96,12 +114,20 @@ class CVConfigValidationCheck(InfrahubCheck):
             devices.append(device)
         return devices
 
+    @staticmethod
+    def _device_name(device: CVConfigCheckDcimDeviceNode) -> str:
+        return device.name.value if device.name and device.name.value else "unknown"
+
+    @staticmethod
+    def _device_serial(device: CVConfigCheckDcimDeviceNode) -> str | None:
+        return device.serial.value if device.serial and device.serial.value else None
+
     async def _collect_eos_configs(self, devices: list[CVConfigCheckDcimDeviceNode], tmp_dir: str) -> list[CVEosConfig]:
         """Download structured configs and generate EOS CLI configs."""
         eos_configs: list[CVEosConfig] = []
         for device in devices:
-            hostname = device.name.value if device.name else "unknown"
-            serial = device.serial.value if device.serial else None
+            hostname = self._device_name(device)
+            serial = self._device_serial(device)
             sc_file_id = device.avd_artifact.node.structured_config_file.node.id
 
             try:
@@ -174,7 +200,10 @@ class CVConfigValidationCheck(InfrahubCheck):
             self.log_error(message=f"CloudVision connection failed: {exc}")
             return
 
-        await self._track_workspace(ws_id, ws_name, fabric_id, "built" if not result.failed else "abandoned")
+        proposed_change_id = get_proposed_change_id(self.initializer)
+        await self._track_workspace(
+            ws_id, ws_name, fabric_id, proposed_change_id, "built" if not result.failed else "abandoned"
+        )
         self._report_results(result, cv_config, fabric_name)
 
     async def _ensure_workspace_pending(self, cv_client: CVClient, workspace: CVWorkspace) -> None:
@@ -196,28 +225,33 @@ class CVConfigValidationCheck(InfrahubCheck):
             await cv_client.wait_for_workspace_state(workspace_id=workspace.id, state="pending")
             workspace.state = "pending"
 
-    async def _track_workspace(self, ws_id: str, ws_name: str, fabric_id: str, status: str) -> None:
+    async def _track_workspace(
+        self, ws_id: str, ws_name: str, fabric_id: str, proposed_change_id: str, status: str
+    ) -> None:
         """Create or update the Cv.Workspace tracking node in Infrahub."""
         from infrahub_sdk.exceptions import NodeNotFoundError, SchemaNotFoundError
 
         try:
             try:
-                ws_node = await self.client.get(kind="CvWorkspace", workspace_id__value=ws_id)
+                ws_node = await self.client.get(kind="CloudvisionWorkspace", workspace_id__value=ws_id)
                 ws_node.status.value = status
+                if hasattr(ws_node, "proposed_change_id"):
+                    ws_node.proposed_change_id.value = proposed_change_id
                 await ws_node.save()
             except NodeNotFoundError:
                 ws_node = await self.client.create(
-                    kind="CvWorkspace",
+                    kind="CloudvisionWorkspace",
                     data={
                         "name": ws_name,
                         "workspace_id": ws_id,
+                        "proposed_change_id": proposed_change_id,
                         "status": status,
                         "fabric": fabric_id,
                     },
                 )
                 await ws_node.save()
         except SchemaNotFoundError:
-            LOGGER.warning("CvWorkspace schema not loaded in Infrahub — skipping workspace tracking")
+            LOGGER.warning("CloudvisionWorkspace schema not loaded in Infrahub — skipping workspace tracking")
         except (AttributeError, ValueError, RuntimeError):
             LOGGER.exception("Failed to track workspace in Infrahub")
 

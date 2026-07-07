@@ -9,11 +9,14 @@ query SubmitCVWorkspace($name: String!) {
       }
     }
   }
-  CvWorkspace(status__value: "built") {
+  CloudvisionWorkspace(status__value: "built") {
     edges {
       node {
         id
         workspace_id {
+          value
+        }
+        proposed_change_id {
           value
         }
         name {

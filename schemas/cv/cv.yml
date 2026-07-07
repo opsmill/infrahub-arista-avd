@@ -4,7 +4,7 @@ version: "1.0"
 
 nodes:
   - name: Workspace
-    namespace: Cv
+    namespace: Cloudvision
     label: CloudVision Workspace
     description: "Tracks a CloudVision workspace linked to a fabric for proposed change validation"
     icon: mdi:cloud-check-variant
@@ -20,6 +20,10 @@ nodes:
         kind: Text
         unique: true
         description: "CloudVision workspace UUID"
+      - name: proposed_change_id
+        kind: Text
+        optional: true
+        description: "Infrahub proposed change ID that created this workspace"
       - name: status
         kind: Dropdown
         default_value: pending
