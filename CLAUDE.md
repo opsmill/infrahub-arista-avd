@@ -163,6 +163,7 @@ the ASN / node-id / management / loopback pools and activates the loopback.
 | `AvdEosConfigTransform` | Converts structured config to EOS CLI configuration |
 | `AvdFabricDocTransform` | Generates markdown fabric documentation |
 | `AvdDeviceDocTransform` | Generates markdown device documentation |
+| `AvdAntaCatalogTransform` | Generates a per-device ANTA test catalog (YAML) from structured config; gated by the fabric `anta_enabled` flag (renders a disabled marker when off). Needs fabric-wide structured configs to build `AVDFabricData`. |
 
 **Transform File Structure:**
 - `<transform>.py` - Transform class implementation
@@ -287,6 +288,8 @@ infrahubctl protocols --out src/solution_arista_avd/protocols.py
 - Files on disk under `docs/docs/`; sidebar in `docs/sidebars.ts` (012-enhance-docs)
 - Python >=3.11, <3.14 (no runtime code changes this cycle — schema YAML + seed YAML + protocol regeneration) + `infrahub-sdk==1.18.1` (`infrahubctl` for schema check / protocols), Infrahub 1.9.x server (015-schema-driven-ip-pools)
 - Infrahub (Neo4j graph); IP pools are `CoreIPPrefixPool` / `CoreIPAddressPool` built-ins (015-schema-driven-ip-pools)
+- Python >=3.11, <3.14 + `pyavd>=5.0.0` (`get_device_test_catalog`, `pyavd.api.anta.AVDFabricData`, `AVDCatalogGenerationSettings`, `pyavd.validate_structured_config`), `infrahub-sdk[all]>=1.19.0` (`InfrahubTransform`) (001-avd-anta-catalog)
+- Infrahub (Neo4j graph); structured config already stored as `Avd.StructuredConfigFile` artifacts (001-avd-anta-catalog)
 
 ## Recent Changes
 - 001-enforce-protocols: Added Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0

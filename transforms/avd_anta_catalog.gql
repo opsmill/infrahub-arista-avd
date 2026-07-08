@@ -1,0 +1,61 @@
+query AvdAntaCatalogQuery($name: String!) {
+  target: DcimDevice(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        pod {
+          node {
+            id
+            parent {
+              node {
+                __typename
+                id
+                ... on NetworkFabric {
+                  name {
+                    value
+                  }
+                  anta_enabled {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  DcimDevice {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        pod {
+          node {
+            id
+            parent {
+              node {
+                id
+              }
+            }
+          }
+        }
+        avd_artifact {
+          node {
+            id
+            structured_config_file {
+              node {
+                id
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -80,6 +80,7 @@ ignore = [
     "ERA001", # commented-out code
     "S101",   # use of assert
     "PLR6301",
+    "PLW0717", # too-many-statements-in-try-clause — unstable Pylint preview rule, not enforced
     "FBT",
     "G004",   # Logging statement uses f-string
     "PLR",
