@@ -103,7 +103,7 @@ artifact_definitions:
 
 ## Jinja2 transforms
 
-Separate from the AVD transforms above, the project also ships a Jinja2 startup-config transform for OSPF (see [Transforms](../transforms.md#jinja2-transforms)). That transform is independent of the AVD pipeline.
+Separate from the AVD transforms above, the project also ships a Jinja2 startup-config transform for OSPF (see [Transforms](../transforms.md#jinja2-transform)). That transform is independent of the AVD pipeline.
 
 ## Adding a new transform
 
