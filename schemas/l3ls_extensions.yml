@@ -94,6 +94,13 @@ extensions:
           optional: true
           description: "Password hash for MLAG iBGP peer group"
           order_weight: 11200
+        - name: anta_enabled
+          label: ANTA Enabled
+          kind: Boolean
+          optional: true
+          default_value: false
+          description: "Generate ANTA test catalogs for this fabric's devices."
+          order_weight: 11300
       relationships:
         - name: uplink_pool
           label: Uplink IP Pool

@@ -39,6 +39,9 @@ queries:
   - name: avd_fabric_devices
     file_path: "./transforms/avd_fabric_devices.gql"
 
+  - name: avd_anta_catalog
+    file_path: "./transforms/avd_anta_catalog.gql"
+
   - name: backfill_structured_config
     file_path: "./generators/backfill_structured_config.gql"
 
@@ -140,6 +143,9 @@ python_transforms:
   - name: avd_device_doc
     class_name: AvdDeviceDocTransform
     file_path: "./transforms/avd_device_doc.py"
+  - name: avd_anta_catalog
+    class_name: AvdAntaCatalogTransform
+    file_path: "./transforms/avd_anta_catalog.py"
 
 artifact_definitions:
   - name: "cabling_plan"
@@ -170,3 +176,10 @@ artifact_definitions:
     content_type: "text/markdown"
     targets: "avd_devices"
     transformation: "avd_device_doc"
+  - name: "avd_anta_catalog"
+    artifact_name: "AVD ANTA Catalog"
+    parameters:
+      name: "name__value"
+    content_type: "application/x-yaml"
+    targets: "avd_devices"
+    transformation: "avd_anta_catalog"
