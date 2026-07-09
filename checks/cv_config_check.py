@@ -15,6 +15,7 @@ from typing import Any
 
 import pyavd
 from infrahub_sdk.checks import InfrahubCheck
+from infrahub_sdk.exceptions import NodeNotFoundError
 from pyavd._cv.api.arista.workspace.v1 import WorkspaceState
 from pyavd._cv.client import CVClient
 from pyavd._cv.client.exceptions import CVClientException, CVResourceNotFound
@@ -132,10 +133,10 @@ class CVConfigValidationCheck(InfrahubCheck):
             sc_file_id = device.avd_artifact.node.structured_config_file.node.id
 
             try:
-                sc_file = await self.client.get(AvdStructuredConfigFile, id=sc_file_id)
+                sc_file = await self.client.get(AvdStructuredConfigFile, id=sc_file_id, branch=self.branch_name)
                 content = await sc_file.download_file()
                 structured_config = json.loads(content)
-            except (json.JSONDecodeError, OSError, ValueError, AttributeError) as exc:
+            except (NodeNotFoundError, json.JSONDecodeError, OSError, ValueError, AttributeError) as exc:
                 self.log_info(message=f"WARNING: Could not fetch structured config for {hostname}: {exc}")
                 continue
 
@@ -234,7 +235,9 @@ class CVConfigValidationCheck(InfrahubCheck):
 
         try:
             try:
-                ws_node = await self.client.get(kind="CloudvisionWorkspace", workspace_id__value=ws_id)
+                ws_node = await self.client.get(
+                    kind="CloudvisionWorkspace", branch=self.branch_name, workspace_id__value=ws_id
+                )
                 ws_node.status.value = status
                 if hasattr(ws_node, "proposed_change_id"):
                     ws_node.proposed_change_id.value = proposed_change_id
@@ -242,6 +245,7 @@ class CVConfigValidationCheck(InfrahubCheck):
             except NodeNotFoundError:
                 ws_node = await self.client.create(
                     kind="CloudvisionWorkspace",
+                    branch=self.branch_name,
                     data={
                         "name": ws_name,
                         "workspace_id": ws_id,
