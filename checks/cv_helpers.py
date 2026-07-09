@@ -25,20 +25,30 @@ LOGGER = logging.getLogger(__name__)
 INFRAHUB_CV_NAMESPACE = uuid5(NAMESPACE_DNS, "infrahub.cloudvision")
 
 
+def _env_value(name: str) -> str | None:
+    """Return a stripped environment variable value or None when unset/blank."""
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
 def get_cloudvision_config() -> CloudVision | None:
     """Build a CloudVision connection config from environment variables.
 
     Returns None if required variables are missing.
     """
-    servers_raw = os.environ.get("CLOUDVISION_SERVERS")
+    servers_raw = _env_value("CLOUDVISION_SERVERS")
     if not servers_raw:
         return None
 
     servers = [s.strip() for s in servers_raw.split(",") if s.strip()]
-    token = os.environ.get("CLOUDVISION_TOKEN")
-    username = os.environ.get("CLOUDVISION_USERNAME")
-    password = os.environ.get("CLOUDVISION_PASSWORD")
+    token = _env_value("CLOUDVISION_TOKEN")
+    username = _env_value("CLOUDVISION_USERNAME")
+    password = _env_value("CLOUDVISION_PASSWORD")
     verify_certs = os.environ.get("CLOUDVISION_VERIFY_CERTS", "true").lower() != "false"
+    proxy_port = _env_value("CLOUDVISION_PROXY_PORT")
 
     if not token and not (username and password):
         return None
@@ -49,12 +59,10 @@ def get_cloudvision_config() -> CloudVision | None:
         username=username,
         password=password,
         verify_certs=verify_certs,
-        proxy_host=os.environ.get("CLOUDVISION_PROXY_HOST"),
-        proxy_port=int(os.environ.get("CLOUDVISION_PROXY_PORT", "8080"))
-        if os.environ.get("CLOUDVISION_PROXY_PORT")
-        else None,
-        proxy_username=os.environ.get("CLOUDVISION_PROXY_USERNAME"),
-        proxy_password=os.environ.get("CLOUDVISION_PROXY_PASSWORD"),
+        proxy_host=_env_value("CLOUDVISION_PROXY_HOST"),
+        proxy_port=int(proxy_port) if proxy_port else None,
+        proxy_username=_env_value("CLOUDVISION_PROXY_USERNAME"),
+        proxy_password=_env_value("CLOUDVISION_PROXY_PASSWORD"),
     )
 
 

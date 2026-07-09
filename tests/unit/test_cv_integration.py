@@ -7,7 +7,7 @@ import pytest
 
 from checks.cv_config_check import CVConfigValidationCheck
 from checks.cv_config_check_query import CVConfigCheckQuery
-from checks.cv_helpers import get_proposed_change_id, get_workspace_id
+from checks.cv_helpers import get_cloudvision_config, get_proposed_change_id, get_workspace_id
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -109,6 +109,26 @@ def test_cv_filter_limits_devices_to_target_fabric_with_structured_configs() -> 
 def test_workspace_id_includes_proposed_change_identity() -> None:
     assert get_proposed_change_id(SimpleNamespace(proposed_change_id="pc-123")) == "pc-123"
     assert get_workspace_id("pc-123", "Fabric-DC1") != get_workspace_id("pc-456", "Fabric-DC1")
+
+
+def test_cloudvision_config_ignores_blank_proxy_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
+    monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
+    monkeypatch.setenv("CLOUDVISION_USERNAME", "")
+    monkeypatch.setenv("CLOUDVISION_PASSWORD", "")
+    monkeypatch.setenv("CLOUDVISION_PROXY_HOST", "")
+    monkeypatch.setenv("CLOUDVISION_PROXY_PORT", "")
+    monkeypatch.setenv("CLOUDVISION_PROXY_USERNAME", "")
+    monkeypatch.setenv("CLOUDVISION_PROXY_PASSWORD", "")
+
+    config = get_cloudvision_config()
+
+    assert config is not None
+    assert config.servers == ["www.cv.example.com"]
+    assert config.proxy_host is None
+    assert config.proxy_port is None
+    assert config.proxy_username is None
+    assert config.proxy_password is None
 
 
 @pytest.mark.asyncio
