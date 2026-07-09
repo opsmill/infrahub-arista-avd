@@ -35,8 +35,8 @@ class CVConfigCheckDcimDeviceNode(BaseModel):
     id: str
     name: CVConfigCheckValueField | None
     serial: CVConfigCheckValueField | None
-    pod: CVConfigCheckDevicePod
-    avd_artifact: CVConfigCheckDeviceAvdArtifact
+    pod: CVConfigCheckDevicePod | None
+    avd_artifact: CVConfigCheckDeviceAvdArtifact | None
 
 
 class CVConfigCheckValueField(BaseModel):
@@ -49,7 +49,7 @@ class CVConfigCheckDevicePod(BaseModel):
 
 class CVConfigCheckDevicePodNode(BaseModel):
     id: str
-    parent: CVConfigCheckDevicePodParent
+    parent: CVConfigCheckDevicePodParent | None
 
 
 class CVConfigCheckDevicePodParent(BaseModel):
@@ -67,7 +67,7 @@ class CVConfigCheckDeviceAvdArtifact(BaseModel):
 
 class CVConfigCheckDeviceAvdArtifactNode(BaseModel):
     id: str
-    structured_config_file: CVConfigCheckDeviceStructuredConfigFile
+    structured_config_file: CVConfigCheckDeviceStructuredConfigFile | None
 
 
 class CVConfigCheckDeviceStructuredConfigFile(BaseModel):

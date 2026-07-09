@@ -109,7 +109,8 @@ class CVConfigValidationCheck(InfrahubCheck):
                 continue
             if not device.avd_artifact or not device.avd_artifact.node:
                 continue
-            if not device.avd_artifact.node.structured_config_file.node:
+            structured_config_file = device.avd_artifact.node.structured_config_file
+            if not structured_config_file or not structured_config_file.node:
                 continue
             devices.append(device)
         return devices

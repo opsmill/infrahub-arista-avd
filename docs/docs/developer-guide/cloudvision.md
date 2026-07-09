@@ -4,9 +4,9 @@ title: CloudVision Integration
 
 # CloudVision Integration
 
-The repository can validate generated EOS configurations in CloudVision during
-proposed-change validation and submit the matching CloudVision workspace after
-the proposed change is merged.
+The repository validates generated EOS configurations in CloudVision during
+Infrahub proposed-change validation. Post-merge workspace submission is out of
+scope for this workflow and should be implemented separately with Semaphore.
 
 ## Runtime Configuration
 
@@ -23,7 +23,7 @@ Username/password authentication is also supported with
 the `CLOUDVISION_PROXY_*` variables.
 
 `docker-compose.override.yml` passes these variables into the custom Infrahub
-runtime so checks and post-merge generators can access them.
+runtime so proposed-change checks can access them.
 
 ## Proposed-Change Validation
 
@@ -50,21 +50,12 @@ Infrahub. The object tracks:
 
 - `workspace_id`: deterministic CloudVision workspace ID
 - `proposed_change_id`: proposed change that created the workspace
-- `status`: `built`, `submitted`, or `abandoned`
+- `status`: `pending`, `built`, `submitted`, or `abandoned`
 - `fabric`: fabric validated by the workspace
 
 The workspace ID is deterministic from proposed-change ID and fabric name, so a
 validation rerun updates the same CloudVision workspace instead of creating a
 new one.
-
-## Post-Merge Submission
-
-The `submit-cv-workspace` generator runs after merge. It queries built
-`CloudvisionWorkspace` objects for the fabric and submits only the workspace
-whose `proposed_change_id` matches the merged proposed change.
-
-This prevents a later merge from submitting a workspace that was created by a
-different proposed change.
 
 ## Operational Notes
 

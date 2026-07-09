@@ -61,6 +61,29 @@ def _cv_query() -> CVConfigCheckQuery:
                             },
                         }
                     },
+                    {
+                        "node": {
+                            "id": "server",
+                            "name": {"value": "server"},
+                            "serial": {"value": "SERIAL3"},
+                            "pod": None,
+                            "avd_artifact": None,
+                        }
+                    },
+                    {
+                        "node": {
+                            "id": "leaf-no-config",
+                            "name": {"value": "leaf-no-config"},
+                            "serial": {"value": "SERIAL4"},
+                            "pod": {
+                                "node": {
+                                    "id": "pod-1",
+                                    "parent": {"node": {"__typename": "NetworkFabric", "id": "fabric-1"}},
+                                }
+                            },
+                            "avd_artifact": {"node": {"id": "artifact-4", "structured_config_file": None}},
+                        }
+                    },
                 ]
             },
         }
