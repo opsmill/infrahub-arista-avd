@@ -183,6 +183,15 @@ def _proposed_change_context_from_node(
     return ProposedChangeContext(id=proposed_change_id, name=name, description=description)
 
 
+def _source_branch_candidates(branch_name: str | None) -> list[str]:
+    if not branch_name:
+        return []
+    candidates = [branch_name]
+    if branch_name.startswith("feat/"):
+        candidates.append(branch_name.removeprefix("feat/"))
+    return candidates
+
+
 def _proposed_change_query(proposed_change_id: str, branch_name: str | None) -> tuple[str, dict[str, object]] | None:
     if proposed_change_id != LOCAL_PROPOSED_CHANGE_ID:
         return (
@@ -205,11 +214,12 @@ query GetProposedChangeMetadata($ids: [ID]) {
 """,
             {"ids": [proposed_change_id]},
         )
-    if branch_name:
+    source_branches = _source_branch_candidates(branch_name)
+    if source_branches:
         return (
             """
-query GetProposedChangeMetadata($sourceBranch: String!) {
-  CoreProposedChange(source_branch__value: $sourceBranch, state__value: "open", limit: 1) {
+query GetProposedChangeMetadata($sourceBranches: [String!]) {
+  CoreProposedChange(source_branch__values: $sourceBranches, state__value: "open", limit: 1) {
     edges {
       node {
         id
@@ -224,7 +234,7 @@ query GetProposedChangeMetadata($sourceBranch: String!) {
   }
 }
 """,
-            {"sourceBranch": branch_name},
+            {"sourceBranches": source_branches},
         )
     return None
 

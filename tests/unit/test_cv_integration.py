@@ -181,7 +181,7 @@ async def test_proposed_change_context_uses_safe_description_fallback() -> None:
 async def test_proposed_change_context_falls_back_to_source_branch_lookup() -> None:
     class FakeClient:
         async def execute_graphql(self, **kwargs: Any) -> dict[str, Any]:
-            assert kwargs["variables"] == {"sourceBranch": "cv-config-check"}
+            assert kwargs["variables"] == {"sourceBranches": ["cv-config-check"]}
             return {
                 "CoreProposedChange": {
                     "edges": [
@@ -201,6 +201,32 @@ async def test_proposed_change_context_falls_back_to_source_branch_lookup() -> N
     assert context.id == "pc-from-branch"
     assert context.name == "Branch Proposed Change"
     assert context.description == "Found by source branch"
+
+
+@pytest.mark.asyncio
+async def test_proposed_change_context_falls_back_to_short_feature_branch_name() -> None:
+    class FakeClient:
+        async def execute_graphql(self, **kwargs: Any) -> dict[str, Any]:
+            assert kwargs["variables"] == {"sourceBranches": ["feat/cv-config-check", "cv-config-check"]}
+            return {
+                "CoreProposedChange": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": "pc-from-short-branch",
+                                "name": {"value": "Short Branch Proposed Change"},
+                                "description": {"value": "Found by short source branch"},
+                            }
+                        }
+                    ]
+                }
+            }
+
+    context = await get_proposed_change_context(FakeClient(), SimpleNamespace(), "feat/cv-config-check")
+
+    assert context.id == "pc-from-short-branch"
+    assert context.name == "Short Branch Proposed Change"
+    assert context.description == "Found by short source branch"
 
 
 def test_cloudvision_config_ignores_blank_proxy_environment(monkeypatch: pytest.MonkeyPatch) -> None:
