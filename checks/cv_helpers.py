@@ -177,32 +177,16 @@ def get_proposed_change_description(initializer: object | None) -> str:
 def _proposed_change_context_from_node(
     node: dict[str, object], current: ProposedChangeContext
 ) -> ProposedChangeContext:
+    proposed_change_id = _mapping_attribute_value(node, "id") or current.id
     name = _mapping_attribute_value(node, "name") or current.name
     description = get_workspace_description(_mapping_attribute_value(node, "description") or current.description)
-    return ProposedChangeContext(id=current.id, name=name, description=description)
+    return ProposedChangeContext(id=proposed_change_id, name=name, description=description)
 
 
-async def get_proposed_change_context(client: Any, initializer: object | None) -> ProposedChangeContext:
-    """Return proposed-change metadata from task context and, when possible, Infrahub.
-
-    Infrahub's check initializer only guarantees the proposed-change ID. The
-    CloudVision workspace name and description need the user-facing name and
-    description, so this function enriches the initializer data with a
-    CoreProposedChange lookup. Metadata lookup failures must not prevent
-    configuration validation, so they fall back to deterministic local values.
-    """
-    proposed_change_id = get_proposed_change_id(initializer)
-    current = ProposedChangeContext(
-        id=proposed_change_id,
-        name=get_proposed_change_name(initializer, proposed_change_id),
-        description=get_proposed_change_description(initializer),
-    )
-    if proposed_change_id == LOCAL_PROPOSED_CHANGE_ID:
-        return current
-
-    try:
-        result = await client.execute_graphql(
-            query="""
+def _proposed_change_query(proposed_change_id: str, branch_name: str | None) -> tuple[str, dict[str, object]] | None:
+    if proposed_change_id != LOCAL_PROPOSED_CHANGE_ID:
+        return (
+            """
 query GetProposedChangeMetadata($ids: [ID]) {
   CoreProposedChange(ids: $ids, limit: 1) {
     edges {
@@ -219,7 +203,58 @@ query GetProposedChangeMetadata($ids: [ID]) {
   }
 }
 """,
-            variables={"ids": [proposed_change_id]},
+            {"ids": [proposed_change_id]},
+        )
+    if branch_name:
+        return (
+            """
+query GetProposedChangeMetadata($sourceBranch: String!) {
+  CoreProposedChange(source_branch__value: $sourceBranch, state__value: "open", limit: 1) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        description {
+          value
+        }
+      }
+    }
+  }
+}
+""",
+            {"sourceBranch": branch_name},
+        )
+    return None
+
+
+async def get_proposed_change_context(
+    client: Any, initializer: object | None, branch_name: str | None = None
+) -> ProposedChangeContext:
+    """Return proposed-change metadata from task context and, when possible, Infrahub.
+
+    Infrahub's check initializer only guarantees the proposed-change ID. The
+    CloudVision workspace name and description need the user-facing name and
+    description, so this function enriches the initializer data with a
+    CoreProposedChange lookup. Metadata lookup failures must not prevent
+    configuration validation, so they fall back to deterministic local values.
+    """
+    proposed_change_id = get_proposed_change_id(initializer)
+    current = ProposedChangeContext(
+        id=proposed_change_id,
+        name=get_proposed_change_name(initializer, proposed_change_id),
+        description=get_proposed_change_description(initializer),
+    )
+    query = _proposed_change_query(proposed_change_id, branch_name)
+    if query is None:
+        return current
+
+    try:
+        gql_query, variables = query
+        result = await client.execute_graphql(
+            query=gql_query,
+            variables=variables,
         )
     except Exception:
         LOGGER.warning("Unable to fetch proposed-change metadata for CloudVision workspace", exc_info=True)

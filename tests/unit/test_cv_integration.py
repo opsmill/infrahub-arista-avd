@@ -177,6 +177,32 @@ async def test_proposed_change_context_uses_safe_description_fallback() -> None:
     assert context.description == DEFAULT_WORKSPACE_DESCRIPTION
 
 
+@pytest.mark.asyncio
+async def test_proposed_change_context_falls_back_to_source_branch_lookup() -> None:
+    class FakeClient:
+        async def execute_graphql(self, **kwargs: Any) -> dict[str, Any]:
+            assert kwargs["variables"] == {"sourceBranch": "cv-config-check"}
+            return {
+                "CoreProposedChange": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": "pc-from-branch",
+                                "name": {"value": "Branch Proposed Change"},
+                                "description": {"value": "Found by source branch"},
+                            }
+                        }
+                    ]
+                }
+            }
+
+    context = await get_proposed_change_context(FakeClient(), SimpleNamespace(), "cv-config-check")
+
+    assert context.id == "pc-from-branch"
+    assert context.name == "Branch Proposed Change"
+    assert context.description == "Found by source branch"
+
+
 def test_cloudvision_config_ignores_blank_proxy_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
     monkeypatch.setenv("CLOUDVISION_TOKEN", "token")

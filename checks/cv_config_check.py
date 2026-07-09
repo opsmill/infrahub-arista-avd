@@ -80,7 +80,7 @@ class CVConfigValidationCheck(InfrahubCheck):
             )
             return
 
-        proposed_change = await get_proposed_change_context(self.client, self.initializer)
+        proposed_change = await get_proposed_change_context(self.client, self.initializer, self.branch_name)
         ws_id = get_workspace_id(proposed_change.id, fabric_name)
         ws_name = get_workspace_name(proposed_change.name, fabric_name)
 
