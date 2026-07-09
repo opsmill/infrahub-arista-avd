@@ -57,6 +57,10 @@ The workspace ID is deterministic from proposed-change ID and fabric name, so a
 validation rerun updates the same CloudVision workspace instead of creating a
 new one.
 
+The CloudVision workspace display name uses the proposed-change name and fabric
+name. Its description uses the proposed-change description, with a generic
+Infrahub validation description when the proposed change has no description.
+
 ## Operational Notes
 
 CloudVision validation depends on the AVD generator chain having already

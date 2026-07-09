@@ -11,7 +11,7 @@ import json
 import logging
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pyavd
 from infrahub_sdk.checks import InfrahubCheck
@@ -29,7 +29,7 @@ from solution_arista_avd.protocols import AvdStructuredConfigFile
 from .cv_config_check_query import CVConfigCheckDcimDeviceNode, CVConfigCheckQuery
 from .cv_helpers import (
     get_cloudvision_config,
-    get_proposed_change_id,
+    get_proposed_change_context,
     get_workspace_id,
     get_workspace_name,
     rollback_workspace,
@@ -44,7 +44,7 @@ class CVConfigValidationCheck(InfrahubCheck):
     query = "cv_config_check"
     timeout = 600
 
-    async def validate(self, data: dict[str, Any]) -> None:
+    async def validate(self, data: dict[str, Any]) -> None:  # type: ignore[override]
         parsed = CVConfigCheckQuery(**data)
 
         fabric_edges = parsed.network_fabric.edges
@@ -54,7 +54,7 @@ class CVConfigValidationCheck(InfrahubCheck):
 
         fabric_node = fabric_edges[0].node
         fabric_id = fabric_node.id
-        fabric_name = fabric_node.name.value if fabric_node.name else "unknown"
+        fabric_name = fabric_node.name.value if fabric_node.name and fabric_node.name.value else "unknown"
 
         cv_config = get_cloudvision_config()
         if cv_config is None:
@@ -80,9 +80,9 @@ class CVConfigValidationCheck(InfrahubCheck):
             )
             return
 
-        proposed_change_id = get_proposed_change_id(self.initializer)
-        ws_id = get_workspace_id(proposed_change_id, fabric_name)
-        ws_name = get_workspace_name(proposed_change_id, fabric_name)
+        proposed_change = await get_proposed_change_context(self.client, self.initializer)
+        ws_id = get_workspace_id(proposed_change.id, fabric_name)
+        ws_name = get_workspace_name(proposed_change.name, fabric_name)
 
         with tempfile.TemporaryDirectory(prefix="infrahub_cv_") as tmp_dir:
             eos_configs = await self._collect_eos_configs(serial_devices, tmp_dir)
@@ -90,7 +90,16 @@ class CVConfigValidationCheck(InfrahubCheck):
                 self.log_info(message=f"No EOS configurations available for fabric {fabric_name}")
                 return
 
-            await self._deploy_and_build(cv_config, ws_id, ws_name, eos_configs, fabric_name, fabric_id)
+            await self._deploy_and_build(
+                cv_config,
+                ws_id,
+                ws_name,
+                proposed_change.description,
+                proposed_change.id,
+                eos_configs,
+                fabric_name,
+                fabric_id,
+            )
 
     def _filter_devices_by_fabric(
         self, parsed: CVConfigCheckQuery, fabric_id: str
@@ -130,7 +139,16 @@ class CVConfigValidationCheck(InfrahubCheck):
         for device in devices:
             hostname = self._device_name(device)
             serial = self._device_serial(device)
-            sc_file_id = device.avd_artifact.node.structured_config_file.node.id
+            avd_artifact = device.avd_artifact
+            if (
+                not avd_artifact
+                or not avd_artifact.node
+                or not avd_artifact.node.structured_config_file
+                or not avd_artifact.node.structured_config_file.node
+            ):
+                self.log_info(message=f"WARNING: Structured config relationship missing for {hostname}")
+                continue
+            sc_file_id = avd_artifact.node.structured_config_file.node.id
 
             try:
                 sc_file = await self.client.get(AvdStructuredConfigFile, id=sc_file_id, branch=self.branch_name)
@@ -157,6 +175,8 @@ class CVConfigValidationCheck(InfrahubCheck):
         cv_config: Any,
         ws_id: str,
         ws_name: str,
+        ws_description: str,
+        proposed_change_id: str,
         eos_configs: list[CVEosConfig],
         fabric_name: str,
         fabric_id: str,
@@ -178,7 +198,7 @@ class CVConfigValidationCheck(InfrahubCheck):
                 proxy_username=cv_config.proxy_username,
                 proxy_password=cv_config.proxy_password,
             ) as cv_client:
-                await self._ensure_workspace_pending(cv_client, workspace)
+                await self._ensure_workspace_pending(cv_client, workspace, ws_description)
 
                 await verify_devices_on_cv(
                     devices=devices,
@@ -202,14 +222,15 @@ class CVConfigValidationCheck(InfrahubCheck):
             self.log_error(message=f"CloudVision connection failed: {exc}")
             return
 
-        proposed_change_id = get_proposed_change_id(self.initializer)
         await self._track_workspace(
             ws_id, ws_name, fabric_id, proposed_change_id, "built" if not result.failed else "abandoned"
         )
         self._report_results(result, cv_config, fabric_name)
 
-    async def _ensure_workspace_pending(self, cv_client: CVClient, workspace: CVWorkspace) -> None:
-        """Create the workspace or rollback to pending if already built."""
+    async def _ensure_workspace_pending(
+        self, cv_client: CVClient, workspace: CVWorkspace, workspace_description: str
+    ) -> None:
+        """Create/update the workspace or rollback to pending if already built."""
         try:
             existing = await cv_client.get_workspace(workspace_id=workspace.id)
             if existing.state in (WorkspaceState.PENDING, WorkspaceState.ROLLED_BACK):
@@ -222,10 +243,17 @@ class CVConfigValidationCheck(InfrahubCheck):
             await cv_client.create_workspace(
                 workspace_id=workspace.id,
                 display_name=workspace.name,
-                description="Infrahub proposed change validation",
+                description=workspace_description,
             )
-            await cv_client.wait_for_workspace_state(workspace_id=workspace.id, state="pending")
-            workspace.state = "pending"
+        else:
+            await cv_client.create_workspace(
+                workspace_id=workspace.id,
+                display_name=workspace.name,
+                description=workspace_description,
+            )
+
+        workspace.state = "pending"
+        await cv_client.wait_for_workspace_state(workspace_id=workspace.id, state="pending")
 
     async def _track_workspace(
         self, ws_id: str, ws_name: str, fabric_id: str, proposed_change_id: str, status: str
@@ -235,24 +263,30 @@ class CVConfigValidationCheck(InfrahubCheck):
 
         try:
             try:
-                ws_node = await self.client.get(
-                    kind="CloudvisionWorkspace", branch=self.branch_name, workspace_id__value=ws_id
+                ws_node = cast(
+                    "Any",
+                    await self.client.get(
+                        kind="CloudvisionWorkspace", branch=self.branch_name, workspace_id__value=ws_id
+                    ),
                 )
                 ws_node.status.value = status
                 if hasattr(ws_node, "proposed_change_id"):
                     ws_node.proposed_change_id.value = proposed_change_id
                 await ws_node.save()
             except NodeNotFoundError:
-                ws_node = await self.client.create(
-                    kind="CloudvisionWorkspace",
-                    branch=self.branch_name,
-                    data={
-                        "name": ws_name,
-                        "workspace_id": ws_id,
-                        "proposed_change_id": proposed_change_id,
-                        "status": status,
-                        "fabric": fabric_id,
-                    },
+                ws_node = cast(
+                    "Any",
+                    await self.client.create(
+                        kind="CloudvisionWorkspace",
+                        branch=self.branch_name,
+                        data={
+                            "name": ws_name,
+                            "workspace_id": ws_id,
+                            "proposed_change_id": proposed_change_id,
+                            "status": status,
+                            "fabric": fabric_id,
+                        },
+                    ),
                 )
                 await ws_node.save()
         except SchemaNotFoundError:

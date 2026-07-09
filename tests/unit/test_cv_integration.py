@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
 from checks.cv_config_check import CVConfigValidationCheck
 from checks.cv_config_check_query import CVConfigCheckQuery
-from checks.cv_helpers import get_cloudvision_config, get_proposed_change_id, get_workspace_id
+from checks.cv_helpers import (
+    DEFAULT_WORKSPACE_DESCRIPTION,
+    get_cloudvision_config,
+    get_proposed_change_context,
+    get_proposed_change_id,
+    get_workspace_description,
+    get_workspace_id,
+    get_workspace_name,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -111,6 +119,64 @@ def test_workspace_id_includes_proposed_change_identity() -> None:
     assert get_workspace_id("pc-123", "Fabric-DC1") != get_workspace_id("pc-456", "Fabric-DC1")
 
 
+def test_workspace_name_and_description_use_proposed_change_metadata() -> None:
+    assert get_workspace_name("Add Tenant", "Fabric-DC1") == (
+        "Infrahub Proposed Changes Add Tenant - Fabric Fabric-DC1"
+    )
+    assert get_workspace_description("  Review EOS changes  ") == "Review EOS changes"
+    assert get_workspace_description("") == DEFAULT_WORKSPACE_DESCRIPTION
+
+
+@pytest.mark.asyncio
+async def test_proposed_change_context_fetches_name_and_description() -> None:
+    class FakeClient:
+        async def execute_graphql(self, **kwargs: Any) -> dict[str, Any]:
+            assert kwargs["variables"] == {"ids": ["pc-123"]}
+            return {
+                "CoreProposedChange": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": "pc-123",
+                                "name": {"value": "Update Fabric"},
+                                "description": {"value": "Validate changed EOS config"},
+                            }
+                        }
+                    ]
+                }
+            }
+
+    context = await get_proposed_change_context(FakeClient(), SimpleNamespace(proposed_change_id="pc-123"))
+
+    assert context.id == "pc-123"
+    assert context.name == "Update Fabric"
+    assert context.description == "Validate changed EOS config"
+
+
+@pytest.mark.asyncio
+async def test_proposed_change_context_uses_safe_description_fallback() -> None:
+    class FakeClient:
+        async def execute_graphql(self, **kwargs: Any) -> dict[str, Any]:
+            return {
+                "CoreProposedChange": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": "pc-123",
+                                "name": {"value": "Update Fabric"},
+                                "description": {"value": ""},
+                            }
+                        }
+                    ]
+                }
+            }
+
+    context = await get_proposed_change_context(FakeClient(), SimpleNamespace(proposed_change_id="pc-123"))
+
+    assert context.name == "Update Fabric"
+    assert context.description == DEFAULT_WORKSPACE_DESCRIPTION
+
+
 def test_cloudvision_config_ignores_blank_proxy_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
     monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
@@ -152,7 +218,7 @@ async def test_collect_eos_configs_fetches_structured_config_from_check_branch(
             return FakeStructuredConfigFile()
 
     fake_client = FakeClient()
-    check = CVConfigValidationCheck(branch="cv-check-test", client=fake_client)
+    check = CVConfigValidationCheck(branch="cv-check-test", client=cast("Any", fake_client))
 
     def fake_get_device_config(structured_config: dict[str, Any]) -> str:
         return "hostname leaf-1\n"
