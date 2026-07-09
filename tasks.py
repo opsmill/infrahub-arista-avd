@@ -184,8 +184,7 @@ def init_semaphore(
     print("=== Semaphore init complete ===")
 
 
-def wait_for_repository_sync(name: str, timeout: int = 300, interval: int = 5) -> None:
-    """Poll Infrahub until the named repository reaches 'in_sync' status."""
+def get_repository_sync_status(name: str) -> str | None:
     query = """
     query CheckRepoSync($name: String!) {
       CoreRepository(name__value: $name) {
@@ -197,18 +196,25 @@ def wait_for_repository_sync(name: str, timeout: int = 300, interval: int = 5) -
       }
     }
     """
+    resp = httpx.post(
+        f"{INFRAHUB_ADDRESS}/graphql",
+        json={"query": query, "variables": {"name": name}},
+        timeout=10,
+    )
+    data = resp.json()
+    edges = data.get("data", {}).get("CoreRepository", {}).get("edges", [])
+    if not edges:
+        return None
+    return str(edges[0]["node"]["sync_status"]["value"])
+
+
+def wait_for_repository_sync(name: str, timeout: int = 300, interval: int = 5) -> None:
+    """Poll Infrahub until the named repository reaches 'in_sync' status."""
     elapsed = 0
     while elapsed < timeout:
         try:
-            resp = httpx.post(
-                f"{INFRAHUB_ADDRESS}/graphql",
-                json={"query": query, "variables": {"name": name}},
-                timeout=10,
-            )
-            data = resp.json()
-            edges = data.get("data", {}).get("CoreRepository", {}).get("edges", [])
-            if edges:
-                status = edges[0]["node"]["sync_status"]["value"]
+            status = get_repository_sync_status(name)
+            if status:
                 print(f"Repository '{name}' sync_status: {status}")
                 if status == "in-sync":
                     return
@@ -229,6 +235,7 @@ def load(ctx: Context) -> None:
     ctx.run("infrahubctl object load objects/")
     ctx.run("infrahubctl object load repository.yml")
     wait_for_repository_sync("test-repository")
+    ctx.run("infrahubctl object load repository_checks.yml")
     ctx.run("infrahubctl object load triggers.yml")
 
 
