@@ -91,12 +91,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages
 
-      # test_infrahub.py spins up the full Infrahub stack via Docker
-      # testcontainers and is too resource-heavy/slow for every PR, so it is
-      # excluded here and runs in the integration-tests-full job (nightly /
-      # on-demand) instead.
       - name: Run integration tests
-        run: uv run pytest tests/integration --ignore=tests/integration/test_infrahub.py -v
+        run: >-
+          uv run pytest tests/integration -m "not e2e"
+          --ignore=tests/integration/test_infrahub.py
+          --ignore=tests/integration/test_e2e_pipeline.py -v
 
   integration-tests-full:
     name: Integration tests (full stack)
@@ -117,5 +116,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages
 
+      - name: Build custom Infrahub image
+        run: docker build --build-arg INFRAHUB_BASE_VERSION=1.10.3 -t opsmill/infrahub-solution-arista-avd:1.10.3 .
+
+      # Pin the image so local and CI runs match; tune resources for the ~7GB runner.
       - name: Run full integration tests
-        run: uv run pytest tests/integration/test_infrahub.py -v
+        env:
+          INFRAHUB_TESTING_DOCKER_IMAGE: "opsmill/infrahub-solution-arista-avd"
+          INFRAHUB_TESTING_IMAGE_VER: "1.10.3"
+          INFRAHUB_TESTING_DOCKER_PULL: "false"
+          INFRAHUB_TESTING_WEB_CONCURRENCY: "2"
+          INFRAHUB_TESTING_API_SERVER_COUNT: "1"
+          # Generators issue large GraphQL reads; raise the client timeout above
+          # the 60s default so a busy server does not trip a false failure.
+          INFRAHUB_TIMEOUT: "300"
+        run: uv run pytest tests/integration/test_infrahub.py tests/integration/test_e2e_pipeline.py -v
