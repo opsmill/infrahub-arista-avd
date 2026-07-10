@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/opsmill/infrahub-arista-avd/actions/workflows/ci.yml/badge.svg)
 
-The Arista AVD Reference Design runs Arista Validated Design on Infrahub. Define a fabric topology — generators build all devices, cabling, and addressing from it; transforms render EOS device configurations, per-device documentation, and ANTA test catalogs as versioned artifacts in Infrahub.
+The Arista AVD Reference Design models a full Arista datacenter fabric in Infrahub — topology, addressing pools, EVPN configuration, and per-device intent as structured, queryable data. The whole team can browse, filter, and query the fabric through the web UI, GraphQL API, or MCP interface; every change runs through Infrahub branches and proposed changes, with a complete audit trail before it reaches a device.
 
 Designed for network automation teams running AVD with static variable files who need a shared source of truth, API access, and branch-based change control — and for teams evaluating how to operate AVD at scale without building the inventory-to-PyAVD translation layer themselves.
 
