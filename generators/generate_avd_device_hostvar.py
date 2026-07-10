@@ -646,6 +646,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             if group_nodes:
                 node_group["nodes"] = group_nodes
             hostvars[node_type_key]["node_groups"] = [node_group]
+        elif not mlag_info["domain_id"] and role == "leaf":
+            hostvars[node_type_key].setdefault("defaults", {})
+            hostvars[node_type_key]["defaults"]["mlag"] = False
 
         if tenants_data:
             hostvars["tenants"] = tenants_data

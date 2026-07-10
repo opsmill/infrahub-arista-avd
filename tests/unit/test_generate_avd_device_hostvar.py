@@ -57,6 +57,14 @@ def _base_hostvars(tenants_data: list[dict]) -> dict:
     )
 
 
+def test_non_mlag_leaf_sets_avd_mlag_false() -> None:
+    """Leaf hostvars without an MLAG domain must explicitly disable MLAG in AVD."""
+    hostvars = _base_hostvars([])
+
+    assert hostvars["l3leaf"]["defaults"]["mlag"] is False
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
 @pytest.mark.anyio
 async def test_tenants_hostvars_validate_against_pyavd():
     """EVPN tenant payload (incl. l2vlan vni_override) must pass pyAVD validation.

@@ -22,6 +22,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+def is_mlag_enabled(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.lower() not in {"false", "no", "0", "off"}
+    return bool(value)
+
+
 class RackGenerator(InfrahubGenerator, GeneratorMixin):
     rack_id: str
     rack_index: int
@@ -57,6 +65,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.rack_name: str = data.location_rack.edges[0].node.name.value
         self.rack_leaf_switch_template: str = data.location_rack.edges[0].node.leaf_switch_template.node.id
         self.rack_amount_of_leafs: int = data.location_rack.edges[0].node.amount_of_leafs.value
+        rack_mlag_attr = data.location_rack.edges[0].node.mlag
+        self.rack_mlag: bool = is_mlag_enabled(None if rack_mlag_attr is None else rack_mlag_attr.value)
+        self.logger.info(f"Rack {self.rack_name}: mlag_enabled={self.rack_mlag}")
         self.leaf_switches = []
         self.l2leaf_switches: list[DcimDevice] = []
 
@@ -118,7 +129,10 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.create_leaf_switches()
 
-        await self.create_mlag_pairs()
+        if self.rack_mlag:
+            await self.create_mlag_pairs()
+        else:
+            self.logger.info(f"Rack {self.rack_name}: MLAG disabled, skipping MLAG pair creation")
 
         await self.connect_leafs_to_spine()
 
@@ -160,6 +174,10 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         - Create MlagDomain with both leafs as peers
         AVD auto-generates the switch-side Port-Channel from mlag_interfaces in hostvars.
         """
+        if not getattr(self, "rack_mlag", True):
+            self.logger.info(f"Rack {self.rack_name}: MLAG disabled, skipping MLAG pair creation")
+            return
+
         if len(self.leaf_switches) < 2:
             self.logger.info(f"Rack {self.rack_name}: fewer than 2 leafs, skipping MLAG pair creation")
             return

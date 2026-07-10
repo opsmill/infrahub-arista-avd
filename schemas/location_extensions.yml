@@ -53,6 +53,12 @@ nodes:
         parameters:
           min_value: 1
           max_value: 2
+      - name: mlag
+        kind: Boolean
+        branch: aware
+        label: MLAG
+        default_value: true
+        optional: false
       - name: generation_complete
         kind: Boolean
         optional: true
