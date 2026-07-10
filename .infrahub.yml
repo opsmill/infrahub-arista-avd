@@ -180,6 +180,6 @@ artifact_definitions:
     artifact_name: "AVD ANTA Catalog"
     parameters:
       name: "name__value"
-    content_type: "application/x-yaml"
+    content_type: "application/yaml"
     targets: "avd_devices"
     transformation: "avd_anta_catalog"
