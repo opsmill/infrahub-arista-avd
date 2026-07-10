@@ -23,7 +23,12 @@ def _make_generator() -> GenerateAVDDeviceHostvar:
     return gen
 
 
-def _base_hostvars(tenants_data: list[dict]) -> dict:
+def _base_hostvars(
+    tenants_data: list[dict],
+    *,
+    rack_info: dict | None = None,
+    mlag_info: dict | None = None,
+) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
         hostname="leaf1",
@@ -51,17 +56,44 @@ def _base_hostvars(tenants_data: list[dict]) -> dict:
             "mlag_peer_l3_ipv4_pool": None,
         },
         uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
-        mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
+        rack_info=rack_info or {"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"]},
+        mlag_info=mlag_info or {"domain_id": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
         connected_endpoints=[],
     )
 
 
-def test_non_mlag_leaf_sets_avd_mlag_false() -> None:
-    """Leaf hostvars without an MLAG domain must explicitly disable MLAG in AVD."""
+def test_non_mlag_leaf_sets_avd_mlag_false_on_rack_node_group() -> None:
+    """Leaf hostvars without an MLAG domain must explicitly disable MLAG on the rack node group."""
     hostvars = _base_hostvars([])
 
-    assert hostvars["l3leaf"]["defaults"]["mlag"] is False
+    node_group = hostvars["l3leaf"]["node_groups"][0]
+    assert node_group["group"] == "DC1_BORDER"
+    assert node_group["nodes"] == [{"name": "leaf1"}]
+    assert node_group["mlag"] is False
+    assert "mlag" not in hostvars["l3leaf"].get("defaults", {})
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_mlag_leaf_uses_rack_node_group_and_domain_id() -> None:
+    """MLAG leaf hostvars must use the rack name for group and explicit mlag_domain_id."""
+    hostvars = _base_hostvars(
+        [],
+        rack_info={"name": "DC1_BORDER", "mlag": True, "leaf_names": ["leaf2", "leaf1"]},
+        mlag_info={
+            "domain_id": "DC1_BORDER",
+            "virtual_router_mac": None,
+            "peer_names": ["leaf1", "leaf2"],
+            "mlag_peer_interfaces": ["Ethernet3", "Ethernet4"],
+        },
+    )
+
+    node_group = hostvars["l3leaf"]["node_groups"][0]
+    assert node_group["group"] == "DC1_BORDER"
+    assert node_group["mlag_domain_id"] == "DC1_BORDER"
+    assert node_group["nodes"] == [{"name": "leaf1"}, {"name": "leaf2"}]
+    assert hostvars["l3leaf"]["nodes"][0]["mlag_interfaces"] == ["Ethernet3", "Ethernet4"]
+    assert "mlag" not in hostvars["l3leaf"].get("defaults", {})
     assert not validate_inputs(hostvars).validation_result.violations
 
 

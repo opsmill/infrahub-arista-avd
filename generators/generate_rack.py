@@ -187,7 +187,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             leaf_b = self.leaf_switches[pair_idx + 1]
 
             pair_suffix = f"-{pair_idx // 2 + 1}" if len(self.leaf_switches) > 2 else ""
-            domain_id = f"mlag-{self.rack_name}{pair_suffix}"
+            domain_id = f"{self.rack_name}{pair_suffix}"
 
             self.logger.info(f"Creating MLAG pair {domain_id}: {leaf_a.name.value} + {leaf_b.name.value}")
 

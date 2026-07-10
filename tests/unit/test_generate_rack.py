@@ -54,7 +54,7 @@ async def test_create_mlag_pairs_defaults_to_enabled_for_two_leaf_racks() -> Non
 
     gen.client.create.assert_awaited_once_with(
         "MlagDomain",
-        domain_id="mlag-DC1_BORDER",
+        domain_id="DC1_BORDER",
         peers=[{"id": "leaf-a"}, {"id": "leaf-b"}],
         pod={"id": "pod-1"},
     )

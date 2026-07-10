@@ -36,6 +36,12 @@ class ServerEndpoint(TypedDict):
     adapters: list[dict[str, Any]]
 
 
+class RackInfo(TypedDict):
+    name: str | None
+    mlag: bool | None
+    leaf_names: list[str]
+
+
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
     pods = await client.filters(NetworkPod, parent__ids=[fabric_id])
 
@@ -517,6 +523,31 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         }
 
     @staticmethod
+    def _extract_rack_info(device: object) -> RackInfo:
+        """Extract rack grouping data for leaf node_groups."""
+        device_rack = getattr(device, "rack", None)
+        if not device_rack or not device_rack.node:
+            return {"name": None, "mlag": None, "leaf_names": []}
+
+        rack = device_rack.node
+        rack_name = rack.name.value if getattr(rack, "name", None) else None
+        rack_mlag = rack.mlag.value if getattr(rack, "mlag", None) else None
+
+        leaf_names: list[str] = []
+        devices = getattr(rack, "devices", None)
+        if devices and hasattr(devices, "edges"):
+            for edge in devices.edges:
+                node = edge.node
+                if not node or not getattr(node, "name", None):
+                    continue
+                role = getattr(node, "role", None)
+                if role and role.value != "leaf":
+                    continue
+                leaf_names.append(node.name.value)
+
+        return {"name": rack_name, "mlag": rack_mlag, "leaf_names": sorted(leaf_names)}
+
+    @staticmethod
     def _build_hostvars(  # noqa: C901 — assembles the full AVD hostvars payload
         *,
         hostname: str,
@@ -538,7 +569,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         management: dict[str, Any],
         pools: dict[str, str | None],
         uplinks: UplinkData,
-        mlag_info: dict[str, str | None],
+        rack_info: RackInfo,
+        mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
     ) -> dict[str, Any]:
@@ -633,22 +665,40 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         hostvars[node_type_key] = hostvars.get(node_type_key, {})
         hostvars[node_type_key]["nodes"] = [node_config]
 
-        # Add MLAG node_group for leaf devices (AVD expects nodes listed inside the group)
-        if mlag_info["domain_id"] and role == "leaf":
-            effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
-            node_group: dict[str, Any] = {"group": mlag_info["domain_id"]}
-            if bgp_asn is not None:
-                node_group["bgp_as"] = str(bgp_asn)
-            if effective_vrmac:
-                node_group["virtual_router_mac_address"] = effective_vrmac
-            # Include peer node names in the group
-            group_nodes: list[dict[str, str]] = [{"name": peer_name} for peer_name in mlag_info.get("peer_names", [])]
-            if group_nodes:
-                node_group["nodes"] = group_nodes
-            hostvars[node_type_key]["node_groups"] = [node_group]
-        elif not mlag_info["domain_id"] and role == "leaf":
-            hostvars[node_type_key].setdefault("defaults", {})
-            hostvars[node_type_key]["defaults"]["mlag"] = False
+        # Group leaf devices by their Infrahub rack name. MLAG-disabled racks must
+        # disable MLAG at the node-group level rather than in l3leaf.defaults.
+        if role == "leaf":
+            rack_name = rack_info.get("name")
+            leaf_names = list(rack_info.get("leaf_names", []))
+            if not leaf_names:
+                leaf_names = list(mlag_info.get("peer_names", []))
+            if hostname not in leaf_names:
+                leaf_names.append(hostname)
+            leaf_names = sorted(dict.fromkeys(leaf_names))
+
+            if rack_name:
+                node_group: dict[str, Any] = {
+                    "group": rack_name,
+                    "nodes": [{"name": leaf_name} for leaf_name in leaf_names],
+                }
+                if mlag_info["domain_id"]:
+                    node_group["mlag_domain_id"] = mlag_info["domain_id"]
+                    effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
+                    if bgp_asn is not None:
+                        node_group["bgp_as"] = str(bgp_asn)
+                    if effective_vrmac:
+                        node_group["virtual_router_mac_address"] = effective_vrmac
+                elif rack_info.get("mlag") is False:
+                    node_group["mlag"] = False
+                hostvars[node_type_key]["node_groups"] = [node_group]
+            elif mlag_info["domain_id"]:
+                effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
+                node_group = {"group": mlag_info["domain_id"], "nodes": [{"name": name} for name in leaf_names]}
+                if bgp_asn is not None:
+                    node_group["bgp_as"] = str(bgp_asn)
+                if effective_vrmac:
+                    node_group["virtual_router_mac_address"] = effective_vrmac
+                hostvars[node_type_key]["node_groups"] = [node_group]
 
         if tenants_data:
             hostvars["tenants"] = tenants_data
@@ -743,9 +793,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         else:
             pools = await self._extract_l3ls_pools(fabric, pod)
 
-        # Extract MLAG domain info (only for L3 leaf devices)
+        # Extract rack and MLAG domain info (only for L3 leaf devices)
+        rack_info: RackInfo = {"name": None, "mlag": None, "leaf_names": []}
         mlag_info: dict[str, Any] = {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
         if not is_l2leaf:
+            rack_info = self._extract_rack_info(device)
             mlag_info = self._extract_mlag_info(device)
             # Extract mlag_peer interface names for AVD mlag_interfaces
             if mlag_info["domain_id"] and iface_edges:
@@ -782,6 +834,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             management=management,
             pools=pools,
             uplinks=uplinks,
+            rack_info=rack_info,
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
