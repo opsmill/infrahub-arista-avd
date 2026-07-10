@@ -75,11 +75,13 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
             )
             return
 
-        await self.get_super_spine_switches_for_fabric()
+        self.super_spine_switches = []
+        if self.fabric_amount_of_super_spines > 0:
+            await self.get_super_spine_switches_for_fabric()
 
-        if self.fabric_amount_of_super_spines != len(self.super_spine_switches):
-            msg = f"Cannot start pod generator on {self.pod_name}-{self.pod_id}: the fabric doesn't seem to be fully generated yet!"
-            raise RuntimeError(msg)
+            if self.fabric_amount_of_super_spines != len(self.super_spine_switches):
+                msg = f"Cannot start pod generator on {self.pod_name}-{self.pod_id}: the fabric doesn't seem to be fully generated yet!"
+                raise RuntimeError(msg)
 
         if not self.pod_spine_switch_template:
             msg = f"Cannot start pod generator on {self.pod_name}-{self.pod_id}: no spine switch template defined!"
@@ -104,7 +106,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.create_spine_switches()
 
-        await self.connect_spine_to_super_spine()
+        if self.fabric_amount_of_super_spines > 0:
+            await self.connect_spine_to_super_spine()
 
         await self.update_checksum()
 
@@ -170,7 +173,11 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         pod.prefix_pool = self.pod_prefix_pool
         await pod.save(allow_upsert=True)
 
-    async def get_super_spine_switches_for_fabric(self) -> tuple[NetworkPod, list[DcimDevice]]:
+    async def get_super_spine_switches_for_fabric(self) -> tuple[NetworkPod | None, list[DcimDevice]]:
+        if self.fabric_amount_of_super_spines == 0:
+            self.super_spine_switches = []
+            return None, self.super_spine_switches
+
         self.fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
         self.super_spine_switches = await self.client.filters(
             kind=DcimDevice, pod__ids=[self.fabric_pod.id], role__value="super_spine"
@@ -178,6 +185,10 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         return self.fabric_pod, self.super_spine_switches
 
     async def connect_spine_to_super_spine(self) -> None:
+        if self.fabric_amount_of_super_spines == 0:
+            self.logger.info(f"Pod {self.pod_name}: no super-spines configured, skipping spine-to-super-spine cabling")
+            return
+
         spine_interfaces = await self.client.filters(
             kind=DcimInterface, device__ids=[spine.id for spine in self.spine_switches], role__value="super_spine"
         )
@@ -204,5 +215,9 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         for rack in racks:
             if rack.checksum.value != checksum:
                 rack.checksum.value = checksum
-                await rack.save(allow_upsert=True)
+                # This update is only a trigger signal for the rack generator.
+                # Do not add pre-seeded racks to PodGenerator's tracking
+                # context, otherwise generator cleanup can treat those input
+                # objects as pod-generated outputs.
+                await rack.save(allow_upsert=True, update_group_context=False)
                 self.logger.info(f"Rack {rack.name.value} has been updated to checksum {checksum}")

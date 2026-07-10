@@ -324,11 +324,15 @@ def lint_mypy(ctx: Context) -> None:
 
 @task
 def lint_ruff(ctx: Context) -> None:
-    """Run Linter to check all Python files."""
-    print(" - Check code with ruff")
-    exec_cmd = "ruff check ."
+    """Run Ruff lint and format checks for all Python files."""
+    exec_cmds = [
+        (" - Check code with ruff", "ruff check ."),
+        (" - Check code formatting with ruff", "ruff format --check ."),
+    ]
     with ctx.cd(MAIN_DIRECTORY_PATH):
-        ctx.run(exec_cmd, pty=True)
+        for message, cmd in exec_cmds:
+            print(message)
+            ctx.run(cmd, pty=True)
 
 
 @task(name="lint")
