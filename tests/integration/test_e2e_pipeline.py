@@ -1,18 +1,25 @@
-"""End-to-end pipeline integration test.
+"""End-to-end pipeline integration test (trigger-driven).
 
-Boots a real Infrahub stack via ``infrahub-testcontainers`` and drives the full
-design-to-artifact pipeline, one component per test:
+Boots a real Infrahub stack via ``infrahub-testcontainers`` and exercises the
+pipeline the way it actually runs in production: the ``triggers.yml`` event rules
+are loaded, work happens on a branch, and only the **fabric** generator is
+invoked explicitly. Everything downstream cascades via ``CoreNodeTriggerRule``:
 
-    load schema -> load objects -> target groups -> register repository
-    -> run generators (fabric/pod/rack/server-cabling) -> IP/cabling checks
-    -> AVD structured config -> artifacts generated -> artifact content
+    generate-fabric  (updates each pod's checksum)
+      -> trigger-pod-generator      -> spines created (+ racks bumped)
+      -> trigger-rack-generator     -> leaves created (+ hostvars generated)
+      -> avd_hostvars_ready True    -> AVD structured config generated
+      -> structured-config created  -> backfill runs
 
-The container stack is class-scoped, so it boots once and the ordered test
-methods share it via the class-scoped ``client``. Tests run in definition order
-and build on each other's server-side state (each later test assumes the earlier
-ones ran); all methods share a single class-scoped event loop so the one client
-is reused safely. Each asynchronous wait is bounded by ``wait_until`` and fails
-with the last observed state, so a regression localizes to its component.
+The trigger rules are ``branch_scope: "other_branches"``, so the cascade only
+fires off ``main`` — hence a dedicated branch. Base data (schema, objects,
+triggers, repository) is loaded on ``main``; the generator cascade runs on the
+branch, mirroring the real change/proposed-change workflow.
+
+The container stack is class-scoped, so it boots once and the ordered component
+tests share it. Each downstream test simply waits (bounded) for the stage's
+output to appear — it does not run that generator itself. All methods share one
+class-scoped event loop so the single ``client`` is reused safely.
 
 Heavy: excluded from the per-PR fast path and run in CI's
 ``integration-tests-full`` job (nightly / workflow_dispatch). Select locally with
@@ -35,14 +42,12 @@ from .helpers import (
     ARTIFACT_AVD_ANTA_CATALOG,
     ARTIFACT_AVD_EOS_CONFIG,
     ARTIFACT_TIMEOUT,
-    GENERATOR_AVD_STRUCTURED_CONFIG,
-    GENERATOR_BACKFILL,
+    GENERATOR_FABRIC,
     GENERATOR_TIMEOUT,
     GROUP_TIMEOUT,
     POLL_INTERVAL,
     REPO_SYNC_INTERVAL,
     REPO_SYNC_RETRIES,
-    TOPOLOGY_GENERATOR_CHAIN,
     expected_super_spine_count,
     wait_until,
 )
@@ -53,40 +58,32 @@ if TYPE_CHECKING:
     from infrahub_sdk import InfrahubClient
 
 REPO_NAME = "e2e-repository"
+# The cascade runs on this branch; trigger rules only fire off `main`.
+PIPELINE_BRANCH = "e2e-pipeline"
 
 
 @pytest.mark.e2e
 class TestE2EPipeline(TestInfrahubDockerClient):
-    """Full design-to-artifact pipeline against a real Infrahub instance.
+    """Trigger-driven design-to-artifact pipeline against a real Infrahub instance.
 
     One test per pipeline component; they run in order and share the class-scoped
-    stack. Running a single test in isolation will fail because it relies on the
-    state produced by the earlier ones.
+    stack. Downstream components appear via ``triggers.yml`` event rules after the
+    fabric generator runs — the tests observe each stage, they do not drive it.
+    Running a single test in isolation will fail because it relies on the state
+    produced by the earlier ones.
     """
 
     @pytest.fixture(scope="class", autouse=True)
     def _client_timeout(self) -> None:
-        # Raise the infrahubctl client timeout: generators trigger downstream work
-        # and issue large GraphQL reads that can exceed the 60s default under load.
+        # Raise the infrahubctl client timeout: the fabric generator issues large
+        # GraphQL reads/writes that can exceed the 60s default under load.
         os.environ.setdefault("INFRAHUB_TIMEOUT", "300")
 
     @staticmethod
     def _address(infrahub_port: int) -> str:
         return f"http://localhost:{infrahub_port}"
 
-    def _run_generator(self, name: str, address: str, branch: str) -> None:
-        """Run a generator over its whole target group and assert it succeeded.
-
-        ``--branch`` is passed explicitly: infrahubctl otherwise defaults to the
-        local git branch, which does not exist on the testcontainer server.
-        """
-        result = self.execute_command(command=f"infrahubctl generator {name} --branch {branch}", address=address)
-        print(f"--- infrahubctl generator {name} ---\n{result.stdout}", flush=True)
-        if result.stderr:
-            print(result.stderr, flush=True)
-        assert result.returncode == 0, f"generator '{name}' failed:\n{result.stdout}\n{result.stderr}"
-
-    # --- Component 1: schema ------------------------------------------------
+    # --- Component 1: schema (main) ----------------------------------------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_load_schema(self, default_branch: str, client: InfrahubClient, schemas: list[dict]) -> None:
         """Load this repository's schemas and wait for convergence (FR-002)."""
@@ -95,7 +92,7 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         assert resp.errors == {}, f"schema load errors: {resp.errors}"
         await client.schema.wait_until_converged(branch=default_branch)
 
-    # --- Component 2: objects ----------------------------------------------
+    # --- Component 2: objects (main) ---------------------------------------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_load_objects(self, default_branch: str, client: InfrahubClient, infrahub_port: int) -> None:
         """Load the seed objects via ``infrahubctl object load`` (FR-003)."""
@@ -107,7 +104,7 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         assert await client.all(kind="OrganizationManufacturer", branch=default_branch), "no manufacturers loaded"
         assert await client.all(kind="DcimDeviceType", branch=default_branch), "no device types loaded"
 
-    # --- Component 3: generator target groups ------------------------------
+    # --- Component 3: target groups (main) ---------------------------------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_target_groups_populated(self, default_branch: str, client: InfrahubClient) -> None:
         """The generators' target groups are populated by seed membership (FR-004)."""
@@ -120,7 +117,7 @@ class TestE2EPipeline(TestInfrahubDockerClient):
                 describe=f"seed objects of kind {kind}",
             )
 
-    # --- Component 4: repository -------------------------------------------
+    # --- Component 4: repository (main) ------------------------------------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_register_repository(
         self, default_branch: str, client: InfrahubClient, root_directory: Path, remote_repos_dir: Path
@@ -136,42 +133,97 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             msg = f"repository '{REPO_NAME}' did not reach in-sync; status={synced.sync_status.value}"
             raise AssertionError(msg)
 
-    # --- Component 5: generators create the topology -----------------------
+    # --- Component 5: trigger rules (main, after repo sync) ----------------
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_run_generators_create_devices(
-        self, default_branch: str, client: InfrahubClient, infrahub_port: int
-    ) -> None:
-        """Run the topology generator chain and verify the expected devices (FR-006/FR-008)."""
-        address = self._address(infrahub_port)
-        for generator_name in TOPOLOGY_GENERATOR_CHAIN:
-            self._run_generator(generator_name, address, default_branch)
+    async def test_load_triggers(self, infrahub_port: int) -> None:
+        """Load the generator event-trigger rules so the cascade can fire on a branch.
 
-        expected_super_spines = await expected_super_spine_count(client, default_branch)
+        Loaded *after* the repository sync: the ``CoreGeneratorAction`` objects
+        reference generators by name (generate-pod, generate-rack, ...) which only
+        exist once the repository has registered its generator definitions. This
+        mirrors the `inv load` order (objects -> repository -> wait -> triggers).
+        """
+        result = self.execute_command(
+            command="infrahubctl object load triggers.yml", address=self._address(infrahub_port)
+        )
+        print(result.stdout, flush=True)
+        if result.stderr:
+            print(result.stderr, flush=True)
+        assert result.returncode == 0, f"trigger load failed:\n{result.stdout}\n{result.stderr}"
+
+    # --- Component 6: branch + enable ANTA ---------------------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_create_branch_and_enable_anta(self, client: InfrahubClient) -> None:
+        """Create the working branch (triggers fire off `main`) and enable ANTA before the cascade."""
+        await client.branch.create(branch_name=PIPELINE_BRANCH, sync_with_git=False)
+        # Enable ANTA on the branch fabrics so the catalog is populated (not the
+        # disabled marker) once the cascade reaches structured-config generation.
+        fabrics = await client.all(kind="NetworkFabric", branch=PIPELINE_BRANCH)
+        assert fabrics, "no fabrics found on the pipeline branch"
+        for fabric in fabrics:
+            if hasattr(fabric, "anta_enabled"):
+                fabric.anta_enabled.value = True
+                await fabric.save()
+
+    # --- Component 7: fabric generator (the only explicit trigger) ---------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_fabric_generator_creates_super_spines(self, client: InfrahubClient, infrahub_port: int) -> None:
+        """Run ONLY the fabric generator on the branch; assert super-spines appear (FR-006/FR-008)."""
+        result = self.execute_command(
+            command=f"infrahubctl generator {GENERATOR_FABRIC} --branch {PIPELINE_BRANCH}",
+            address=self._address(infrahub_port),
+        )
+        print(result.stdout, flush=True)
+        assert result.returncode == 0, f"fabric generator failed:\n{result.stdout}\n{result.stderr}"
+
+        expected = await expected_super_spine_count(client, PIPELINE_BRANCH)
         super_spines = await wait_until(
-            fetch=lambda: client.filters(kind="DcimDevice", role__value="super_spine", branch=default_branch),
-            ready=lambda d: len(d) >= expected_super_spines > 0,
+            fetch=lambda: client.filters(kind="DcimDevice", role__value="super_spine", branch=PIPELINE_BRANCH),
+            ready=lambda d: len(d) >= expected > 0,
             timeout=GENERATOR_TIMEOUT,
             interval=POLL_INTERVAL,
-            describe=f"super_spine devices (expected {expected_super_spines})",
+            describe=f"super_spine devices (expected {expected})",
         )
-        spines = await client.filters(kind="DcimDevice", role__value="spine", branch=default_branch)
-        leaves = await client.filters(kind="DcimDevice", role__value="leaf", branch=default_branch)
-        assert spines, "no spine devices created"
-        assert leaves, "no leaf devices created"
-        print(f"devices: super_spine={len(super_spines)} spine={len(spines)} leaf={len(leaves)}", flush=True)
+        print(f"super_spine devices: {len(super_spines)}", flush=True)
 
-    # --- Component 6: cabling & IP allocation (US2) ------------------------
+    # --- Component 8: pod trigger cascade ----------------------------------
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_cabling_and_ip_allocation(self, default_branch: str, client: InfrahubClient) -> None:
+    async def test_pod_trigger_creates_spines(self, client: InfrahubClient) -> None:
+        """The fabric generator bumped the pods, firing the pod generator via triggers."""
+        spines = await wait_until(
+            fetch=lambda: client.filters(kind="DcimDevice", role__value="spine", branch=PIPELINE_BRANCH),
+            ready=lambda d: len(d) > 0,
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="spine devices (pod generator fired via trigger)",
+        )
+        print(f"spine devices: {len(spines)}", flush=True)
+
+    # --- Component 9: rack trigger cascade ---------------------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_rack_trigger_creates_leaves(self, client: InfrahubClient) -> None:
+        """The pod generator bumped the racks, firing the rack generator via triggers."""
+        leaves = await wait_until(
+            fetch=lambda: client.filters(kind="DcimDevice", role__value="leaf", branch=PIPELINE_BRANCH),
+            ready=lambda d: len(d) > 0,
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="leaf devices (rack generator fired via trigger)",
+        )
+        print(f"leaf devices: {len(leaves)}", flush=True)
+
+    # --- Component 10: cabling & IP allocation (US2) -----------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_cabling_and_ip_allocation(self, client: InfrahubClient) -> None:
         """Links exist and every L3 device has a unique loopback + a management IP (FR-009)."""
-        links = await client.all(kind="NetworkLink", branch=default_branch)
+        links = await client.all(kind="NetworkLink", branch=PIPELINE_BRANCH)
         assert links, "no NetworkLink cabling created"
 
         l3_device_count = 0
         for role in ("super_spine", "spine", "leaf"):
-            l3_device_count += len(await client.filters(kind="DcimDevice", role__value=role, branch=default_branch))
+            l3_device_count += len(await client.filters(kind="DcimDevice", role__value=role, branch=PIPELINE_BRANCH))
 
-        ip_report = await _device_ip_report(client, default_branch)
+        ip_report = await _device_ip_report(client, PIPELINE_BRANCH)
         print(
             f"ip report: total={ip_report['total']} with_loopback={ip_report['with_loopback']} "
             f"with_mgmt={ip_report['with_mgmt']} duplicate_loopbacks={ip_report['duplicate_loopbacks']}",
@@ -185,31 +237,12 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         )
         assert ip_report["with_mgmt"] > 0, "no devices have an allocated management IP"
 
-    # --- Component 7: AVD structured config --------------------------------
+    # --- Component 11: AVD structured config (via trigger cascade) ---------
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_generate_structured_config(
-        self, default_branch: str, client: InfrahubClient, infrahub_port: int
-    ) -> None:
-        """Enable ANTA, generate AVD structured config, and verify every device has it (FR-010/FR-014)."""
-        address = self._address(infrahub_port)
-
-        # Enable ANTA so the catalog is populated (not the disabled marker); the
-        # schema default is False and the seed does not set it.
-        fabrics = await client.all(kind="NetworkFabric", branch=default_branch)
-        assert fabrics, "no fabrics found to enable ANTA on"
-        for fabric in fabrics:
-            if hasattr(fabric, "anta_enabled"):
-                fabric.anta_enabled.value = True
-                await fabric.save()
-
-        self._run_generator(GENERATOR_AVD_STRUCTURED_CONFIG, address, default_branch)
-        # Backfill is best-effort (P2); it reconciles structured config into the model.
-        self.execute_command(
-            command=f"infrahubctl generator {GENERATOR_BACKFILL} --branch {default_branch}", address=address
-        )
-
+    async def test_structured_config_cascade(self, client: InfrahubClient) -> None:
+        """Rack completion set avd_hostvars_ready, cascading into AVD structured config (FR-010)."""
         report = await wait_until(
-            fetch=lambda: _devices_without_structured_config(client, default_branch),
+            fetch=lambda: _devices_without_structured_config(client, PIPELINE_BRANCH),
             ready=lambda r: r is not None and r["total"] > 0 and not r["without"],
             timeout=GENERATOR_TIMEOUT,
             interval=POLL_INTERVAL,
@@ -217,28 +250,28 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         )
         print(f"structured config present on all {report['total']} devices", flush=True)
 
-    # --- Component 8: artifacts generated ----------------------------------
+    # --- Component 12: artifacts generated ---------------------------------
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_artifacts_generated(self, default_branch: str, client: InfrahubClient) -> None:
-        """Every AVD artifact definition yields at least one Ready artifact (FR-011/FR-013)."""
-        definitions = await client.all(kind="CoreArtifactDefinition", branch=default_branch)
+    async def test_artifacts_generated(self, client: InfrahubClient) -> None:
+        """Every AVD artifact definition yields at least one Ready artifact on the branch (FR-011/FR-013)."""
+        definitions = await client.all(kind="CoreArtifactDefinition", branch=PIPELINE_BRANCH)
         assert definitions, "no artifact definitions registered (repository sync incomplete?)"
-        await _trigger_all_artifacts(definitions)
+        await _trigger_all_artifacts(client, PIPELINE_BRANCH, definitions)
 
         for artifact_name in ALL_ARTIFACT_NAMES:
-            await self._wait_for_ready_artifact(client, default_branch, artifact_name, definitions)
+            await self._wait_for_ready_artifact(client, PIPELINE_BRANCH, artifact_name, definitions)
 
-    # --- Component 9: artifact content -------------------------------------
+    # --- Component 13: artifact content ------------------------------------
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_artifact_content(self, default_branch: str, client: InfrahubClient) -> None:
+    async def test_artifact_content(self, client: InfrahubClient) -> None:
         """A rendered EOS config mentions its device hostname; the ANTA catalog is populated (FR-012)."""
-        eos_content, eos_target = await _fetch_ready_artifact_content(client, default_branch, ARTIFACT_AVD_EOS_CONFIG)
+        eos_content, eos_target = await _fetch_ready_artifact_content(client, PIPELINE_BRANCH, ARTIFACT_AVD_EOS_CONFIG)
         assert eos_content and eos_content.strip(), "EOS configuration artifact is empty"
         assert "hostname" in eos_content, "EOS config does not contain a hostname line"
         if eos_target:
             assert eos_target in eos_content, f"EOS config does not mention its device hostname {eos_target}"
 
-        anta_content, _ = await _fetch_ready_artifact_content(client, default_branch, ARTIFACT_AVD_ANTA_CATALOG)
+        anta_content, _ = await _fetch_ready_artifact_content(client, PIPELINE_BRANCH, ARTIFACT_AVD_ANTA_CATALOG)
         assert anta_content and anta_content.strip(), "ANTA catalog artifact is empty"
         assert ANTA_DISABLED_MARKER not in anta_content, (
             "ANTA catalog rendered the disabled marker despite anta_enabled"
@@ -256,7 +289,7 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             # One re-trigger at the halfway mark to cover read-replica visibility gaps (FR-013).
             if not ready and not retriggered["done"]:
                 retriggered["done"] = True
-                await _trigger_all_artifacts(definitions)
+                await _trigger_all_artifacts(client, branch, definitions)
             return ready
 
         await wait_until(
@@ -335,10 +368,18 @@ async def _devices_without_structured_config(client: InfrahubClient, branch: str
     return {"total": len(edges), "without": without}
 
 
-async def _trigger_all_artifacts(definitions: list) -> None:
-    """Fire artifact generation for every definition (fire-and-forget)."""
+async def _trigger_all_artifacts(client: InfrahubClient, branch: str, definitions: list) -> None:
+    """Fire artifact generation for every definition on ``branch`` (fire-and-forget).
+
+    The node ``.generate()`` helper posts without a branch (targets main, which has
+    no devices in this flow), so hit the branch-aware endpoint directly.
+    """
     for definition in definitions:
-        await definition.generate()
+        resp = await client._post(
+            f"{client.address}/api/artifact/generate/{definition.id}?branch={branch}",
+            payload={"nodes": []},
+        )
+        resp.raise_for_status()
 
 
 async def _fetch_ready_artifact_content(
