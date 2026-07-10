@@ -165,16 +165,30 @@ class TestE2EPipeline(TestInfrahubDockerClient):
                 fabric.anta_enabled.value = True
                 await fabric.save()
 
-    # --- Component 7: fabric generator (the only explicit trigger) ---------
+    # --- Component 7: fabric generator (the only explicit kick-off) --------
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_fabric_generator_creates_super_spines(self, client: InfrahubClient, infrahub_port: int) -> None:
-        """Run ONLY the fabric generator on the branch; assert super-spines appear (FR-006/FR-008)."""
-        result = self.execute_command(
-            command=f"infrahubctl generator {GENERATOR_FABRIC} --branch {PIPELINE_BRANCH}",
-            address=self._address(infrahub_port),
+    async def test_fabric_generator_creates_super_spines(self, client: InfrahubClient) -> None:
+        """Kick off ONLY the fabric generator via the API; assert super-spines appear (FR-006/FR-008).
+
+        Uses the ``CoreGeneratorDefinitionRun`` mutation — the same server-side
+        mechanism the repo's own generators use to chain (see ``_trigger_generator``
+        in ``src/solution_arista_avd/generator.py``) and how the triggered pod/rack
+        generators run. No infrahubctl subprocess; it runs in the task-worker against
+        the synced repo. Fire-and-forget, so success is confirmed by polling for the
+        produced devices, which also proves the trigger cascade started.
+        """
+        gen_def = await client.get(kind="CoreGeneratorDefinition", name__value=GENERATOR_FABRIC, branch=PIPELINE_BRANCH)
+        await client.execute_graphql(
+            query="""
+            mutation RunGenerator($id: String!) {
+                CoreGeneratorDefinitionRun(data: { id: $id }) {
+                    ok
+                }
+            }
+            """,
+            variables={"id": gen_def.id},
+            branch_name=PIPELINE_BRANCH,
         )
-        print(result.stdout, flush=True)
-        assert result.returncode == 0, f"fabric generator failed:\n{result.stdout}\n{result.stderr}"
 
         expected = await expected_super_spine_count(client, PIPELINE_BRANCH)
         super_spines = await wait_until(
