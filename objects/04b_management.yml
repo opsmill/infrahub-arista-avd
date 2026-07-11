@@ -5,10 +5,7 @@ kind: Object
 spec:
   kind: NetworkDnsServer
   data:
-    - name: dns-primary
-      ip_address: 192.168.1.1/32
-      vrf: MGMT
-    - name: dns-secondary
+    - name: dns-google
       ip_address: 8.8.8.8/32
 ---
 # NTP Servers
@@ -17,10 +14,7 @@ kind: Object
 spec:
   kind: NetworkNtpServer
   data:
-    - name: 0.pool.ntp.org
-      server_vrf: use_mgmt_interface_vrf
-    - name: 1.pool.ntp.org
-      server_vrf: use_mgmt_interface_vrf
+    - name: time.google.com
 ---
 # Local Users
 apiVersion: infrahub.app/v1
@@ -28,13 +22,13 @@ kind: Object
 spec:
   kind: NetworkLocalUser
   data:
-    - name: arista
+    - name: admin-nopass
       privilege: 15
       role: network-admin
-      password_type: sha512
-      password: "$6$arista$abc123examplehashreplacewithreal"
-    - name: admin
+      password_type: type7
+      password: "nopassword"
+    - name: mtache-nopass
       privilege: 15
       role: network-admin
-      password_type: sha512
-      password: "$6$admin$abc123examplehashreplacewithreal"
+      password_type: type7
+      password: "nopassword"
