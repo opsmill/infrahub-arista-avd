@@ -99,6 +99,12 @@ nodes:
         kind: Text
         optional: true
         order_weight: 1300
+      - name: fabric_tags
+        label: Fabric Tags
+        kind: List
+        optional: true
+        description: "AVD tags used to scope this SVI to selected fabrics or sites"
+        order_weight: 1400
     relationships:
       - name: vrf
         label: "VRF"

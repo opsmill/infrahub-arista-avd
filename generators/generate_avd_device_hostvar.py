@@ -5,6 +5,7 @@ import logging
 import operator
 from typing import TYPE_CHECKING, Any, TypedDict
 
+import yaml
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
@@ -173,6 +174,7 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
         List of server endpoint configs for pyAVD
     """
     servers: dict[str, ServerEndpoint] = {}  # Group by remote device name
+    lag_adapters: dict[tuple[str, str], dict[str, Any]] = {}
 
     for edge in interfaces:
         interface = edge.node
@@ -233,22 +235,42 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
                             "adapters": [],
                         }
 
-                    # Build adapter config
-                    adapter: dict[str, Any] = {
-                        "endpoint_ports": [endpoint_port],
-                        "switch_ports": [switch_port],
-                        "switches": [hostname],
-                    }
-
-                    # Detect port-channel on the remote (server) endpoint
+                    # Detect port-channel on the remote server endpoint and
+                    # collapse all member links into one all-active adapter.
                     endpoint_lag = getattr(endpoint, "lag", None)
                     if endpoint_lag and endpoint_lag.node:
                         lag_node = endpoint_lag.node
-                        port_channel: dict[str, str] = {"mode": "active"}
+                        lag_name = lag_node.name.value if lag_node.name else "port-channel"
+                        adapter_key = (server_name, lag_name)
+                        adapter = lag_adapters.get(adapter_key)
+                        if adapter is None:
+                            adapter = {
+                                "endpoint_ports": [],
+                                "switch_ports": [],
+                                "switches": [],
+                                "ethernet_segment": {"short_esi": "auto"},
+                                "port_channel": {"mode": "active", "description": server_name},
+                            }
+                            lag_adapters[adapter_key] = adapter
+                            servers[server_name]["adapters"].append(adapter)
+
                         lacp_mode = getattr(lag_node, "lacp_mode", None)
                         if lacp_mode and lacp_mode.value:
-                            port_channel["mode"] = lacp_mode.value
-                        adapter["port_channel"] = port_channel
+                            adapter["port_channel"]["mode"] = lacp_mode.value
+                    else:
+                        adapter = {
+                            "endpoint_ports": [],
+                            "switch_ports": [],
+                            "switches": [],
+                        }
+                        servers[server_name]["adapters"].append(adapter)
+
+                    if endpoint_port not in adapter["endpoint_ports"]:
+                        adapter["endpoint_ports"].append(endpoint_port)
+                    if switch_port not in adapter["switch_ports"]:
+                        adapter["switch_ports"].append(switch_port)
+                    if hostname not in adapter["switches"]:
+                        adapter["switches"].append(hostname)
 
                     # Determine mode and add VLAN config
                     if tagged_vlans:
@@ -265,12 +287,29 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
                     # Add spanning tree portfast for server ports
                     adapter["spanning_tree_portfast"] = "edge"
 
-                    servers[server_name]["adapters"].append(adapter)
-
     return _sort_server_endpoints(servers)
 
 
 class GenerateAVDDeviceHostvar(InfrahubGenerator):
+    async def _filter_or_fetch_peers(
+        self,
+        *,
+        kind: str,
+        filter_name: str,
+        parent_id: str,
+        relationship: object,
+    ) -> list[Any]:
+        """Read related objects by reverse filter, falling back to relationship peers."""
+        try:
+            objects = await self.client.filters(kind=kind, **{filter_name: [parent_id]})
+        except (AttributeError, KeyError):
+            objects = []
+        if objects:
+            return objects
+
+        await relationship.fetch()
+        return [peer.peer for peer in relationship.peers]
+
     async def _build_tenants_hostvars(self, fabric_id: str) -> list[dict[str, Any]]:
         """Build AVD-compatible tenants structure from EVPN data.
 
@@ -292,11 +331,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 "mac_vrf_vni_base": tenant.mac_vrf_vni_base.value,
             }
 
-            # Fetch VRFs for this tenant
-            await tenant.vrfs.fetch()
+            # Infrahub object-load may populate the reverse side of Generic/Parent relationships
+            # without exposing peers from the tenant/VRF side in all server versions.
+            vrfs = await self._filter_or_fetch_peers(
+                kind="IpamVRF",
+                filter_name="tenant__ids",
+                parent_id=tenant.id,
+                relationship=tenant.vrfs,
+            )
             vrfs_list: list[dict[str, Any]] = []
-            for vrf_peer in tenant.vrfs.peers:
-                vrf = vrf_peer.peer
+            for vrf in vrfs:
                 vrf_data: dict[str, Any] = {"name": vrf.name.value}
 
                 vrf_vni = getattr(vrf, "vrf_vni", None)
@@ -310,11 +354,14 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                     if vtep_diag_ip and vtep_diag_ip.value:
                         vrf_data["vtep_diagnostic"]["loopback_ip_range"] = str(vtep_diag_ip.value)
 
-                # Fetch SVIs for this VRF
-                await vrf.svis.fetch()
+                svis = await self._filter_or_fetch_peers(
+                    kind="EvpnSvi",
+                    filter_name="vrf__ids",
+                    parent_id=vrf.id,
+                    relationship=vrf.svis,
+                )
                 svis_list: list[dict[str, Any]] = []
-                for svi_peer in vrf.svis.peers:
-                    svi = svi_peer.peer
+                for svi in svis:
                     svi_data: dict[str, Any] = {
                         "id": svi.svi_id.value,
                         "name": svi.name.value,
@@ -322,6 +369,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                     }
                     if svi.ip_address_virtual and svi.ip_address_virtual.value:
                         svi_data["ip_address_virtual"] = str(svi.ip_address_virtual.value)
+                    fabric_tags = getattr(svi, "fabric_tags", None)
+                    if fabric_tags and fabric_tags.value:
+                        svi_data["tags"] = fabric_tags.value
                     svis_list.append(svi_data)
 
                 if svis_list:
@@ -331,11 +381,14 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             if vrfs_list:
                 tenant_data["vrfs"] = vrfs_list
 
-            # Fetch L2 VLANs for this tenant
-            await tenant.l2vlans.fetch()
+            l2vlans = await self._filter_or_fetch_peers(
+                kind="EvpnL2Vlan",
+                filter_name="tenant__ids",
+                parent_id=tenant.id,
+                relationship=tenant.l2vlans,
+            )
             l2vlans_list: list[dict[str, Any]] = []
-            for l2v_peer in tenant.l2vlans.peers:
-                l2vlan = l2v_peer.peer
+            for l2vlan in l2vlans:
                 l2v_data: dict[str, Any] = {
                     "id": l2vlan.vlan_id.value,
                     "name": l2vlan.name.value,
@@ -496,6 +549,34 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return result
 
+    @classmethod
+    def _extract_custom_hostvars(cls, fabric: object) -> dict[str, Any]:
+        """Parse fabric-level custom pyAVD hostvars.
+
+        The current schema stores this as JSON to avoid the 4096-character Text
+        limit. Keep string parsing for compatibility with already-loaded data.
+        """
+        raw_value = cls._gql_val(fabric, "avd_custom_hostvars")
+        if not raw_value:
+            return {}
+
+        parsed = yaml.safe_load(raw_value) if isinstance(raw_value, str) else raw_value
+        if parsed is None:
+            return {}
+        if not isinstance(parsed, dict):
+            raise TypeError("avd_custom_hostvars must be a mapping")
+        return parsed
+
+    @classmethod
+    def _deep_merge(cls, base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+        """Recursively merge ``overlay`` into ``base`` and return ``base``."""
+        for key, value in overlay.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                cls._deep_merge(base[key], value)
+            else:
+                base[key] = value
+        return base
+
     @staticmethod
     def _extract_mlag_info(device: object) -> dict[str, Any]:
         """Extract MLAG domain info for a device, including peer names."""
@@ -576,6 +657,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
+        custom_hostvars: dict[str, Any],
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
         avd_type = get_avd_type(role)
@@ -583,6 +665,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Build node config
         node_config: dict[str, Any] = {"name": hostname}
+        if role == "spine":
+            node_config["structured_config"] = {"spanning_tree": {"mode": "none"}}
+        elif role == "leaf" and spanning_tree_mode:
+            spanning_tree_config: dict[str, Any] = {"mode": spanning_tree_mode}
+            if spanning_tree_mode == "mstp" and spanning_tree_priority is not None:
+                spanning_tree_config["mst_instances"] = [{"id": "0", "priority": spanning_tree_priority}]
+            node_config["structured_config"] = {"spanning_tree": spanning_tree_config}
         if node_id is not None:
             node_config["id"] = node_id
         is_mlag_leaf = bool(mlag_info.get("domain_id")) and role == "leaf"
@@ -708,6 +797,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if connected_endpoints:
             hostvars["servers"] = connected_endpoints
 
+        if custom_hostvars:
+            hostvars = GenerateAVDDeviceHostvar._deep_merge(hostvars, custom_hostvars)
+
         return hostvars
 
     async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
@@ -765,7 +857,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         virtual_router_mac = None if is_l2leaf else self._get_attr_value(fabric, "virtual_router_mac")
         underlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "underlay_routing_protocol")
         overlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "overlay_routing_protocol")
-        p2p_uplinks_mtu = None if is_l2leaf else self._get_attr_value(fabric, "p2p_uplinks_mtu")
+        # Auto-generated Pydantic model renames p2p_uplinks_mtu to p_2_p_uplinks_mtu
+        p2p_uplinks_mtu = (
+            None
+            if is_l2leaf
+            else (self._get_attr_value(fabric, "p_2_p_uplinks_mtu") or self._get_attr_value(fabric, "p2p_uplinks_mtu"))
+        )
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
         spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
         # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
@@ -783,6 +880,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract management settings from fabric (applies to all device types)
         management = self._extract_management_settings(fabric)
+        custom_hostvars = self._extract_custom_hostvars(fabric)
 
         # Extract configurable IP pools (not applicable for L2 leafs)
         if is_l2leaf:
@@ -841,6 +939,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
+            custom_hostvars=custom_hostvars,
         )
 
         # Validate hostvars against pyAVD schema before saving

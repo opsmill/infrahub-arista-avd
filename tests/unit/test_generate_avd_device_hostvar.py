@@ -60,6 +60,7 @@ def _base_hostvars(
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -296,6 +297,7 @@ async def test_tenants_hostvars_validate_against_pyavd():
         name=_attr("web"),
         enabled=_attr(True),
         ip_address_virtual=_attr("10.10.10.1/24"),
+        fabric_tags=_attr(["dc1"]),
     )
     vrf = SimpleNamespace(
         name=_attr("VRF1"),
@@ -306,6 +308,7 @@ async def test_tenants_hostvars_validate_against_pyavd():
     )
     l2vlan = SimpleNamespace(vlan_id=_attr(200), name=_attr("l2"), vni_override=_attr(20200))
     tenant = SimpleNamespace(
+        id="tenant-1",
         name=_attr("T1"),
         mac_vrf_vni_base=_attr(10000),
         vrfs=_rel([vrf]),
@@ -313,12 +316,29 @@ async def test_tenants_hostvars_validate_against_pyavd():
     )
 
     gen = _make_generator()
-    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    async def filters_side_effect(*, kind: str, **kwargs: object) -> list[object]:
+        if kind == "EvpnTenant":
+            return [tenant]
+        if kind == "IpamVRF":
+            assert kwargs == {"tenant__ids": ["tenant-1"]}
+            return [vrf]
+        if kind == "EvpnSvi":
+            assert kwargs == {"vrf__ids": [vrf.id]}
+            return [svi]
+        if kind == "EvpnL2Vlan":
+            assert kwargs == {"tenant__ids": ["tenant-1"]}
+            return [l2vlan]
+        return []
+
+    vrf.id = "vrf-1"
+    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
 
     tenants_data = await gen._build_tenants_hostvars("fabric-1")
 
     # The bug site: the l2vlan must use `vni_override`, not `vni`.
     assert tenants_data[0]["l2vlans"][0]["vni_override"] == 20200
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["tags"] == ["dc1"]
 
     hostvars = _base_hostvars(tenants_data)
     assert not validate_inputs(hostvars).validation_result.violations

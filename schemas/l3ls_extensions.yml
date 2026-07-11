@@ -101,6 +101,12 @@ extensions:
           default_value: false
           description: "Generate ANTA test catalogs for this fabric's devices."
           order_weight: 11300
+        - name: avd_custom_hostvars
+          label: AVD Custom Hostvars
+          kind: JSON
+          optional: true
+          description: "pyAVD hostvars merged into every device in this fabric"
+          order_weight: 11400
       relationships:
         - name: uplink_pool
           label: Uplink IP Pool

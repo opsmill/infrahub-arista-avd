@@ -195,6 +195,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   bgp_mlag_password {
                     value
                   }
+                  avd_custom_hostvars {
+                    value
+                  }
                   dns_servers {
                     edges {
                       node {
