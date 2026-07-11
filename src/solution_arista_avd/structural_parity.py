@@ -14,6 +14,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 import pyavd
 
@@ -158,7 +159,7 @@ async def _download_structured_configs(output_dir: Path) -> None:
     files = await client.all(kind=AvdStructuredConfigFile)
     await asyncio.to_thread(output_dir.mkdir, parents=True, exist_ok=True)
     for file_obj in files:
-        content = await file_obj.download_file()
+        content = await cast("Any", file_obj).download_file()
         name = getattr(file_obj, "name", None)
         filename = name.value if name and name.value else f"{file_obj.id}.json"
         output_path = output_dir / filename
