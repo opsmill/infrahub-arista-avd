@@ -1,171 +1,111 @@
-# Infrahub Arista AVD
+# Arista AVD Reference Design
 
-An Infrahub repository for datacenter infrastructure management. It models network fabric hierarchies (Fabric > Pod > Rack > Device) with full [Arista Validated Design (AVD)](https://avd.arista.com/) integration, automatic device generation, and configuration rendering.
+![CI](https://github.com/opsmill/infrahub-arista-avd/actions/workflows/ci.yml/badge.svg)
 
-## Documentation
+The Arista AVD Reference Design models a full Arista datacenter fabric in Infrahub — topology, addressing pools, EVPN configuration, and per-device intent as structured, queryable data. The whole team can browse, filter, and query the fabric through the web UI, GraphQL API, or MCP interface; every change runs through Infrahub branches and proposed changes, with a complete audit trail before it reaches a device.
 
-The documentation site lives under [`docs/`](./docs) and is split into two tracks:
+Designed for network automation teams running AVD with static variable files who need a shared source of truth, API access, and branch-based change control — and for teams evaluating how to operate AVD at scale without building the inventory-to-PyAVD translation layer themselves.
 
-- **[User Guide](https://opsmill.github.io/infrahub-arista-avd/user-guide/)** — for network engineers and operators. Quick start, first-fabric provisioning, service-portal how-tos, artifact viewing, troubleshooting.
-- **[Developer Guide](https://opsmill.github.io/infrahub-arista-avd/developer-guide/)** — for contributors. Architecture, schemas, generators, transforms, and a dedicated AVD Integration sub-section covering the two-phase pipeline, hostvars, role mapping, extending the integration, and debugging.
+## What It's For
 
-To build and preview locally:
-
-```bash
-cd docs
-npm install
-npm run start     # hot-reloading preview at http://localhost:3000/infrahub-arista-avd/
-npm run build     # production build; fails on any broken internal link
-```
+- **Generate a complete fabric from a design** — define topology parameters and addressing pools; generators create all super-spines, spines, and leaves, allocate loopback, interconnect, and management addresses, BGP ASNs, and node IDs, and cable devices together automatically.
+- **Render EOS device configurations and documentation** — PyAVD runs inside Infrahub workers and produces EOS CLI configurations, per-device and fabric-level Markdown documentation, and a cabling plan CSV as downloadable artifacts.
+- **Make day-two changes without rebuilding** — edit the design and regenerate; checksum-based idempotency applies changes only to affected objects; branch-aware pools prevent collisions across parallel work.
+- **Give other teams access to network data** — the fabric is queryable through the Infrahub Web UI, GraphQL API, and MCP interface; the Streamlit service portal provides guided workflows for stakeholders without API or CLI access.
+- **Track and review every change** — all changes run through Infrahub branches and proposed changes, with a full diff before any change reaches a device.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python package manager)
 - Python 3.11+
+- pyAVD ≥ 6.2.0 (bundled in the custom Docker image — no separate install required)
 
 ## Quick Start
 
-### 1. Install dependencies
-
 ```bash
+# Install Python dependencies, including pyAVD and the Infrahub SDK
 uv sync --all-packages
-```
 
-### 2. Build the custom Infrahub image
-
-The project extends the base Infrahub image with project-specific Python dependencies (pyAVD, etc.).
-
-```bash
+# Build the custom Infrahub image (extends the base image with pyAVD — run once)
 export INFRAHUB_BASE_VERSION=1.10.1
 uv run invoke build
-```
 
-### 3. Start all services
-
-This brings up Infrahub, Neo4j, PostgreSQL, Redis, RabbitMQ, the service catalog UI, and Semaphore.
-
-```bash
+# Start all services: Infrahub, Neo4j, PostgreSQL, Redis, RabbitMQ, service portal, Semaphore
 uv run invoke start
-```
 
-Wait for the services to become healthy. You can check status with:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.override.yml ps
-```
-
-### 4. Load schemas, menus, objects, and repository
-
-Once the Infrahub server is healthy (available at http://localhost:8000), load everything in one command:
-
-```bash
+# Load schemas, UI menu, seed data, register the repository, and load event triggers
 uv run invoke load
 ```
 
-This will, in order:
-1. Initialize Semaphore (automation runner)
-2. Load all schema definitions from `schemas/`
-3. Load the UI menu from `menus/`
-4. Load seed data from `objects/` (manufacturers, device types, IP pools, profiles, templates, fabrics, racks)
-5. Register this repository with Infrahub and wait for it to sync
-6. Load event triggers and rules from `triggers.yml`
+Open the Infrahub UI at `http://localhost:8000` and the service portal at `http://localhost:8501`.
 
-### 5. Create a branch
+Then follow [Provision Your First Fabric](#) to run the generator chain and reach rendered EOS artifacts.
 
-We'll work on a branch so changes stay isolated until you're ready to bring them into `main`. In the Infrahub UI: top-right branch selector → **+ Create branch**, name it `fabric-a-build`.
+## What You'll See
 
-You can also create a branch from the CLI with `uv run infrahubctl branch create fabric-a-build`, but you'll need to source `.envrc` first (or otherwise set `INFRAHUB_USERNAME`/`INFRAHUB_PASSWORD` or `INFRAHUB_API_TOKEN`). If you go that route, also switch the UI's branch selector to the new branch so subsequent UI actions are scoped to it.
+After `invoke load` completes and you run the generator chain on a fabric:
 
-### 6. Run the fabric generator
+1. **Seed data appears in the UI** — manufacturers, device types, addressing pools, device templates, two example fabrics (Fabric-A, Fabric-B) with pods and racks, and seed VLANs are loaded.
+2. **FabricGenerator runs** — super-spine devices appear on the branch, with loopback and management addresses allocated from pools.
+3. **PodGenerator and RackGenerator trigger automatically** — spine and leaf devices appear, cabled to their uplinks, with interconnect addresses, BGP ASNs, and node IDs assigned.
+4. **AVD generators run** — each device's PyAVD host_vars and structured configuration are stored as `AvdArtifact` graph objects.
+5. **Transforms produce artifacts** — EOS device configuration, per-device Markdown documentation, fabric documentation, and a cabling plan CSV are available as downloadable artifacts on each device and fabric object.
+6. **Propose and review** — open a proposed change from the branch; the UI shows a diff of every new object and the rendered artifacts for review before any configuration reaches production.
 
-On the new branch, in the Infrahub UI navigate to **Actions > Generator definitions > generate_fabric**, click the run button, and select a target fabric (e.g. `Fabric-A`).
+## What's Included
 
-This kicks off the generator chain:
-1. **FabricGenerator** creates super-spine devices
-2. **PodGenerator** creates spine devices per pod (triggered automatically)
-3. **RackGenerator** creates leaf devices per rack (triggered automatically)
-4. **AvdDeviceStructuredConfigGenerator** populates AVD structured configs
+- **Schemas** — 20 schema files covering the full fabric data model:
+  - Topology: NetworkFabric, NetworkPod, NetworkDevice, NetworkInterface, NetworkLink
+  - IPAM: prefixes and addresses with role tagging (loopback, interconnect, management, server)
+  - EVPN: tenants, VRFs, SVIs, L2 VLANs
+  - MLAG: domain and peer pool definitions
+  - AVD types: `AvdArtifact` for per-device hostvar and structured config tracking with checksums
+- **Generators** — six checksum-based, idempotent generators:
+  - FabricGenerator, PodGenerator, RackGenerator — device creation, addressing, and cabling
+  - GenerateAVDDeviceHostvar — assembles per-device PyAVD input from the source of truth
+  - AvdDeviceStructuredConfigGenerator — runs PyAVD to produce structured configuration
+  - GenerateServerCabling — handles server attachment
+- **Transforms** — render structured data into downloadable artifacts:
+  - EOS device configuration (via PyAVD, running inside Infrahub workers)
+  - Per-device and fabric-level Markdown documentation
+  - Cabling plan CSV
+  - ANTA test catalogs — generation ships; test execution is on the roadmap
+  - Computed interface descriptions
+- **Seed data** — manufacturers, device types, addressing and number pools (loopback, interconnect, management, ASN, node ID), device profiles and templates, two example fabrics with pods and racks, and seed VLANs.
+- **Service portal** — Streamlit application with guided day-2 workflows:
+  - Add network segment (VRF, VLAN, SVI)
+  - Provision server into a rack
+  - Create EVPN tenant
+  - Fabric Design visualization (topology, cabling, settings, EVPN)
+- **Stack** — Docker Compose extending Infrahub 1.10.1 with pyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
 
-When the chain finishes, the branch contains the new devices, hostvar files, and structured-config files.
+| File | What it does |
+|------|-------------|
+| `.infrahub.yml` | Registers all generators, transforms, queries, and artifact definitions with Infrahub |
+| `schemas/` | YAML schema definitions for the full data model |
+| `generators/` | Python generators (fabric, pod, rack, AVD hostvars, structured config, server cabling) |
+| `transforms/` | Python and Jinja2 transforms (EOS config, docs, cabling plan, ANTA catalog, interface descriptions) |
+| `objects/` | Seed YAML (manufacturers, device types, pools, profiles, templates, fabrics, racks, VLANs) |
+| `triggers.yml` | Event trigger rules wiring schema changes to generator runs |
+| `service_catalog/` | Streamlit service portal |
+| `docker-compose.yml` | Stack definition; docker-compose.override.yml adds the portal and Semaphore |
+| `Dockerfile` | Custom Infrahub image with pyAVD |
+| `tasks.py` | Invoke task definitions (build, start, stop, load, lint, test) |
 
-### 7. Render the AVD artifacts
+> **Note:** Brownfield import (modeling an existing fabric and importing configurations via Infrahub Sync) is available in a guided engagement today — it is not yet a self-serve path.
 
-The per-device AVD artifacts (EOS configs, device documentation) can be rendered manually from a device's **Artifacts** tab (click **Regenerate**), or — recommended for a full review — open a proposed change from the branch and the CI pipeline renders them for every device in one step. See [Provision Your First Fabric](docs/docs/user-guide/provision-first-fabric.md) for the full walkthrough.
+## Documentation
 
-## Services
+| | |
+|--|--|
+| **Provision a fabric end-to-end** | [Provision Your First Fabric](#) — step-by-step walkthrough from seed data to rendered EOS artifacts |
+| **Use the service portal** | [Get Started](#) — day-two workflows, how-to guides, troubleshooting |
+| **Understand the generator pipeline** | [Architecture Overview](#) — system components, data model, and generator chain |
+| **Understand the AVD pipeline** | [AVD Pipeline Overview](#) — two-phase pipeline, hostvars reference, role mapping |
+| **Extend the integration** | [Extending the Integration](#) — new device roles, transform outputs, schema fields |
+| **Debug pipeline issues** | [Debugging the Pipeline](#) — intermediate-file inspection, single-generator re-runs, common failure modes |
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| Infrahub UI | http://localhost:8000 | Main web interface |
-| Service Catalog | http://localhost:8501 | Streamlit-based service catalog |
-| Semaphore | http://localhost:3000 | Ansible automation runner (admin / semaphore) |
-| Neo4j Browser | http://localhost:7474 | Graph database browser |
+## About Infrahub
 
-## Service Portal
-
-The Service Portal is a Streamlit application available at http://localhost:8501 that provides a self-service interface for common datacenter operations. All changes made through the portal are created on a branch and submitted as a proposed change for review.
-
-### Dashboard
-
-The home page shows an overview of your fabrics, EVPN tenants, VRFs, and device counts. Use the branch selector in the sidebar to view resources on different branches.
-
-### Add Network Segment
-
-Creates a new EVPN network segment (VRF + VLAN + SVI) on a target fabric. The workflow:
-1. Select a tenant, fabric, and L2 domain
-2. Provide a VLAN ID, VRF name, VNI, and gateway IP
-3. The portal creates a branch, provisions the objects, runs the AVD generators, and opens a proposed change
-
-### Add Server
-
-Provisions a new physical server into a compute rack. Select a rack and server template, and the portal handles branch creation, server provisioning, cabling generation, and proposed change creation.
-
-### Create Tenant
-
-Creates a new EVPN tenant with a MAC VRF VNI base allocation on one or more fabrics. After creation, network segments can be added to the tenant.
-
-### Fabric Design
-
-An interactive visualization of the fabric topology with four tabs:
-- **Design Topology** -- hierarchical view of the fabric (pods, racks, devices)
-- **Cabling Topology** -- physical cabling map showing device interconnections
-- **Fabric Settings** -- underlay/overlay protocols, MTU, spanning tree config
-- **EVPN Tenants** -- tenant VRFs, SVIs, and L2 VLANs
-
-From this page you can also trigger a full fabric generation (devices, cabling, hostvars, structured configs) directly from the UI.
-
-## Available Commands
-
-All commands use [Invoke](https://www.pyinvoke.org/) and should be run from the repository root.
-
-| Command | Description |
-|---------|-------------|
-| `uv run invoke start` | Start all services in detached mode |
-| `uv run invoke stop` | Stop containers and remove networks |
-| `uv run invoke destroy` | Stop and remove containers, networks, and volumes |
-| `uv run invoke restart` | Restart all services (or `uv run invoke restart --component=<name>` for one) |
-| `uv run invoke load` | Load schemas, menus, objects, repository, and triggers |
-| `uv run invoke load-schema` | Load schema definitions only |
-| `uv run invoke load-menu` | Load UI menus only |
-| `uv run invoke build` | Build the custom Docker image |
-| `uv run invoke init-semaphore` | Seed Semaphore with project, repo, inventory, and task template |
-| `uv run invoke format` | Format Python code with ruff |
-| `uv run invoke lint` | Run all linters (yamllint, ruff, mypy) |
-| `uv run invoke test` | Run the test suite |
-
-## Running Tests
-
-```bash
-pytest tests               # All tests
-pytest tests/unit          # Unit tests only
-pytest tests/integration   # Integration tests (requires running Infrahub)
-```
-
-## Teardown
-
-To stop and remove all containers, networks, and volumes:
-
-```bash
-uv run invoke destroy
-```
+[Infrahub](https://github.com/opsmill/infrahub) is an open source infrastructure data management and automation platform (Apache 2.0), developed by [OpsMill](https://opsmill.com). It gives infrastructure and network teams a unified, schema-driven source of truth for all infrastructure data — devices, topology, IP space, configuration — with built-in version control, a generator framework for automation, and native integrations with Git, Ansible, Terraform, and CI/CD pipelines.
