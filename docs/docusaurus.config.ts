@@ -2,13 +2,16 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
+const siteUrl = process.env.DOCUSAURUS_URL ?? 'https://opsmill.github.io';
+const baseUrl = process.env.DOCUSAURUS_BASE_URL ?? '/infrahub-arista-avd/';
+
 const config: Config = {
   title: 'Infrahub Arista AVD',
   tagline: 'AI datacenter infrastructure management with Infrahub and Arista Validated Design',
   favicon: 'img/favicon.ico',
 
-  url: 'https://opsmill.github.io',
-  baseUrl: '/infrahub-arista-avd/',
+  url: siteUrl,
+  baseUrl,
 
   organizationName: 'opsmill',
   projectName: 'infrahub-arista-avd',
@@ -48,13 +51,18 @@ const config: Config = {
         configureWebpack() {
           return {
             ignoreWarnings: [
-              (warning) =>
-                /vscode-languageserver-types/.test(
-                  warning.module?.resource ?? '',
-                ) &&
-                /Critical dependency: require function is used/.test(
-                  warning.message ?? '',
-                ),
+              (warning) => {
+                const resource =
+                  (warning.module as {resource?: string} | undefined)
+                    ?.resource ?? '';
+
+                return (
+                  /vscode-languageserver-types/.test(resource) &&
+                  /Critical dependency: require function is used/.test(
+                    warning.message ?? '',
+                  )
+                );
+              },
             ],
           };
         },
