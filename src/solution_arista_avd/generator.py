@@ -9,6 +9,8 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
 from .protocols import DcimDevice, DcimInterface
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from infrahub_sdk import InfrahubClient
 
     from .protocols import LocationRack, NetworkPod
@@ -176,33 +178,60 @@ async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> b
     return True
 
 
-async def _trigger_generator(client: InfrahubClient, name: str) -> None:
-    """Trigger a generator by name via CoreGeneratorDefinition mutation."""
+async def _trigger_generator(client: InfrahubClient, name: str, nodes: Sequence[str] | None = None) -> None:
+    """Trigger a generator by name via CoreGeneratorDefinition mutation.
+
+    When ``nodes`` is provided, Infrahub runs the generator only for those target
+    node IDs. Omitting ``nodes`` preserves the previous global trigger behavior.
+    """
     generator_defs = await client.filters(kind="CoreGeneratorDefinition", name__value=name)
     if not generator_defs:
         logger.error("Could not find CoreGeneratorDefinition '%s'", name)
         return
 
     generator_def = generator_defs[0]
-    logger.info("Triggering %s via CoreGeneratorDefinitionRun for %s", name, generator_def.id)
+    logger.info("Triggering %s via CoreGeneratorDefinitionRun for %s with nodes=%s", name, generator_def.id, nodes)
+
+    if nodes is None:
+        await client.execute_graphql(
+            query="""
+            mutation RunGenerator($id: String!) {
+                CoreGeneratorDefinitionRun(data: { id: $id }) {
+                    ok
+                }
+            }
+            """,
+            variables={"id": generator_def.id},
+        )
+        return
 
     await client.execute_graphql(
         query="""
-        mutation RunGenerator($id: String!) {
-            CoreGeneratorDefinitionRun(data: { id: $id }) {
+        mutation RunGenerator($id: String!, $nodes: [String!]) {
+            CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
                 ok
             }
         }
         """,
-        variables={"id": generator_def.id},
+        variables={"id": generator_def.id, "nodes": list(nodes)},
     )
 
 
-async def trigger_hostvar_generation(client: InfrahubClient) -> None:
-    """Trigger the hostvar generator via CoreGeneratorDefinition mutation."""
-    await _trigger_generator(client, "generate-avd-device-hostvar")
+async def trigger_pod_generation(client: InfrahubClient, nodes: Sequence[str] | None = None) -> None:
+    """Trigger the pod generator, optionally constrained to pod node IDs."""
+    await _trigger_generator(client, "generate-pod", nodes=nodes)
 
 
-async def trigger_structured_config_generation(client: InfrahubClient) -> None:
-    """Trigger the structured config generator via CoreGeneratorDefinition mutation."""
-    await _trigger_generator(client, "generate-avd-device-structured-config")
+async def trigger_rack_generation(client: InfrahubClient, nodes: Sequence[str] | None = None) -> None:
+    """Trigger the rack generator, optionally constrained to rack node IDs."""
+    await _trigger_generator(client, "generate-rack", nodes=nodes)
+
+
+async def trigger_hostvar_generation(client: InfrahubClient, nodes: Sequence[str] | None = None) -> None:
+    """Trigger the hostvar generator, optionally constrained to device node IDs."""
+    await _trigger_generator(client, "generate-avd-device-hostvar", nodes=nodes)
+
+
+async def trigger_structured_config_generation(client: InfrahubClient, nodes: Sequence[str] | None = None) -> None:
+    """Trigger the structured config generator, optionally constrained to fabric node IDs."""
+    await _trigger_generator(client, "generate-avd-device-structured-config", nodes=nodes)

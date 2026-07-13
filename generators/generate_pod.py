@@ -11,6 +11,7 @@ from solution_arista_avd.cabling import build_pod_cabling_plan, connect_interfac
 from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
 
+from .generation_state import get_racks_needing_generation, trigger_rack_generation
 from .pod_generator_query import PodGeneratorQuery
 
 if TYPE_CHECKING:
@@ -109,7 +110,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         if self.fabric_amount_of_super_spines > 0:
             await self.connect_spine_to_super_spine()
 
-        await self.update_checksum()
+        changed_rack_ids = await self.update_checksum()
+        await self.recover_preseeded_racks(changed_rack_ids=changed_rack_ids or [])
 
     async def create_spine_switches(self) -> None:
         """Create the spine switches"""
@@ -207,8 +209,22 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
         await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)
 
-    async def update_checksum(self) -> None:
+    async def recover_preseeded_racks(self, *, changed_rack_ids: list[str]) -> None:
+        """Explicitly recover unchanged pre-seeded racks whose generated state is incomplete."""
+        racks_needing_generation = await get_racks_needing_generation(
+            self.client, self.pod_id, exclude_rack_ids=changed_rack_ids
+        )
+        if not racks_needing_generation:
+            self.logger.info("Pod %s racks are complete or already triggered normally", self.pod_name)
+            return
+
+        self.logger.info("Triggering targeted rack generation for recovered racks: %s", racks_needing_generation)
+        await trigger_rack_generation(self.client, nodes=racks_needing_generation)
+
+    async def update_checksum(self) -> list[str]:
         racks = await self.client.filters(kind=LocationRack, pod__ids=[self.pod_id])
+
+        changed_rack_ids: list[str] = []
 
         # store the checksum for the fabric in the object itself
         checksum = self.calculate_checksum()
@@ -220,4 +236,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 # context, otherwise generator cleanup can treat those input
                 # objects as pod-generated outputs.
                 await rack.save(allow_upsert=True, update_group_context=False)
+                changed_rack_ids.append(rack.id)
                 self.logger.info(f"Rack {rack.name.value} has been updated to checksum {checksum}")
+
+        return changed_rack_ids

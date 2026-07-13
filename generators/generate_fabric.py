@@ -7,6 +7,13 @@ from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvar
 from solution_arista_avd.protocols import DcimDevice, NetworkPod
 
 from .fabric_generator_query import FabricGeneratorQuery
+from .generation_state import (
+    get_fabric_avd_generation_state,
+    get_pods_needing_generation,
+    trigger_hostvar_generation,
+    trigger_pod_generation,
+    trigger_structured_config_generation,
+)
 
 
 class FabricGenerator(InfrahubGenerator, GeneratorMixin):
@@ -39,7 +46,8 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.create_super_spine_switches()
 
-        await self.update_checksum()
+        changed_pod_ids = await self.update_checksum()
+        await self.recover_preseeded_state(changed_pod_ids=changed_pod_ids or [])
 
     async def create_super_spine_switches(self) -> None:
         if self.amount_of_super_spines == 0:
@@ -99,8 +107,50 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         )
         await self.loopback_pool.save(allow_upsert=True)
 
-    async def update_checksum(self) -> None:
+    async def recover_preseeded_state(self, *, changed_pod_ids: list[str]) -> None:
+        """Explicitly recover unchanged pre-seeded pods/racks or missing AVD generated state."""
+        if changed_pod_ids:
+            self.logger.info(
+                "Skipping explicit pre-seeded recovery for %s because %s pods changed checksum and will trigger normally",
+                self.fabric_name,
+                len(changed_pod_ids),
+            )
+            return
+
+        pods_needing_generation = await get_pods_needing_generation(self.client, self.fabric_id)
+        if pods_needing_generation:
+            self.logger.info("Triggering targeted pod generation for recovered pods: %s", pods_needing_generation)
+            await trigger_pod_generation(self.client, nodes=pods_needing_generation)
+            return
+
+        avd_state = await get_fabric_avd_generation_state(self.client, self.fabric_id)
+        if not avd_state.has_devices:
+            self.logger.info("Fabric %s has no generated devices yet; skipping AVD recovery", self.fabric_name)
+            return
+
+        if avd_state.missing_hostvar_device_ids:
+            self.logger.info(
+                "Triggering targeted hostvar generation for devices missing AVD artifacts/hostvars: %s",
+                avd_state.missing_hostvar_device_ids,
+            )
+            await trigger_hostvar_generation(self.client, nodes=avd_state.missing_hostvar_device_ids)
+            return
+
+        if avd_state.missing_structured_config_device_ids:
+            self.logger.info(
+                "Triggering targeted structured config generation for fabric %s; devices missing structured config: %s",
+                self.fabric_id,
+                avd_state.missing_structured_config_device_ids,
+            )
+            await trigger_structured_config_generation(self.client, nodes=[self.fabric_id])
+            return
+
+        self.logger.info("Fabric %s topology and AVD generated state are complete", self.fabric_name)
+
+    async def update_checksum(self) -> list[str]:
         pods = await self.client.filters(kind=NetworkPod, parent__ids=[self.fabric_id])
+
+        changed_pod_ids: list[str] = []
 
         # store the checksum for the fabric in the object itself
         fabric_checksum = self.calculate_checksum()
@@ -112,4 +162,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
                 # context, otherwise generator cleanup can treat those input
                 # objects as fabric-generated outputs.
                 await pod.save(allow_upsert=True, update_group_context=False)
+                changed_pod_ids.append(pod.id)
                 self.logger.info(f"Pod {pod.name.value} has been updated to checksum {fabric_checksum}")
+
+        return changed_pod_ids
