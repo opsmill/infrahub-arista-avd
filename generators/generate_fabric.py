@@ -12,7 +12,7 @@ from .fabric_generator_query import FabricGeneratorQuery
 class FabricGenerator(InfrahubGenerator, GeneratorMixin):
     fabric_name: str
     fabric_id: str
-    fabric_super_spine_switch_template: str
+    fabric_super_spine_switch_template: str | None
 
     loopback_pool: CoreIPAddressPool
     asn_pool: CoreNumberPool | None
@@ -24,8 +24,9 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
 
         self.fabric_name = data.network_fabric.edges[0].node.name.value.lower()
         self.fabric_id = data.network_fabric.edges[0].node.id
-        self.fabric_super_spine_switch_template = data.network_fabric.edges[0].node.super_spine_switch_template.node.id
         self.amount_of_super_spines = data.network_fabric.edges[0].node.amount_of_super_spines.value
+        super_spine_template = data.network_fabric.edges[0].node.super_spine_switch_template.node
+        self.fabric_super_spine_switch_template = super_spine_template.id if super_spine_template else None
         await set_fabric_avd_hostvars_ready(self.client, self.fabric_id, False)
         self.super_spine_devices: list[DcimDevice] = []
 
@@ -41,6 +42,14 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         await self.update_checksum()
 
     async def create_super_spine_switches(self) -> None:
+        if self.amount_of_super_spines == 0:
+            self.logger.info("Skipping super-spine creation for %s: amount_of_super_spines is 0", self.fabric_name)
+            return
+
+        if not self.fabric_super_spine_switch_template:
+            msg = f"Cannot create super-spines for {self.fabric_name}: no super-spine switch template defined!"
+            raise ValueError(msg)
+
         fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
 
         for idx in range(1, self.amount_of_super_spines + 1):
@@ -98,5 +107,9 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         for pod in pods:
             if pod.checksum.value != fabric_checksum:
                 pod.checksum.value = fabric_checksum
-                await pod.save(allow_upsert=True)
+                # This update is only a trigger signal for the pod generator.
+                # Do not add pre-seeded pods to FabricGenerator's tracking
+                # context, otherwise generator cleanup can treat those input
+                # objects as fabric-generated outputs.
+                await pod.save(allow_upsert=True, update_group_context=False)
                 self.logger.info(f"Pod {pod.name.value} has been updated to checksum {fabric_checksum}")
