@@ -1,11 +1,11 @@
 ---
-title: Extending the Integration
+title: Extending the Pipeline
 description: Worked examples for adding a device role, adding a transform output, or adding a hostvar field.
 audience: developer
 sidebar_position: 6
 ---
 
-# Extending the Integration
+# Extending the Pipeline
 
 :::info Developer Guide
 This page is part of the developer guide. The touch-point lists below give you the exact files to edit for the three most common extensions.

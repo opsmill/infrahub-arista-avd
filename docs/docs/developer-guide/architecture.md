@@ -8,7 +8,7 @@ sidebar_position: 1
 # Architecture Overview
 
 :::info Developer Guide
-This page is part of the developer guide. It assumes familiarity with Infrahub and Python. If you only want to *use* the system, switch to the [user guide](/user-guide/).
+This page is part of the developer guide. It assumes familiarity with Infrahub and Python. If you only want to *use* the system, switch to [Quick Start](/quick-start).
 :::
 
 This document describes the system architecture of the AVD Workshop Infrahub solution.

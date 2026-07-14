@@ -64,4 +64,4 @@ The role mapping is exercised by:
 
 ## Adding a new role
 
-See [Extending the Integration → Add a new device role](./extending.md#add-a-new-device-role).
+See [Extending the Pipeline → Add a new device role](./extending.md#add-a-new-device-role).

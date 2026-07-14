@@ -8,7 +8,7 @@ sidebar_position: 3
 # Generators
 
 :::info Developer Guide
-This page is part of the developer guide. It explains how the generators are structured. To *run* generators as an operator, switch to the [user guide](/user-guide/).
+This page is part of the developer guide. It explains how the generators are structured. To *run* generators as an operator, switch to [Quick Start](/quick-start).
 :::
 
 This document describes the infrastructure generators in this solution.
@@ -321,7 +321,7 @@ generators/
   - [`generators/generate_fabric.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_fabric.py) — `FabricGenerator`.
   - [`generators/generate_pod.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_pod.py) — `PodGenerator`.
   - [`generators/generate_rack.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_rack.py) — `RackGenerator`.
-- AVD generators (documented in detail in the [AVD Integration sub-section](./avd/overview.md)):
+- AVD generators (documented in detail in the [AVD Pipeline sub-section](./avd/overview.md)):
   - [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) — `GenerateAVDDeviceHostvar`.
   - [`generators/generate_avd_device_structured_config.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_structured_config.py) — `AvdDeviceStructuredConfigGenerator`.
 - Registration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — `generator_definitions:` block.

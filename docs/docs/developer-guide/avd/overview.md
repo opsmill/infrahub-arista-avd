@@ -1,22 +1,22 @@
 ---
-title: AVD Integration Overview
+title: AVD Pipeline Overview
 description: The two-phase AVD generator pipeline, the pyAVD version pinned, and the shape of the data flow.
 audience: developer
 sidebar_position: 1
 ---
 
-# AVD Integration Overview
+# AVD Pipeline Overview
 
 :::info Developer Guide
-This page is part of the developer guide. If you want to *use* the system to produce configs, switch to the [user guide](/user-guide/).
+This page is part of the developer guide. If you want to *use* the system to produce configs, switch to [Quick Start](/quick-start).
 :::
 
-The Arista Validated Design (AVD) integration transforms Infrahub's network data model into pyAVD-compatible input data, then renders Arista EOS configurations and human-readable documentation from it.
+The Arista Validated Design (AVD) pipeline transforms Infrahub's network data model into pyAVD-compatible input data, then renders Arista EOS configurations and human-readable documentation from it.
 
 ## pyAVD version
 
 :::warning Version-sensitive
-The integration targets **pyavd >= 5.0.0** (pinned in [`pyproject.toml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/pyproject.toml)).
+The pipeline targets **pyavd >= 5.0.0** (pinned in [`pyproject.toml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/pyproject.toml)).
 
 The following sections are version-sensitive — review them when upgrading pyAVD:
 
@@ -105,5 +105,5 @@ See [Transforms](./transforms.md) for the full transform-by-transform reference.
 - [AvdArtifact & File Storage](./artifacts.md) — schema, relationships, and how Phase 1 and Phase 2 share data.
 - [Role Mapping](./role-mapping.md) — Infrahub roles → AVD device types.
 - [Transforms](./transforms.md) — detailed transform-by-transform breakdown.
-- [Extending the Integration](./extending.md) — worked examples for adding roles, transform outputs, or hostvar fields.
+- [Extending the Pipeline](./extending.md) — worked examples for adding roles, transform outputs, or hostvar fields.
 - [Debugging the Pipeline](./debugging.md) — object-store inspection, forced regeneration, single-generator re-runs.

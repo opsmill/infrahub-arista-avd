@@ -8,7 +8,7 @@ sidebar_position: 4
 # Transforms
 
 :::info Developer Guide
-This page is part of the developer guide. It documents the transform implementations. To *view* artifacts as an operator, switch to the [user guide](/user-guide/).
+This page is part of the developer guide. It documents the transform implementations. To *view* artifacts as an operator, switch to [Viewing Artifacts](/viewing-artifacts).
 :::
 
 This document describes the data transforms and artifact generation in this solution.

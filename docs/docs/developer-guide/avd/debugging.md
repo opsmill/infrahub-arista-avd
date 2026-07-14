@@ -8,7 +8,7 @@ sidebar_position: 7
 # Debugging the Pipeline
 
 :::info Developer Guide
-This page is part of the developer guide. For operator-facing issues (stack health, generator order, "no structured config available") switch to the [user guide troubleshooting page](/user-guide/troubleshooting).
+This page is part of the developer guide. For operator-facing issues (stack health, generator order, "no structured config available") switch to the [Troubleshooting page](/troubleshooting).
 :::
 
 ## Inspecting hostvars and structured configs
@@ -149,4 +149,4 @@ uv run invoke restart --component=infrahub-server
 
 - [Overview](./overview.md) — the pipeline shape at a glance.
 - [AvdArtifact & File Storage](./artifacts.md) — exactly which node holds which piece of data.
-- [User guide troubleshooting](/user-guide/troubleshooting) — operator-level issues and fixes.
+- [Troubleshooting](/troubleshooting) — operator-level issues and fixes.
