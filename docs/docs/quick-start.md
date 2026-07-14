@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # Quick Start
 
-This page takes you from a fresh clone to a running Infrahub instance with seed data loaded. After this, see [Provision Your First Fabric](./provision-first-fabric.md) to generate devices, configurations, and AVD artifacts.
+The steps below take you from a fresh clone to a running Infrahub instance with seed data loaded. After this, see [Provision Your First Fabric](./provision-first-fabric.md) to generate devices, configurations, and AVD artifacts.
 
 ## Prerequisites
 
@@ -82,10 +82,10 @@ This runs, in order:
 
 Open the Infrahub UI at **`http://localhost:8000`** and log in. You should see:
 
-- **Organization → Manufacturer**: Arista, Dell, and other manufacturers.
-- **Network → NetworkFabric**: `Fabric-A` and `Fabric-B` with their pods.
-- **Location → LocationRack**: pre-defined racks per pod.
-- **IPAM → IpamIPPrefix**: the fabric supernet, per-fabric prefix pools, ASN/Node ID pools.
+- **Devices → Types & Models → Manufacturers**: Arista, Dell, and other manufacturers.
+- **Fabric Design → Fabrics**: `Fabric-A` and `Fabric-B` with their pods.
+- **Locations → Racks**: pre-defined racks per pod.
+- **IPAM → Prefixes**: the fabric supernet and per-fabric prefix pools.
 
 If you don't see these, re-run `uv run invoke load` or see [Common Issues](./troubleshooting.md).
 

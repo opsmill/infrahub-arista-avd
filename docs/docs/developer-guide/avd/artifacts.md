@@ -8,7 +8,7 @@ sidebar_position: 4
 # AvdArtifact & File Storage
 
 :::info Developer Guide
-This page is part of the developer guide. It documents the graph schema that links the two pipeline phases.
+Documents the graph schema that links the two pipeline phases.
 :::
 
 The AVD pipeline stores its intermediate data — hostvars and structured configs — in Infrahub as **graph nodes**, not in an external object store. Three schema kinds are involved, all defined in [`schemas/objects/objects.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/objects/objects.yml).
@@ -111,7 +111,7 @@ Same shape as `AvdHostvarFile`, for the structured-config JSON:
 
 ```mermaid
 flowchart LR
-    ND[NetworkDevice]
+    ND[DcimDevice]
     AA[AvdArtifact]
     HF[AvdHostvarFile]
     SCF[AvdStructuredConfigFile]
@@ -142,7 +142,7 @@ Generators avoid re-writing unchanged files by comparing SHA256 checksums:
 4. If the checksums match, skip the write.
 5. If they differ, replace the file.
 
-The checksum is computed **in-memory per run** — it is not a custom attribute on `AvdArtifact`. This keeps the schema simple and lets Infrahub handle file-level checksumming via `CoreFileObject`.
+The checksum is computed **in-memory per run** — it is not a custom attribute on `AvdArtifact`. This keeps the schema minimal and lets Infrahub handle file-level checksumming via `CoreFileObject`.
 
 ## Artifact definitions
 
@@ -171,7 +171,7 @@ When an operator opens one of these artifacts in the UI, Infrahub runs the trans
 
 ## Target groups
 
-- `avd_devices` — all `NetworkDevice` nodes that should participate in AVD. Populated by upstream generators (e.g. `generate-rack` adds newly-created leaves to the group).
+- `avd_devices` — all `DcimDevice` nodes that should participate in AVD. Populated by upstream generators (e.g. `generate-rack` adds newly-created leaves to the group).
 - `fabrics` — all `NetworkFabric` nodes.
 
 Group membership is set by the generators at creation time; there is no separate "add to group" step in the AVD pipeline itself.

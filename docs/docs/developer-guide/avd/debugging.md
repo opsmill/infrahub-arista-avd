@@ -8,7 +8,7 @@ sidebar_position: 7
 # Debugging the Pipeline
 
 :::info Developer Guide
-This page is part of the developer guide. For operator-facing issues (stack health, generator order, "no structured config available") switch to the [Troubleshooting page](/troubleshooting).
+For operator-facing issues (stack health, generator order, "no structured config available"), see the [Troubleshooting page](/troubleshooting).
 :::
 
 ## Inspecting hostvars and structured configs

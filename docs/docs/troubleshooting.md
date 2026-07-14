@@ -7,7 +7,7 @@ sidebar_position: 6
 
 # Common Issues
 
-This page covers the failure modes operators hit most often. If your problem isn't here, the [developer guide](/developer-guide/) has deeper debugging material for contributors.
+The failure modes below are the ones you'll hit most often. If your problem isn't here, the [developer guide](/developer-guide/) has deeper debugging material for contributors.
 
 ## Stack is not healthy
 
@@ -77,7 +77,7 @@ uv run invoke load
 
 This is idempotent and re-registers triggers.
 
-If the generators already ran out of order and left partial data, the easiest fix is to discard the branch (Infrahub UI → Branches → your branch → Delete) and re-run from a fresh branch.
+If the generators already ran out of order and left partial data, the cleanest fix is to discard the branch (Infrahub UI → Branches → your branch → Delete) and re-run from a fresh branch.
 
 ## Missing seed data
 
@@ -85,7 +85,7 @@ If the generators already ran out of order and left partial data, the easiest fi
 
 - Running the fabric generator returns an error about missing IP pools, ASN pools, or device templates.
 - The fabrics list is empty.
-- Manufacturer or DeviceType lookups fail.
+- Manufacturer or device-type lookups fail.
 
 **Diagnose**
 
@@ -93,10 +93,10 @@ Open the Infrahub UI and check each of these lists is populated:
 
 | Menu | Expected |
 |------|----------|
-| Organization → Manufacturer | Arista, Dell, and others |
-| Network → DeviceType | Arista models (7050-CX3, etc.) |
-| Network → NetworkFabric | `Fabric-A` and `Fabric-B` |
-| IPAM → IpamIPPrefix | supernet and per-fabric pools |
+| Devices → Types & Models → Manufacturers | Arista, Dell, and others |
+| Devices → Types & Models → Device Types | Arista models (7050-CX3, etc.) |
+| Fabric Design → Fabrics | `Fabric-A` and `Fabric-B` |
+| IPAM → Prefixes | supernet and per-fabric pools |
 
 If any are empty, seed data did not load.
 

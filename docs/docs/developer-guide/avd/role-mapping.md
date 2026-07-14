@@ -8,10 +8,10 @@ sidebar_position: 5
 # Role Mapping
 
 :::info Developer Guide
-This page is part of the developer guide. Role names are **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
+Role names are **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
 :::
 
-Infrahub's `NetworkDevice.role.value` is a string enum that the hostvars generator maps to a PyAVD `type`. The mapping lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py):
+Infrahub's `DcimDevice.role.value` is a string enum that the hostvars generator maps to a PyAVD `type`. The mapping lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py):
 
 ## Table
 

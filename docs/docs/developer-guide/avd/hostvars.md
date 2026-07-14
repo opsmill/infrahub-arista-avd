@@ -8,21 +8,21 @@ sidebar_position: 2
 # Hostvars Reference
 
 :::info Developer Guide
-This page is part of the developer guide. Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
+Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
 :::
 
-This page documents the PyAVD hostvars dict that [`generate-avd-device-hostvar`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) produces for each `NetworkDevice`. The dict is serialised to JSON and stored as an `AvdHostvarFile` attached to the device's `AvdArtifact` (see [AvdArtifact & File Storage](./artifacts.md)).
+[`generate-avd-device-hostvar`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) builds the PyAVD hostvars dict below for each `DcimDevice`. The dict is serialised to JSON and stored as an `AvdHostvarFile` attached to the device's `AvdArtifact` (see [AvdArtifact & File Storage](./artifacts.md)).
 
 ## Top-level fields (all roles)
 
 | Field | Type | Source | Notes |
 |-------|------|--------|-------|
-| `type` | string | Role-mapped from `NetworkDevice.role.value` | See [Role Mapping](./role-mapping.md). |
+| `type` | string | Role-mapped from `DcimDevice.role.value` | See [Role Mapping](./role-mapping.md). |
 | `fabric_name` | string | `NetworkFabric.name.value` | |
-| `id` | int | `NetworkDevice.node_id.value` | Fabric-unique device identifier. |
-| `bgp_as` | string | `NetworkDevice.bgp_asn.value` | Stringified; PyAVD expects a string. |
-| `loopback_ipv4_address` | string | `NetworkDevice.loopback_ip` | Optional; stripped of CIDR. |
-| `mgmt_ip` | string | `NetworkDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
+| `id` | int | `DcimDevice.node_id.value` | Fabric-unique device identifier. |
+| `bgp_as` | string | `DcimDevice.bgp_asn.value` | Stringified; PyAVD expects a string. |
+| `loopback_ipv4_address` | string | `DcimDevice.loopback_ip` | Optional; stripped of CIDR. |
+| `mgmt_ip` | string | `DcimDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |
 
 The builder for these basics lives in [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) as `_build_hostvars()`. (The role→AVD-type mapping it uses, `ROLE_TO_AVD_TYPE`, lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py).)
@@ -37,7 +37,7 @@ Super-spines have no uplinks; all other roles do.
 | `uplink_switches` | list[string] | Upstream device hostnames, matched 1:1 with `uplink_interfaces`. |
 | `uplink_switch_interfaces` | list[string] | Upstream interface names, matched 1:1 with `uplink_interfaces`. |
 
-These are derived from `NetworkInterface` objects on the device that carry `role = "uplink"`, plus their connected remote interfaces via `NetworkLink`.
+These are derived from `DcimInterface` objects on the device that carry `role = "uplink"`, plus their connected remote interfaces via `NetworkLink`.
 
 ### Uplink role by device role
 

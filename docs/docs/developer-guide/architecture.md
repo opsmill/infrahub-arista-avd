@@ -8,10 +8,10 @@ sidebar_position: 1
 # Architecture Overview
 
 :::info Developer Guide
-This page is part of the developer guide. It assumes familiarity with Infrahub and Python. If you only want to *use* the system, switch to [Quick Start](/quick-start).
+Assumes familiarity with Infrahub and Python. If you only want to *use* the system, start with [Quick Start](/quick-start).
 :::
 
-This document describes the system architecture of the AVD Workshop Infrahub solution.
+The solution is a repository of schemas, generators, and transforms loaded on top of the Infrahub platform. The sections below cover its components, data model, and the generator and transform pipelines.
 
 ## System Components
 
@@ -53,12 +53,12 @@ The system models a 3-tier datacenter network fabric:
 NetworkFabric (e.g., "Fabric-A")
 ├── NetworkPod (e.g., "Pod-A1", "Pod-A2")
 │   ├── LocationRack (e.g., "Rack-A1-01", "Rack-A1-02")
-│   │   └── NetworkDevice [leaf] (e.g., "leaf-A1-01-1")
-│   │       └── NetworkInterface (e.g., "Ethernet1")
+│   │   └── DcimDevice [leaf] (e.g., "leaf-A1-01-1")
+│   │       └── InterfacePhysical (e.g., "Ethernet1")
 │   │           ├── NetworkLink → remote interface
 │   │           └── IpamIPAddress
-│   └── NetworkDevice [spine] (e.g., "spine-A1-1")
-└── NetworkDevice [super_spine] (e.g., "ss-A-1")
+│   └── DcimDevice [spine] (e.g., "spine-A1-1")
+└── DcimDevice [super_spine] (e.g., "ss-A-1")
 ```
 
 ## IP Address Management
@@ -120,9 +120,9 @@ Transforms convert data to artifacts:
 └──────────────────┘     └────────────────────┘     └─────────────────┘
 
 Examples:
-- NetworkInterface → ComputedInterfaceDescription → "→ device:interface"
+- DcimInterface → ComputedInterfaceDescription → "→ device:interface"
 - NetworkFabric → CablingPlan → CSV cabling matrix
-- NetworkDevice → AvdEosConfig → EOS CLI configuration
+- DcimDevice → AvdEosConfig → EOS CLI configuration
 - NetworkFabric → AvdFabricDoc → Markdown documentation
 ```
 
@@ -185,7 +185,7 @@ services:
 
 ## Source
 
-- Infrahub configuration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — canonical list of queries, generators, transforms, and artifact definitions.
+- Infrahub configuration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — the queries, generators, transforms, and artifact definitions registered with Infrahub.
 - Schemas: [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas) — the data model.
 - Generators: [`generators/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/generators) — Python generator classes.
 - Transforms: [`transforms/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/transforms) — Python and Jinja2 transforms.

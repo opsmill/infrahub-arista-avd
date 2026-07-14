@@ -56,7 +56,7 @@ In the proposed change:
 2. Inspect the **Artifacts** tab — the AVD EOS configurations for devices on the target fabric should have updated to include the new VLAN, VRF, and SVI.
 3. Approve and **Merge** when the updated configs look correct.
 
-Once merged, the segment exists on `main` and operators using Ansible inventories built from Infrahub will pick up the new config on their next deployment.
+Once merged, the segment exists on `main`, and Ansible inventories built from Infrahub include the new config on the next deployment.
 
 ## If the service portal is unavailable
 

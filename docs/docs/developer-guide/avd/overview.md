@@ -8,7 +8,7 @@ sidebar_position: 1
 # AVD Pipeline Overview
 
 :::info Developer Guide
-This page is part of the developer guide. If you want to *use* the system to produce configs, switch to [Quick Start](/quick-start).
+If you want to *use* the system to produce configs, start with [Quick Start](/quick-start).
 :::
 
 The Arista Validated Design (AVD) pipeline transforms Infrahub's network data model into PyAVD-compatible input data, then renders Arista EOS configurations and human-readable documentation from it.
@@ -52,7 +52,7 @@ flowchart TD
 ### Phase 1 — Hostvars
 
 **Generator**: [`generate-avd-device-hostvar`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py)
-**Target**: each `NetworkDevice` in the `avd_devices` group (one task per device).
+**Target**: each `DcimDevice` in the `avd_devices` group (one task per device).
 
 For each device the generator:
 

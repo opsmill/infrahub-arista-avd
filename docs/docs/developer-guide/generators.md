@@ -8,10 +8,8 @@ sidebar_position: 3
 # Generators
 
 :::info Developer Guide
-This page is part of the developer guide. It explains how the generators are structured. To *run* generators as an operator, switch to [Quick Start](/quick-start).
+Explains how the generators are structured. To *run* generators as an operator, start with [Quick Start](/quick-start).
 :::
-
-This document describes the infrastructure generators in this solution.
 
 ## Overview
 
@@ -136,7 +134,7 @@ query RackGenerator($rack_id: String!) {
 
 **File**: `generators/generate_avd_device_hostvar.py`
 
-**Target**: `NetworkDevice`
+**Target**: `DcimDevice`
 
 **Purpose**: Generate PyAVD hostvars for each device
 

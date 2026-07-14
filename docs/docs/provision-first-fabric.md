@@ -9,7 +9,7 @@ sidebar_position: 2
 
 Prerequisites: [Quick Start](./quick-start.md) complete — Infrahub is running at `http://localhost:8000`, and seed data (fabrics, pods, racks, device types, IP pools) is loaded.
 
-At this point you have fabrics defined but **no devices**. This page walks you through generating the devices, cabling, hostvars, and configurations for `Fabric-A`.
+At this point you have fabrics defined but **no devices**. The steps below generate the devices, cabling, hostvars, and configurations for `Fabric-A`.
 
 ## The generator chain
 
@@ -34,7 +34,7 @@ flowchart TD
 
 ## Step 1 — Create a branch
 
-We'll do this work on a branch so the changes stay isolated and you can review them as a proposed change before bringing them into `main`. In the Infrahub UI: click the branch selector in the top bar, then **+ Create branch**, and name it something like `generate-fabric-a`.
+Do this work on a branch so the changes stay isolated and you can review them as a proposed change before bringing them into `main`. In the Infrahub UI: click the branch selector in the top bar, then **+ Create branch**, and name it something like `generate-fabric-a`.
 
 You can also create a branch from the CLI:
 
@@ -70,7 +70,7 @@ The full chain typically takes a few minutes depending on fabric size.
 
 ## Step 4 — Verify devices exist
 
-Once all tasks complete, open **Network → NetworkDevice** in the menu. You should see devices with roles:
+Once all tasks complete, open **Devices → All Devices** in the menu. You should see devices with roles:
 
 - `super_spine` — top of the fabric
 - `spine` — one per pod

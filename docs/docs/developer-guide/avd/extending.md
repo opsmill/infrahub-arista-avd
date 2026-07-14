@@ -8,7 +8,7 @@ sidebar_position: 6
 # Extending the Pipeline
 
 :::info Developer Guide
-This page is part of the developer guide. The touch-point lists below give you the exact files to edit for the three most common extensions.
+The touch-point lists below give you the exact files to edit for the three most common extensions.
 :::
 
 ## Add a new device role
@@ -43,7 +43,7 @@ Scenario: you want an additional artifact per device or per fabric (e.g. a JSON 
 **Touch points:**
 
 1. **GraphQL query** — write the `.gql` query under `transforms/`. Example: `transforms/avd_inventory.gql`.
-2. **Pydantic query model** — **do not write this by hand.** Generate it with:
+2. **Pydantic query model** — **do not write this manually.** Generate it with:
    ```bash
    uv run infrahubctl graphql generate-return-types transforms/avd_inventory.gql
    ```
@@ -84,7 +84,7 @@ Scenario: you want PyAVD to receive an additional input field (e.g. a per-device
 
 **Touch points:**
 
-1. **Schema** — if the field isn't already represented, add it to the relevant schema (`NetworkDevice`, `NetworkFabric`, etc.) in [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas).
+1. **Schema** — if the field isn't already represented, add it to the relevant schema (`DcimDevice`, `NetworkFabric`, etc.) in [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas).
 2. **Reload the schema and regenerate generated files**:
    ```bash
    uv run invoke load-schema                                             # push schema to Infrahub

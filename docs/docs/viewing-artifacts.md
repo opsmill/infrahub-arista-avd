@@ -19,7 +19,7 @@ Per-device artifacts (`AVD EOS Configuration`, `AVD Device Documentation`) are r
 
 ## Finding a device artifact
 
-1. In the Infrahub UI, open **Network → NetworkDevice**.
+1. In the Infrahub UI, open **Devices → All Devices**.
 2. Click a device (for example `leaf-pod-A1-1`).
 3. Click the **Artifacts** tab on the device's detail page.
 4. You'll see rows for **AVD EOS Configuration** and **AVD Device Documentation**.
@@ -52,7 +52,7 @@ The fabric and device markdown documents include tables, topology descriptions, 
 
 ## Finding the fabric documentation
 
-1. Open **Network → NetworkFabric**.
+1. Open **Fabric Design → Fabrics**.
 2. Click the fabric (`Fabric-A`).
 3. Click the **Artifacts** tab.
 4. Open **AVD Fabric Documentation**.
