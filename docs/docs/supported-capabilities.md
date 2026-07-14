@@ -5,7 +5,7 @@ description: What this Arista AVD reference design supports today, what is parti
 
 # Supported Capabilities
 
-This is a **reference design** that covers a defined set of AVD capabilities on Infrahub — it is not a full replacement for every AVD feature. Uncommon or highly customized AVD options may not be modeled. Use the matrix below to check where a capability sits before planning a deployment.
+This is a **reference design** that covers a defined set of AVD capabilities on Infrahub — it is not a full replacement for every AVD feature. Uncommon or highly customized AVD options may not be modeled. Use the matrix below to check the status of a capability before planning a deployment.
 
 **Status key:** ✅ Supported today · 🟡 Partial / confirm scope · ⬜ Not yet
 
@@ -34,7 +34,7 @@ Some boundaries below are marked *confirm scope* and are being finalized with th
 |------------|:------:|-------|
 | Model VLANs and L2 domains | ✅ | Defined in the source of truth and rendered into config. |
 | Fabric-level EVPN settings | ✅ | Fabric EVPN overlay configuration. Exact EVPN depth is being confirmed. |
-| EVPN L3 VRFs | 🟡 | Wired into the pyAVD hostvar generator and produce config. The maintainers flagged "we don't do VRF and route targets" — **confirm** whether the exclusion is VRF-lite, route-leaking, or explicit route targets. |
+| EVPN L3 VRFs | 🟡 | Wired into the PyAVD hostvar generator and produce config. The maintainers flagged "we don't do VRF and route targets" — **confirm** whether the exclusion is VRF-lite, route-leaking, or explicit route targets. |
 | MLAG (domain + peer) | 🟡 | Modeled and wired into hostvars; **confirm** supported scope. |
 | Server LAG | 🟡 | Modeled and wired into hostvars; **confirm** supported scope. |
 | BGP peer groups | 🟡 | Wired into hostvars and produce config; **confirm** supported scope. |
@@ -49,7 +49,7 @@ Some boundaries below are marked *confirm scope* and are being finalized with th
 | Fabric and per-device documentation (Markdown) | ✅ | Generated from the same source of truth as the config. |
 | Cabling plan (CSV) | ✅ | One row per connection for the field/cabling team. |
 | Computed interface descriptions | ✅ | Consistent, auto-maintained interface descriptions. |
-| ANTA test catalog (per device, YAML) | ✅ | Catalog **generation** ships (gated by the fabric `anta_enabled` flag). Execution is not yet included — see below. |
+| ANTA test catalog (per device, YAML) | ✅ | Catalog **generation** is included (gated by the fabric `anta_enabled` flag). Execution is not yet included — see below. |
 
 ## Validation (ANTA)
 

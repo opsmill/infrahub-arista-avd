@@ -1,6 +1,6 @@
 ---
 title: Hostvars Reference
-description: The pyAVD-compatible hostvars structure built per device role by Phase 1 of the pipeline.
+description: The PyAVD-compatible hostvars structure built per device role by Phase 1 of the pipeline.
 audience: developer
 sidebar_position: 2
 ---
@@ -8,10 +8,10 @@ sidebar_position: 2
 # Hostvars Reference
 
 :::info Developer Guide
-This page is part of the developer guide. Hostvars structure is **pyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
+This page is part of the developer guide. Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
 :::
 
-This page documents the pyAVD hostvars dict that [`generate-avd-device-hostvar`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) produces for each `NetworkDevice`. The dict is serialised to JSON and stored as an `AvdHostvarFile` attached to the device's `AvdArtifact` (see [AvdArtifact & File Storage](./artifacts.md)).
+This page documents the PyAVD hostvars dict that [`generate-avd-device-hostvar`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) produces for each `NetworkDevice`. The dict is serialised to JSON and stored as an `AvdHostvarFile` attached to the device's `AvdArtifact` (see [AvdArtifact & File Storage](./artifacts.md)).
 
 ## Top-level fields (all roles)
 
@@ -20,7 +20,7 @@ This page documents the pyAVD hostvars dict that [`generate-avd-device-hostvar`]
 | `type` | string | Role-mapped from `NetworkDevice.role.value` | See [Role Mapping](./role-mapping.md). |
 | `fabric_name` | string | `NetworkFabric.name.value` | |
 | `id` | int | `NetworkDevice.node_id.value` | Fabric-unique device identifier. |
-| `bgp_as` | string | `NetworkDevice.bgp_asn.value` | Stringified; pyAVD expects a string. |
+| `bgp_as` | string | `NetworkDevice.bgp_asn.value` | Stringified; PyAVD expects a string. |
 | `loopback_ipv4_address` | string | `NetworkDevice.loopback_ip` | Optional; stripped of CIDR. |
 | `mgmt_ip` | string | `NetworkDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |

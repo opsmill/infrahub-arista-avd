@@ -54,7 +54,7 @@ Review and merge as usual.
 
 - After manually editing IP pools, fabric settings, or device templates that affect code paths in the generators.
 - After a failed partial run where some generators didn't complete. Re-running is idempotent — existing devices and objects are upserted, not duplicated.
-- After upgrading the pyAVD version, if the structured config output format has changed.
+- After upgrading the PyAVD version, if the structured config output format has changed.
 
 ## Inspecting without regenerating
 

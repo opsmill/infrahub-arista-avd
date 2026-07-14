@@ -20,7 +20,7 @@ The `*_query.py` files referenced below are **generated** from their matching `.
 | Transform | Target group | Content type | Wraps |
 |-----------|-------------|--------------|-------|
 | `avd_eos_config` | `avd_devices` | `text/plain` | `pyavd.get_device_config()` |
-| `avd_device_doc` | `avd_devices` | `text/markdown` | pyAVD device documentation |
+| `avd_device_doc` | `avd_devices` | `text/markdown` | PyAVD device documentation |
 | `avd_fabric_doc` | `fabrics` | `text/markdown` | `pyavd.get_fabric_documentation()` |
 
 ## `avd_eos_config`
@@ -53,7 +53,7 @@ Renders per-device markdown documentation.
 Flow:
 
 1. Same query as `avd_eos_config` — resolves device and its structured config.
-2. Calls the pyAVD device documentation function on the structured config.
+2. Calls the PyAVD device documentation function on the structured config.
 3. Returns markdown.
 
 ## `avd_fabric_doc`

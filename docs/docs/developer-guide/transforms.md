@@ -19,7 +19,7 @@ Transforms convert Infrahub data into usable outputs (configs, documentation, co
 
 ## Transform Types
 
-1. **Python Transforms** - Complex logic, external library calls (pyAVD)
+1. **Python Transforms** - Complex logic, external library calls (PyAVD)
 2. **Jinja2 Transforms** - Template-based text generation
 
 ## Transform Architecture

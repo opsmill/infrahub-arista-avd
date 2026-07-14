@@ -12,7 +12,7 @@ This guide is for **contributors** who want to extend, debug, or maintain the AV
 ## Start here
 
 1. **[Architecture Overview](./architecture.md)** — system components, data model hierarchy, and the generator pipeline at a glance.
-2. **[AVD Pipeline → Overview](./avd/overview.md)** — the two-phase pipeline (hostvars → structured config) and the pyAVD version target.
+2. **[AVD Pipeline → Overview](./avd/overview.md)** — the two-phase pipeline (hostvars → structured config) and the PyAVD version target.
 
 ## Reference
 
@@ -24,8 +24,8 @@ This guide is for **contributors** who want to extend, debug, or maintain the AV
 
 The AVD pipeline is the technically distinguishing piece of this solution and has its own sub-section:
 
-- **[Overview](./avd/overview.md)** — two-phase pipeline + pyAVD version pin.
-- **[Hostvars Reference](./avd/hostvars.md)** — the pyAVD-compatible structure produced per device role.
+- **[Overview](./avd/overview.md)** — two-phase pipeline + PyAVD version pin.
+- **[Hostvars Reference](./avd/hostvars.md)** — the PyAVD-compatible structure produced per device role.
 - **[Transforms](./avd/transforms.md)** — `avd_eos_config`, `avd_fabric_doc`, `avd_device_doc`.
 - **[AvdArtifact & File Storage](./avd/artifacts.md)** — the `AvdArtifact` node, child file nodes, checksum-based change detection.
 - **[Role Mapping](./avd/role-mapping.md)** — Infrahub roles → AVD device types.

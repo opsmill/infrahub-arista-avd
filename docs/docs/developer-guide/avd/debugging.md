@@ -101,7 +101,7 @@ See the service portal implementation in [`service_catalog/utils/api.py`](https:
 3. Does `AvdArtifact.structured_config_file` exist? If not — Phase 2 didn't run (or failed) for this device's fabric. Run `generate-avd-device-structured-config` for the fabric.
 4. If `structured_config_file` exists but `content` is empty or malformed — the previous Phase 2 run had a partial failure. Delete the file and re-run Phase 2.
 
-## pyAVD validation errors
+## PyAVD validation errors
 
 `pyavd.validate_inputs()` is called in Phase 2 across **all** devices in the fabric. If one device has invalid hostvars, the whole Phase 2 run fails.
 
@@ -115,7 +115,7 @@ The error usually names a field and a device. Fetch that device's hostvars (abov
 
 - Missing required fields for the role (`id`, `bgp_as`, `loopback_ipv4_address` for L3 roles).
 - Mismatched list lengths in the uplink block (`uplink_interfaces` vs `uplink_switches`).
-- Type mismatches — pyAVD expects stringified ASNs (`"65101"`), CIDR-less loopbacks, etc.
+- Type mismatches — PyAVD expects stringified ASNs (`"65101"`), CIDR-less loopbacks, etc.
 
 Cross-reference [Hostvars Reference](./hostvars.md) for the expected types.
 

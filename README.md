@@ -27,15 +27,15 @@ The full pipeline, from a high-level fabric design to versioned, deployable conf
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python package manager)
 - Python 3.11+
-- pyAVD ≥ 6.2.0 (bundled in the custom Docker image — no separate install required)
+- PyAVD ≥ 6.2.0 (bundled in the custom Docker image — no separate install required)
 
 ## Quick Start
 
 ```bash
-# Install Python dependencies, including pyAVD and the Infrahub SDK
+# Install Python dependencies, including PyAVD and the Infrahub SDK
 uv sync --all-packages
 
-# Build the custom Infrahub image (extends the base image with pyAVD — run once)
+# Build the custom Infrahub image (extends the base image with PyAVD — run once)
 export INFRAHUB_BASE_VERSION=1.10.1
 uv run invoke build
 
@@ -87,7 +87,7 @@ After `invoke load` completes and you run the generator chain on a fabric:
   - Provision server into a rack
   - Create EVPN tenant
   - Fabric Design visualization (topology, cabling, settings, EVPN)
-- **Stack** — Docker Compose extending Infrahub 1.10.1 with pyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
+- **Stack** — Docker Compose extending Infrahub 1.10.1 with PyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
 
 | File | What it does |
 |------|-------------|
@@ -99,7 +99,7 @@ After `invoke load` completes and you run the generator chain on a fabric:
 | `triggers.yml` | Event trigger rules wiring schema changes to generator runs |
 | `service_catalog/` | Streamlit service portal |
 | `docker-compose.yml` | Stack definition; docker-compose.override.yml adds the portal and Semaphore |
-| `Dockerfile` | Custom Infrahub image with pyAVD |
+| `Dockerfile` | Custom Infrahub image with PyAVD |
 | `tasks.py` | Invoke task definitions (build, start, stop, load, lint, test) |
 
 > **Note:** Brownfield import (modeling an existing fabric and importing configurations via Infrahub Sync) is available in a guided engagement today — it is not yet a self-serve path.
@@ -113,7 +113,7 @@ The full documentation is under [`docs/`](docs/docs/). Key entry points:
 | **Get the stack running** | [Quick Start](docs/docs/quick-start.md) — prerequisites, install steps, and first load |
 | **Provision a fabric end-to-end** | [Provision Your First Fabric](docs/docs/provision-first-fabric.md) — step-by-step walkthrough from seed data to rendered EOS artifacts |
 | **Check what's supported** | [Supported Capabilities](docs/docs/supported-capabilities.md) — capability matrix (supported / partial / not yet) |
-| **Use the service portal** | [How-to Guides](docs/docs/how-to/add-network-segment.md) — day-two workflows |
+| **Run a day-two workflow** | [Add a Network Segment](docs/docs/how-to/add-network-segment.md) — and the other how-to guides |
 | **Understand the generator pipeline** | [Architecture Overview](docs/docs/developer-guide/architecture.md) — system components, data model, and generator chain |
 | **Understand the AVD pipeline** | [AVD Pipeline Overview](docs/docs/developer-guide/avd/overview.md) — two-phase pipeline, hostvars reference, role mapping |
 | **Extend the pipeline** | [Extending the Pipeline](docs/docs/developer-guide/avd/extending.md) — new device roles, transform outputs, schema fields |
@@ -129,8 +129,8 @@ The full documentation is under [`docs/`](docs/docs/). Key entry points:
 | Project | Description |
 |---------|-------------|
 | [Infrahub](https://github.com/opsmill/infrahub) | The infrastructure data management and automation platform this reference design runs on |
-| [Arista AVD](https://github.com/aristanetworks/avd) | Arista Validated Design — the collection and pyAVD engine that render EOS configurations |
-| [AVD documentation](https://avd.arista.com/) | Upstream AVD reference and pyAVD documentation |
+| [Arista AVD](https://github.com/aristanetworks/avd) | Arista Validated Design — the collection and PyAVD engine that render EOS configurations |
+| [AVD documentation](https://avd.arista.com/) | Upstream AVD reference and PyAVD documentation |
 
 ## About Infrahub
 

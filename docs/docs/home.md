@@ -38,7 +38,7 @@ flowchart LR
 ## What it's for
 
 - **Generate a complete fabric from a design** — define topology parameters and addressing pools; generators create all super-spines, spines, and leaves, allocate loopback, interconnect, and management addresses, BGP ASNs, and node IDs, and cable devices together automatically.
-- **Render EOS device configurations and documentation** — pyAVD runs inside Infrahub workers and produces EOS CLI configurations, per-device and fabric-level Markdown documentation, and a cabling plan CSV as downloadable artifacts.
+- **Render EOS device configurations and documentation** — PyAVD runs inside Infrahub workers and produces EOS CLI configurations, per-device and fabric-level Markdown documentation, and a cabling plan CSV as downloadable artifacts.
 - **Make incremental day-two changes** — edit the design and regenerate; checksum-based idempotency applies changes only to affected objects; branch-aware pools prevent collisions across parallel work.
 - **Give other teams access to network data** — the fabric is queryable through the Infrahub Web UI, GraphQL API, and MCP interface; the Streamlit service portal provides guided workflows for stakeholders without API or CLI access.
 - **Track and review every change** — all changes run through Infrahub branches and proposed changes, with a full diff before any change reaches a device.
@@ -81,14 +81,14 @@ flowchart LR
   - AVD types: `AvdArtifact` for per-device host_var and structured-config tracking with checksums
 - **Generators** — the automation layer. Define topology parameters and pool ranges; generators derive the full fabric from that design intent. All are checksum-based and idempotent.
   - FabricGenerator, PodGenerator, RackGenerator — create devices, allocate addresses, assign BGP ASNs and node IDs, cable devices together
-  - GenerateAVDDeviceHostvar — assembles per-device pyAVD input from the source of truth
-  - AvdDeviceStructuredConfigGenerator — runs pyAVD to produce structured configuration
+  - GenerateAVDDeviceHostvar — assembles per-device PyAVD input from the source of truth
+  - AvdDeviceStructuredConfigGenerator — runs PyAVD to produce structured configuration
   - GenerateServerCabling — handles server attachment
-- **Transforms** — the rendering layer. Reads structured data from generators and outputs downloadable artifacts. pyAVD runs inside Infrahub workers.
+- **Transforms** — the rendering layer. Reads structured data from generators and outputs downloadable artifacts. PyAVD runs inside Infrahub workers.
   - EOS device configurations
   - Per-device and fabric-level Markdown documentation
   - Cabling plan CSV
-  - ANTA test catalogs (generation ships; test execution on the roadmap)
+  - ANTA test catalogs (generation is included; test execution on the roadmap)
   - Computed interface descriptions
 - **Seed data** — a ready-to-run starting point. `invoke load` populates Infrahub immediately with manufacturers, device types, device profiles and templates, addressing and number pools, and two example fabrics with pods, racks, and seed VLANs.
 - **Service portal** — a Streamlit application for self-service day-2 operations. Every operation creates a branch and opens a proposed change for review.
@@ -96,14 +96,14 @@ flowchart LR
   - Provision a server into a rack
   - Create an EVPN tenant
   - Fabric Design visualization (topology, cabling, settings, EVPN tenants)
-- **Stack** — Docker Compose bundling everything needed to run locally: Infrahub with pyAVD, the service portal, a bundled Ansible runner for device deployment, and Neo4j.
+- **Stack** — Docker Compose bundling everything needed to run locally: Infrahub with PyAVD, the service portal, a bundled Ansible runner for device deployment, and Neo4j.
 
 ## Best practices
 
 - **Work on branches.** Create a named branch for each change set. The generator chain and service portal both operate on branches; proposed changes give you a diff before anything merges.
 - **Run `invoke load` in order.** The load sequence is ordered: schemas, then menu, then seed data, then repository registration, then triggers. Running steps out of order or skipping `uv sync` first is the most common cause of load failures.
 - **Re-run generators idempotently.** All generators use checksum-based change detection — re-running after a partial failure is safe and applies only what changed.
-- **Use the service portal for repeatable day-two operations.** The portal wraps generator calls and branch creation into guided workflows with validation. For one-off changes, the Infrahub UI and GraphQL API work directly; the portal is the right path for provisioning workflows used by team members without API or CLI access.
+- **Use the service portal for repeatable day-two operations.** The portal wraps generator calls and branch creation into guided workflows with validation. For one-off changes, the Infrahub UI and GraphQL API work directly; use the portal for provisioning workflows run by team members without API or CLI access.
 - **Scope to supported capabilities.** This reference design covers a defined set of AVD capabilities — uncommon or highly custom options may not be modeled. Review the [Supported Capabilities](/supported-capabilities) page before planning a deployment.
 
 ## Get started

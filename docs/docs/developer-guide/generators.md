@@ -138,14 +138,14 @@ query RackGenerator($rack_id: String!) {
 
 **Target**: `NetworkDevice`
 
-**Purpose**: Generate pyAVD hostvars for each device
+**Purpose**: Generate PyAVD hostvars for each device
 
 **Actions**:
 1. Extract device attributes (hostname, role, ASN, node ID)
 2. Extract IP addresses (loopback, management)
 3. Determine uplink topology by device role
 4. Extract connected endpoints (servers with VLANs)
-5. Build pyAVD-compatible hostvars structure
+5. Build PyAVD-compatible hostvars structure
 6. Upload hostvars JSON to object store
 7. Create/update AvdArtifact with checksum
 

@@ -1,6 +1,6 @@
 ---
 title: AVD Pipeline Overview
-description: The two-phase AVD generator pipeline, the pyAVD version pinned, and the shape of the data flow.
+description: The two-phase AVD generator pipeline, the PyAVD version pinned, and the shape of the data flow.
 audience: developer
 sidebar_position: 1
 ---
@@ -11,18 +11,18 @@ sidebar_position: 1
 This page is part of the developer guide. If you want to *use* the system to produce configs, switch to [Quick Start](/quick-start).
 :::
 
-The Arista Validated Design (AVD) pipeline transforms Infrahub's network data model into pyAVD-compatible input data, then renders Arista EOS configurations and human-readable documentation from it.
+The Arista Validated Design (AVD) pipeline transforms Infrahub's network data model into PyAVD-compatible input data, then renders Arista EOS configurations and human-readable documentation from it.
 
-## pyAVD version
+## PyAVD version
 
 :::warning Version-sensitive
 The pipeline targets **pyavd >= 5.0.0** (pinned in [`pyproject.toml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/pyproject.toml)).
 
-The following sections are version-sensitive — review them when upgrading pyAVD:
+The following sections are version-sensitive — review them when upgrading PyAVD:
 
-- [Hostvars Reference](./hostvars.md) — the pyAVD input schema.
+- [Hostvars Reference](./hostvars.md) — the PyAVD input schema.
 - [Role Mapping](./role-mapping.md) — AVD device type names (e.g. `l3leaf`, `super-spine`).
-- [Transforms](./transforms.md) — the pyAVD functions the transforms call (`validate_inputs`, `get_avd_facts`, `get_device_structured_config`, `get_device_config`, `get_fabric_documentation`).
+- [Transforms](./transforms.md) — the PyAVD functions the transforms call (`validate_inputs`, `get_avd_facts`, `get_device_structured_config`, `get_device_config`, `get_fabric_documentation`).
 :::
 
 ## The two-phase pipeline
@@ -61,7 +61,7 @@ For each device the generator:
 3. Extracts connected endpoints (servers) from interfaces with `role = "server"`, including tagged/untagged VLANs.
 4. For leaves, extracts MLAG peer information and the virtual router MAC.
 5. For leaves and spines, queries EVPN tenants, VRFs, SVIs, and L2 VLANs associated with the fabric (skipped entirely for `l2leaf`).
-6. Builds a complete pyAVD `hostvars` dict (see [Hostvars Reference](./hostvars.md)).
+6. Builds a complete PyAVD `hostvars` dict (see [Hostvars Reference](./hostvars.md)).
 7. Serialises to JSON, computes a SHA256 checksum, and compares against the previous content. If changed (or absent), writes a new `AvdHostvarFile` as a child of the device's `AvdArtifact` node.
 
 ### Phase 2 — Structured Config
@@ -84,7 +84,7 @@ For the fabric the generator:
 When an operator opens an AVD artifact in the Infrahub UI, the matching transform runs:
 
 - **`avd_eos_config`** — reads `structured_config_file`, calls `pyavd.get_device_config()`, returns `text/plain`.
-- **`avd_device_doc`** — reads `structured_config_file`, calls the pyAVD device documentation function, returns `text/markdown`.
+- **`avd_device_doc`** — reads `structured_config_file`, calls the PyAVD device documentation function, returns `text/markdown`.
 - **`avd_fabric_doc`** — reads hostvars and structured configs for all devices in the fabric, calls `pyavd.get_fabric_documentation()`, returns `text/markdown`.
 
 See [Transforms](./transforms.md) for the full transform-by-transform reference.
@@ -101,7 +101,7 @@ See [Transforms](./transforms.md) for the full transform-by-transform reference.
 
 ## Related pages
 
-- [Hostvars Reference](./hostvars.md) — the exact pyAVD input structure built per role.
+- [Hostvars Reference](./hostvars.md) — the exact PyAVD input structure built per role.
 - [AvdArtifact & File Storage](./artifacts.md) — schema, relationships, and how Phase 1 and Phase 2 share data.
 - [Role Mapping](./role-mapping.md) — Infrahub roles → AVD device types.
 - [Transforms](./transforms.md) — detailed transform-by-transform breakdown.

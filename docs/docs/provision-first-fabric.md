@@ -29,7 +29,7 @@ flowchart TD
 | 1 | **generate-fabric** | Super-spine switches, allocates IP pools from `FabricSupernetPool` |
 | 2 | **generate-pod** | Spine switches for each pod |
 | 3 | **generate-rack** | Leaf switches for each rack |
-| 4 | **generate-avd-device-hostvar** | Per-device pyAVD hostvars (stored in the graph as an `AvdHostvarFile`) |
+| 4 | **generate-avd-device-hostvar** | Per-device PyAVD hostvars (stored in the graph as an `AvdHostvarFile`) |
 | 5 | **generate-avd-device-structured-config** | Per-device structured AVD config (stored as `AvdStructuredConfigFile`) |
 
 ## Step 1 — Create a branch

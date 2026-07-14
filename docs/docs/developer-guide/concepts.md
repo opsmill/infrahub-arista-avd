@@ -6,7 +6,7 @@ audience: developer
 
 # Concepts
 
-This reference design is built on Infrahub. If you come from an AVD-and-files background, these are the platform terms used throughout the docs. Each links to the upstream [Infrahub documentation](https://docs.infrahub.app) for the full treatment.
+This reference design is built on Infrahub. If you come from an AVD-and-files background, these are the platform terms used throughout the docs. Each links to the upstream [Infrahub documentation](https://docs.infrahub.app) for full detail.
 
 ## Branch
 
@@ -22,7 +22,7 @@ A Python routine that reads high-level design intent and creates the many detail
 
 ## Transform
 
-A routine that converts stored data into an output document, saved as an artifact. Here, transforms render EOS CLI configuration, fabric and per-device Markdown documentation, the cabling-plan CSV, and the ANTA test catalog — with pyAVD running inside Infrahub's workers. See the [Transforms](/developer-guide/transforms) reference.
+A routine that converts stored data into an output document, saved as an artifact. Here, transforms render EOS CLI configuration, fabric and per-device Markdown documentation, the cabling-plan CSV, and the ANTA test catalog — with PyAVD running inside Infrahub's workers. See the [Transforms](/developer-guide/transforms) reference.
 
 ## Artifact
 

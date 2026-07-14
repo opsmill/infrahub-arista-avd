@@ -56,7 +56,7 @@ Key points:
 
 ## Schema: `AvdHostvarFile`
 
-Stores the per-device pyAVD hostvars as a JSON file. Inherits from `CoreFileObject`.
+Stores the per-device PyAVD hostvars as a JSON file. Inherits from `CoreFileObject`.
 
 ```yaml
 - name: HostvarFile
