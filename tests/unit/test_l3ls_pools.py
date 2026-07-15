@@ -100,3 +100,22 @@ async def test_extract_l3ls_pools_mlag_optional() -> None:
     assert pools["mlag_peer_ipv4_pool"] is None
     assert pools["mlag_peer_l3_ipv4_pool"] is None
     assert pools["loopback_ipv4_pool"] == "10.3.0.0/24"
+
+
+async def test_extract_l3ls_pools_uses_generated_mlag_l3_pool_alias() -> None:
+    """The generated Pydantic field name resolves the optional MLAG L3 pool."""
+    uplink, vtep, loopback, mlag_l3 = (object() for _ in range(4))
+    fabric = SimpleNamespace(name=_attr("Fabric-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback)
+    pod = SimpleNamespace(mlag_peer_pool=None, mlag_l_3_pool=mlag_l3)
+    gen = _make_generator(
+        {
+            id(uplink): "10.1.0.0/16",
+            id(vtep): "10.2.0.0/24",
+            id(loopback): "10.3.0.0/24",
+            id(mlag_l3): "10.5.0.0/24",
+        }
+    )
+
+    pools = await gen._extract_l3ls_pools(fabric, pod)
+
+    assert pools["mlag_peer_l3_ipv4_pool"] == "10.5.0.0/24"

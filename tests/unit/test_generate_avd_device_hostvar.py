@@ -97,3 +97,71 @@ async def test_tenants_hostvars_validate_against_pyavd():
     assert not validate_inputs(hostvars).validation_result.violations
     # get_avd_facts is where the invalid key surfaced as a hard KeyError pre-fix.
     get_avd_facts({"leaf1": hostvars})
+
+
+def test_generated_only_p2p_mtu_resolves() -> None:
+    fabric = SimpleNamespace(p_2_p_uplinks_mtu=_attr(1500))
+
+    assert GenerateAVDDeviceHostvar._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu") == 1500
+
+
+def test_schema_name_only_p2p_mtu_resolves() -> None:
+    fabric = SimpleNamespace(p2p_uplinks_mtu=_attr(9000))
+
+    assert GenerateAVDDeviceHostvar._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu") == 9000
+
+
+def test_generated_p2p_mtu_preferred_when_both_names_exist() -> None:
+    fabric = SimpleNamespace(p_2_p_uplinks_mtu=_attr(1500), p2p_uplinks_mtu=_attr(9000))
+
+    assert GenerateAVDDeviceHostvar._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu") == 1500
+
+
+def test_generated_p2p_mtu_none_falls_back_to_schema_name() -> None:
+    fabric = SimpleNamespace(p_2_p_uplinks_mtu=_attr(None), p2p_uplinks_mtu=_attr(9000))
+
+    assert GenerateAVDDeviceHostvar._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu") == 9000
+
+
+def test_generated_p2p_mtu_zero_does_not_fall_back() -> None:
+    fabric = SimpleNamespace(p_2_p_uplinks_mtu=_attr(0), p2p_uplinks_mtu=_attr(9000))
+
+    assert GenerateAVDDeviceHostvar._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu") == 0
+
+
+def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
+    fabric = SimpleNamespace(p_2_p_uplinks_mtu=_attr(1500))
+    p2p_uplinks_mtu = GenerateAVDDeviceHostvar._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu")
+
+    hostvars = GenerateAVDDeviceHostvar._build_hostvars(
+        hostname="leaf1",
+        role="leaf",
+        bgp_asn=65001,
+        node_id=3,
+        loopback_ip="10.0.0.3",
+        mgmt_ip="192.168.0.3",
+        fabric_name="Fabric-A",
+        mgmt_gateway=None,
+        virtual_router_mac=None,
+        underlay_routing_protocol=None,
+        overlay_routing_protocol=None,
+        p2p_uplinks_mtu=p2p_uplinks_mtu,
+        spanning_tree_mode=None,
+        spanning_tree_priority=None,
+        loopback_ipv4_offset=None,
+        bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
+        management={},
+        pools={
+            "uplink_ipv4_pool": "10.1.0.0/24",
+            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
+            "loopback_ipv4_pool": "10.0.0.0/24",
+            "mlag_peer_ipv4_pool": None,
+            "mlag_peer_l3_ipv4_pool": None,
+        },
+        uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
+        tenants_data=[],
+        connected_endpoints=[],
+    )
+
+    assert hostvars["p2p_uplinks_mtu"] == 1500
