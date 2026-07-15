@@ -550,6 +550,7 @@ class EvpnL2Vlan(CoreNode):
 class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHasSubInterface, GenericInterfaceBundle):
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: Boolean
     index: StringOptional
     l2_mode: DropdownOptional
     lacp_mode: Dropdown
@@ -1227,6 +1228,7 @@ class ProfileInterfaceHasSubInterface(LineageSource, CoreProfile, CoreNode):
 class ProfileInterfaceLag(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: BooleanOptional
     l2_mode: DropdownOptional
     lacp_mode: DropdownOptional
     lacp_rate: DropdownOptional
@@ -1820,6 +1822,7 @@ class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcim
 class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, TemplateInterfaceHasSubInterface, TemplateGenericInterfaceBundle, CoreNode):
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: Boolean
     l2_mode: DropdownOptional
     lacp_mode: Dropdown
     lacp_rate: Dropdown

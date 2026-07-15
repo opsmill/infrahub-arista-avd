@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from pyavd import get_avd_facts, validate_inputs
 
-from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar
+from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar, apply_lag_adapter_config
 
 
 def _attr(value: object) -> SimpleNamespace:
@@ -28,6 +28,7 @@ def _base_hostvars(
     *,
     rack_info: dict | None = None,
     mlag_info: dict | None = None,
+    connected_endpoints: list[dict] | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -59,7 +60,7 @@ def _base_hostvars(
         rack_info=rack_info or {"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"]},
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
-        connected_endpoints=[],
+        connected_endpoints=connected_endpoints or [],
     )
 
 
@@ -284,6 +285,24 @@ def test_mlag_leaf_without_domain_asn_fails() -> None:
         )
 
 
+def _lag(lacp_mode: str = "active", evpn_ethernet_segment: bool = False) -> SimpleNamespace:
+    return SimpleNamespace(
+        lacp_mode=_attr(lacp_mode),
+        evpn_ethernet_segment=_attr(evpn_ethernet_segment),
+    )
+
+
+def _multi_switch_adapter() -> dict:
+    return {
+        "switches": ["leaf1", "leaf2"],
+        "switch_ports": ["Ethernet1", "Ethernet1"],
+        "endpoint_ports": ["eth1", "eth2"],
+        "mode": "trunk",
+        "vlans": "11,19",
+        "spanning_tree_portfast": "edge",
+    }
+
+
 @pytest.mark.anyio
 async def test_tenants_hostvars_validate_against_pyavd():
     """EVPN tenant payload (incl. l2vlan vni_override) must pass pyAVD validation.
@@ -386,9 +405,66 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
             "mlag_peer_l3_ipv4_pool": None,
         },
         uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        rack_info={"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"]},
         mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=[],
         connected_endpoints=[],
     )
 
     assert hostvars["p2p_uplinks_mtu"] == 1500
+
+
+def test_lag_without_evpn_knob_preserves_port_channel_only() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=False), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "active"}
+    assert "ethernet_segment" not in adapter
+
+
+def test_evpn_lag_multi_switch_non_mlag_emits_ethernet_segment() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=False)
+
+    assert adapter["ethernet_segment"] == {"short_esi": "auto"}
+
+
+def test_evpn_lag_with_mlag_active_does_not_emit_ethernet_segment() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=True)
+
+    assert "ethernet_segment" not in adapter
+
+
+def test_evpn_lag_single_switch_does_not_emit_ethernet_segment() -> None:
+    adapter = _multi_switch_adapter()
+    adapter["switches"] = ["leaf1"]
+    adapter["switch_ports"] = ["Ethernet1"]
+    adapter["endpoint_ports"] = ["eth1"]
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=False)
+
+    assert "ethernet_segment" not in adapter
+
+
+def test_disabled_lacp_mode_maps_to_pyavd_on() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(lacp_mode="disabled"), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "on"}
+
+
+def test_server_lag_evpn_hostvars_validate_against_pyavd() -> None:
+    adapter = _multi_switch_adapter()
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=False)
+
+    hostvars = _base_hostvars(
+        tenants_data=[],
+        connected_endpoints=[{"name": "server1", "adapters": [adapter]}],
+    )
+
+    assert not validate_inputs(hostvars).validation_result.violations

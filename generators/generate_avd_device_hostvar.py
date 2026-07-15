@@ -42,6 +42,9 @@ class RackInfo(TypedDict):
     leaf_names: list[str]
 
 
+LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
+
+
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
     pods = await client.filters(NetworkPod, parent__ids=[fabric_id])
 
@@ -159,9 +162,26 @@ def _sort_server_endpoints(servers: dict[str, ServerEndpoint]) -> list[ServerEnd
     return sorted_servers
 
 
+def apply_lag_adapter_config(adapter: dict[str, Any], lag_node: object, *, mlag_active: bool) -> None:
+    """Apply pyAVD port-channel and optional EVPN Ethernet Segment settings."""
+    lacp_mode = getattr(lag_node, "lacp_mode", None)
+    port_channel = {"mode": LACP_MODE_MAP.get(getattr(lacp_mode, "value", None), "active")}
+    adapter["port_channel"] = port_channel
+
+    evpn_ethernet_segment = getattr(lag_node, "evpn_ethernet_segment", None)
+    if (
+        getattr(evpn_ethernet_segment, "value", False) is True
+        and not mlag_active
+        and len(set(adapter["switches"])) >= 2
+    ):
+        adapter["ethernet_segment"] = {"short_esi": "auto"}
+
+
 def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inherently branchy
     interfaces: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges],
     hostname: str,
+    *,
+    mlag_active: bool = False,
 ) -> list[ServerEndpoint]:
     """Extract connected endpoints (servers) from device interfaces.
 
@@ -243,12 +263,7 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
                     # Detect port-channel on the remote (server) endpoint
                     endpoint_lag = getattr(endpoint, "lag", None)
                     if endpoint_lag and endpoint_lag.node:
-                        lag_node = endpoint_lag.node
-                        port_channel: dict[str, str] = {"mode": "active"}
-                        lacp_mode = getattr(lag_node, "lacp_mode", None)
-                        if lacp_mode and lacp_mode.value:
-                            port_channel["mode"] = lacp_mode.value
-                        adapter["port_channel"] = port_channel
+                        apply_lag_adapter_config(adapter, endpoint_lag.node, mlag_active=mlag_active)
 
                     # Determine mode and add VLAN config
                     if tagged_vlans:
@@ -776,9 +791,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         iface_edges = device.interfaces.edges or []
         uplinks = extract_uplinks_from_dict(iface_edges, uplink_role, device_id)
 
-        # Extract connected endpoints (servers)
-        connected_endpoints = extract_connected_endpoints(iface_edges, hostname)
-
         is_l2leaf = role == "l2leaf"
 
         # Extract fabric L3LS settings (with backwards-compatible fallbacks)
@@ -835,6 +847,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                         mlag_peer_ifaces.append(iface.name.value)
                 if mlag_peer_ifaces:
                     mlag_info["mlag_peer_interfaces"] = sorted(mlag_peer_ifaces)
+
+        # Extract connected endpoints (servers)
+        connected_endpoints = extract_connected_endpoints(
+            iface_edges,
+            hostname,
+            mlag_active=bool(mlag_info["domain_id"]),
+        )
 
         # Fetch EVPN tenants (not applicable for L2 leafs)
         tenants_data: list[dict[str, Any]] = []

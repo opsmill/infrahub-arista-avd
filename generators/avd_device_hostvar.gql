@@ -318,6 +318,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                   lacp_mode {
                                     value
                                   }
+                                  evpn_ethernet_segment {
+                                    value
+                                  }
                                 }
                               }
                             }
