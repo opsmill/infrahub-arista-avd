@@ -39,8 +39,7 @@ def _domain(domain_id: str, *, domain_uuid: str | None = None, asn: int | None =
 
 def _filters_side_effect(
     *,
-    desired_domains: list[SimpleNamespace] | None = None,
-    legacy_domains: list[SimpleNamespace] | None = None,
+    domains: list[SimpleNamespace] | None = None,
     used_devices: list[SimpleNamespace] | None = None,
     used_domains: list[SimpleNamespace] | None = None,
 ) -> Callable[..., Coroutine[Any, Any, list[SimpleNamespace]]]:
@@ -49,9 +48,7 @@ def _filters_side_effect(
         kind_name = kind if isinstance(kind, str) else getattr(kind, "__name__", str(kind))
 
         if kind_name == "MlagDomain" and kwargs.get("domain_id__value") == "DC1_BORDER":
-            return desired_domains or []
-        if kind_name == "MlagDomain" and kwargs.get("domain_id__value") == "mlag-DC1_BORDER":
-            return legacy_domains or []
+            return domains or []
         if kind_name == "NetworkPod":
             return [SimpleNamespace(id="pod-1")]
         if kind_name == "DcimDevice":
@@ -161,13 +158,9 @@ async def test_mlag_disabled_leafs_allocate_device_asns() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_mlag_pairs_migrates_legacy_domain_and_reuses_peer_asn() -> None:
+async def test_create_mlag_pairs_reuses_existing_domain_asn() -> None:
     gen = _make_generator()
-    gen.leaf_switches[0].bgp_asn.value = 65114
-    gen.leaf_switches[1].bgp_asn.value = 65116
-    gen.client.filters = AsyncMock(
-        side_effect=_filters_side_effect(legacy_domains=[_domain("mlag-DC1_BORDER", domain_uuid="legacy-id")])
-    )
+    gen.client.filters = AsyncMock(side_effect=_filters_side_effect(domains=[_domain("DC1_BORDER", asn=65114)]))
     mlag_domain = MagicMock()
     mlag_domain.save = AsyncMock()
     gen.client.create.return_value = mlag_domain
@@ -177,7 +170,6 @@ async def test_create_mlag_pairs_migrates_legacy_domain_and_reuses_peer_asn() ->
 
     gen.client.create.assert_awaited_once_with(
         "MlagDomain",
-        id="legacy-id",
         domain_id="DC1_BORDER",
         bgp_asn=65114,
         peers=[{"id": "leaf-a"}, {"id": "leaf-b"}],
