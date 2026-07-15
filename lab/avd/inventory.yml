@@ -1,0 +1,115 @@
+---
+all:
+  children:
+    # =========================================================================
+    # Fabric — all devices
+    # =========================================================================
+    INFRAHUB_AVD:
+      vars:
+        fabric_name: INFRAHUB_AVD
+        ansible_user: admin
+        ansible_connection: httpapi
+        ansible_network_os: eos
+        ansible_become: true
+        ansible_httpapi_use_ssl: true
+        ansible_httpapi_validate_certs: false
+        cv_server: www.cv-prod-euwest-2.arista.io
+        cv_token: "{{ lookup('file', '../../global/service-accounts/cvaas-mtache-lab-black.tok') }}"
+        cv_verify_certs: true
+        anta_user: admin
+        anta_password: admin
+      children:
+        # =====================================================================
+        # DC1 — 2 spines + 2 border leaves + 2 access leaves
+        # =====================================================================
+        DC1:
+          vars:
+            dc_name: DC1
+            pod_name: DC1_POD1
+          children:
+            DC1_SPINES:
+              vars:
+                type: spine
+              hosts:
+                ih-dc1-spine1:
+                  ansible_host: clab-infrahub-avd-ih-dc1-spine1
+                  serial_number: INFRAHUB001
+                ih-dc1-spine2:
+                  ansible_host: clab-infrahub-avd-ih-dc1-spine2
+                  serial_number: INFRAHUB002
+            DC1_LEAVES:
+              vars:
+                type: l3leaf
+              children:
+                DC1_BORDER:
+                  hosts:
+                    ih-dc1-leaf1a:
+                      ansible_host: clab-infrahub-avd-ih-dc1-leaf1a
+                      serial_number: INFRAHUB003
+                    ih-dc1-leaf1b:
+                      ansible_host: clab-infrahub-avd-ih-dc1-leaf1b
+                      serial_number: INFRAHUB004
+                DC1_ACCESS:
+                  hosts:
+                    ih-dc1-leaf2a:
+                      ansible_host: clab-infrahub-avd-ih-dc1-leaf2a
+                      serial_number: INFRAHUB005
+                    ih-dc1-leaf2b:
+                      ansible_host: clab-infrahub-avd-ih-dc1-leaf2b
+                      serial_number: INFRAHUB006
+
+        # =====================================================================
+        # DC2 — 2 spines + 2 border leaves + 2 access leaves
+        # =====================================================================
+        DC2:
+          vars:
+            dc_name: DC2
+            pod_name: DC2_POD1
+          children:
+            DC2_SPINES:
+              vars:
+                type: spine
+              hosts:
+                ih-dc2-spine1:
+                  ansible_host: clab-infrahub-avd-ih-dc2-spine1
+                  serial_number: INFRAHUB011
+                ih-dc2-spine2:
+                  ansible_host: clab-infrahub-avd-ih-dc2-spine2
+                  serial_number: INFRAHUB012
+            DC2_LEAVES:
+              vars:
+                type: l3leaf
+              children:
+                DC2_BORDER:
+                  hosts:
+                    ih-dc2-leaf1a:
+                      ansible_host: clab-infrahub-avd-ih-dc2-leaf1a
+                      serial_number: INFRAHUB013
+                    ih-dc2-leaf1b:
+                      ansible_host: clab-infrahub-avd-ih-dc2-leaf1b
+                      serial_number: INFRAHUB014
+                DC2_ACCESS:
+                  hosts:
+                    ih-dc2-leaf2a:
+                      ansible_host: clab-infrahub-avd-ih-dc2-leaf2a
+                      serial_number: INFRAHUB015
+                    ih-dc2-leaf2b:
+                      ansible_host: clab-infrahub-avd-ih-dc2-leaf2b
+                      serial_number: INFRAHUB016
+
+    # =========================================================================
+    # Functional groups
+    # =========================================================================
+    NETWORK_SERVICES:
+      children:
+        DC1_BORDER:
+        DC1_ACCESS:
+        DC2_BORDER:
+        DC2_ACCESS:
+
+    CONNECTED_ENDPOINTS:
+      children:
+        DC1_BORDER:
+        DC1_ACCESS:
+        DC2_BORDER:
+        DC2_ACCESS:

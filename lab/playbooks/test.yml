@@ -1,0 +1,9 @@
+---
+- name: Network testing using ANTA
+  hosts: all
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Run ANTA tests
+      ansible.builtin.import_role:
+        name: arista.avd.anta_runner
