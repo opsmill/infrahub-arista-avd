@@ -21,9 +21,9 @@
 #                               ${CV_TOKEN_BIND} (no-CVaaS lab).
 # =============================================================================
 ifeq ($(USE_ZTP),1)
-  CV_TOKEN_BIND ?= ../global/ztp:/mnt/usb1/ztp:ro
+  CV_TOKEN_BIND ?= ../ztp:/mnt/usb1/ztp:ro
 else ifneq ($(LAB_ONBOARDING_TOKEN),)
-  CV_TOKEN_BIND ?= ../global/ztp/$(LAB_ONBOARDING_TOKEN):/mnt/flash/cv-onboarding-token:ro
+  CV_TOKEN_BIND ?= ../ztp/$(LAB_ONBOARDING_TOKEN):/mnt/flash/cv-onboarding-token:ro
 endif
 
 .PHONY: start stop destroy
@@ -38,7 +38,7 @@ destroy:
 	containerlab destroy --cleanup --keep-mgmt-net
 
 # Ansible
-ANSIBLE_CONFIG ?= ../global/ansible.cfg
+ANSIBLE_CONFIG ?= ansible.cfg
 ANSIBLE_INVENTORY ?=  avd/inventory.yml
 ANSIBLE_PLAYBOOK = ANSIBLE_CONFIG=${ANSIBLE_CONFIG} ${EXTRA_ANSIBLE_ARGS} ${UV} ansible-playbook -i ${ANSIBLE_INVENTORY}
 
@@ -57,24 +57,24 @@ graph:
 .PHONY: build deploy workspace eapi-deploy eapi-check test
 
 build:
-	${ANSIBLE_PLAYBOOK} ../global/playbooks/build.yml
+	${ANSIBLE_PLAYBOOK} playbooks/build.yml
 
 # Submit workspace only, do not execute change control
 workspace:
-	${ANSIBLE_PLAYBOOK} ../global/playbooks/deploy.yml
+	${ANSIBLE_PLAYBOOK} playbooks/deploy.yml
 
 # Execute change control after submit workspace
 deploy:
-	${ANSIBLE_PLAYBOOK} ../global/playbooks/deploy.yml -e cv_run_change_control=true
+	${ANSIBLE_PLAYBOOK} playbooks/deploy.yml -e cv_run_change_control=true
 
 eapi-check:
-	${ANSIBLE_PLAYBOOK} ../global/playbooks/deploy-eapi.yml --diff --check
+	${ANSIBLE_PLAYBOOK} playbooks/deploy-eapi.yml --diff --check
 
 eapi-deploy:
-	${ANSIBLE_PLAYBOOK} ../global/playbooks/deploy-eapi.yml --diff
+	${ANSIBLE_PLAYBOOK} playbooks/deploy-eapi.yml --diff
 
 test:
-	${ANSIBLE_PLAYBOOK} ../global/playbooks/test.yml
+	${ANSIBLE_PLAYBOOK} playbooks/test.yml
 
 .PHONY: clean
 clean:

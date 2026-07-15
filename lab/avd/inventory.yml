@@ -14,7 +14,7 @@ all:
         ansible_httpapi_use_ssl: true
         ansible_httpapi_validate_certs: false
         cv_server: www.cv-prod-euwest-2.arista.io
-        cv_token: "{{ lookup('file', '../../global/service-accounts/cvaas-mtache-lab-black.tok') }}"
+        # cv_token: "{{ lookup('file', '../../global/service-accounts/cvaas-mtache-lab-black.tok') }}"
         cv_verify_certs: true
         anta_user: admin
         anta_password: admin

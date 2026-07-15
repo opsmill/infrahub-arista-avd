@@ -3,17 +3,13 @@
 # =============================================================================
 cv_settings:
   cvaas:
-    enabled: true
+    enabled: false
     clusters:
       - name: cvaas
         token_file: /mnt/flash/cv-onboarding-token
   terminattr:
     smashexcludes: ale,flexCounter,kni,pulse,strata
     disable_aaa: true
-
-custom_structured_configuration_daemon_terminattr:
-  cvtargetconfigs:
-    - arista/traffic-policy
 
 generate_cv_tags:
   topology_hints: true

@@ -12,7 +12,7 @@ topology:
       startup-config: avd/intended/configs/__clabNodeName__.cfg
       binds:
         - configs/ceos-config/__clabNodeName__.cfg:/mnt/flash/ceos-config:ro
-        - ${CV_TOKEN_BIND}
+        # - ${CV_TOKEN_BIND}
     linux:
       image: lab-server
 
