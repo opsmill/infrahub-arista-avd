@@ -668,46 +668,39 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         hostvars[node_type_key] = hostvars.get(node_type_key, {})
         hostvars[node_type_key]["nodes"] = [node_config]
 
-        # Group leaf devices by their Infrahub rack name. MLAG-disabled racks must
-        # disable MLAG at the node-group level rather than in l3leaf.defaults.
+        # Assemble the leaf node_group. MLAG grouping is a per-pair concept, so an
+        # MLAG leaf is grouped by its MLAG domain (which is pair-unique — a rack with
+        # multiple pairs yields several domains) and lists only its peer pair. A
+        # non-MLAG rack groups every rack leaf together and disables MLAG at the
+        # node-group level rather than in l3leaf.defaults.
         if role == "leaf":
-            rack_name = rack_info.get("name")
-            leaf_names = list(rack_info.get("leaf_names", []))
-            if not leaf_names:
-                leaf_names = list(mlag_info.get("peer_names", []))
-            if hostname not in leaf_names:
-                leaf_names.append(hostname)
-            leaf_names = sorted(dict.fromkeys(leaf_names))
-
-            if rack_name:
-                node_group: dict[str, Any] = {
-                    "group": rack_name,
-                    "nodes": [{"name": leaf_name} for leaf_name in leaf_names],
-                }
-                if mlag_info["domain_id"]:
-                    node_group["mlag_domain_id"] = mlag_info["domain_id"]
-                    mlag_bgp_asn = mlag_info.get("bgp_asn")
-                    if mlag_bgp_asn is None:
-                        msg = f"MLAG domain {mlag_info['domain_id']} for leaf {hostname} has no BGP ASN"
-                        raise ValueError(msg)
-                    effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
-                    node_group["bgp_as"] = str(mlag_bgp_asn)
-                    if effective_vrmac:
-                        node_group["virtual_router_mac_address"] = effective_vrmac
-                elif rack_info.get("mlag") is False:
-                    node_group["mlag"] = False
-                hostvars[node_type_key]["node_groups"] = [node_group]
-            elif mlag_info["domain_id"]:
+            if mlag_info["domain_id"]:
                 mlag_bgp_asn = mlag_info.get("bgp_asn")
                 if mlag_bgp_asn is None:
                     msg = f"MLAG domain {mlag_info['domain_id']} for leaf {hostname} has no BGP ASN"
                     raise ValueError(msg)
+                pair_names = sorted(dict.fromkeys([*mlag_info.get("peer_names", []), hostname]))
+                node_group: dict[str, Any] = {
+                    "group": mlag_info["domain_id"],
+                    "nodes": [{"name": name} for name in pair_names],
+                    "mlag_domain_id": mlag_info["domain_id"],
+                    "bgp_as": str(mlag_bgp_asn),
+                }
                 effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
-                node_group = {"group": mlag_info["domain_id"], "nodes": [{"name": name} for name in leaf_names]}
-                node_group["bgp_as"] = str(mlag_bgp_asn)
                 if effective_vrmac:
                     node_group["virtual_router_mac_address"] = effective_vrmac
                 hostvars[node_type_key]["node_groups"] = [node_group]
+            else:
+                rack_name = rack_info.get("name")
+                leaf_names = sorted(dict.fromkeys([*rack_info.get("leaf_names", []), hostname]))
+                if rack_name:
+                    node_group = {
+                        "group": rack_name,
+                        "nodes": [{"name": leaf_name} for leaf_name in leaf_names],
+                    }
+                    if rack_info.get("mlag") is False:
+                        node_group["mlag"] = False
+                    hostvars[node_type_key]["node_groups"] = [node_group]
 
         if tenants_data:
             hostvars["tenants"] = tenants_data

@@ -72,6 +72,8 @@ def _make_generator() -> RackGenerator:
     gen.pod_id = "pod-1"
     gen.rack_name = "DC1_BORDER"
     gen.rack_amount_of_leafs = 2
+    gen.rack_mlag = True
+    gen.rack_mlag_enabled = True
     gen.rack_index = 1
     gen.rack_id = "rack-1"
     gen.rack_leaf_switch_template = "leaf-template"
@@ -98,6 +100,7 @@ def test_is_mlag_enabled_defaults_to_enabled(value: object) -> None:
 async def test_create_mlag_pairs_skips_when_rack_mlag_false() -> None:
     gen = _make_generator()
     gen.rack_mlag = False
+    gen.rack_mlag_enabled = False
 
     await gen.create_mlag_pairs()
 

@@ -101,6 +101,86 @@ def test_mlag_leaf_uses_rack_node_group_and_domain_id() -> None:
     assert not validate_inputs(hostvars).validation_result.violations
 
 
+def _leaf_hostvars(
+    *,
+    hostname: str,
+    node_id: int,
+    rack_info: dict,
+    mlag_info: dict,
+) -> dict:
+    """Build leaf hostvars with an arbitrary hostname / rack / MLAG context."""
+    return GenerateAVDDeviceHostvar._build_hostvars(
+        hostname=hostname,
+        role="leaf",
+        bgp_asn=65000 + node_id,
+        node_id=node_id,
+        loopback_ip=f"10.0.0.{node_id}",
+        mgmt_ip=f"192.168.0.{node_id}",
+        fabric_name="Fabric-A",
+        mgmt_gateway=None,
+        virtual_router_mac="00:1c:73:00:00:99",
+        underlay_routing_protocol="ebgp",
+        overlay_routing_protocol="ebgp",
+        p2p_uplinks_mtu=9000,
+        spanning_tree_mode="mstp",
+        spanning_tree_priority=4096,
+        loopback_ipv4_offset=None,
+        bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
+        management={},
+        pools={
+            "uplink_ipv4_pool": "10.1.0.0/24",
+            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
+            "loopback_ipv4_pool": "10.0.0.0/24",
+            "mlag_peer_ipv4_pool": None,
+            "mlag_peer_l3_ipv4_pool": None,
+        },
+        uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        rack_info=rack_info,
+        mlag_info=mlag_info,
+        tenants_data=[],
+        connected_endpoints=[],
+    )
+
+
+def test_multi_pair_rack_keeps_mlag_pairs_in_separate_node_groups() -> None:
+    """A rack with two MLAG pairs (4 leafs) must not collapse into one node group.
+
+    Each leaf is grouped by its own pair-unique MLAG domain and lists only its
+    peer pair — never all four rack leafs under a single group/domain.
+    """
+    rack_leaf_names = ["leaf1", "leaf2", "leaf3", "leaf4"]
+
+    def mlag(domain_id: str, peers: list[str], asn: int) -> dict:
+        return {"domain_id": domain_id, "bgp_asn": asn, "virtual_router_mac": None, "peer_names": peers}
+
+    def rack() -> dict:
+        return {"name": "Rack-X", "mlag": True, "leaf_names": rack_leaf_names}
+
+    leaf1 = _leaf_hostvars(
+        hostname="leaf1", node_id=1, rack_info=rack(), mlag_info=mlag("Rack-X", ["leaf1", "leaf2"], 65010)
+    )
+    leaf3 = _leaf_hostvars(
+        hostname="leaf3", node_id=3, rack_info=rack(), mlag_info=mlag("Rack-X-2", ["leaf3", "leaf4"], 65011)
+    )
+
+    group1 = leaf1["l3leaf"]["node_groups"][0]
+    group3 = leaf3["l3leaf"]["node_groups"][0]
+
+    assert group1["group"] == "Rack-X"
+    assert group1["mlag_domain_id"] == "Rack-X"
+    assert group1["bgp_as"] == "65010"
+    assert group1["nodes"] == [{"name": "leaf1"}, {"name": "leaf2"}]
+
+    assert group3["group"] == "Rack-X-2"
+    assert group3["mlag_domain_id"] == "Rack-X-2"
+    assert group3["bgp_as"] == "65011"
+    assert group3["nodes"] == [{"name": "leaf3"}, {"name": "leaf4"}]
+
+    # The two pairs must remain distinct groups with distinct ASNs.
+    assert group1["group"] != group3["group"]
+    assert group1["bgp_as"] != group3["bgp_as"]
+
+
 def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict:
     return GenerateAVDDeviceHostvar._build_hostvars(
         hostname=hostname,

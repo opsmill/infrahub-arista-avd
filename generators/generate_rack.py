@@ -153,6 +153,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             await trigger_hostvar_generation(self.client)
 
     async def create_leaf_switches(self) -> None:
+        # MLAG leafs share an ASN allocated onto the MLAG domain, so they must not
+        # draw a per-device ASN from the fabric pool. Non-MLAG leafs allocate directly.
+        asn_pool = None if self.rack_mlag_enabled else self.asn_pool
         for index in range(1, self.rack_amount_of_leafs + 1):
             leaf_switch = await self.create_avd_device(
                 name=f"leaf-{self.pod_name}-{self.rack_index}-{index}",
@@ -162,11 +165,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 rack_id=self.rack_id,
                 index=index,
                 loopback_pool=self.loopback_pool,
-                asn_pool=None
-                if getattr(
-                    self, "rack_mlag_enabled", getattr(self, "rack_mlag", True) and self.rack_amount_of_leafs >= 2
-                )
-                else self.asn_pool,
+                asn_pool=asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,
             )
@@ -179,10 +178,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         - Create MlagDomain with both leafs as peers
         AVD auto-generates the switch-side Port-Channel from mlag_interfaces in hostvars.
         """
-        rack_mlag_enabled = getattr(
-            self, "rack_mlag_enabled", getattr(self, "rack_mlag", True) and len(self.leaf_switches) >= 2
-        )
-        if not rack_mlag_enabled:
+        if not self.rack_mlag_enabled:
             self.logger.info(f"Rack {self.rack_name}: MLAG disabled or fewer than 2 leafs, skipping MLAG pair creation")
             return
 
