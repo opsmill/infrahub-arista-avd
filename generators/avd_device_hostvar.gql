@@ -41,6 +41,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             domain_id {
               value
             }
+            bgp_asn {
+              value
+            }
             virtual_router_mac {
               value
             }

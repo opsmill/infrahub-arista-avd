@@ -501,10 +501,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         """Extract MLAG domain info for a device, including peer names."""
         device_mlag_domain = getattr(device, "mlag_domain", None)
         if not device_mlag_domain or not device_mlag_domain.node:
-            return {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
+            return {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []}
 
         mlag_domain = device_mlag_domain.node
         domain_id = mlag_domain.domain_id.value if mlag_domain.domain_id else None
+        bgp_asn = mlag_domain.bgp_asn.value if getattr(mlag_domain, "bgp_asn", None) else None
         vrmac = getattr(mlag_domain, "virtual_router_mac", None)
 
         # Extract all peer names from the MLAG domain
@@ -518,6 +519,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return {
             "domain_id": domain_id,
+            "bgp_asn": bgp_asn,
             "virtual_router_mac": vrmac.value if vrmac else None,
             "peer_names": peer_names,
         }
@@ -582,7 +584,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         node_config: dict[str, Any] = {"name": hostname}
         if node_id is not None:
             node_config["id"] = node_id
-        if bgp_asn is not None:
+        is_mlag_leaf = bool(mlag_info.get("domain_id")) and role == "leaf"
+        if bgp_asn is not None and not is_mlag_leaf:
             node_config["bgp_as"] = str(bgp_asn)
         if loopback_ip:
             node_config["loopback_ipv4_address"] = loopback_ip
@@ -683,19 +686,25 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 }
                 if mlag_info["domain_id"]:
                     node_group["mlag_domain_id"] = mlag_info["domain_id"]
+                    mlag_bgp_asn = mlag_info.get("bgp_asn")
+                    if mlag_bgp_asn is None:
+                        msg = f"MLAG domain {mlag_info['domain_id']} for leaf {hostname} has no BGP ASN"
+                        raise ValueError(msg)
                     effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
-                    if bgp_asn is not None:
-                        node_group["bgp_as"] = str(bgp_asn)
+                    node_group["bgp_as"] = str(mlag_bgp_asn)
                     if effective_vrmac:
                         node_group["virtual_router_mac_address"] = effective_vrmac
                 elif rack_info.get("mlag") is False:
                     node_group["mlag"] = False
                 hostvars[node_type_key]["node_groups"] = [node_group]
             elif mlag_info["domain_id"]:
+                mlag_bgp_asn = mlag_info.get("bgp_asn")
+                if mlag_bgp_asn is None:
+                    msg = f"MLAG domain {mlag_info['domain_id']} for leaf {hostname} has no BGP ASN"
+                    raise ValueError(msg)
                 effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
                 node_group = {"group": mlag_info["domain_id"], "nodes": [{"name": name} for name in leaf_names]}
-                if bgp_asn is not None:
-                    node_group["bgp_as"] = str(bgp_asn)
+                node_group["bgp_as"] = str(mlag_bgp_asn)
                 if effective_vrmac:
                     node_group["virtual_router_mac_address"] = effective_vrmac
                 hostvars[node_type_key]["node_groups"] = [node_group]
@@ -795,7 +804,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract rack and MLAG domain info (only for L3 leaf devices)
         rack_info: RackInfo = {"name": None, "mlag": None, "leaf_names": []}
-        mlag_info: dict[str, Any] = {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
+        mlag_info: dict[str, Any] = {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []}
         if not is_l2leaf:
             rack_info = self._extract_rack_info(device)
             mlag_info = self._extract_mlag_info(device)

@@ -67,6 +67,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.rack_amount_of_leafs: int = data.location_rack.edges[0].node.amount_of_leafs.value
         rack_mlag_attr = data.location_rack.edges[0].node.mlag
         self.rack_mlag: bool = is_mlag_enabled(None if rack_mlag_attr is None else rack_mlag_attr.value)
+        self.rack_mlag_enabled: bool = self.rack_mlag and self.rack_amount_of_leafs >= 2
         self.logger.info(f"Rack {self.rack_name}: mlag_enabled={self.rack_mlag}")
         self.leaf_switches = []
         self.l2leaf_switches: list[DcimDevice] = []
@@ -161,7 +162,11 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 rack_id=self.rack_id,
                 index=index,
                 loopback_pool=self.loopback_pool,
-                asn_pool=self.asn_pool,
+                asn_pool=None
+                if getattr(
+                    self, "rack_mlag_enabled", getattr(self, "rack_mlag", True) and self.rack_amount_of_leafs >= 2
+                )
+                else self.asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,
             )
@@ -174,13 +179,16 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         - Create MlagDomain with both leafs as peers
         AVD auto-generates the switch-side Port-Channel from mlag_interfaces in hostvars.
         """
-        if not getattr(self, "rack_mlag", True):
-            self.logger.info(f"Rack {self.rack_name}: MLAG disabled, skipping MLAG pair creation")
+        rack_mlag_enabled = getattr(
+            self, "rack_mlag_enabled", getattr(self, "rack_mlag", True) and len(self.leaf_switches) >= 2
+        )
+        if not rack_mlag_enabled:
+            self.logger.info(f"Rack {self.rack_name}: MLAG disabled or fewer than 2 leafs, skipping MLAG pair creation")
             return
 
-        if len(self.leaf_switches) < 2:
-            self.logger.info(f"Rack {self.rack_name}: fewer than 2 leafs, skipping MLAG pair creation")
-            return
+        if self.asn_pool is None:
+            msg = f"Rack {self.rack_name}: MLAG is enabled but the parent fabric has no ASN pool"
+            raise ValueError(msg)
 
         for pair_idx in range(0, len(self.leaf_switches) - 1, 2):
             leaf_a = self.leaf_switches[pair_idx]
@@ -194,12 +202,25 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             mlag_domain = await self.client.create(
                 "MlagDomain",
                 domain_id=domain_id,
+                bgp_asn=self.asn_pool,
                 peers=[{"id": leaf_a.id}, {"id": leaf_b.id}],
                 pod={"id": self.pod_id},
             )
             await mlag_domain.save(allow_upsert=True)
 
-            self.logger.info(f"MLAG domain {domain_id} created successfully")
+            mlag_domain = await self.client.get(kind="MlagDomain", domain_id__value=domain_id)
+            mlag_asn_attr = getattr(mlag_domain, "bgp_asn", None)
+            mlag_asn = mlag_asn_attr.value if mlag_asn_attr else None
+            if mlag_asn is None:
+                msg = f"MLAG domain {domain_id} did not receive a BGP ASN from the fabric ASN pool"
+                raise ValueError(msg)
+
+            leaf_a.bgp_asn.value = mlag_asn
+            leaf_b.bgp_asn.value = mlag_asn
+            await leaf_a.save(allow_upsert=True)
+            await leaf_b.save(allow_upsert=True)
+
+            self.logger.info(f"MLAG domain {domain_id} created successfully with ASN {mlag_asn}")
 
     async def connect_leafs_to_spine(self) -> None:
         spine_interfaces = await self.client.filters(

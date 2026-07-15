@@ -80,12 +80,17 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain(BaseModel):
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNode(BaseModel):
     id: str
     domain_id: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeDomainId | None
+    bgp_asn: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeBgpAsn | None
     virtual_router_mac: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeVirtualRouterMac | None
     peers: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeers
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeDomainId(BaseModel):
     value: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeBgpAsn(BaseModel):
+    value: Any | None
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeVirtualRouterMac(BaseModel):

@@ -404,6 +404,7 @@ class NetworkDnsServer(CoreNode):
 
 
 class MlagDomain(GenericMlagDomain):
+    bgp_asn: IntegerOptional
     domain_id: String
     reload_delay: Integer
     virtual_router_mac: StringOptional
@@ -1476,6 +1477,7 @@ class ProfileLocationRack(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileMlagDomain(LineageSource, CoreProfile, CoreNode):
+    bgp_asn: IntegerOptional
     profile_name: String
     profile_priority: Integer
     reload_delay: IntegerOptional
@@ -1929,4 +1931,3 @@ class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTem
     subscriber_of_groups: RelationshipManager[CoreGroup]
     subscriber_of_groups_for_instances: RelationshipManager[CoreGroup]
     vcpu_from_resource_pool: RelationshipAttribute[CoreNumberPool]
-
