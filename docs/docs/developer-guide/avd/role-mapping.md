@@ -1,6 +1,6 @@
 ---
 title: Role Mapping
-description: Infrahub device roles mapped to pyAVD device types.
+description: Infrahub device roles mapped to PyAVD device types.
 audience: developer
 sidebar_position: 5
 ---
@@ -8,14 +8,14 @@ sidebar_position: 5
 # Role Mapping
 
 :::info Developer Guide
-This page is part of the developer guide. Role names are **pyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
+Role names are **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
 :::
 
-Infrahub's `NetworkDevice.role.value` is a string enum that the hostvars generator maps to a pyAVD `type`. The mapping lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py):
+Infrahub's `DcimDevice.role.value` is a string enum that the hostvars generator maps to a PyAVD `type`. The mapping lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py):
 
 ## Table
 
-| Infrahub role | pyAVD `type` |
+| Infrahub role | PyAVD `type` |
 |---------------|--------------|
 | `super_spine` | `super-spine` |
 | `spine` | `spine` |
@@ -45,7 +45,7 @@ An unrecognised role raises `ValueError` at generation time — Phase 1 will fai
 
 ## Role implications
 
-The role governs several downstream behaviours in the hostvars generator and in pyAVD itself:
+The role governs several downstream behaviours in the hostvars generator and in PyAVD itself:
 
 | Role | Uplink source | Gets EVPN data? | MLAG? |
 |------|---------------|----------------|-------|
@@ -64,4 +64,4 @@ The role mapping is exercised by:
 
 ## Adding a new role
 
-See [Extending the Integration → Add a new device role](./extending.md#add-a-new-device-role).
+See [Extending the Pipeline → Add a new device role](./extending.md#add-a-new-device-role).

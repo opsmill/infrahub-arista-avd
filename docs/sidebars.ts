@@ -3,27 +3,21 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   mainSidebar: [
     'home',
+    'quick-start',
+    'provision-first-fabric',
+    'viewing-artifacts',
+    'troubleshooting',
+    'supported-capabilities',
     {
       type: 'category',
-      label: 'User Guide',
+      label: 'How-to Guides',
       collapsed: false,
-      link: { type: 'doc', id: 'user-guide/index' },
       items: [
-        'user-guide/quick-start',
-        'user-guide/provision-first-fabric',
-        {
-          type: 'category',
-          label: 'How To',
-          collapsed: false,
-          items: [
-            'user-guide/how-to/add-network-segment',
-            'user-guide/how-to/add-server',
-            'user-guide/how-to/create-tenant',
-            'user-guide/how-to/regenerate-fabric',
-          ],
-        },
-        'user-guide/viewing-artifacts',
-        'user-guide/troubleshooting',
+        'how-to/add-network-segment',
+        'how-to/add-server',
+        'how-to/create-tenant',
+        'how-to/regenerate-fabric',
+        'how-to/upgrade-avd-version',
       ],
     },
     {
@@ -36,9 +30,10 @@ const sidebars: SidebarsConfig = {
         'developer-guide/schemas',
         'developer-guide/generators',
         'developer-guide/transforms',
+        'developer-guide/concepts',
         {
           type: 'category',
-          label: 'AVD Integration',
+          label: 'AVD Pipeline',
           collapsed: false,
           items: [
             'developer-guide/avd/overview',

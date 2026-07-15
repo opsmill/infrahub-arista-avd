@@ -4,30 +4,38 @@
 
 The Arista AVD Reference Design models a full Arista datacenter fabric in Infrahub — topology, addressing pools, EVPN configuration, and per-device intent as structured, queryable data. The whole team can browse, filter, and query the fabric through the web UI, GraphQL API, or MCP interface; every change runs through Infrahub branches and proposed changes, with a complete audit trail before it reaches a device.
 
-Designed for network automation teams running AVD with static variable files who need a shared source of truth, API access, and branch-based change control — and for teams evaluating how to operate AVD at scale without building the inventory-to-PyAVD translation layer themselves.
+Designed for network automation teams running AVD with static variable files who need a shared source of truth, API access, and branch-based change control — and for teams evaluating how to operate AVD at scale with a ready-made source of truth and generation pipeline.
+
+**Jump to:** [What it's for](#what-its-for) · [How it works](#how-it-works) · [Quick start](#quick-start) · [What's included](#whats-included) · [Documentation](#documentation)
 
 ## What It's For
 
 - **Generate a complete fabric from a design** — define topology parameters and addressing pools; generators create all super-spines, spines, and leaves, allocate loopback, interconnect, and management addresses, BGP ASNs, and node IDs, and cable devices together automatically.
 - **Render EOS device configurations and documentation** — PyAVD runs inside Infrahub workers and produces EOS CLI configurations, per-device and fabric-level Markdown documentation, and a cabling plan CSV as downloadable artifacts.
-- **Make day-two changes without rebuilding** — edit the design and regenerate; checksum-based idempotency applies changes only to affected objects; branch-aware pools prevent collisions across parallel work.
+- **Make incremental day-two changes** — edit the design and regenerate; checksum-based idempotency applies changes only to affected objects; branch-aware pools prevent collisions across parallel work.
 - **Give other teams access to network data** — the fabric is queryable through the Infrahub Web UI, GraphQL API, and MCP interface; the Streamlit service portal provides guided workflows for stakeholders without API or CLI access.
 - **Track and review every change** — all changes run through Infrahub branches and proposed changes, with a full diff before any change reaches a device.
+
+## How It Works
+
+The full pipeline, from a high-level fabric design to versioned, deployable configuration:
+
+![The AVD + Infrahub pipeline: generate topology, format host vars, run EOS Designs, generate artifacts, and store and version every output in the knowledge graph.](docs/static/img/pipeline.png)
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python package manager)
 - Python 3.11+
-- pyAVD ≥ 6.2.0 (bundled in the custom Docker image — no separate install required)
+- PyAVD ≥ 6.2.0 (bundled in the custom Docker image — no separate install required)
 
 ## Quick Start
 
 ```bash
-# Install Python dependencies, including pyAVD and the Infrahub SDK
+# Install Python dependencies, including PyAVD and the Infrahub SDK
 uv sync --all-packages
 
-# Build the custom Infrahub image (extends the base image with pyAVD — run once)
+# Build the custom Infrahub image (extends the base image with PyAVD — run once)
 export INFRAHUB_BASE_VERSION=1.10.1
 uv run invoke build
 
@@ -40,7 +48,7 @@ uv run invoke load
 
 Open the Infrahub UI at `http://localhost:8000` and the service portal at `http://localhost:8501`.
 
-Then follow [Provision Your First Fabric](#) to run the generator chain and reach rendered EOS artifacts.
+Then follow [Provision Your First Fabric](docs/docs/provision-first-fabric.md) to run the generator chain and reach rendered EOS artifacts.
 
 ## What You'll See
 
@@ -52,6 +60,7 @@ After `invoke load` completes and you run the generator chain on a fabric:
 4. **AVD generators run** — each device's PyAVD host_vars and structured configuration are stored as `AvdArtifact` graph objects.
 5. **Transforms produce artifacts** — EOS device configuration, per-device Markdown documentation, fabric documentation, and a cabling plan CSV are available as downloadable artifacts on each device and fabric object.
 6. **Propose and review** — open a proposed change from the branch; the UI shows a diff of every new object and the rendered artifacts for review before any configuration reaches production.
+7. **Deploy to devices** — apply the rendered configurations to the fabric through the bundled Ansible runner (Semaphore) or CloudVision (CVP/CVaaS).
 
 ## What's Included
 
@@ -78,7 +87,7 @@ After `invoke load` completes and you run the generator chain on a fabric:
   - Provision server into a rack
   - Create EVPN tenant
   - Fabric Design visualization (topology, cabling, settings, EVPN)
-- **Stack** — Docker Compose extending Infrahub 1.10.1 with pyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
+- **Stack** — Docker Compose extending Infrahub 1.10.1 with PyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
 
 | File | What it does |
 |------|-------------|
@@ -90,21 +99,38 @@ After `invoke load` completes and you run the generator chain on a fabric:
 | `triggers.yml` | Event trigger rules wiring schema changes to generator runs |
 | `service_catalog/` | Streamlit service portal |
 | `docker-compose.yml` | Stack definition; docker-compose.override.yml adds the portal and Semaphore |
-| `Dockerfile` | Custom Infrahub image with pyAVD |
+| `Dockerfile` | Custom Infrahub image with PyAVD |
 | `tasks.py` | Invoke task definitions (build, start, stop, load, lint, test) |
 
 > **Note:** Brownfield import (modeling an existing fabric and importing configurations via Infrahub Sync) is available in a guided engagement today — it is not yet a self-serve path.
 
 ## Documentation
 
+The full documentation is under [`docs/`](docs/docs/). Key entry points:
+
 | | |
 |--|--|
-| **Provision a fabric end-to-end** | [Provision Your First Fabric](#) — step-by-step walkthrough from seed data to rendered EOS artifacts |
-| **Use the service portal** | [Get Started](#) — day-two workflows, how-to guides, troubleshooting |
-| **Understand the generator pipeline** | [Architecture Overview](#) — system components, data model, and generator chain |
-| **Understand the AVD pipeline** | [AVD Pipeline Overview](#) — two-phase pipeline, hostvars reference, role mapping |
-| **Extend the integration** | [Extending the Integration](#) — new device roles, transform outputs, schema fields |
-| **Debug pipeline issues** | [Debugging the Pipeline](#) — intermediate-file inspection, single-generator re-runs, common failure modes |
+| **Get the stack running** | [Quick Start](docs/docs/quick-start.md) — prerequisites, install steps, and first load |
+| **Provision a fabric end-to-end** | [Provision Your First Fabric](docs/docs/provision-first-fabric.md) — step-by-step walkthrough from seed data to rendered EOS artifacts |
+| **Check what's supported** | [Supported Capabilities](docs/docs/supported-capabilities.md) — capability matrix (supported / partial / not yet) |
+| **Run a day-two workflow** | [Add a Network Segment](docs/docs/how-to/add-network-segment.md) — and the other how-to guides |
+| **Understand the generator pipeline** | [Architecture Overview](docs/docs/developer-guide/architecture.md) — system components, data model, and generator chain |
+| **Understand the AVD pipeline** | [AVD Pipeline Overview](docs/docs/developer-guide/avd/overview.md) — two-phase pipeline, hostvars reference, role mapping |
+| **Extend the pipeline** | [Extending the Pipeline](docs/docs/developer-guide/avd/extending.md) — new device roles, transform outputs, schema fields |
+| **Debug pipeline issues** | [Debugging the Pipeline](docs/docs/developer-guide/avd/debugging.md) — intermediate-file inspection, single-generator re-runs, common failure modes |
+
+## Community & Support
+
+- **Questions and discussion:** [GitHub Discussions](https://github.com/opsmill/infrahub-arista-avd/discussions)
+- **Bugs and feature requests:** [GitHub Issues](https://github.com/opsmill/infrahub-arista-avd/issues)
+
+## Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [Infrahub](https://github.com/opsmill/infrahub) | The infrastructure data management and automation platform this reference design runs on |
+| [Arista AVD](https://github.com/aristanetworks/avd) | Arista Validated Design — the collection and PyAVD engine that render EOS configurations |
+| [AVD documentation](https://avd.arista.com/) | Upstream AVD reference and PyAVD documentation |
 
 ## About Infrahub
 

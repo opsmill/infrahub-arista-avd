@@ -8,7 +8,7 @@ sidebar_position: 3
 # AVD Transforms
 
 :::info Developer Guide
-This page is part of the developer guide. It documents the transform implementations. To *view* artifacts as an operator, switch to the [user guide](/user-guide/viewing-artifacts).
+Documents the transform implementations. To *view* artifacts as an operator, see [Viewing Artifacts](/viewing-artifacts).
 :::
 
 Three Python transforms turn the data produced by the [two-phase pipeline](./overview.md) into user-facing artifacts. All three are registered in [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml).
@@ -20,7 +20,7 @@ The `*_query.py` files referenced below are **generated** from their matching `.
 | Transform | Target group | Content type | Wraps |
 |-----------|-------------|--------------|-------|
 | `avd_eos_config` | `avd_devices` | `text/plain` | `pyavd.get_device_config()` |
-| `avd_device_doc` | `avd_devices` | `text/markdown` | pyAVD device documentation |
+| `avd_device_doc` | `avd_devices` | `text/markdown` | PyAVD device documentation |
 | `avd_fabric_doc` | `fabrics` | `text/markdown` | `pyavd.get_fabric_documentation()` |
 
 ## `avd_eos_config`
@@ -53,7 +53,7 @@ Renders per-device markdown documentation.
 Flow:
 
 1. Same query as `avd_eos_config` — resolves device and its structured config.
-2. Calls the pyAVD device documentation function on the structured config.
+2. Calls the PyAVD device documentation function on the structured config.
 3. Returns markdown.
 
 ## `avd_fabric_doc`
@@ -107,4 +107,4 @@ Separate from the AVD transforms above, the project also ships a Jinja2 startup-
 
 ## Adding a new transform
 
-See [Extending the Integration → Adding a new transform output](./extending.md#add-a-new-transform-output).
+See [Extending the Pipeline → Adding a new transform output](./extending.md#add-a-new-transform-output).

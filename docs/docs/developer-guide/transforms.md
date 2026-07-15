@@ -8,10 +8,8 @@ sidebar_position: 4
 # Transforms
 
 :::info Developer Guide
-This page is part of the developer guide. It documents the transform implementations. To *view* artifacts as an operator, switch to the [user guide](/user-guide/).
+Documents the transform implementations. To *view* artifacts as an operator, see [Viewing Artifacts](/viewing-artifacts).
 :::
-
-This document describes the data transforms and artifact generation in this solution.
 
 ## Overview
 
@@ -19,7 +17,7 @@ Transforms convert Infrahub data into usable outputs (configs, documentation, co
 
 ## Transform Types
 
-1. **Python Transforms** - Complex logic, external library calls (pyAVD)
+1. **Python Transforms** - Complex logic, external library calls (PyAVD)
 2. **Jinja2 Transforms** - Template-based text generation
 
 ## Transform Architecture
@@ -39,13 +37,13 @@ Transforms convert Infrahub data into usable outputs (configs, documentation, co
 
 **Purpose**: Generate human-readable interface descriptions
 
-**Input**: NetworkInterface
+**Input**: DcimInterface
 **Output**: String like "→ remote-device:Ethernet1"
 
 ```python
 class ComputedInterfaceDescription(InfrahubTransform):
     async def transform(self, data):
-        interface = data["NetworkInterface"]["edges"][0]["node"]
+        interface = data["DcimInterface"]["edges"][0]["node"]
         link = interface.get("link")
         if not link:
             return ""
@@ -76,13 +74,13 @@ leaf-A1-01-1,Ethernet49,spine-A1-1,Ethernet1,uplink
 
 **Purpose**: Convert AVD structured config to EOS CLI
 
-**Input**: NetworkDevice (with AvdArtifact)
+**Input**: DcimDevice (with AvdArtifact)
 **Output**: EOS CLI configuration
 
 ```python
 class AvdEosConfigTransform(InfrahubTransform):
     async def transform(self, data):
-        device = data["NetworkDevice"]["edges"][0]["node"]
+        device = data["DcimDevice"]["edges"][0]["node"]
         artifact = device["avd_artifact"]["node"]
 
         if not artifact["structured_config_identifier"]["value"]:
@@ -128,7 +126,7 @@ class AvdFabricDocTransform(InfrahubTransform):
 
 **Purpose**: Generate per-device documentation
 
-**Input**: NetworkDevice
+**Input**: DcimDevice
 **Output**: Markdown documentation for single device
 
 ## Query Classes
@@ -270,7 +268,7 @@ class MyTransform(InfrahubTransform):
 ```graphql
 # transforms/my_query.gql
 query MyQuery($device_id: String!) {
-  NetworkDevice(ids: [$device_id]) {
+  DcimDevice(ids: [$device_id]) {
     edges {
       node {
         name { value }
