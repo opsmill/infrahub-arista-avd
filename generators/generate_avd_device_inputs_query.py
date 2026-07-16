@@ -278,8 +278,8 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     spanning_tree_mode: (
         GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreeMode | None
     )
-    spanning_tree_priority: (
-        GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePriority | None
+    spanning_tree_priorities: (
+        GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePriorities
     )
     bgp_evpn_overlay_password: (
         GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricBgpEvpnOverlayPassword | None
@@ -289,6 +289,9 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     )
     bgp_mlag_password: (
         GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricBgpMlagPassword | None
+    )
+    avd_custom_hostvars: (
+        GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdCustomHostvars | None
     )
     dns_servers: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServers
     ntp_servers: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricNtpServers
@@ -397,7 +400,43 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     value: str | None
 
 
-class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePriority(BaseModel):
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePriorities(BaseModel):
+    edges: list[
+        GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdges
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdges(
+    BaseModel
+):
+    node: (
+        GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNode
+        | None
+    )
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNode(
+    BaseModel
+):
+    role: (
+        GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNodeRole
+        | None
+    )
+    priority: (
+        GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNodePriority
+        | None
+    )
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNodeRole(
+    BaseModel
+):
+    value: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNodePriority(
+    BaseModel
+):
     value: Any | None
 
 
@@ -411,6 +450,10 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricBgpMlagPassword(BaseModel):
     value: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdCustomHostvars(BaseModel):
+    value: Any | None
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServers(BaseModel):
@@ -897,6 +940,9 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVte
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePriorities.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServers.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServersEdges.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDnsServersEdgesNode.model_rebuild()

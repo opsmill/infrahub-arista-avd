@@ -5,6 +5,7 @@ import logging
 import operator
 from typing import TYPE_CHECKING, Any, TypedDict
 
+import yaml
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
@@ -517,6 +518,30 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return result
 
+    @classmethod
+    def _extract_custom_hostvars(cls, fabric: object) -> dict[str, Any]:
+        """Parse fabric-level custom pyAVD hostvars."""
+        raw_value = cls._gql_val(fabric, "avd_custom_hostvars")
+        if not raw_value:
+            return {}
+
+        parsed = yaml.safe_load(raw_value) if isinstance(raw_value, str) else raw_value
+        if parsed is None:
+            return {}
+        if not isinstance(parsed, dict):
+            raise TypeError("avd_custom_hostvars must be a mapping")
+        return parsed
+
+    @classmethod
+    def _deep_merge(cls, base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+        """Recursively merge overlay into base and return base."""
+        for key, value in overlay.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                cls._deep_merge(base[key], value)
+            else:
+                base[key] = value
+        return base
+
     @staticmethod
     def _extract_mlag_info(device: object) -> dict[str, Any]:
         """Extract MLAG domain info for a device, including peer names."""
@@ -587,7 +612,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         overlay_routing_protocol: str | None,
         p2p_uplinks_mtu: int | None,
         spanning_tree_mode: str | None,
-        spanning_tree_priority: int | None,
+        spanning_tree_priorities: dict[str, int],
         loopback_ipv4_offset: int | None,
         bgp_passwords: dict[str, str | None],
         management: dict[str, Any],
@@ -597,6 +622,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
+        custom_hostvars: dict[str, Any],
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
         avd_type = get_avd_type(role)
@@ -652,9 +678,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if p2p_uplinks_mtu is not None:
             hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
         if spanning_tree_mode:
-            hostvars["spanning_tree_mode"] = spanning_tree_mode
-        if spanning_tree_priority is not None:
-            hostvars["spanning_tree_priority"] = spanning_tree_priority
+            hostvars["spanning_tree_settings"] = {"mode": spanning_tree_mode}
+
+        role_priority = spanning_tree_priorities.get(role)
+        if role_priority is not None:
+            hostvars.setdefault(node_type_key, {})
+            hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
+            hostvars[node_type_key]["defaults"]["spanning_tree_priority"] = role_priority
 
         # Loopback offset for leaf devices
         if loopback_ipv4_offset is not None and role == "leaf":
@@ -729,6 +759,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if connected_endpoints:
             hostvars["servers"] = connected_endpoints
 
+        if custom_hostvars:
+            hostvars = GenerateAVDDeviceHostvar._deep_merge(hostvars, custom_hostvars)
+
         return hostvars
 
     async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
@@ -790,7 +823,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             None if is_l2leaf else self._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu")
         )
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
-        spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
+        spanning_tree_priorities: dict[str, int] = {}
+        spanning_tree_priority_edges = getattr(getattr(fabric, "spanning_tree_priorities", None), "edges", None) or []
+        for edge in spanning_tree_priority_edges:
+            priority_node = edge.node
+            if not priority_node:
+                continue
+            priority_role = self._get_attr_value(priority_node, "role")
+            priority_value = self._get_attr_value(priority_node, "priority")
+            if priority_role and priority_value is not None:
+                spanning_tree_priorities[priority_role] = priority_value
         # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
         loopback_ipv4_offset = (
             None if is_l2leaf else self._get_first_attr_value(pod, "loopback_ipv_4_offset", "loopback_ipv4_offset")
@@ -807,6 +849,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract management settings from fabric (applies to all device types)
         management = self._extract_management_settings(fabric)
+        custom_hostvars = self._extract_custom_hostvars(fabric)
 
         # Extract configurable IP pools (not applicable for L2 leafs)
         if is_l2leaf:
@@ -855,7 +898,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             overlay_routing_protocol=overlay_routing_protocol,
             p2p_uplinks_mtu=p2p_uplinks_mtu,
             spanning_tree_mode=spanning_tree_mode,
-            spanning_tree_priority=spanning_tree_priority,
+            spanning_tree_priorities=spanning_tree_priorities,
             loopback_ipv4_offset=loopback_ipv4_offset,
             bgp_passwords=bgp_passwords,
             management=management,
@@ -865,6 +908,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
+            custom_hostvars=custom_hostvars,
         )
 
         # Validate hostvars against pyAVD schema before saving

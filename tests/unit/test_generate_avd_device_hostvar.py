@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from pyavd import get_avd_facts, validate_inputs
+from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 
 from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar
 
@@ -44,7 +44,7 @@ def _base_hostvars(
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -60,6 +60,7 @@ def _base_hostvars(
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -160,7 +161,7 @@ def _leaf_hostvars(
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -176,6 +177,7 @@ def _leaf_hostvars(
         mlag_info=mlag_info,
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -233,7 +235,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -255,6 +257,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         },
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -288,7 +291,7 @@ def test_mlag_leaf_without_domain_asn_fails() -> None:
 async def test_tenants_hostvars_validate_against_pyavd():
     """EVPN tenant payload (incl. l2vlan vni_override) must pass pyAVD validation.
 
-    Regression guard for the AVD 6.2 upgrade, which renamed the l2vlan key to
+    Regression guard for the AVD 6.3 target, which expects the l2vlan key to be
     `vni_override` and rejects the old `vni` key with an invalid-key error.
     """
     svi = SimpleNamespace(
@@ -374,7 +377,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         overlay_routing_protocol=None,
         p2p_uplinks_mtu=p2p_uplinks_mtu,
         spanning_tree_mode=None,
-        spanning_tree_priority=None,
+        spanning_tree_priorities={},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -386,9 +389,124 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
             "mlag_peer_l3_ipv4_pool": None,
         },
         uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
-        mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
+        rack_info={"name": "Rack-A", "mlag": False, "leaf_names": ["leaf1"]},
+        mlag_info={"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
     assert hostvars["p2p_uplinks_mtu"] == 1500
+
+
+def _role_hostvars(
+    *,
+    role: str,
+    spanning_tree_mode: str | None = "mstp",
+    spanning_tree_priorities: dict[str, int] | None = None,
+    custom_hostvars: dict | None = None,
+) -> dict:
+    hostname = role.replace("_", "-") + "1"
+    return GenerateAVDDeviceHostvar._build_hostvars(
+        hostname=hostname,
+        role=role,
+        bgp_asn=65001,
+        node_id=1,
+        loopback_ip="10.0.0.1",
+        mgmt_ip="192.168.0.1",
+        fabric_name="Fabric-A",
+        mgmt_gateway=None,
+        virtual_router_mac="00:1c:73:00:00:99",
+        underlay_routing_protocol="ebgp",
+        overlay_routing_protocol="ebgp",
+        p2p_uplinks_mtu=9000,
+        spanning_tree_mode=spanning_tree_mode,
+        spanning_tree_priorities=spanning_tree_priorities or {},
+        loopback_ipv4_offset=None,
+        bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
+        management={},
+        pools={
+            "uplink_ipv4_pool": "10.1.0.0/24",
+            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
+            "loopback_ipv4_pool": "10.0.0.0/24",
+            "mlag_peer_ipv4_pool": None,
+            "mlag_peer_l3_ipv4_pool": None,
+        },
+        uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        rack_info={"name": "Rack-A", "mlag": False, "leaf_names": [hostname]},
+        mlag_info={"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
+        tenants_data=[],
+        connected_endpoints=[],
+        custom_hostvars=custom_hostvars or {},
+    )
+
+
+def test_spanning_tree_mode_uses_avd_63_settings_key() -> None:
+    hostvars = _role_hostvars(role="leaf", spanning_tree_mode="mstp")
+
+    assert hostvars["spanning_tree_settings"] == {"mode": "mstp"}
+    assert "spanning_tree_mode" not in hostvars
+
+
+def test_spanning_tree_none_mode_is_emitted_as_settings() -> None:
+    hostvars = _role_hostvars(role="leaf", spanning_tree_mode="none")
+
+    assert hostvars["spanning_tree_settings"] == {"mode": "none"}
+
+
+def test_spanning_tree_legacy_top_level_and_structured_config_are_absent() -> None:
+    hostvars = _role_hostvars(role="leaf", spanning_tree_priorities={"leaf": 8192})
+
+    assert "spanning_tree_mode" not in hostvars
+    assert "spanning_tree_priority" not in hostvars
+    assert "structured_config" not in hostvars["l3leaf"]["nodes"][0]
+
+
+@pytest.mark.parametrize(
+    ("role", "node_type_key", "priority"),
+    [
+        ("super_spine", "super_spine", 4096),
+        ("spine", "spine", 4096),
+        ("leaf", "l3leaf", 8192),
+        ("l2leaf", "l2leaf", 12288),
+    ],
+)
+def test_spanning_tree_priority_is_emitted_under_role_defaults(role: str, node_type_key: str, priority: int) -> None:
+    hostvars = _role_hostvars(role=role, spanning_tree_priorities={role: priority})
+
+    assert hostvars[node_type_key]["defaults"]["spanning_tree_priority"] == priority
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_missing_spanning_tree_priority_lets_pyavd_defaults_apply() -> None:
+    hostvars = _role_hostvars(role="leaf", spanning_tree_priorities={})
+
+    assert "defaults" not in hostvars["l3leaf"] or "spanning_tree_priority" not in hostvars["l3leaf"]["defaults"]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_custom_hostvars_overlay_can_override_spanning_tree_defaults() -> None:
+    hostvars = _role_hostvars(
+        role="leaf",
+        spanning_tree_priorities={"leaf": 8192},
+        custom_hostvars={
+            "spanning_tree_settings": {"mode": "rapid-pvst"},
+            "l3leaf": {"defaults": {"spanning_tree_priority": 4096}},
+        },
+    )
+
+    assert hostvars["spanning_tree_settings"] == {"mode": "rapid-pvst"}
+    assert hostvars["l3leaf"]["defaults"]["spanning_tree_priority"] == 4096
+
+
+def test_pyavd_63_smoke_builds_facts_and_structured_config() -> None:
+    hostvars = _role_hostvars(role="leaf", spanning_tree_priorities={"leaf": 8192})
+    inputs = {"leaf1": hostvars}
+
+    facts = get_avd_facts(inputs)
+    structured_config = get_device_structured_config(hostname="leaf1", inputs=hostvars, avd_facts=facts)
+    structured_config_dict = (
+        structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config
+    )
+
+    assert structured_config_dict["hostname"] == "leaf1"
