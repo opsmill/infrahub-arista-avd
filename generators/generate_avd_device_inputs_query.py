@@ -23,6 +23,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNode(BaseModel):
     role: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRole | None
     asn: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAsn | None
     node_id: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeNodeId | None
+    avd_custom_hostvars: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAvdCustomHostvars | None
     loopback_ip: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIp
     mgmt_ip: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIp
     mlag_domain: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain
@@ -52,6 +53,10 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAsnNodeAsn(BaseModel):
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeNodeId(BaseModel):
+    value: Any | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAvdCustomHostvars(BaseModel):
     value: Any | None
 
 
@@ -196,6 +201,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode(BaseModel):
     loopback_ipv_4_offset: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeLoopbackIpv4Offset | None = Field(
         alias="loopback_ipv4_offset"
     )
+    avd_custom_hostvars: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeAvdCustomHostvars | None
     parent: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParent
 
 
@@ -230,6 +236,10 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagL3PoolNodeName(B
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeLoopbackIpv4Offset(BaseModel):
+    value: Any | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeAvdCustomHostvars(BaseModel):
     value: Any | None
 
 

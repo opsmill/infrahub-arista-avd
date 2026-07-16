@@ -115,6 +115,42 @@ For every interface on the device whose `role.value == "server"`, an entry is em
 - `mode: "access"` + a single `vlans: "100"` for access-only interfaces.
 - `native_vlan: 100` added if an untagged VLAN is configured alongside tagged VLANs.
 
+## AVD custom hostvars escape hatch
+
+`avd_custom_hostvars` is an optional JSON attribute on `NetworkFabric`, `NetworkPod`, and `DcimDevice`. It is intended as an escape hatch for pyAVD hostvars that are not yet modeled by the Infrahub schemas and hostvar generator.
+
+Custom hostvars are merged in this order:
+
+1. `NetworkFabric.avd_custom_hostvars`
+2. `NetworkPod.avd_custom_hostvars`
+3. `DcimDevice.avd_custom_hostvars`
+4. Generated hostvars from Infrahub-modeled data
+
+That means device-level custom values override pod-level custom values, pod-level custom values override fabric-level custom values, and generated hostvars override all custom values. Custom hostvars are fill-only relative to modeled data: they can add keys the generator does not produce, but they cannot replace generated values such as `fabric_name`, role-specific `nodes`, generated tenant data, or generated connected endpoints.
+
+Dictionaries merge recursively. Lists and scalar values replace the lower-precedence value as a whole; there is no element-wise list merge. Missing, `null`, or empty custom values are ignored. Non-empty custom values must be mappings; a list or scalar raises `TypeError` before pyAVD validation runs.
+
+Example:
+
+```json
+{
+  "fabric_name": "ignored-custom-name",
+  "custom_structured_configuration_prefix": ["custom"],
+  "l3leaf": {
+    "defaults": {
+      "platform": "7280R3"
+    },
+    "nodes": [
+      {
+        "name": "ignored-custom-node"
+      }
+    ]
+  }
+}
+```
+
+In the final hostvars, `custom_structured_configuration_prefix` and `l3leaf.defaults.platform` survive if the generator does not set them. The generated `fabric_name` and generated `l3leaf.nodes` still win.
+
 ## Validation
 
 Once the dict is built, Phase 1 calls `pyavd.validate_inputs()` on the whole hostvars object. Validation failures are non-recoverable — the generator returns a failure for that device and does **not** write the `AvdHostvarFile`.

@@ -20,6 +20,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
         node_id {
           value
         }
+        avd_custom_hostvars {
+          value
+        }
         loopback_ip {
           node {
             __typename
@@ -119,6 +122,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
               }
             }
             loopback_ipv4_offset {
+              value
+            }
+            avd_custom_hostvars {
               value
             }
             parent {

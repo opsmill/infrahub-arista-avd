@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+import yaml
 from pyavd import get_avd_facts, validate_inputs
 
 from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar
@@ -17,6 +18,10 @@ def _rel(peers: list[object]) -> SimpleNamespace:
     return SimpleNamespace(fetch=AsyncMock(), peers=[SimpleNamespace(peer=p) for p in peers])
 
 
+def _custom(value: object) -> SimpleNamespace:
+    return SimpleNamespace(avd_custom_hostvars=_attr(value))
+
+
 def _make_generator() -> GenerateAVDDeviceHostvar:
     gen = GenerateAVDDeviceHostvar.__new__(GenerateAVDDeviceHostvar)
     gen.client = AsyncMock()
@@ -28,6 +33,7 @@ def _base_hostvars(
     *,
     rack_info: dict | None = None,
     mlag_info: dict | None = None,
+    custom_hostvars: dict | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -60,6 +66,7 @@ def _base_hostvars(
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
         connected_endpoints=[],
+        custom_hostvars=custom_hostvars or {},
     )
 
 
@@ -282,6 +289,107 @@ def test_mlag_leaf_without_domain_asn_fails() -> None:
                 "peer_names": ["leaf1", "leaf2"],
             },
         )
+
+
+@pytest.mark.parametrize("value", [None, "", {}, []])
+def test_extract_custom_hostvars_ignores_empty_values(value: object) -> None:
+    assert GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom(value)) == {}
+
+
+def test_extract_custom_hostvars_parses_yaml_string() -> None:
+    hostvars = GenerateAVDDeviceHostvar._extract_custom_hostvars(
+        _custom(
+            """
+            custom_structured_configuration_prefix:
+              - custom
+            nested:
+              enabled: true
+            """
+        )
+    )
+
+    assert hostvars == {
+        "custom_structured_configuration_prefix": ["custom"],
+        "nested": {"enabled": True},
+    }
+
+
+@pytest.mark.parametrize("value", [["invalid"], "invalid"])
+def test_extract_custom_hostvars_rejects_non_mapping_values(value: object) -> None:
+    with pytest.raises(TypeError, match="avd_custom_hostvars must be a mapping"):
+        GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom(value))
+
+
+def test_extract_custom_hostvars_rejects_malformed_yaml_string() -> None:
+    with pytest.raises(yaml.YAMLError):
+        GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom("not: [closed"))
+
+
+def test_merge_custom_hostvars_scope_precedence_and_replacement() -> None:
+    merged = GenerateAVDDeviceHostvar._merge_custom_hostvars(
+        {
+            "fabric_only": True,
+            "scope": "fabric",
+            "nested": {"fabric": True, "winner": "fabric"},
+            "servers": [{"name": "fabric-server"}],
+        },
+        {
+            "pod_only": True,
+            "scope": "pod",
+            "nested": {"pod": True, "winner": "pod"},
+            "servers": [{"name": "pod-server"}],
+        },
+        {
+            "device_only": True,
+            "scope": "device",
+            "nested": {"device": True, "winner": "device"},
+        },
+    )
+
+    assert merged == {
+        "fabric_only": True,
+        "pod_only": True,
+        "device_only": True,
+        "scope": "device",
+        "nested": {"fabric": True, "pod": True, "device": True, "winner": "device"},
+        "servers": [{"name": "pod-server"}],
+    }
+
+
+def test_deep_merge_does_not_mutate_inputs() -> None:
+    base = {"nested": {"keep": True, "replace": "base"}, "items": ["base"]}
+    overlay = {"nested": {"replace": "overlay"}, "items": ["overlay"]}
+
+    merged = GenerateAVDDeviceHostvar._deep_merge(base, overlay)
+
+    assert merged == {"nested": {"keep": True, "replace": "overlay"}, "items": ["overlay"]}
+    assert base == {"nested": {"keep": True, "replace": "base"}, "items": ["base"]}
+    assert overlay == {"nested": {"replace": "overlay"}, "items": ["overlay"]}
+
+
+def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
+    custom_hostvars = {
+        "fabric_name": "custom-fabric",
+        "custom_only": {"enabled": True},
+        "l3leaf": {
+            "defaults": {"platform": "custom-platform"},
+            "nodes": [{"name": "custom-leaf", "id": 999}],
+        },
+        "servers": [{"name": "custom-server"}],
+    }
+
+    hostvars = _base_hostvars([], custom_hostvars=custom_hostvars)
+
+    assert hostvars["fabric_name"] == "Fabric-A"
+    assert hostvars["custom_only"] == {"enabled": True}
+    assert hostvars["l3leaf"]["defaults"] == {"platform": "custom-platform"}
+    assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
+    assert hostvars["l3leaf"]["nodes"][0]["id"] == 3
+    assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
+    assert hostvars["l3leaf"]["nodes"][0]["loopback_ipv4_address"] == "10.0.0.3"
+    assert hostvars["l3leaf"]["nodes"][0]["mgmt_ip"] == "192.168.0.3"
+    assert hostvars["servers"] == [{"name": "custom-server"}]
+    assert custom_hostvars["l3leaf"]["nodes"] == [{"name": "custom-leaf", "id": 999}]
 
 
 @pytest.mark.anyio

@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import operator
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, TypedDict
 
+import yaml
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
@@ -517,6 +519,44 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return result
 
+    @classmethod
+    def _extract_custom_hostvars(cls, source: object) -> dict[str, Any]:
+        """Parse custom pyAVD hostvars from a GraphQL object.
+
+        The current schema stores this as JSON to avoid the 4096-character Text
+        limit. Keep string parsing for compatibility with already-loaded data.
+        """
+        raw_value = cls._gql_val(source, "avd_custom_hostvars")
+        if raw_value in (None, "", [], {}):
+            return {}
+
+        parsed = yaml.safe_load(raw_value) if isinstance(raw_value, str) else raw_value
+        if parsed in (None, "", [], {}):
+            return {}
+        if not isinstance(parsed, dict):
+            raise TypeError("avd_custom_hostvars must be a mapping")
+        return deepcopy(parsed)
+
+    @classmethod
+    def _deep_merge(cls, base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+        """Recursively merge ``overlay`` over ``base`` without mutating either input."""
+        merged = deepcopy(base)
+        for key, value in overlay.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = cls._deep_merge(merged[key], value)
+            else:
+                merged[key] = deepcopy(value)
+        return merged
+
+    @classmethod
+    def _merge_custom_hostvars(cls, *scopes: dict[str, Any]) -> dict[str, Any]:
+        """Merge custom hostvar scopes in ascending precedence order."""
+        merged: dict[str, Any] = {}
+        for scope in scopes:
+            if scope:
+                merged = cls._deep_merge(merged, scope)
+        return merged
+
     @staticmethod
     def _extract_mlag_info(device: object) -> dict[str, Any]:
         """Extract MLAG domain info for a device, including peer names."""
@@ -597,6 +637,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
+        custom_hostvars: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
         avd_type = get_avd_type(role)
@@ -729,6 +770,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if connected_endpoints:
             hostvars["servers"] = connected_endpoints
 
+        if custom_hostvars:
+            hostvars = GenerateAVDDeviceHostvar._deep_merge(custom_hostvars, hostvars)
+
         return hostvars
 
     async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
@@ -807,6 +851,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract management settings from fabric (applies to all device types)
         management = self._extract_management_settings(fabric)
+        custom_hostvars = self._merge_custom_hostvars(
+            self._extract_custom_hostvars(fabric),
+            self._extract_custom_hostvars(pod),
+            self._extract_custom_hostvars(device),
+        )
 
         # Extract configurable IP pools (not applicable for L2 leafs)
         if is_l2leaf:
@@ -865,6 +914,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
+            custom_hostvars=custom_hostvars,
         )
 
         # Validate hostvars against pyAVD schema before saving

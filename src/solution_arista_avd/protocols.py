@@ -355,6 +355,7 @@ class RoutingBGPPeerGroup(CoreNode):
 
 
 class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
+    avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
     index: IntegerOptional
     name: String
@@ -672,6 +673,7 @@ class DcimPlatform(CoreNode):
 
 class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
     amount_of_spines: Integer
+    avd_custom_hostvars: JSONAttributeOptional
     checksum: StringOptional
     index: Integer
     leaf_interface_sorting_method: Dropdown
@@ -1027,6 +1029,7 @@ class ProfileDcimConnector(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileDcimDevice(LineageSource, CoreProfile, CoreNode):
+    avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -1577,6 +1580,7 @@ class ProfileNetworkNtpServer(LineageSource, CoreProfile, CoreNode):
 
 class ProfileNetworkPod(LineageSource, CoreProfile, CoreNode):
     amount_of_spines: IntegerOptional
+    avd_custom_hostvars: JSONAttributeOptional
     checksum: StringOptional
     index: IntegerOptional
     leaf_interface_sorting_method: DropdownOptional
@@ -1926,4 +1930,3 @@ class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTem
     subscriber_of_groups: RelationshipManager[CoreGroup]
     subscriber_of_groups_for_instances: RelationshipManager[CoreGroup]
     vcpu_from_resource_pool: RelationshipAttribute[CoreNumberPool]
-

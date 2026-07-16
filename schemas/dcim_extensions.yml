@@ -41,6 +41,13 @@ extensions:
           label: Node ID
           kind: Number
           optional: true
+        - name: avd_custom_hostvars
+          label: AVD Custom Hostvars
+          kind: JSON
+          optional: true
+          description: >-
+            Escape hatch for pyAVD hostvars not yet modeled by Infrahub schemas/generators. Applies only to this
+            device; generated hostvars take precedence.
       relationships:
         - name: loopback_ip
           peer: IpamIPAddress
