@@ -99,6 +99,17 @@ spec:
           - attribute_name: rack_type
             value_match: any
 
+    - name: trigger-rack-generator-update-mlag
+      branch_scope: "other_branches"
+      node_kind: LocationRack
+      mutation_action: "updated"
+      action: run-rack-generator
+      matches:
+        kind: CoreNodeTriggerAttributeMatch
+        data:
+          - attribute_name: mlag
+            value_match: any
+
     - name: trigger-avd-structured-config-generator-update-avd-hostvars-ready
       branch_scope: "other_branches"
       node_kind: NetworkFabric
