@@ -27,8 +27,8 @@ spec:
   kind: CoreNumberPool
   data:
     - name: Fabric-A-ASN-Pool
-      node: DcimDevice
-      node_attribute: bgp_asn
+      node: RoutingAsn
+      node_attribute: asn
       start_range: 65000
       end_range: 65999
 ---
@@ -51,8 +51,8 @@ spec:
   kind: CoreNumberPool
   data:
     - name: Fabric-B-ASN-Pool
-      node: DcimDevice
-      node_attribute: bgp_asn
+      node: RoutingAsn
+      node_attribute: asn
       start_range: 65100
       end_range: 65199
 ---

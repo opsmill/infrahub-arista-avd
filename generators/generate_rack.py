@@ -169,6 +169,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 role="leaf",
                 object_template_id=self.rack_leaf_switch_template,
                 pod_id=self.pod_id,
+                fabric_id=self.fabric.id,
                 rack_id=self.rack_id,
                 index=index,
                 loopback_pool=self.loopback_pool,
@@ -182,7 +183,10 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         """Create MLAG domains pairing consecutive leaf switches.
 
         For every pair of consecutive leafs (0+1, 2+3, ...):
-        - Create MlagDomain with both leafs as peers
+        - Create an MlagDomain with both leafs as peers.
+        - Allocate a single shared ``Routing.Asn`` from the fabric ASN pool and
+          link it to both leaf devices and the domain via the ``asn``
+          relationship, so the pair presents one BGP ASN (FR-004).
         AVD auto-generates the switch-side Port-Channel from mlag_interfaces in hostvars.
         """
         if not self.rack_mlag_enabled:
@@ -202,17 +206,11 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
             self.logger.info(f"Creating MLAG pair {domain_id}: {leaf_a.name.value} + {leaf_b.name.value}")
 
-            existing_domain = await self._get_existing_mlag_domain(domain_id)
-            mlag_asn = await self._get_or_allocate_mlag_domain_asn(
-                domain_id=domain_id,
-                existing_domains=[existing_domain] if existing_domain is not None else [],
-                leaf_a=leaf_a,
-                leaf_b=leaf_b,
-            )
+            routing_asn_id = await self._get_or_allocate_mlag_asn(domain_id)
 
             domain_kwargs = {
                 "domain_id": domain_id,
-                "bgp_asn": mlag_asn,
+                "asn": {"id": routing_asn_id},
                 "peers": [{"id": leaf_a.id}, {"id": leaf_b.id}],
                 "pod": {"id": self.pod_id},
             }
@@ -223,19 +221,13 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             )
             await mlag_domain.save(allow_upsert=True)
 
-            mlag_domain = await self.client.get(kind="MlagDomain", domain_id__value=domain_id)
-            mlag_asn_attr = getattr(mlag_domain, "bgp_asn", None)
-            mlag_asn = mlag_asn_attr.value if mlag_asn_attr else None
-            if mlag_asn is None:
-                msg = f"MLAG domain {domain_id} did not receive a BGP ASN from the fabric ASN pool"
-                raise ValueError(msg)
+            # Both leaves share the domain's single ASN node.
+            await self._set_device_asn(leaf_a.id, routing_asn_id)
+            await self._set_device_asn(leaf_b.id, routing_asn_id)
 
-            await self._set_device_bgp_asn(leaf_a.id, mlag_asn)
-            await self._set_device_bgp_asn(leaf_b.id, mlag_asn)
-            leaf_a.bgp_asn.value = mlag_asn
-            leaf_b.bgp_asn.value = mlag_asn
-
-            self.logger.info(f"MLAG domain {domain_id} created successfully with ASN {mlag_asn}")
+            self.logger.info(
+                f"MLAG domain {domain_id} created successfully with shared ASN node {routing_asn_id}"
+            )
 
     async def delete_stale_mlag_domains(self) -> None:
         """Delete MLAG domains for this rack before hostvar generation runs.
@@ -300,18 +292,18 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 await hostvar_file.delete()
                 self.logger.info("Invalidated hostvars for %s before targeted regeneration", hostname)
 
-    async def _set_device_bgp_asn(self, device_id: str, bgp_asn: int) -> None:
-        """Update only DcimDevice.bgp_asn without resaving relationships from the SDK object."""
+    async def _set_device_asn(self, device_id: str, routing_asn_id: str) -> None:
+        """Link DcimDevice.asn to a RoutingAsn without resaving the SDK object's relationships."""
         await self.client.execute_graphql(
             query="""
-            mutation SetDeviceBgpAsn($id: String!, $bgp_asn: BigInt!) {
-                DcimDeviceUpsert(data: { id: $id, bgp_asn: { value: $bgp_asn } }) {
+            mutation SetDeviceAsn($id: String!, $asn_id: String!) {
+                DcimDeviceUpsert(data: { id: $id, asn: { id: $asn_id } }) {
                     ok
                     object { id }
                 }
             }
             """,
-            variables={"id": device_id, "bgp_asn": bgp_asn},
+            variables={"id": device_id, "asn_id": routing_asn_id},
         )
 
     async def _get_existing_mlag_domain(self, domain_id: str) -> object | None:
@@ -319,94 +311,26 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         domains = await self.client.filters(kind="MlagDomain", domain_id__value=domain_id)
         return domains[0] if domains else None
 
-    async def _get_or_allocate_mlag_domain_asn(
-        self,
-        *,
-        domain_id: str,
-        existing_domains: list[object],
-        leaf_a: DcimDevice,
-        leaf_b: DcimDevice,
-    ) -> int:
-        """Return the authoritative ASN for an MLAG domain.
+    async def _get_or_allocate_mlag_asn(self, domain_id: str) -> str:
+        """Return the shared ``Routing.Asn`` node id for an MLAG pair, allocating if needed.
 
-        CoreNumberPool objects are bound to one target node kind/attribute.  The
-        fabric ASN pools in this repository target ``DcimDevice.bgp_asn``, so
-        Infrahub rejects using the same pool object directly for
-        ``MlagDomain.bgp_asn``.  Keep the single fabric ASN range model by
-        selecting an available number from that pool range and saving the value
-        directly on the MLAG domain.
+        The idempotency anchor is the existing domain's ``asn`` link: a re-run
+        reuses the same shared ASN node rather than drawing a new number from the
+        pool (FR-007). When no domain exists yet, a new ``RoutingAsn`` is
+        allocated from the fabric ASN pool (FR-004/FR-005).
         """
-        for domain in existing_domains:
-            domain_asn = self._number_attr_value(domain, "bgp_asn")
-            if domain_asn is not None:
-                return domain_asn
-
-        excluded_domain_ids = {domain.id for domain in existing_domains if getattr(domain, "id", None)}
-        used_by_others = await self._collect_used_fabric_asns(
-            excluded_device_ids={leaf_a.id, leaf_b.id},
-            excluded_domain_ids=excluded_domain_ids,
-        )
-
-        start, end = self._asn_pool_range()
-        for asn in range(start, end + 1):
-            if asn not in used_by_others:
-                return asn
-
-        msg = f"Rack {self.rack_name}: no available ASN in fabric ASN pool for MLAG domain {domain_id}"
-        raise ValueError(msg)
-
-    async def _collect_used_fabric_asns(
-        self, *, excluded_device_ids: set[str], excluded_domain_ids: set[str]
-    ) -> set[int]:
-        """Collect BGP ASNs already used by this fabric's devices and MLAG domains."""
-        used: set[int] = set()
-
-        pods = await self.client.filters(kind=NetworkPod, parent__ids=[self.fabric.id])
-        pod_ids = [pod.id for pod in pods]
-        if not pod_ids:
-            return used
-
-        devices = await self.client.filters(kind=DcimDevice, pod__ids=pod_ids)
-        for device in devices:
-            if device.id in excluded_device_ids:
-                continue
-            asn = self._number_attr_value(device, "bgp_asn")
-            if asn is not None and self._asn_is_in_pool(asn):
-                used.add(asn)
-
-        domains = await self.client.filters(kind="MlagDomain", pod__ids=pod_ids)
-        for domain in domains:
-            if domain.id in excluded_domain_ids:
-                continue
-            asn = self._number_attr_value(domain, "bgp_asn")
-            if asn is not None and self._asn_is_in_pool(asn):
-                used.add(asn)
-
-        return used
-
-    def _asn_pool_range(self) -> tuple[int, int]:
-        if self.asn_pool is None:
+        if self.asn_pool is None:  # pragma: no cover - guarded by caller
             msg = f"Rack {self.rack_name}: MLAG is enabled but the parent fabric has no ASN pool"
             raise ValueError(msg)
 
-        start = self._number_attr_value(self.asn_pool, "start_range")
-        end = self._number_attr_value(self.asn_pool, "end_range")
-        if start is None or end is None:
-            msg = f"Rack {self.rack_name}: fabric ASN pool is missing a start or end range"
-            raise ValueError(msg)
-        return start, end
+        existing = await self.client.filters(kind="MlagDomain", domain_id__value=domain_id, include=["asn"])
+        if existing:
+            existing_asn_id = getattr(existing[0].asn, "id", None)
+            if existing_asn_id:
+                return existing_asn_id
 
-    def _asn_is_in_pool(self, asn: int) -> bool:
-        start, end = self._asn_pool_range()
-        return start <= asn <= end
-
-    @staticmethod
-    def _number_attr_value(node: object, attr_name: str) -> int | None:
-        attr = getattr(node, attr_name, None)
-        if attr is None:
-            return None
-        value = attr.value if hasattr(attr, "value") else attr
-        return int(value) if value is not None else None
+        routing_asn = await self.allocate_routing_asn(self.asn_pool, self.fabric.id)
+        return routing_asn.id
 
     async def connect_leafs_to_spine(self) -> None:
         spine_interfaces = await self.client.filters(
@@ -443,6 +367,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 role="l2leaf",
                 object_template_id=self.rack_l2leaf_switch_template,
                 pod_id=self.pod_id,
+                fabric_id=self.fabric.id,
                 rack_id=self.rack_id,
                 index=index,
                 node_id_pool=self.node_id_pool,

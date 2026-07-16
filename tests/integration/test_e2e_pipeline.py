@@ -226,6 +226,49 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         )
         print(f"leaf devices: {len(leaves)}", flush=True)
 
+    # --- Component 9b: BGP ASN nodes (regression 002) ----------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_asn_nodes_created_and_linked(self, client: InfrahubClient) -> None:
+        """RoutingAsn nodes are created, fabric-owned, and linked to every L3 device (C1);
+        each MLAG pair shares one ASN node across both leaves and the domain (C2).
+
+        This is the regression guard for feature 002: before the fix, fabric
+        generation produced zero Routing.Asn nodes.
+        """
+        report = await wait_until(
+            fetch=lambda: _asn_report(client, PIPELINE_BRANCH),
+            ready=lambda r: len(r["asns"]) > 0
+            and all(d["asn_node_id"] for d in r["devices"] if d["role"] in ("super_spine", "spine", "leaf")),
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="RoutingAsn nodes created and linked to every L3 device",
+        )
+
+        # SC-001 / C1: nodes exist and every one is owned by a fabric.
+        assert report["asns"], "no RoutingAsn nodes created by fabric generation"
+        assert all(a["fabric_id"] for a in report["asns"]), "a RoutingAsn node has no owning fabric"
+
+        # SC-002: every L3 device (super-spine/spine/leaf) resolves an ASN node.
+        l3 = [d for d in report["devices"] if d["role"] in ("super_spine", "spine", "leaf")]
+        assert l3, "no L3 devices found"
+        unlinked = [d["name"] for d in l3 if not d["asn_node_id"]]
+        assert not unlinked, f"L3 devices without an ASN node: {unlinked}"
+
+        # C2 / SC-004: each MLAG domain shares one ASN node with both of its peers.
+        asn_by_device = {d["id"]: d["asn_node_id"] for d in report["devices"]}
+        for dom in report["domains"]:
+            dom_asn = dom["asn_node_id"]
+            assert dom_asn, f"MLAG domain {dom['domain_id']} has no ASN node"
+            peer_asns = {asn_by_device.get(pid) for pid in dom["peer_ids"]}
+            assert peer_asns == {dom_asn}, (
+                f"MLAG domain {dom['domain_id']} does not share one ASN node with its peers: "
+                f"domain={dom_asn} peers={peer_asns}"
+            )
+        print(
+            f"asn report: routing_asns={len(report['asns'])} l3_devices={len(l3)} mlag_domains={len(report['domains'])}",
+            flush=True,
+        )
+
     # --- Component 10: cabling & IP allocation (US2) -----------------------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_cabling_and_ip_allocation(self, client: InfrahubClient) -> None:
@@ -313,6 +356,58 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             interval=POLL_INTERVAL,
             describe=f"Ready artifact '{artifact_name}'",
         )
+
+
+async def _asn_report(client: InfrahubClient, branch: str) -> dict:
+    """Report Routing.Asn nodes and every device's / MLAG domain's linked ASN node.
+
+    Returns:
+        asns: [{id, value, fabric_id}] — the allocated ASN nodes.
+        devices: [{id, name, role, asn_node_id}] — each device's linked ASN node id (or None).
+        domains: [{domain_id, asn_node_id, peer_ids}] — MLAG domains and their peers.
+    """
+    query = """
+    query AsnReport {
+      RoutingAsn { edges { node { id asn { value } fabric { node { id } } } } }
+      DcimDevice { edges { node { id name { value } role { value } asn { node { id } } } } }
+      MlagDomain { edges { node { domain_id { value } asn { node { id } } peers { edges { node { id } } } } } }
+    }
+    """
+    resp = await client.execute_graphql(query=query, branch_name=branch)
+
+    asns = []
+    for edge in resp["RoutingAsn"]["edges"]:
+        node = edge["node"]
+        fabric = (node.get("fabric") or {}).get("node")
+        asns.append({"id": node["id"], "value": (node.get("asn") or {}).get("value"), "fabric_id": (fabric or {}).get("id")})
+
+    devices = []
+    for edge in resp["DcimDevice"]["edges"]:
+        node = edge["node"]
+        asn_node = (node.get("asn") or {}).get("node")
+        devices.append(
+            {
+                "id": node["id"],
+                "name": node["name"]["value"],
+                "role": node["role"]["value"],
+                "asn_node_id": (asn_node or {}).get("id"),
+            }
+        )
+
+    domains = []
+    for edge in resp["MlagDomain"]["edges"]:
+        node = edge["node"]
+        asn_node = (node.get("asn") or {}).get("node")
+        peer_ids = [p["node"]["id"] for p in node.get("peers", {}).get("edges", []) if p.get("node")]
+        domains.append(
+            {
+                "domain_id": node["domain_id"]["value"],
+                "asn_node_id": (asn_node or {}).get("id"),
+                "peer_ids": peer_ids,
+            }
+        )
+
+    return {"asns": asns, "devices": devices, "domains": domains}
 
 
 async def _device_ip_report(client: InfrahubClient, branch: str) -> dict:

@@ -103,7 +103,7 @@ top of them, plus feature-specific subdirectories. Loaded via
 |------|---------|
 | `logical_design.yml` | `Network.Fabric`, `Network.Pod`, `Network.BuildingBlock` generic (interface-sorting methods, super-spine counts) |
 | `generator.yml` | `Generator.Target` generic (checksum tracking for idempotent regeneration) |
-| `dcim_extensions.yml` | `Network.Link` plus device extensions (role, bgp_asn, node_id, loopback_ip, mgmt_ip, rack/pod relations) |
+| `dcim_extensions.yml` | `Network.Link` plus device extensions (role, node_id, loopback_ip, mgmt_ip, rack/pod relations, `asn` → `Routing.Asn`) |
 | `l3ls_extensions.yml` | L3LS fabric attributes on the fabric (routing protocols, MTU, spanning-tree, EVPN overlay) |
 | `location_extensions.yml` | `Location.Hall`, `Location.Rack` (rack_type, leaf counts, generation_complete) |
 | `ipam_extensions.yml` | IP prefix/address `role` & `status` dropdowns (fabric_supernet, *_loopback, management, backfill) |
@@ -116,7 +116,7 @@ top of them, plus feature-specific subdirectories. Loaded via
 | `evpn/evpn_services.yml` | `Evpn.Tenant`, `Evpn.Svi` EVPN service definitions |
 | `lag/lag.yml` | `Interface.Lag`, LAG bundle generic |
 | `mlag/mlag.yml` | `Generic.MlagDomain`, `Mlag.Interface` |
-| `routing/routing.yml` | `Routing.BGPPeerGroup`, BGP neighbors, prefix lists, route maps, static routes |
+| `routing/routing.yml` | `Routing.Asn` (first-class BGP ASN, allocated per fabric from a `CoreNumberPool` bound to `RoutingAsn.asn`), `Routing.BGPPeerGroup`, BGP neighbors, prefix lists, route maps, static routes |
 | `vlan/vlan.yml` | `Ipam.VLAN` configuration schema |
 | `vrf/vrf.yml` | `Ipam.VRF`, `Ipam.RouteTarget` |
 | `compute/compute.yml` | `Compute.GenericUnit`, `Compute.PhysicalServer`, virtualization hosts |
@@ -292,6 +292,8 @@ infrahubctl protocols --out src/solution_arista_avd/protocols.py
 - Infrahub (Neo4j graph); structured config already stored as `Avd.StructuredConfigFile` artifacts (001-avd-anta-catalog)
 - Python >=3.11, <3.14 (downstream only; this cycle is schema YAML + `infrahubctl protocols` regeneration) + `infrahub-sdk` (`infrahubctl schema check` / `schema load` / `protocols`); `pyavd` unaffected this cycle (002-bgp-asn-schema)
 - Infrahub (Neo4j graph). ASN becomes a graph node; pools are `CoreNumberPool` built-ins (002-bgp-asn-schema)
+- Python >=3.11, <3.14 + `infrahub-sdk[all]` (generators, `CoreNumberPool` allocation), `pyavd>=5.0.0` (hostvar/config consumer) (002-asn-generation-fix)
+- Infrahub (Neo4j graph); ASN numbers allocated from `CoreNumberPool` built-ins into `Routing.Asn` nodes (002-asn-generation-fix)
 
 ## Recent Changes
 - 001-enforce-protocols: Added Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0
