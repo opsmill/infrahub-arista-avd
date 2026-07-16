@@ -225,13 +225,74 @@ async def test_delete_stale_mlag_domains_only_deletes_current_rack_domains() -> 
     other_domain.delete.assert_not_awaited()
 
 
-def test_hostvar_target_device_ids_deduplicates_rack_and_spine_devices() -> None:
+def test_rack_hostvar_target_device_ids_deduplicates_rack_and_spine_devices() -> None:
     gen = _make_generator()
     gen.leaf_switches = [_named_device("leaf-a", "leaf-a"), _named_device("leaf-b", "leaf-b")]
     gen.l2leaf_switches = [_named_device("l2leaf-a", "l2leaf-a")]
     gen.spine_switches = [_named_device("spine-a", "spine-a"), _named_device("leaf-a", "leaf-a")]
 
-    assert gen.hostvar_target_device_ids() == ["leaf-a", "leaf-b", "l2leaf-a", "spine-a"]
+    assert gen.rack_hostvar_target_device_ids() == ["leaf-a", "leaf-b", "l2leaf-a", "spine-a"]
+
+
+def _rel_peers(*peers: object) -> SimpleNamespace:
+    return SimpleNamespace(fetch=AsyncMock(), peers=[SimpleNamespace(peer=peer) for peer in peers])
+
+
+def _artifact_with_hostvar() -> SimpleNamespace:
+    return SimpleNamespace(hostvar_file=SimpleNamespace(id="hostvar-file", fetch=AsyncMock(), peer=object()))
+
+
+@pytest.mark.asyncio
+async def test_hostvar_target_device_ids_uses_full_fabric_when_any_hostvars_missing() -> None:
+    gen = _make_generator()
+    super_spine = _named_device("super-spine", "super-spine")
+    spine = _named_device("spine-a", "spine-a")
+    leaf = _named_device("leaf-a", "leaf-a")
+    rack = SimpleNamespace(devices=_rel_peers(leaf))
+    pod = SimpleNamespace(devices=_rel_peers(super_spine, spine), racks=_rel_peers(rack))
+
+    async def filters_side_effect(*args: object, **kwargs: object) -> list[SimpleNamespace]:
+        kind = kwargs.get("kind", args[0] if args else None)
+        kind_name = kind if isinstance(kind, str) else getattr(kind, "__name__", str(kind))
+        if kind_name == "NetworkPod":
+            return [pod]
+        if kind_name == "AvdArtifact" and kwargs.get("name__value") == "super-spine":
+            return [_artifact_with_hostvar()]
+        if kind_name == "AvdArtifact" and kwargs.get("name__value") == "spine-a":
+            return [_artifact_with_hostvar()]
+        if kind_name == "AvdArtifact" and kwargs.get("name__value") == "leaf-a":
+            return []
+        return []
+
+    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
+
+    assert await gen.hostvar_target_device_ids() == ["super-spine", "spine-a", "leaf-a"]
+
+
+@pytest.mark.asyncio
+async def test_hostvar_target_device_ids_uses_rack_targets_when_fabric_hostvars_exist() -> None:
+    gen = _make_generator()
+    super_spine = _named_device("super-spine", "super-spine")
+    spine = _named_device("spine-a", "spine-a")
+    leaf = _named_device("leaf-a", "leaf-a")
+    rack = SimpleNamespace(devices=_rel_peers(leaf))
+    pod = SimpleNamespace(devices=_rel_peers(super_spine, spine), racks=_rel_peers(rack))
+    gen.leaf_switches = [_named_device("leaf-a", "leaf-a")]
+    gen.l2leaf_switches = []
+    gen.spine_switches = [_named_device("spine-a", "spine-a")]
+
+    async def filters_side_effect(*args: object, **kwargs: object) -> list[SimpleNamespace]:
+        kind = kwargs.get("kind", args[0] if args else None)
+        kind_name = kind if isinstance(kind, str) else getattr(kind, "__name__", str(kind))
+        if kind_name == "NetworkPod":
+            return [pod]
+        if kind_name == "AvdArtifact":
+            return [_artifact_with_hostvar()]
+        return []
+
+    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
+
+    assert await gen.hostvar_target_device_ids() == ["leaf-a", "spine-a"]
 
 
 @pytest.mark.asyncio

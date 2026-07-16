@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
@@ -152,7 +152,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         # Check if all racks in the fabric are done; if so, trigger hostvar generation
         if await check_all_racks_generated(self.client, self.fabric.id):
-            hostvar_target_ids = self.hostvar_target_device_ids()
+            hostvar_target_ids = await self.hostvar_target_device_ids()
             await self.invalidate_hostvars(hostvar_target_ids)
             self.logger.info(
                 "All racks generated — triggering hostvar generation for %s devices", len(hostvar_target_ids)
@@ -254,7 +254,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             await domain.delete()
             self.logger.info("Deleted stale MLAG domain %s for rack %s", domain_id, self.rack_name)
 
-    def hostvar_target_device_ids(self) -> list[str]:
+    def rack_hostvar_target_device_ids(self) -> list[str]:
         """Return rack-local devices plus pod spines whose hostvars should be refreshed."""
         devices = [*self.leaf_switches, *self.l2leaf_switches, *self.spine_switches]
         seen: set[str] = set()
@@ -265,6 +265,87 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             seen.add(device.id)
             device_ids.append(device.id)
         return device_ids
+
+    async def hostvar_target_device_ids(self) -> list[str]:
+        """Return devices that need hostvar generation after a rack run.
+
+        On an already-generated fabric, only the rack leafs/l2leafs and their
+        pod spines are affected by a rack change. During initial fabric
+        generation, however, the last rack to complete is the first point where
+        hostvars can be triggered. In that case many other fabric devices still
+        have no hostvar artifact, so targeting only the last rack would leave the
+        fabric permanently not ready and structured config / EOS artifacts would
+        never render. Detect that bootstrap state and generate hostvars for the
+        whole fabric.
+        """
+        fabric_devices = await self.fabric_devices()
+        missing_hostvars = await self.devices_missing_hostvars(fabric_devices)
+        if missing_hostvars:
+            self.logger.info(
+                "Fabric %s is missing hostvars for %s devices; triggering full-fabric hostvar generation",
+                getattr(self.fabric, "id", "<unknown>"),
+                len(missing_hostvars),
+            )
+            return self.device_ids(fabric_devices)
+
+        return self.rack_hostvar_target_device_ids()
+
+    async def fabric_devices(self) -> list[Any]:
+        """Return all generated devices under the current fabric."""
+        pods = await self.client.filters(kind=NetworkPod, parent__ids=[self.fabric.id])
+        devices: list[Any] = []
+
+        for pod in pods:
+            await pod.devices.fetch()
+            devices.extend(peer.peer for peer in pod.devices.peers if peer.peer)
+
+            await pod.racks.fetch()
+            for rack_peer in pod.racks.peers:
+                rack = rack_peer.peer
+                if not rack:
+                    continue
+                await rack.devices.fetch()
+                devices.extend(peer.peer for peer in rack.devices.peers if peer.peer)
+
+        return devices
+
+    def device_ids(self, devices: list[Any]) -> list[str]:
+        """Return de-duplicated device IDs preserving input order."""
+        seen: set[str] = set()
+        device_ids: list[str] = []
+        for device in devices:
+            if device.id in seen:
+                continue
+            seen.add(device.id)
+            device_ids.append(device.id)
+        return device_ids
+
+    async def devices_missing_hostvars(self, devices: list[Any]) -> list[Any]:
+        """Return devices without an AVD artifact hostvar file."""
+        missing: list[Any] = []
+        for device in devices:
+            hostname = device.name.value
+            artifacts = await self.client.filters(kind=AvdArtifact, name__value=hostname)
+            if not artifacts:
+                missing.append(device)
+                continue
+
+            artifact = artifacts[0]
+            if not artifact.hostvar_file.id:
+                missing.append(device)
+                continue
+
+            try:
+                await artifact.hostvar_file.fetch()
+            except Exception as exc:  # noqa: BLE001 - a missing file means hostvars are not ready
+                self.logger.debug("Hostvar readiness check failed for %s: %s", hostname, exc)
+                missing.append(device)
+                continue
+
+            if not artifact.hostvar_file.peer:
+                missing.append(device)
+
+        return missing
 
     async def invalidate_hostvars(self, device_ids: list[str]) -> None:
         """Remove existing hostvar files for targeted devices before regeneration.
