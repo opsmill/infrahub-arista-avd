@@ -105,9 +105,7 @@ extensions:
           label: AVD Custom Hostvars
           kind: JSON
           optional: true
-          description: >-
-            Escape hatch for pyAVD hostvars not yet modeled by Infrahub schemas/generators. Applies to every device
-            in this fabric; generated hostvars take precedence.
+          description: "Fabric-scope custom pyAVD hostvars; generated values take precedence."
           order_weight: 11400
       relationships:
         - name: uplink_pool
@@ -177,9 +175,7 @@ extensions:
           label: AVD Custom Hostvars
           kind: JSON
           optional: true
-          description: >-
-            Escape hatch for pyAVD hostvars not yet modeled by Infrahub schemas/generators. Applies to every device
-            in this pod; generated hostvars take precedence.
+          description: "Pod-scope custom pyAVD hostvars; generated values take precedence."
           order_weight: 9100
       relationships:
         - name: mlag_peer_pool

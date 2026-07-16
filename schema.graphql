@@ -7939,7 +7939,7 @@ type DcimDevice implements DcimPhysicalDevice & CoreNode & CoreArtifactTarget & 
   """None"""
   node_id: NumberAttribute
 
-  """Escape hatch for pyAVD hostvars not yet modeled by Infrahub schemas/generators. Applies only to this device; generated hostvars take precedence."""
+  """Device-scope custom pyAVD hostvars; generated values take precedence."""
   avd_custom_hostvars: JSONAttribute
   loopback_ip: NestedEdgedIpamIPAddress!
   mgmt_ip: NestedEdgedIpamIPAddress!
@@ -9104,7 +9104,7 @@ type NetworkPod implements GeneratorTarget & CoreNode & NetworkBuildingBlock {
   """Offset for leaf loopback IDs to avoid overlap with spines"""
   loopback_ipv4_offset: NumberAttribute
 
-  """Escape hatch for pyAVD hostvars not yet modeled by Infrahub schemas/generators. Applies to every device in this pod; generated hostvars take precedence."""
+  """Pod-scope custom pyAVD hostvars; generated values take precedence."""
   avd_custom_hostvars: JSONAttribute
   prefix_pool: NestedEdgedCoreIPPrefixPool!
   racks(offset: Int, limit: Int, order: OrderInput, ids: [ID], isnull: Boolean, display_label__value: String, display_label__values: [String], display_label__isnull: Boolean, mlag__value: Boolean, mlag__values: [Boolean], mlag__source__id: ID, mlag__owner__id: ID, mlag__is_protected: Boolean, name__value: String, name__values: [String], name__source__id: ID, name__owner__id: ID, name__is_protected: Boolean, shortname__value: String, shortname__values: [String], shortname__source__id: ID, shortname__owner__id: ID, shortname__is_protected: Boolean, description__value: String, description__values: [String], description__source__id: ID, description__owner__id: ID, description__is_protected: Boolean, checksum__value: String, checksum__values: [String], checksum__source__id: ID, checksum__owner__id: ID, checksum__is_protected: Boolean, rack_type__value: String, rack_type__values: [String], rack_type__source__id: ID, rack_type__owner__id: ID, rack_type__is_protected: Boolean, amount_of_leafs__value: BigInt, amount_of_leafs__values: [BigInt], amount_of_leafs__source__id: ID, amount_of_leafs__owner__id: ID, amount_of_leafs__is_protected: Boolean, index__value: BigInt, index__values: [BigInt], index__source__id: ID, index__owner__id: ID, index__is_protected: Boolean, generation_complete__value: Boolean, generation_complete__values: [Boolean], generation_complete__source__id: ID, generation_complete__owner__id: ID, generation_complete__is_protected: Boolean, amount_of_l2leafs__value: BigInt, amount_of_l2leafs__values: [BigInt], amount_of_l2leafs__source__id: ID, amount_of_l2leafs__owner__id: ID, amount_of_l2leafs__is_protected: Boolean, include_descendants: Boolean): NestedPaginatedLocationRack!

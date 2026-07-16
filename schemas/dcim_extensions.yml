@@ -45,9 +45,7 @@ extensions:
           label: AVD Custom Hostvars
           kind: JSON
           optional: true
-          description: >-
-            Escape hatch for pyAVD hostvars not yet modeled by Infrahub schemas/generators. Applies only to this
-            device; generated hostvars take precedence.
+          description: "Device-scope custom pyAVD hostvars; generated values take precedence."
       relationships:
         - name: loopback_ip
           peer: IpamIPAddress
