@@ -174,9 +174,7 @@ async def fetch_link_endpoints(
     batch_size = 50
     for i in range(0, len(link_ids), batch_size):
         batch = link_ids[i : i + batch_size]
-        result = await client.execute_graphql(
-            query=_LINK_ENDPOINTS_QUERY, variables={"ids": batch}, branch_name=branch
-        )
+        result = await client.execute_graphql(query=_LINK_ENDPOINTS_QUERY, variables={"ids": batch}, branch_name=branch)
         for edge in result.get("NetworkLink", {}).get("edges", []):
             endpoints = edge.get("node", {}).get("connected_endpoints", {}).get("edges", [])
             if len(endpoints) != 2:
@@ -243,7 +241,9 @@ class ContainerLabTopology(InfrahubTransform):
         parsed = ContainerLabTopologyQuery(**data)
         fabric_edges = parsed.network_fabric.edges
         fabric_node = fabric_edges[0].node if fabric_edges else None
-        fabric_name = fabric_node.name.value if fabric_node and fabric_node.name and fabric_node.name.value else "fabric"
+        fabric_name = (
+            fabric_node.name.value if fabric_node and fabric_node.name and fabric_node.name.value else "fabric"
+        )
 
         devices = collect_devices(parsed)
         link_ids = collect_link_ids(parsed)

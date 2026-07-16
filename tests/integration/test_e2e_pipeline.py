@@ -111,7 +111,9 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         # Issue #70: Arista device types + object templates with the right port layout.
         missing_types = set(ARISTA_DEVICE_TYPES) - device_types
         assert not missing_types, f"Arista device types not loaded: {missing_types}"
-        template_counts = await _template_interface_counts(client, default_branch, list(ARISTA_TEMPLATE_INTERFACE_COUNTS))
+        template_counts = await _template_interface_counts(
+            client, default_branch, list(ARISTA_TEMPLATE_INTERFACE_COUNTS)
+        )
         assert template_counts == ARISTA_TEMPLATE_INTERFACE_COUNTS, (
             f"Arista object templates wrong/absent: expected {ARISTA_TEMPLATE_INTERFACE_COUNTS}, got {template_counts}"
         )
@@ -363,9 +365,7 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             resp.raise_for_status()
 
         def _has_populated_topology(contents: list[str]) -> bool:
-            return any(
-                (yaml.safe_load(c).get("topology") or {}).get("nodes") for c in contents if c and c.strip()
-            )
+            return any((yaml.safe_load(c).get("topology") or {}).get("nodes") for c in contents if c and c.strip())
 
         clab_contents = await wait_until(
             fetch=lambda: _fetch_ready_artifact_contents(client, PIPELINE_BRANCH, ARTIFACT_CONTAINERLAB_TOPOLOGY),
