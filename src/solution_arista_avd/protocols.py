@@ -309,6 +309,17 @@ class AvdArtifact(CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
+class RoutingAsn(CoreNode):
+    asn: Integer
+    description: StringOptional
+    devices: RelationshipManager[DcimDevice]
+    fabric: RelationshipAttribute[NetworkFabric]
+    member_of_groups: RelationshipManager[CoreGroup]
+    mlag_domains: RelationshipManager[MlagDomain]
+    profiles: RelationshipManager[CoreProfile]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
+
+
 class RoutingBGPNeighbor(CoreNode):
     bfd: BooleanOptional
     description: StringOptional
@@ -344,7 +355,6 @@ class RoutingBGPPeerGroup(CoreNode):
 
 
 class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
-    bgp_asn: IntegerOptional
     description: StringOptional
     index: IntegerOptional
     name: String
@@ -356,6 +366,7 @@ class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
     serial: StringOptional
     status: Dropdown
     artifacts: RelationshipManager[CoreArtifact]
+    asn: RelationshipAttribute[RoutingAsn]
     avd_artifact: RelationshipAttribute[AvdArtifact]
     bgp_neighbors: RelationshipManager[RoutingBGPNeighbor]
     bgp_peer_groups: RelationshipManager[RoutingBGPPeerGroup]
@@ -404,10 +415,10 @@ class NetworkDnsServer(CoreNode):
 
 
 class MlagDomain(GenericMlagDomain):
-    bgp_asn: IntegerOptional
     domain_id: String
     reload_delay: Integer
     virtual_router_mac: StringOptional
+    asn: RelationshipAttribute[RoutingAsn]
     member_of_groups: RelationshipManager[CoreGroup]
     mlag_interfaces: RelationshipManager[MlagInterface]
     peer_links: RelationshipManager[InterfaceLag]
@@ -430,7 +441,6 @@ class AvdEvpn(CoreNode):
 class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     amount_of_super_spines: Integer
     anta_enabled: Boolean
-    avd_custom_hostvars: JSONAttributeOptional
     avd_hostvars_ready: Boolean
     bgp_evpn_overlay_password: StringOptional
     bgp_mlag_password: StringOptional
@@ -822,7 +832,6 @@ class AvdStructuredConfigFile(CoreFileObject):
 class EvpnSvi(CoreNode):
     description: StringOptional
     enabled: Boolean
-    fabric_tags: ListAttributeOptional
     ip_address_virtual: IPHost
     name: String
     svi_id: Integer
@@ -909,17 +918,6 @@ class VirtualizationVirtualMachine(ComputeGenericUnit):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
-class CloudvisionWorkspace(CoreNode):
-    name: String
-    proposed_change_id: StringOptional
-    status: Dropdown
-    workspace_id: String
-    fabric: RelationshipAttribute[NetworkFabric]
-    member_of_groups: RelationshipManager[CoreGroup]
-    profiles: RelationshipManager[CoreProfile]
-    subscriber_of_groups: RelationshipManager[CoreGroup]
-
-
 
 
 class ProfileAvdArtifact(LineageSource, CoreProfile, CoreNode):
@@ -991,18 +989,6 @@ class ProfileBuiltinTag(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
-class ProfileCloudvisionWorkspace(LineageSource, CoreProfile, CoreNode):
-    name: StringOptional
-    profile_name: String
-    profile_priority: Integer
-    proposed_change_id: StringOptional
-    status: DropdownOptional
-    fabric: RelationshipAttribute[NetworkFabric]
-    member_of_groups: RelationshipManager[CoreGroup]
-    related_nodes: RelationshipManager[CloudvisionWorkspace]
-    subscriber_of_groups: RelationshipManager[CoreGroup]
-
-
 class ProfileComputeGenericUnit(LineageSource, CoreProfile, CoreNode):
     profile_name: String
     profile_priority: Integer
@@ -1041,7 +1027,6 @@ class ProfileDcimConnector(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileDcimDevice(LineageSource, CoreProfile, CoreNode):
-    bgp_asn: IntegerOptional
     description: StringOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -1054,6 +1039,7 @@ class ProfileDcimDevice(LineageSource, CoreProfile, CoreNode):
     serial: StringOptional
     status: DropdownOptional
     artifacts: RelationshipManager[CoreArtifact]
+    asn: RelationshipAttribute[RoutingAsn]
     avd_artifact: RelationshipAttribute[AvdArtifact]
     bgp_neighbors: RelationshipManager[RoutingBGPNeighbor]
     bgp_peer_groups: RelationshipManager[RoutingBGPPeerGroup]
@@ -1176,7 +1162,6 @@ class ProfileEvpnL2Vlan(LineageSource, CoreProfile, CoreNode):
 class ProfileEvpnSvi(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     enabled: BooleanOptional
-    fabric_tags: ListAttributeOptional
     ip_address_virtual: IPHostOptional
     profile_name: String
     profile_priority: Integer
@@ -1477,11 +1462,11 @@ class ProfileLocationRack(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileMlagDomain(LineageSource, CoreProfile, CoreNode):
-    bgp_asn: IntegerOptional
     profile_name: String
     profile_priority: Integer
     reload_delay: IntegerOptional
     virtual_router_mac: StringOptional
+    asn: RelationshipAttribute[RoutingAsn]
     member_of_groups: RelationshipManager[CoreGroup]
     peer_links: RelationshipManager[InterfaceLag]
     peers: RelationshipManager[DcimDevice]
@@ -1525,7 +1510,6 @@ class ProfileNetworkDnsServer(LineageSource, CoreProfile, CoreNode):
 class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
     amount_of_super_spines: IntegerOptional
     anta_enabled: BooleanOptional
-    avd_custom_hostvars: JSONAttributeOptional
     avd_hostvars_ready: BooleanOptional
     bgp_evpn_overlay_password: StringOptional
     bgp_mlag_password: StringOptional
@@ -1643,6 +1627,18 @@ class ProfileOrganizationProvider(LineageSource, CoreProfile, CoreNode):
     related_nodes: RelationshipManager[OrganizationProvider]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     tags: RelationshipManager[BuiltinTag]
+
+
+class ProfileRoutingAsn(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    profile_name: String
+    profile_priority: Integer
+    devices: RelationshipManager[DcimDevice]
+    fabric: RelationshipAttribute[NetworkFabric]
+    member_of_groups: RelationshipManager[CoreGroup]
+    mlag_domains: RelationshipManager[MlagDomain]
+    related_nodes: RelationshipManager[RoutingAsn]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
 class ProfileRoutingBGPNeighbor(LineageSource, CoreProfile, CoreNode):
@@ -1778,7 +1774,6 @@ class TemplateComputePhysicalServer(LineageSource, TemplateComputeGenericUnit, T
 
 
 class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcimGenericDevice, TemplateDcimPhysicalDevice, CoreObjectTemplate, CoreNode):
-    bgp_asn: IntegerOptional
     description: StringOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -1790,8 +1785,8 @@ class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcim
     status: DropdownOptional
     template_name: String
     artifacts: RelationshipManager[CoreArtifact]
+    asn: RelationshipAttribute[RoutingAsn]
     avd_artifact: RelationshipAttribute[AvdArtifact]
-    bgp_asn_from_resource_pool: RelationshipAttribute[CoreNumberPool]
     bgp_neighbors: RelationshipManager[RoutingBGPNeighbor]
     bgp_peer_groups: RelationshipManager[RoutingBGPPeerGroup]
     device_type: RelationshipAttribute[DcimDeviceType]
@@ -1931,3 +1926,4 @@ class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTem
     subscriber_of_groups: RelationshipManager[CoreGroup]
     subscriber_of_groups_for_instances: RelationshipManager[CoreGroup]
     vcpu_from_resource_pool: RelationshipAttribute[CoreNumberPool]
+

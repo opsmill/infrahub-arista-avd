@@ -63,6 +63,43 @@ def _base_hostvars(
     )
 
 
+def test_extract_mlag_info_reads_bgp_asn_from_routing_asn_relationship() -> None:
+    """The MLAG ASN is now sourced from the shared Routing.Asn node via the ``asn`` relationship."""
+    mlag_domain = SimpleNamespace(
+        domain_id=_attr("DC1_BORDER"),
+        asn=SimpleNamespace(node=SimpleNamespace(asn=_attr(65100))),
+        virtual_router_mac=_attr(None),
+        peers=SimpleNamespace(
+            edges=[
+                SimpleNamespace(node=SimpleNamespace(name=_attr("leaf1"))),
+                SimpleNamespace(node=SimpleNamespace(name=_attr("leaf2"))),
+            ]
+        ),
+    )
+    device = SimpleNamespace(mlag_domain=SimpleNamespace(node=mlag_domain))
+
+    info = GenerateAVDDeviceHostvar._extract_mlag_info(device)
+
+    assert info["bgp_asn"] == 65100
+    assert info["domain_id"] == "DC1_BORDER"
+    assert info["peer_names"] == ["leaf1", "leaf2"]
+
+
+def test_extract_mlag_info_handles_unlinked_asn() -> None:
+    """A domain with no ASN node linked yet resolves bgp_asn to None (no crash)."""
+    mlag_domain = SimpleNamespace(
+        domain_id=_attr("DC1_BORDER"),
+        asn=SimpleNamespace(node=None),
+        virtual_router_mac=_attr(None),
+        peers=SimpleNamespace(edges=[]),
+    )
+    device = SimpleNamespace(mlag_domain=SimpleNamespace(node=mlag_domain))
+
+    info = GenerateAVDDeviceHostvar._extract_mlag_info(device)
+
+    assert info["bgp_asn"] is None
+
+
 def test_non_mlag_leaf_sets_avd_mlag_false_on_rack_node_group() -> None:
     """Leaf hostvars without an MLAG domain must explicitly disable MLAG on the rack node group."""
     hostvars = _base_hostvars([])

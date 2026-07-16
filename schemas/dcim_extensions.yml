@@ -37,10 +37,6 @@ extensions:
               label: L2 Leaf
               description: "L2 Leaf Switch (access layer, no EVPN)"
               color: "#f0e6fa"
-        - name: bgp_asn
-          label: BGP ASN
-          kind: Number
-          optional: true
         - name: node_id
           label: Node ID
           kind: Number

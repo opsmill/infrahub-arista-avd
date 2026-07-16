@@ -58,6 +58,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
                 role="super_spine",
                 object_template_id=self.fabric_super_spine_switch_template,
                 pod_id=fabric_pod.id,
+                fabric_id=self.fabric_id,
                 loopback_pool=self.loopback_pool,
                 asn_pool=self.asn_pool,
                 node_id_pool=self.node_id_pool,

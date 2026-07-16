@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
 
-from .protocols import DcimDevice, DcimInterface
+from .protocols import DcimDevice, DcimInterface, RoutingAsn
 
 if TYPE_CHECKING:
     from infrahub_sdk import InfrahubClient
@@ -84,6 +84,7 @@ class GeneratorMixin:
         role: str,
         object_template_id: str,
         pod_id: str,
+        fabric_id: str,
         rack_id: str | None = None,
         index: int | None = None,
         loopback_pool: CoreIPAddressPool | None = None,
@@ -95,10 +96,14 @@ class GeneratorMixin:
 
         Centralises the device-creation pattern shared by the fabric, pod and
         rack generators: assemble the common kwargs, allocate from whichever of
-        the ASN / node-id / management / loopback pools are supplied, save, and
-        (when a loopback pool was given) activate the loopback interface.
+        the node-id / management / loopback pools are supplied, save, and (when a
+        loopback pool was given) activate the loopback interface.
 
-        Returns the created device with all of its fields populated.
+        The BGP ASN is modelled as a first-class ``Routing.Asn`` node owned by
+        the fabric. When an ASN pool is supplied the device is linked to a
+        ``RoutingAsn`` allocated from it (see ``_ensure_device_asn``).
+
+        Returns the created device.
         """
         device_kwargs: dict[str, Any] = {
             "name": name,
@@ -114,8 +119,6 @@ class GeneratorMixin:
             device_kwargs["index"] = index
         if loopback_pool is not None:
             device_kwargs["loopback_ip"] = loopback_pool
-        if asn_pool is not None:
-            device_kwargs["bgp_asn"] = asn_pool
         if node_id_pool is not None:
             device_kwargs["node_id"] = node_id_pool
         if mgmt_pool is not None:
@@ -124,10 +127,66 @@ class GeneratorMixin:
         device = await self.client.create(DcimDevice, **device_kwargs)  # type: ignore[type-abstract]
         await device.save(allow_upsert=True)
 
+        if asn_pool is not None:
+            await self._ensure_device_asn(device.id, asn_pool, fabric_id)
+
         if loopback_pool is not None:
             await self._activate_loopback_interface(device.id)
 
         return device
+
+    async def allocate_routing_asn(self, asn_pool: CoreNumberPool, fabric_id: str) -> RoutingAsn:
+        """Allocate a BGP ASN from ``asn_pool`` as a first-class ``Routing.Asn`` node.
+
+        The ASN ``CoreNumberPool`` is bound to ``RoutingAsn.asn``, so creating a
+        ``RoutingAsn`` with ``asn=<pool>`` draws the next free number from the
+        fabric's range. Ownership is recorded via the ``fabric`` relationship
+        (FR-003). The allocated value is not populated on the object returned by
+        ``create()`` + ``save()`` (as with pool-backed IP allocations), but the
+        node id is — which is all the caller needs to wire the ``asn``
+        relationship. Callers are responsible for idempotency (reusing an
+        already-linked node) — this helper always allocates a new one.
+
+        The node is saved with ``update_group_context=False`` so it is not
+        enrolled in the generator's tracking group: a ``RoutingAsn`` that is no
+        longer referenced is retained rather than cleaned up (FR-009), and a
+        re-run that reuses an existing ASN never risks the tracking cleanup
+        deleting an in-use node.
+
+        This is a plain create (no ``allow_upsert``): ``asn`` is both
+        pool-sourced and the node's human-friendly id, so an upsert cannot
+        resolve the HFID before the pool assigns a value. Idempotency is the
+        caller's responsibility — reuse an already-linked node instead of
+        allocating again.
+        """
+        routing_asn = await self.client.create(  # type: ignore[type-abstract]
+            RoutingAsn,
+            asn=asn_pool,
+            fabric={"id": fabric_id},
+        )
+        await routing_asn.save(update_group_context=False)
+        return routing_asn
+
+    async def _ensure_device_asn(self, device_id: str, asn_pool: CoreNumberPool, fabric_id: str) -> None:
+        """Link a device to a fabric-owned ``RoutingAsn`` (unique per device), idempotently.
+
+        Re-runs must not allocate a fresh AS number: ``RoutingAsn`` is keyed only
+        by its (pool-allocated) value, so the device's existing ``asn`` link is
+        the stable idempotency anchor. If the device is already linked, reuse it;
+        otherwise allocate a new ``RoutingAsn`` from the pool and attach it.
+        """
+        device = await self.client.get(  # type: ignore[type-abstract]
+            DcimDevice,
+            id=device_id,
+            include=["asn"],
+            exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
+        )
+        if device.asn.id:
+            return
+
+        routing_asn = await self.allocate_routing_asn(asn_pool, fabric_id)
+        device.asn = routing_asn.id  # type: ignore[assignment]
+        await device.save(allow_upsert=True)
 
     async def _activate_loopback_interface(self, device_id: str) -> None:
         """Activate a device's loopback interface and bind its pool-allocated IP.

@@ -120,6 +120,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 role="spine",
                 object_template_id=self.pod_spine_switch_template,
                 pod_id=self.pod_id,
+                fabric_id=self.fabric_id,
                 loopback_pool=self.loopback_pool,
                 asn_pool=self.asn_pool,
                 node_id_pool=self.node_id_pool,

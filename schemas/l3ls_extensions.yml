@@ -188,12 +188,6 @@ extensions:
     # --- MlagDomain: AVD-specific extensions ---
     - kind: MlagDomain
       attributes:
-        - name: bgp_asn
-          label: BGP ASN
-          kind: Number
-          optional: true
-          description: "Authoritative BGP ASN shared by the MLAG peer pair"
-          order_weight: 1650
         - name: virtual_router_mac
           label: Virtual Router MAC
           kind: Text

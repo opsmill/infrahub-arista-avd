@@ -10,8 +10,12 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
         role {
           value
         }
-        bgp_asn {
-          value
+        asn {
+          node {
+            asn {
+              value
+            }
+          }
         }
         node_id {
           value
@@ -41,8 +45,12 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             domain_id {
               value
             }
-            bgp_asn {
-              value
+            asn {
+              node {
+                asn {
+                  value
+                }
+              }
             }
             virtual_router_mac {
               value

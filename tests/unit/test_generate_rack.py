@@ -17,7 +17,6 @@ def _leaf(leaf_id: str, name: str) -> SimpleNamespace:
     return SimpleNamespace(
         id=leaf_id,
         name=SimpleNamespace(value=name),
-        bgp_asn=SimpleNamespace(value=None),
         save=AsyncMock(),
     )
 
@@ -26,15 +25,12 @@ def _pool(start: int = 65100, end: int = 65199) -> SimpleNamespace:
     return SimpleNamespace(start_range=SimpleNamespace(value=start), end_range=SimpleNamespace(value=end))
 
 
-def _device(device_id: str, asn: int | None) -> SimpleNamespace:
-    return SimpleNamespace(id=device_id, bgp_asn=SimpleNamespace(value=asn))
-
-
-def _domain(domain_id: str, *, domain_uuid: str | None = None, asn: int | None = None) -> SimpleNamespace:
+def _domain(domain_id: str, *, domain_uuid: str | None = None, asn_node_id: str | None = None) -> SimpleNamespace:
+    """Mock MlagDomain whose ``asn`` relationship points at the given RoutingAsn node id."""
     return SimpleNamespace(
         id=domain_uuid or domain_id,
         domain_id=SimpleNamespace(value=domain_id),
-        bgp_asn=SimpleNamespace(value=asn),
+        asn=SimpleNamespace(id=asn_node_id),
     )
 
 
@@ -45,8 +41,6 @@ def _named_device(device_id: str, name: str) -> SimpleNamespace:
 def _filters_side_effect(
     *,
     domains: list[SimpleNamespace] | None = None,
-    used_devices: list[SimpleNamespace] | None = None,
-    used_domains: list[SimpleNamespace] | None = None,
 ) -> Callable[..., Coroutine[Any, Any, list[SimpleNamespace]]]:
     async def side_effect(*args: object, **kwargs: object) -> list[SimpleNamespace]:
         kind = kwargs.get("kind", args[0] if args else None)
@@ -54,12 +48,6 @@ def _filters_side_effect(
 
         if kind_name == "MlagDomain" and kwargs.get("domain_id__value") == "DC1_BORDER":
             return domains or []
-        if kind_name == "NetworkPod":
-            return [SimpleNamespace(id="pod-1")]
-        if kind_name == "DcimDevice":
-            return used_devices or []
-        if kind_name == "MlagDomain" and "pod__ids" in kwargs:
-            return used_domains or []
         return []
 
     return side_effect
@@ -69,7 +57,7 @@ def _make_generator() -> RackGenerator:
     gen = RackGenerator.__new__(RackGenerator)
     gen.client = MagicMock()
     gen.client.create = AsyncMock()
-    gen.client.get = AsyncMock(return_value=SimpleNamespace(bgp_asn=SimpleNamespace(value=65100)))
+    gen.client.get = AsyncMock()
     gen.client.filters = AsyncMock(side_effect=_filters_side_effect())
     gen.client.execute_graphql = AsyncMock()
     gen.logger = MagicMock()
@@ -115,24 +103,30 @@ async def test_create_mlag_pairs_skips_when_rack_mlag_false() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_mlag_pairs_defaults_to_enabled_for_two_leaf_racks() -> None:
+async def test_create_mlag_pairs_allocates_shared_asn_node() -> None:
     gen = _make_generator()
     gen.rack_mlag = True
+    gen.allocate_routing_asn = AsyncMock(return_value=SimpleNamespace(id="asn-node-1"))  # type: ignore[method-assign]
     mlag_domain = MagicMock()
     mlag_domain.save = AsyncMock()
     gen.client.create.return_value = mlag_domain
 
     await gen.create_mlag_pairs()
 
+    # A single shared RoutingAsn is allocated from the fabric pool and linked to the domain.
+    gen.allocate_routing_asn.assert_awaited_once_with(gen.asn_pool, gen.fabric.id)
     gen.client.create.assert_awaited_once_with(
         "MlagDomain",
         domain_id="DC1_BORDER",
-        bgp_asn=65100,
+        asn={"id": "asn-node-1"},
         peers=[{"id": "leaf-a"}, {"id": "leaf-b"}],
         pod={"id": "pod-1"},
     )
     mlag_domain.save.assert_awaited_once_with(allow_upsert=True)
-    assert [leaf.bgp_asn.value for leaf in gen.leaf_switches] == [65100, 65100]
+    # Both leaves are linked to that same shared ASN node via a targeted mutation.
+    assert gen.client.execute_graphql.await_count == 2
+    linked_asn_ids = {call.kwargs["variables"]["asn_id"] for call in gen.client.execute_graphql.await_args_list}
+    assert linked_asn_ids == {"asn-node-1"}
 
 
 @pytest.mark.asyncio
@@ -169,43 +163,51 @@ async def test_mlag_disabled_leafs_allocate_device_asns() -> None:
 
 @pytest.mark.asyncio
 async def test_create_mlag_pairs_reuses_existing_domain_asn() -> None:
+    """A re-run must reuse the pair's existing shared RoutingAsn, not allocate a new one (FR-007)."""
     gen = _make_generator()
-    gen.client.filters = AsyncMock(side_effect=_filters_side_effect(domains=[_domain("DC1_BORDER", asn=65114)]))
+    gen.client.filters = AsyncMock(
+        side_effect=_filters_side_effect(domains=[_domain("DC1_BORDER", asn_node_id="asn-existing")])
+    )
+    gen.allocate_routing_asn = AsyncMock()  # type: ignore[method-assign]
     mlag_domain = MagicMock()
     mlag_domain.save = AsyncMock()
     gen.client.create.return_value = mlag_domain
-    gen.client.get = AsyncMock(return_value=SimpleNamespace(bgp_asn=SimpleNamespace(value=65114)))
 
     await gen.create_mlag_pairs()
 
+    gen.allocate_routing_asn.assert_not_awaited()
     gen.client.create.assert_awaited_once_with(
         "MlagDomain",
         domain_id="DC1_BORDER",
-        bgp_asn=65114,
+        asn={"id": "asn-existing"},
         peers=[{"id": "leaf-a"}, {"id": "leaf-b"}],
         pod={"id": "pod-1"},
     )
-    assert [leaf.bgp_asn.value for leaf in gen.leaf_switches] == [65114, 65114]
 
 
 @pytest.mark.asyncio
-async def test_get_or_allocate_mlag_domain_asn_skips_used_fabric_asns() -> None:
+async def test_get_or_allocate_mlag_asn_allocates_when_no_existing_domain() -> None:
+    gen = _make_generator()
+    gen.allocate_routing_asn = AsyncMock(return_value=SimpleNamespace(id="asn-new"))  # type: ignore[method-assign]
+
+    asn_id = await gen._get_or_allocate_mlag_asn("DC1_BORDER")
+
+    assert asn_id == "asn-new"
+    gen.allocate_routing_asn.assert_awaited_once_with(gen.asn_pool, gen.fabric.id)
+
+
+@pytest.mark.asyncio
+async def test_get_or_allocate_mlag_asn_reuses_existing_domain_link() -> None:
     gen = _make_generator()
     gen.client.filters = AsyncMock(
-        side_effect=_filters_side_effect(
-            used_devices=[_device("spine-1", 65100)],
-            used_domains=[_domain("Rack-OTHER", asn=65101)],
-        )
+        side_effect=_filters_side_effect(domains=[_domain("DC1_BORDER", asn_node_id="asn-existing")])
     )
+    gen.allocate_routing_asn = AsyncMock()  # type: ignore[method-assign]
 
-    asn = await gen._get_or_allocate_mlag_domain_asn(
-        domain_id="DC1_BORDER",
-        existing_domains=[],
-        leaf_a=gen.leaf_switches[0],
-        leaf_b=gen.leaf_switches[1],
-    )
+    asn_id = await gen._get_or_allocate_mlag_asn("DC1_BORDER")
 
-    assert asn == 65102
+    assert asn_id == "asn-existing"
+    gen.allocate_routing_asn.assert_not_awaited()
 
 
 @pytest.mark.asyncio
