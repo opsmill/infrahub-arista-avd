@@ -220,13 +220,27 @@ def _create_server(
     rack_id: str,
     template_id: str,
 ) -> dict:
-    """Create a ComputePhysicalServer and add it to the servers group."""
-    # Create the server
+    """Create a ComputePhysicalServer as a member of the ``servers`` group.
+
+    Group membership is set atomically inside the upsert rather than as a
+    separate follow-up write. The ``servers`` group is the target of the
+    ``generate-server-cabling`` generator, so adding a member emits a
+    ``GroupMemberAdded`` event that triggers the generator for the new node.
+    Infrahub then re-queries the group's members on the branch and asserts the
+    node is present — a separate add-to-group write races that trigger and can
+    fail with ``Target ... is not part of the group ...`` because the membership
+    is not yet visible on the branch when the generator runs. Committing the
+    server and its membership in one transaction closes that race (this mirrors
+    how the device generators enroll devices in ``avd_devices`` at creation).
+    """
+    servers_group_id = _get_group_id(client, group_name="servers", branch=branch)
+
     mutation = """
     mutation CreateServer(
         $name: String!,
         $rack_id: String!,
-        $template_id: String!
+        $template_id: String!,
+        $servers_group_id: String!
     ) {
         ComputePhysicalServerUpsert(
             data: {
@@ -234,6 +248,7 @@ def _create_server(
                 rack: { id: $rack_id }
                 object_template: { id: $template_id }
                 status: { value: "provisioning" }
+                member_of_groups: [{ id: $servers_group_id }]
             }
         ) {
             ok
@@ -249,6 +264,7 @@ def _create_server(
         "name": name,
         "rack_id": rack_id,
         "template_id": template_id,
+        "servers_group_id": servers_group_id,
     }
 
     result = client.execute_graphql(mutation, variables, branch)
@@ -256,41 +272,23 @@ def _create_server(
     if not result.get("ComputePhysicalServerUpsert", {}).get("ok"):
         raise InfrahubAPIError(f"Failed to create server: {result}")
 
-    server = result["ComputePhysicalServerUpsert"]["object"]
-
-    # Add the server to the 'servers' group via the SDK (more reliable than GraphQL)
-    _add_to_group(client, server_id=server["id"], group_name="servers", branch=branch)
-
-    return server
+    return result["ComputePhysicalServerUpsert"]["object"]
 
 
-def _get_fabric_for_rack(client: InfrahubClient, rack_id: str, branch: str) -> str | None:
-    """Navigate rack -> pod -> fabric to get fabric name."""
+def _get_group_id(client: InfrahubClient, group_name: str, branch: str) -> str:
+    """Resolve a CoreStandardGroup id by name on the given branch."""
     query = """
-    query($id: [ID!]) {
-        LocationRack(ids: $id) {
-            edges { node { pod { node { parent { node {
-                ... on NetworkFabric { name { value } }
-            } } } } } }
+    query GetGroup($name: String!) {
+        CoreStandardGroup(name__value: $name) {
+            edges { node { id } }
         }
     }
     """
-    result = client.execute_graphql(query, {"id": [rack_id]}, branch=branch)
-    edges = result.get("LocationRack", {}).get("edges", [])
+    result = client.execute_graphql(query, {"name": group_name}, branch)
+    edges = result.get("CoreStandardGroup", {}).get("edges", [])
     if not edges:
-        return None
-    pod = edges[0]["node"].get("pod", {}).get("node", {})
-    parent = pod.get("parent", {}).get("node", {})
-    return parent.get("name", {}).get("value")
-
-
-def _add_to_group(client: InfrahubClient, server_id: str, group_name: str, branch: str) -> None:
-    """Add a node to a CoreStandardGroup using the SDK."""
-    sdk = client._client  # noqa: SLF001
-    group = sdk.get(kind="CoreStandardGroup", name__value=group_name, branch=branch)
-    group.members.fetch()
-    group.members.add(server_id)
-    group.save()
+        raise InfrahubAPIError(f"Group '{group_name}' not found on branch '{branch}'")
+    return edges[0]["node"]["id"]
 
 
 main()
