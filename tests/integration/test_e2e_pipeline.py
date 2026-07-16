@@ -237,8 +237,10 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         """
         report = await wait_until(
             fetch=lambda: _asn_report(client, PIPELINE_BRANCH),
-            ready=lambda r: len(r["asns"]) > 0
-            and all(d["asn_node_id"] for d in r["devices"] if d["role"] in ("super_spine", "spine", "leaf")),
+            ready=lambda r: (
+                len(r["asns"]) > 0
+                and all(d["asn_node_id"] for d in r["devices"] if d["role"] in ("super_spine", "spine", "leaf"))
+            ),
             timeout=GENERATOR_TIMEOUT,
             interval=POLL_INTERVAL,
             describe="RoutingAsn nodes created and linked to every L3 device",
@@ -379,7 +381,9 @@ async def _asn_report(client: InfrahubClient, branch: str) -> dict:
     for edge in resp["RoutingAsn"]["edges"]:
         node = edge["node"]
         fabric = (node.get("fabric") or {}).get("node")
-        asns.append({"id": node["id"], "value": (node.get("asn") or {}).get("value"), "fabric_id": (fabric or {}).get("id")})
+        asns.append(
+            {"id": node["id"], "value": (node.get("asn") or {}).get("value"), "fabric_id": (fabric or {}).get("id")}
+        )
 
     devices = []
     for edge in resp["DcimDevice"]["edges"]:

@@ -506,11 +506,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_domain = device_mlag_domain.node
         domain_id = mlag_domain.domain_id.value if mlag_domain.domain_id else None
         mlag_asn_rel = getattr(mlag_domain, "asn", None)
-        bgp_asn = (
-            mlag_asn_rel.node.asn.value
-            if mlag_asn_rel and mlag_asn_rel.node and mlag_asn_rel.node.asn
-            else None
-        )
+        bgp_asn = mlag_asn_rel.node.asn.value if mlag_asn_rel and mlag_asn_rel.node and mlag_asn_rel.node.asn else None
         vrmac = getattr(mlag_domain, "virtual_router_mac", None)
 
         # Extract all peer names from the MLAG domain
@@ -727,11 +723,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         device_id = device.id
         hostname = device.name.value
         role = device.role.value
-        bgp_asn = (
-            device.asn.node.asn.value
-            if device.asn and device.asn.node and device.asn.node.asn
-            else None
-        )
+        bgp_asn = device.asn.node.asn.value if device.asn and device.asn.node and device.asn.node.asn else None
         node_id = device.node_id.value if device.node_id else None
 
         # Extract IP addresses

@@ -225,9 +225,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             await self._set_device_asn(leaf_a.id, routing_asn_id)
             await self._set_device_asn(leaf_b.id, routing_asn_id)
 
-            self.logger.info(
-                f"MLAG domain {domain_id} created successfully with shared ASN node {routing_asn_id}"
-            )
+            self.logger.info(f"MLAG domain {domain_id} created successfully with shared ASN node {routing_asn_id}")
 
     async def delete_stale_mlag_domains(self) -> None:
         """Delete MLAG domains for this rack before hostvar generation runs.
