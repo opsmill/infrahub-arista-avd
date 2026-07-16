@@ -41,6 +41,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             domain_id {
               value
             }
+            bgp_asn {
+              value
+            }
             virtual_router_mac {
               value
             }
@@ -51,6 +54,34 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   id
                   name {
                     value
+                  }
+                }
+              }
+            }
+          }
+        }
+        rack {
+          node {
+            __typename
+            id
+            name {
+              value
+            }
+            mlag {
+              value
+            }
+            devices {
+              edges {
+                node {
+                  __typename
+                  id
+                  ... on DcimDevice {
+                    name {
+                      value
+                    }
+                    role {
+                      value
+                    }
                   }
                 }
               }

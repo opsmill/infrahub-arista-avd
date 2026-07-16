@@ -9360,6 +9360,9 @@ type MlagDomain implements CoreNode & GenericMlagDomain {
   """Identifier for the MLAG domain"""
   domain_id: TextAttribute
 
+  """Authoritative BGP ASN shared by the MLAG peer pair"""
+  bgp_asn: NumberAttribute
+
   """Time in seconds to wait before bringing up the MLAG after a reload"""
   reload_delay: NumberAttribute
   peer_links(offset: Int, limit: Int, order: OrderInput, ids: [ID], isnull: Boolean, display_label__value: String, display_label__values: [String], display_label__isnull: Boolean, lacp_rate__value: String, lacp_rate__values: [String], lacp_rate__source__id: ID, lacp_rate__owner__id: ID, lacp_rate__is_protected: Boolean, lacp_mode__value: String, lacp_mode__values: [String], lacp_mode__source__id: ID, lacp_mode__owner__id: ID, lacp_mode__is_protected: Boolean, name__value: String, name__values: [String], name__source__id: ID, name__owner__id: ID, name__is_protected: Boolean, status__value: String, status__values: [String], status__source__id: ID, status__owner__id: ID, status__is_protected: Boolean, index__value: String, index__values: [String], index__source__id: ID, index__owner__id: ID, index__is_protected: Boolean, role__value: String, role__values: [String], role__source__id: ID, role__owner__id: ID, role__is_protected: Boolean, mtu__value: BigInt, mtu__values: [BigInt], mtu__source__id: ID, mtu__owner__id: ID, mtu__is_protected: Boolean, description__value: String, description__values: [String], description__source__id: ID, description__owner__id: ID, description__is_protected: Boolean, l2_mode__value: String, l2_mode__values: [String], l2_mode__source__id: ID, l2_mode__owner__id: ID, l2_mode__is_protected: Boolean, dot1q_id__value: BigInt, dot1q_id__values: [BigInt], dot1q_id__source__id: ID, dot1q_id__owner__id: ID, dot1q_id__is_protected: Boolean, mac_address__value: String, mac_address__values: [String], mac_address__source__id: ID, mac_address__owner__id: ID, mac_address__is_protected: Boolean): NestedPaginatedInterfaceLag!
@@ -12169,6 +12172,9 @@ type ProfileMlagDomain implements CoreNode & CoreProfile & LineageSource {
   Priority level for profile application (lower numbers have higher priority)
   """
   profile_priority: NumberAttribute
+
+  """Authoritative BGP ASN shared by the MLAG peer pair"""
+  bgp_asn: NumberAttribute
 
   """Override fabric-level virtual router MAC for this MLAG pair"""
   virtual_router_mac: TextAttribute
@@ -67688,6 +67694,9 @@ type MlagDomainCreate {
 input MlagDomainCreateInput {
   id: String
 
+  """Authoritative BGP ASN shared by the MLAG peer pair"""
+  bgp_asn: NumberAttributeCreate
+
   """Override fabric-level virtual router MAC for this MLAG pair"""
   virtual_router_mac: TextAttributeCreate
 
@@ -67723,6 +67732,9 @@ input MlagDomainUpdateInput {
   id: String
   hfid: [String]
 
+  """Authoritative BGP ASN shared by the MLAG peer pair"""
+  bgp_asn: NumberAttributeUpdate
+
   """Override fabric-level virtual router MAC for this MLAG pair"""
   virtual_router_mac: TextAttributeUpdate
 
@@ -67757,6 +67769,9 @@ type MlagDomainUpsert {
 input MlagDomainUpsertInput {
   id: String
   hfid: [String]
+
+  """Authoritative BGP ASN shared by the MLAG peer pair"""
+  bgp_asn: NumberAttributeUpdate
 
   """Override fabric-level virtual router MAC for this MLAG pair"""
   virtual_router_mac: TextAttributeUpdate

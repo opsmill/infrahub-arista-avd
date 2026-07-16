@@ -36,6 +36,12 @@ class ServerEndpoint(TypedDict):
     adapters: list[dict[str, Any]]
 
 
+class RackInfo(TypedDict):
+    name: str | None
+    mlag: bool | None
+    leaf_names: list[str]
+
+
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
     pods = await client.filters(NetworkPod, parent__ids=[fabric_id])
 
@@ -495,10 +501,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         """Extract MLAG domain info for a device, including peer names."""
         device_mlag_domain = getattr(device, "mlag_domain", None)
         if not device_mlag_domain or not device_mlag_domain.node:
-            return {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
+            return {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []}
 
         mlag_domain = device_mlag_domain.node
         domain_id = mlag_domain.domain_id.value if mlag_domain.domain_id else None
+        bgp_asn = mlag_domain.bgp_asn.value if getattr(mlag_domain, "bgp_asn", None) else None
         vrmac = getattr(mlag_domain, "virtual_router_mac", None)
 
         # Extract all peer names from the MLAG domain
@@ -512,9 +519,35 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return {
             "domain_id": domain_id,
+            "bgp_asn": bgp_asn,
             "virtual_router_mac": vrmac.value if vrmac else None,
             "peer_names": peer_names,
         }
+
+    @staticmethod
+    def _extract_rack_info(device: object) -> RackInfo:
+        """Extract rack grouping data for leaf node_groups."""
+        device_rack = getattr(device, "rack", None)
+        if not device_rack or not device_rack.node:
+            return {"name": None, "mlag": None, "leaf_names": []}
+
+        rack = device_rack.node
+        rack_name = rack.name.value if getattr(rack, "name", None) else None
+        rack_mlag = rack.mlag.value if getattr(rack, "mlag", None) else None
+
+        leaf_names: list[str] = []
+        devices = getattr(rack, "devices", None)
+        if devices and hasattr(devices, "edges"):
+            for edge in devices.edges:
+                node = edge.node
+                if not node or not getattr(node, "name", None):
+                    continue
+                role = getattr(node, "role", None)
+                if role and role.value != "leaf":
+                    continue
+                leaf_names.append(node.name.value)
+
+        return {"name": rack_name, "mlag": rack_mlag, "leaf_names": sorted(leaf_names)}
 
     @staticmethod
     def _build_hostvars(  # noqa: C901 — assembles the full AVD hostvars payload
@@ -538,7 +571,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         management: dict[str, Any],
         pools: dict[str, str | None],
         uplinks: UplinkData,
-        mlag_info: dict[str, str | None],
+        rack_info: RackInfo,
+        mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
     ) -> dict[str, Any]:
@@ -550,7 +584,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         node_config: dict[str, Any] = {"name": hostname}
         if node_id is not None:
             node_config["id"] = node_id
-        if bgp_asn is not None:
+        is_mlag_leaf = bool(mlag_info.get("domain_id")) and role == "leaf"
+        if bgp_asn is not None and not is_mlag_leaf:
             node_config["bgp_as"] = str(bgp_asn)
         if loopback_ip:
             node_config["loopback_ipv4_address"] = loopback_ip
@@ -633,19 +668,39 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         hostvars[node_type_key] = hostvars.get(node_type_key, {})
         hostvars[node_type_key]["nodes"] = [node_config]
 
-        # Add MLAG node_group for leaf devices (AVD expects nodes listed inside the group)
-        if mlag_info["domain_id"] and role == "leaf":
-            effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
-            node_group: dict[str, Any] = {"group": mlag_info["domain_id"]}
-            if bgp_asn is not None:
-                node_group["bgp_as"] = str(bgp_asn)
-            if effective_vrmac:
-                node_group["virtual_router_mac_address"] = effective_vrmac
-            # Include peer node names in the group
-            group_nodes: list[dict[str, str]] = [{"name": peer_name} for peer_name in mlag_info.get("peer_names", [])]
-            if group_nodes:
-                node_group["nodes"] = group_nodes
-            hostvars[node_type_key]["node_groups"] = [node_group]
+        # Assemble the leaf node_group. MLAG grouping is a per-pair concept, so an
+        # MLAG leaf is grouped by its MLAG domain (which is pair-unique — a rack with
+        # multiple pairs yields several domains) and lists only its peer pair. A
+        # non-MLAG rack groups every rack leaf together and disables MLAG at the
+        # node-group level rather than in l3leaf.defaults.
+        if role == "leaf":
+            if mlag_info["domain_id"]:
+                mlag_bgp_asn = mlag_info.get("bgp_asn")
+                if mlag_bgp_asn is None:
+                    msg = f"MLAG domain {mlag_info['domain_id']} for leaf {hostname} has no BGP ASN"
+                    raise ValueError(msg)
+                pair_names = sorted(dict.fromkeys([*mlag_info.get("peer_names", []), hostname]))
+                node_group: dict[str, Any] = {
+                    "group": mlag_info["domain_id"],
+                    "nodes": [{"name": name} for name in pair_names],
+                    "mlag_domain_id": mlag_info["domain_id"],
+                    "bgp_as": str(mlag_bgp_asn),
+                }
+                effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
+                if effective_vrmac:
+                    node_group["virtual_router_mac_address"] = effective_vrmac
+                hostvars[node_type_key]["node_groups"] = [node_group]
+            else:
+                rack_name = rack_info.get("name")
+                leaf_names = sorted(dict.fromkeys([*rack_info.get("leaf_names", []), hostname]))
+                if rack_name:
+                    node_group = {
+                        "group": rack_name,
+                        "nodes": [{"name": leaf_name} for leaf_name in leaf_names],
+                    }
+                    if rack_info.get("mlag") is False:
+                        node_group["mlag"] = False
+                    hostvars[node_type_key]["node_groups"] = [node_group]
 
         if tenants_data:
             hostvars["tenants"] = tenants_data
@@ -740,9 +795,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         else:
             pools = await self._extract_l3ls_pools(fabric, pod)
 
-        # Extract MLAG domain info (only for L3 leaf devices)
-        mlag_info: dict[str, Any] = {"domain_id": None, "virtual_router_mac": None, "peer_names": []}
+        # Extract rack and MLAG domain info (only for L3 leaf devices)
+        rack_info: RackInfo = {"name": None, "mlag": None, "leaf_names": []}
+        mlag_info: dict[str, Any] = {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []}
         if not is_l2leaf:
+            rack_info = self._extract_rack_info(device)
             mlag_info = self._extract_mlag_info(device)
             # Extract mlag_peer interface names for AVD mlag_interfaces
             if mlag_info["domain_id"] and iface_edges:
@@ -779,6 +836,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             management=management,
             pools=pools,
             uplinks=uplinks,
+            rack_info=rack_info,
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,

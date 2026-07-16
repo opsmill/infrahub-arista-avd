@@ -26,6 +26,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNode(BaseModel):
     loopback_ip: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIp
     mgmt_ip: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIp
     mlag_domain: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain
+    rack: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRack
     pod: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePod
     interfaces: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfaces
 
@@ -79,12 +80,17 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain(BaseModel):
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNode(BaseModel):
     id: str
     domain_id: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeDomainId | None
+    bgp_asn: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeBgpAsn | None
     virtual_router_mac: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeVirtualRouterMac | None
     peers: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeers
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeDomainId(BaseModel):
     value: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeBgpAsn(BaseModel):
+    value: Any | None
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodeVirtualRouterMac(BaseModel):
@@ -105,6 +111,60 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNod
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNodeName(BaseModel):
+    value: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRack(BaseModel):
+    node: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNode | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNode(BaseModel):
+    id: str
+    name: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeName | None
+    mlag: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeMlag | None
+    devices: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevices
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeName(BaseModel):
+    value: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeMlag(BaseModel):
+    value: bool | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevices(BaseModel):
+    edges: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdges] | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdges(BaseModel):
+    node: (
+        Annotated[
+            GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimPhysicalDevice
+            | GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDevice,
+            Field(discriminator="typename__"),
+        ]
+        | None
+    )
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimPhysicalDevice(BaseModel):
+    typename__: Literal["DcimPhysicalDevice"] = Field(alias="__typename")
+    id: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDevice(BaseModel):
+    typename__: Literal["DcimDevice"] = Field(alias="__typename")
+    id: str
+    name: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDeviceName | None
+    role: GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDeviceRole | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDeviceName(BaseModel):
+    value: str | None
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDeviceRole(BaseModel):
     value: str | None
 
 
@@ -797,6 +857,11 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeers.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdges.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomainNodePeersEdgesNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRack.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevices.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDevice.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePod.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagPeerPool.model_rebuild()

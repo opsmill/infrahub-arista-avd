@@ -14,12 +14,22 @@ from solution_arista_avd.generator import (
     set_fabric_avd_hostvars_ready,
     trigger_hostvar_generation,
 )
-from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
+from solution_arista_avd.protocols import AvdArtifact, DcimDevice, DcimInterface, LocationRack, NetworkPod
 
 from .rack_generator_query import RackGeneratorQuery
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+TASK_LOGGER = logging.getLogger("infrahub.tasks")
+
+
+def is_mlag_enabled(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.lower() not in {"false", "no", "0", "off"}
+    return bool(value)
 
 
 class RackGenerator(InfrahubGenerator, GeneratorMixin):
@@ -47,7 +57,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     node_id_pool: CoreNumberPool | None
     mgmt_pool: CoreIPAddressPool | None
 
-    logger = logging.getLogger("infrahub.tasks")
+    logger = TASK_LOGGER
 
     async def generate(self, data: dict) -> None:
         data: RackGeneratorQuery = RackGeneratorQuery(**data)
@@ -57,6 +67,10 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.rack_name: str = data.location_rack.edges[0].node.name.value
         self.rack_leaf_switch_template: str = data.location_rack.edges[0].node.leaf_switch_template.node.id
         self.rack_amount_of_leafs: int = data.location_rack.edges[0].node.amount_of_leafs.value
+        rack_mlag_attr = data.location_rack.edges[0].node.mlag
+        self.rack_mlag: bool = is_mlag_enabled(None if rack_mlag_attr is None else rack_mlag_attr.value)
+        self.rack_mlag_enabled: bool = self.rack_mlag and self.rack_amount_of_leafs >= 2
+        self.logger.info(f"Rack {self.rack_name}: mlag_enabled={self.rack_mlag}")
         self.leaf_switches = []
         self.l2leaf_switches: list[DcimDevice] = []
 
@@ -118,7 +132,11 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.create_leaf_switches()
 
-        await self.create_mlag_pairs()
+        if self.rack_mlag_enabled:
+            await self.create_mlag_pairs()
+        else:
+            self.logger.info(f"Rack {self.rack_name}: MLAG disabled, skipping MLAG pair creation")
+            await self.delete_stale_mlag_domains()
 
         await self.connect_leafs_to_spine()
 
@@ -134,10 +152,17 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         # Check if all racks in the fabric are done; if so, trigger hostvar generation
         if await check_all_racks_generated(self.client, self.fabric.id):
-            self.logger.info("All racks generated — triggering hostvar generation")
-            await trigger_hostvar_generation(self.client)
+            hostvar_target_ids = self.hostvar_target_device_ids()
+            await self.invalidate_hostvars(hostvar_target_ids)
+            self.logger.info(
+                "All racks generated — triggering hostvar generation for %s devices", len(hostvar_target_ids)
+            )
+            await trigger_hostvar_generation(self.client, node_ids=hostvar_target_ids)
 
     async def create_leaf_switches(self) -> None:
+        # MLAG leafs share an ASN allocated onto the MLAG domain, so they must not
+        # draw a per-device ASN from the fabric pool. Non-MLAG leafs allocate directly.
+        asn_pool = None if self.rack_mlag_enabled else self.asn_pool
         for index in range(1, self.rack_amount_of_leafs + 1):
             leaf_switch = await self.create_avd_device(
                 name=f"leaf-{self.pod_name}-{self.rack_index}-{index}",
@@ -147,7 +172,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 rack_id=self.rack_id,
                 index=index,
                 loopback_pool=self.loopback_pool,
-                asn_pool=self.asn_pool,
+                asn_pool=asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,
             )
@@ -160,28 +185,228 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         - Create MlagDomain with both leafs as peers
         AVD auto-generates the switch-side Port-Channel from mlag_interfaces in hostvars.
         """
-        if len(self.leaf_switches) < 2:
-            self.logger.info(f"Rack {self.rack_name}: fewer than 2 leafs, skipping MLAG pair creation")
+        if not self.rack_mlag_enabled:
+            self.logger.info(f"Rack {self.rack_name}: MLAG disabled or fewer than 2 leafs, skipping MLAG pair creation")
             return
+
+        if self.asn_pool is None:
+            msg = f"Rack {self.rack_name}: MLAG is enabled but the parent fabric has no ASN pool"
+            raise ValueError(msg)
 
         for pair_idx in range(0, len(self.leaf_switches) - 1, 2):
             leaf_a = self.leaf_switches[pair_idx]
             leaf_b = self.leaf_switches[pair_idx + 1]
 
             pair_suffix = f"-{pair_idx // 2 + 1}" if len(self.leaf_switches) > 2 else ""
-            domain_id = f"mlag-{self.rack_name}{pair_suffix}"
+            domain_id = f"{self.rack_name}{pair_suffix}"
 
             self.logger.info(f"Creating MLAG pair {domain_id}: {leaf_a.name.value} + {leaf_b.name.value}")
 
+            existing_domain = await self._get_existing_mlag_domain(domain_id)
+            mlag_asn = await self._get_or_allocate_mlag_domain_asn(
+                domain_id=domain_id,
+                existing_domains=[existing_domain] if existing_domain is not None else [],
+                leaf_a=leaf_a,
+                leaf_b=leaf_b,
+            )
+
+            domain_kwargs = {
+                "domain_id": domain_id,
+                "bgp_asn": mlag_asn,
+                "peers": [{"id": leaf_a.id}, {"id": leaf_b.id}],
+                "pod": {"id": self.pod_id},
+            }
+
             mlag_domain = await self.client.create(
                 "MlagDomain",
-                domain_id=domain_id,
-                peers=[{"id": leaf_a.id}, {"id": leaf_b.id}],
-                pod={"id": self.pod_id},
+                **domain_kwargs,
             )
             await mlag_domain.save(allow_upsert=True)
 
-            self.logger.info(f"MLAG domain {domain_id} created successfully")
+            mlag_domain = await self.client.get(kind="MlagDomain", domain_id__value=domain_id)
+            mlag_asn_attr = getattr(mlag_domain, "bgp_asn", None)
+            mlag_asn = mlag_asn_attr.value if mlag_asn_attr else None
+            if mlag_asn is None:
+                msg = f"MLAG domain {domain_id} did not receive a BGP ASN from the fabric ASN pool"
+                raise ValueError(msg)
+
+            await self._set_device_bgp_asn(leaf_a.id, mlag_asn)
+            await self._set_device_bgp_asn(leaf_b.id, mlag_asn)
+            leaf_a.bgp_asn.value = mlag_asn
+            leaf_b.bgp_asn.value = mlag_asn
+
+            self.logger.info(f"MLAG domain {domain_id} created successfully with ASN {mlag_asn}")
+
+    async def delete_stale_mlag_domains(self) -> None:
+        """Delete MLAG domains for this rack before hostvar generation runs.
+
+        Generator tracking would eventually delete domains that are no longer
+        created by this run, but hostvar generation is triggered before the
+        tracking context exits. Removing stale domains explicitly prevents
+        downstream hostvars from seeing old MLAG state.
+        """
+        domains = await self.client.filters(kind="MlagDomain", pod__ids=[self.pod_id])
+        for domain in domains:
+            domain_id = getattr(getattr(domain, "domain_id", None), "value", None)
+            if domain_id != self.rack_name and not str(domain_id).startswith(f"{self.rack_name}-"):
+                continue
+
+            await domain.delete()
+            self.logger.info("Deleted stale MLAG domain %s for rack %s", domain_id, self.rack_name)
+
+    def hostvar_target_device_ids(self) -> list[str]:
+        """Return rack-local devices plus pod spines whose hostvars should be refreshed."""
+        devices = [*self.leaf_switches, *self.l2leaf_switches, *self.spine_switches]
+        seen: set[str] = set()
+        device_ids: list[str] = []
+        for device in devices:
+            if device.id in seen:
+                continue
+            seen.add(device.id)
+            device_ids.append(device.id)
+        return device_ids
+
+    async def invalidate_hostvars(self, device_ids: list[str]) -> None:
+        """Remove existing hostvar files for targeted devices before regeneration.
+
+        The hostvar generator marks the fabric ready once every device has a
+        hostvar file. If existing target files remain in place, the first
+        regenerated device can flip the fabric back to ready before the rest of
+        the targeted devices have refreshed. Deleting only the target files
+        makes the existing readiness check wait for the full target set.
+        """
+        if not device_ids:
+            return
+
+        devices = await self.client.filters(kind=DcimDevice, ids=device_ids)
+        for device in devices:
+            hostname = device.name.value
+            artifacts = await self.client.filters(kind=AvdArtifact, name__value=hostname)
+            if not artifacts:
+                continue
+
+            artifact = artifacts[0]
+            if not artifact.hostvar_file.id:
+                continue
+
+            try:
+                await artifact.hostvar_file.fetch()
+                hostvar_file = artifact.hostvar_file.peer
+            except Exception as exc:  # noqa: BLE001 - a missing file is already invalidated
+                self.logger.debug("Could not fetch hostvar file for %s before invalidation: %s", hostname, exc)
+                continue
+
+            if hostvar_file:
+                await hostvar_file.delete()
+                self.logger.info("Invalidated hostvars for %s before targeted regeneration", hostname)
+
+    async def _set_device_bgp_asn(self, device_id: str, bgp_asn: int) -> None:
+        """Update only DcimDevice.bgp_asn without resaving relationships from the SDK object."""
+        await self.client.execute_graphql(
+            query="""
+            mutation SetDeviceBgpAsn($id: String!, $bgp_asn: BigInt!) {
+                DcimDeviceUpsert(data: { id: $id, bgp_asn: { value: $bgp_asn } }) {
+                    ok
+                    object { id }
+                }
+            }
+            """,
+            variables={"id": device_id, "bgp_asn": bgp_asn},
+        )
+
+    async def _get_existing_mlag_domain(self, domain_id: str) -> object | None:
+        """Return the current MLAG domain for a rack pair, if present."""
+        domains = await self.client.filters(kind="MlagDomain", domain_id__value=domain_id)
+        return domains[0] if domains else None
+
+    async def _get_or_allocate_mlag_domain_asn(
+        self,
+        *,
+        domain_id: str,
+        existing_domains: list[object],
+        leaf_a: DcimDevice,
+        leaf_b: DcimDevice,
+    ) -> int:
+        """Return the authoritative ASN for an MLAG domain.
+
+        CoreNumberPool objects are bound to one target node kind/attribute.  The
+        fabric ASN pools in this repository target ``DcimDevice.bgp_asn``, so
+        Infrahub rejects using the same pool object directly for
+        ``MlagDomain.bgp_asn``.  Keep the single fabric ASN range model by
+        selecting an available number from that pool range and saving the value
+        directly on the MLAG domain.
+        """
+        for domain in existing_domains:
+            domain_asn = self._number_attr_value(domain, "bgp_asn")
+            if domain_asn is not None:
+                return domain_asn
+
+        excluded_domain_ids = {domain.id for domain in existing_domains if getattr(domain, "id", None)}
+        used_by_others = await self._collect_used_fabric_asns(
+            excluded_device_ids={leaf_a.id, leaf_b.id},
+            excluded_domain_ids=excluded_domain_ids,
+        )
+
+        start, end = self._asn_pool_range()
+        for asn in range(start, end + 1):
+            if asn not in used_by_others:
+                return asn
+
+        msg = f"Rack {self.rack_name}: no available ASN in fabric ASN pool for MLAG domain {domain_id}"
+        raise ValueError(msg)
+
+    async def _collect_used_fabric_asns(
+        self, *, excluded_device_ids: set[str], excluded_domain_ids: set[str]
+    ) -> set[int]:
+        """Collect BGP ASNs already used by this fabric's devices and MLAG domains."""
+        used: set[int] = set()
+
+        pods = await self.client.filters(kind=NetworkPod, parent__ids=[self.fabric.id])
+        pod_ids = [pod.id for pod in pods]
+        if not pod_ids:
+            return used
+
+        devices = await self.client.filters(kind=DcimDevice, pod__ids=pod_ids)
+        for device in devices:
+            if device.id in excluded_device_ids:
+                continue
+            asn = self._number_attr_value(device, "bgp_asn")
+            if asn is not None and self._asn_is_in_pool(asn):
+                used.add(asn)
+
+        domains = await self.client.filters(kind="MlagDomain", pod__ids=pod_ids)
+        for domain in domains:
+            if domain.id in excluded_domain_ids:
+                continue
+            asn = self._number_attr_value(domain, "bgp_asn")
+            if asn is not None and self._asn_is_in_pool(asn):
+                used.add(asn)
+
+        return used
+
+    def _asn_pool_range(self) -> tuple[int, int]:
+        if self.asn_pool is None:
+            msg = f"Rack {self.rack_name}: MLAG is enabled but the parent fabric has no ASN pool"
+            raise ValueError(msg)
+
+        start = self._number_attr_value(self.asn_pool, "start_range")
+        end = self._number_attr_value(self.asn_pool, "end_range")
+        if start is None or end is None:
+            msg = f"Rack {self.rack_name}: fabric ASN pool is missing a start or end range"
+            raise ValueError(msg)
+        return start, end
+
+    def _asn_is_in_pool(self, asn: int) -> bool:
+        start, end = self._asn_pool_range()
+        return start <= asn <= end
+
+    @staticmethod
+    def _number_attr_value(node: object, attr_name: str) -> int | None:
+        attr = getattr(node, attr_name, None)
+        if attr is None:
+            return None
+        value = attr.value if hasattr(attr, "value") else attr
+        return int(value) if value is not None else None
 
     async def connect_leafs_to_spine(self) -> None:
         spine_interfaces = await self.client.filters(

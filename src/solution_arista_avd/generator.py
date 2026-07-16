@@ -176,7 +176,7 @@ async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> b
     return True
 
 
-async def _trigger_generator(client: InfrahubClient, name: str) -> None:
+async def _trigger_generator(client: InfrahubClient, name: str, node_ids: list[str] | None = None) -> None:
     """Trigger a generator by name via CoreGeneratorDefinition mutation."""
     generator_defs = await client.filters(kind="CoreGeneratorDefinition", name__value=name)
     if not generator_defs:
@@ -188,19 +188,19 @@ async def _trigger_generator(client: InfrahubClient, name: str) -> None:
 
     await client.execute_graphql(
         query="""
-        mutation RunGenerator($id: String!) {
-            CoreGeneratorDefinitionRun(data: { id: $id }) {
+        mutation RunGenerator($id: String!, $nodes: [String!]) {
+            CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
                 ok
             }
         }
         """,
-        variables={"id": generator_def.id},
+        variables={"id": generator_def.id, "nodes": node_ids},
     )
 
 
-async def trigger_hostvar_generation(client: InfrahubClient) -> None:
+async def trigger_hostvar_generation(client: InfrahubClient, node_ids: list[str] | None = None) -> None:
     """Trigger the hostvar generator via CoreGeneratorDefinition mutation."""
-    await _trigger_generator(client, "generate-avd-device-hostvar")
+    await _trigger_generator(client, "generate-avd-device-hostvar", node_ids=node_ids)
 
 
 async def trigger_structured_config_generation(client: InfrahubClient) -> None:

@@ -24,6 +24,7 @@ class RackGeneratorQueryLocationRackEdgesNode(BaseModel):
     index: RackGeneratorQueryLocationRackEdgesNodeIndex | None
     rack_type: RackGeneratorQueryLocationRackEdgesNodeRackType | None
     amount_of_leafs: RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs | None
+    mlag: RackGeneratorQueryLocationRackEdgesNodeMlag | None
     leaf_switch_template: RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate
     amount_of_l_2_leafs: RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs | None = Field(
         alias="amount_of_l2leafs"
@@ -53,6 +54,10 @@ class RackGeneratorQueryLocationRackEdgesNodeRackType(BaseModel):
 
 class RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs(BaseModel):
     value: Any | None
+
+
+class RackGeneratorQueryLocationRackEdgesNodeMlag(BaseModel):
+    value: bool | None
 
 
 class RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate(BaseModel):

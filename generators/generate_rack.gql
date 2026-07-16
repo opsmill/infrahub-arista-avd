@@ -18,6 +18,9 @@ query RackGeneratorQuery($name: String!) {
 				amount_of_leafs {
 					value
 				}
+				mlag {
+					value
+				}
 				leaf_switch_template {
 					node {
 						__typename
