@@ -23,6 +23,10 @@ def _make_generator() -> GenerateAVDDeviceHostvar:
     return gen
 
 
+def _named_peer(name: str) -> SimpleNamespace:
+    return SimpleNamespace(name=_attr(name))
+
+
 def _base_hostvars(
     tenants_data: list[dict],
     *,
@@ -326,6 +330,119 @@ async def test_tenants_hostvars_validate_against_pyavd():
     get_avd_facts({"leaf1": hostvars})
 
 
+@pytest.mark.anyio
+async def test_svi_rack_tags_emit_rack_names() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([_named_peer("Rack-B"), _named_peer("Rack-A")]),
+        avd_tags=_rel([]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["tags"] == ["Rack-A", "Rack-B"]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_svi_avd_tags_emit_tag_names() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([]),
+        avd_tags=_rel([_named_peer("storage"), _named_peer("compute")]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["tags"] == ["compute", "storage"]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+def test_mixed_svi_tags_are_deduplicated_with_rack_names_first() -> None:
+    tags = GenerateAVDDeviceHostvar._build_svi_tags(
+        [_named_peer("shared"), _named_peer("Rack-A"), _named_peer("shared")],
+        [_named_peer("blue"), _named_peer("shared"), _named_peer("blue")],
+    )
+
+    assert tags == ["Rack-A", "shared", "blue"]
+
+
+@pytest.mark.anyio
+async def test_empty_svi_tag_relationships_omit_tags() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([]),
+        avd_tags=_rel([]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert "tags" not in tenants_data[0]["vrfs"][0]["svis"][0]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+def test_rack_avd_tags_emit_node_group_filter_tags() -> None:
+    hostvars = _base_hostvars(
+        [],
+        rack_info={"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"], "avd_tags": ["storage", "compute"]},
+    )
+
+    node_group = hostvars["l3leaf"]["node_groups"][0]
+    assert node_group["filter"] == {"tags": ["compute", "storage"]}
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_rack_avd_tags_are_fetched_by_rack_id() -> None:
+    gen = _make_generator()
+    rack = SimpleNamespace(avd_tags=_rel([_named_peer("storage"), _named_peer("compute")]))
+    gen.client.get = AsyncMock(return_value=rack)
+
+    tags = await gen._fetch_rack_avd_tags("rack-1")
+
+    assert tags == ["compute", "storage"]
+    gen.client.get.assert_awaited_once_with(kind="LocationRack", id="rack-1", include=["avd_tags"])
+
+
 def test_generated_only_p2p_mtu_resolves() -> None:
     fabric = SimpleNamespace(p_2_p_uplinks_mtu=_attr(1500))
 
@@ -386,6 +503,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
             "mlag_peer_l3_ipv4_pool": None,
         },
         uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        rack_info={"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"]},
         mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=[],
         connected_endpoints=[],

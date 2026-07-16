@@ -117,6 +117,22 @@ nodes:
         optional: true
         description: "VLAN this SVI maps to"
         order_weight: 950
+      - name: rack_tags
+        label: "Rack Tags"
+        peer: LocationRack
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: "Rack names emitted as AVD SVI tags"
+        order_weight: 960
+      - name: avd_tags
+        label: "AVD Tags"
+        peer: AvdTag
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: "AVD tag names emitted as AVD SVI tags"
+        order_weight: 970
 
   - name: L2Vlan
     namespace: Evpn

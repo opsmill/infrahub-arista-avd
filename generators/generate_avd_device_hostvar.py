@@ -40,6 +40,7 @@ class RackInfo(TypedDict):
     name: str | None
     mlag: bool | None
     leaf_names: list[str]
+    avd_tags: list[str]
 
 
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
@@ -271,6 +272,48 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
 
 
 class GenerateAVDDeviceHostvar(InfrahubGenerator):
+    @staticmethod
+    def _peer_name(peer: object) -> str | None:
+        name = getattr(peer, "name", None)
+        if not name:
+            return None
+        return name.value
+
+    @classmethod
+    def _build_svi_tags(cls, rack_tag_peers: list[object], avd_tag_peers: list[object]) -> list[str]:
+        rack_tags = sorted({name for peer in rack_tag_peers if (name := cls._peer_name(peer))})
+        rack_tag_set = set(rack_tags)
+        avd_tags = sorted(
+            {name for peer in avd_tag_peers if (name := cls._peer_name(peer)) and name not in rack_tag_set}
+        )
+        return [*rack_tags, *avd_tags]
+
+    @classmethod
+    async def _fetch_relationship_peers(cls, obj: object, relationship_name: str) -> list[object]:
+        relationship = getattr(obj, relationship_name, None)
+        if relationship is None:
+            return []
+
+        await relationship.fetch()
+        return [peer.peer for peer in getattr(relationship, "peers", [])]
+
+    @classmethod
+    async def _fetch_relationship_peer_names(cls, obj: object, relationship_name: str) -> list[str]:
+        return sorted(
+            {
+                name
+                for peer in await cls._fetch_relationship_peers(obj, relationship_name)
+                if (name := cls._peer_name(peer))
+            }
+        )
+
+    async def _fetch_rack_avd_tags(self, rack_id: str | None) -> list[str]:
+        if not rack_id:
+            return []
+
+        rack = await self.client.get(kind="LocationRack", id=rack_id, include=["avd_tags"])
+        return await self._fetch_relationship_peer_names(rack, "avd_tags")
+
     async def _build_tenants_hostvars(self, fabric_id: str) -> list[dict[str, Any]]:
         """Build AVD-compatible tenants structure from EVPN data.
 
@@ -322,6 +365,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                     }
                     if svi.ip_address_virtual and svi.ip_address_virtual.value:
                         svi_data["ip_address_virtual"] = str(svi.ip_address_virtual.value)
+                    rack_tag_peers = await self._fetch_relationship_peers(svi, "rack_tags")
+                    avd_tag_peers = await self._fetch_relationship_peers(svi, "avd_tags")
+                    svi_tags = self._build_svi_tags(rack_tag_peers, avd_tag_peers)
+                    if svi_tags:
+                        svi_data["tags"] = svi_tags
                     svis_list.append(svi_data)
 
                 if svis_list:
@@ -551,7 +599,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         """Extract rack grouping data for leaf node_groups."""
         device_rack = getattr(device, "rack", None)
         if not device_rack or not device_rack.node:
-            return {"name": None, "mlag": None, "leaf_names": []}
+            return {"name": None, "mlag": None, "leaf_names": [], "avd_tags": []}
 
         rack = device_rack.node
         rack_name = rack.name.value if getattr(rack, "name", None) else None
@@ -569,7 +617,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                     continue
                 leaf_names.append(node.name.value)
 
-        return {"name": rack_name, "mlag": rack_mlag, "leaf_names": sorted(leaf_names)}
+        return {"name": rack_name, "mlag": rack_mlag, "leaf_names": sorted(leaf_names), "avd_tags": []}
 
     @staticmethod
     def _build_hostvars(  # noqa: C901 — assembles the full AVD hostvars payload
@@ -696,6 +744,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         # non-MLAG rack groups every rack leaf together and disables MLAG at the
         # node-group level rather than in l3leaf.defaults.
         if role == "leaf":
+            avd_tags = sorted(dict.fromkeys(rack_info.get("avd_tags", [])))
             if mlag_info["domain_id"]:
                 mlag_bgp_asn = mlag_info.get("bgp_asn")
                 if mlag_bgp_asn is None:
@@ -711,6 +760,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
                 if effective_vrmac:
                     node_group["virtual_router_mac_address"] = effective_vrmac
+                if avd_tags:
+                    node_group["filter"] = {"tags": avd_tags}
                 hostvars[node_type_key]["node_groups"] = [node_group]
             else:
                 rack_name = rack_info.get("name")
@@ -720,6 +771,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                         "group": rack_name,
                         "nodes": [{"name": leaf_name} for leaf_name in leaf_names],
                     }
+                    if avd_tags:
+                        node_group["filter"] = {"tags": avd_tags}
                     if rack_info.get("mlag") is False:
                         node_group["mlag"] = False
                     hostvars[node_type_key]["node_groups"] = [node_group]
@@ -825,6 +878,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any] = {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []}
         if not is_l2leaf:
             rack_info = self._extract_rack_info(device)
+            rack_info["avd_tags"] = await self._fetch_rack_avd_tags(device.rack.node.id if device.rack.node else None)
             mlag_info = self._extract_mlag_info(device)
             # Extract mlag_peer interface names for AVD mlag_interfaces
             if mlag_info["domain_id"] and iface_edges:

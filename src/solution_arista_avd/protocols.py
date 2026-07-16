@@ -6,7 +6,190 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from infrahub_sdk.protocols import CoreNode, BuiltinIPAddress, BuiltinIPAddressSync, BuiltinIPNamespace, BuiltinIPNamespaceSync, BuiltinIPPrefix, BuiltinIPPrefixSync, BuiltinTag, BuiltinTagSync, CoreAccount, CoreAccountGroup, CoreAccountGroupSync, CoreAccountRole, CoreAccountRoleSync, CoreAccountSync, CoreAction, CoreActionSync, CoreArtifact, CoreArtifactCheck, CoreArtifactCheckSync, CoreArtifactDefinition, CoreArtifactDefinitionSync, CoreArtifactSync, CoreArtifactTarget, CoreArtifactTargetSync, CoreArtifactThread, CoreArtifactThreadSync, CoreArtifactValidator, CoreArtifactValidatorSync, CoreBasePermission, CoreBasePermissionSync, CoreChangeComment, CoreChangeCommentSync, CoreChangeThread, CoreChangeThreadSync, CoreCheck, CoreCheckDefinition, CoreCheckDefinitionSync, CoreCheckSync, CoreComment, CoreCommentSync, CoreCredential, CoreCredentialSync, CoreCustomWebhook, CoreCustomWebhookSync, CoreDataCheck, CoreDataCheckSync, CoreDataValidator, CoreDataValidatorSync, CoreEnvKeyValue, CoreEnvKeyValueSync, CoreFileCheck, CoreFileCheckSync, CoreFileObject, CoreFileObjectSync, CoreFileThread, CoreFileThreadSync, CoreGeneratorAction, CoreGeneratorActionSync, CoreGeneratorAwareGroup, CoreGeneratorAwareGroupSync, CoreGeneratorCheck, CoreGeneratorCheckSync, CoreGeneratorDefinition, CoreGeneratorDefinitionSync, CoreGeneratorGroup, CoreGeneratorGroupSync, CoreGeneratorInstance, CoreGeneratorInstanceSync, CoreGeneratorValidator, CoreGeneratorValidatorSync, CoreGenericAccount, CoreGenericAccountSync, CoreGenericRepository, CoreGenericRepositorySync, CoreGlobalPermission, CoreGlobalPermissionSync, CoreGraphQLQuery, CoreGraphQLQueryGroup, CoreGraphQLQueryGroupSync, CoreGraphQLQuerySync, CoreGroup, CoreGroupAction, CoreGroupActionSync, CoreGroupSync, CoreGroupTriggerRule, CoreGroupTriggerRuleSync, CoreIPAddressPool, CoreIPAddressPoolSync, CoreIPPrefixPool, CoreIPPrefixPoolSync, CoreKeyValue, CoreKeyValueSync, CoreMenu, CoreMenuItem, CoreMenuItemSync, CoreMenuSync, CoreNodeSync, CoreNodeTriggerAttributeMatch, CoreNodeTriggerAttributeMatchSync, CoreNodeTriggerMatch, CoreNodeTriggerMatchSync, CoreNodeTriggerRelationshipMatch, CoreNodeTriggerRelationshipMatchSync, CoreNodeTriggerRule, CoreNodeTriggerRuleSync, CoreNumberPool, CoreNumberPoolSync, CoreObjectComponentTemplate, CoreObjectComponentTemplateSync, CoreObjectPermission, CoreObjectPermissionSync, CoreObjectTemplate, CoreObjectTemplateSync, CoreObjectThread, CoreObjectThreadSync, CorePasswordCredential, CorePasswordCredentialSync, CoreProfile, CoreProfileSync, CoreProposedChange, CoreProposedChangeSync, CoreReadOnlyRepository, CoreReadOnlyRepositorySync, CoreRepository, CoreRepositoryGroup, CoreRepositoryGroupSync, CoreRepositorySync, CoreRepositoryValidator, CoreRepositoryValidatorSync, CoreResourcePool, CoreResourcePoolSync, CoreSchemaCheck, CoreSchemaCheckSync, CoreSchemaValidator, CoreSchemaValidatorSync, CoreStandardCheck, CoreStandardCheckSync, CoreStandardGroup, CoreStandardGroupSync, CoreStandardWebhook, CoreStandardWebhookSync, CoreStaticKeyValue, CoreStaticKeyValueSync, CoreTaskTarget, CoreTaskTargetSync, CoreThread, CoreThreadComment, CoreThreadCommentSync, CoreThreadSync, CoreTransformJinja2, CoreTransformJinja2Sync, CoreTransformPython, CoreTransformPythonSync, CoreTransformation, CoreTransformationSync, CoreTriggerRule, CoreTriggerRuleSync, CoreUserValidator, CoreUserValidatorSync, CoreValidator, CoreValidatorSync, CoreWebhook, CoreWebhookSync, CoreWeightedPoolResource, CoreWeightedPoolResourceSync, InternalAccountToken, InternalAccountTokenSync, InternalExternalIdentity, InternalExternalIdentitySync, InternalIPPrefixAvailable, InternalIPPrefixAvailableSync, InternalIPRangeAvailable, InternalIPRangeAvailableSync, InternalRefreshToken, InternalRefreshTokenSync, IpamNamespace, IpamNamespaceSync, LineageOwner, LineageOwnerSync, LineageSource, LineageSourceSync
+from infrahub_sdk.protocols import (
+    CoreNode,
+    BuiltinIPAddress,
+    BuiltinIPAddressSync,
+    BuiltinIPNamespace,
+    BuiltinIPNamespaceSync,
+    BuiltinIPPrefix,
+    BuiltinIPPrefixSync,
+    BuiltinTag,
+    BuiltinTagSync,
+    CoreAccount,
+    CoreAccountGroup,
+    CoreAccountGroupSync,
+    CoreAccountRole,
+    CoreAccountRoleSync,
+    CoreAccountSync,
+    CoreAction,
+    CoreActionSync,
+    CoreArtifact,
+    CoreArtifactCheck,
+    CoreArtifactCheckSync,
+    CoreArtifactDefinition,
+    CoreArtifactDefinitionSync,
+    CoreArtifactSync,
+    CoreArtifactTarget,
+    CoreArtifactTargetSync,
+    CoreArtifactThread,
+    CoreArtifactThreadSync,
+    CoreArtifactValidator,
+    CoreArtifactValidatorSync,
+    CoreBasePermission,
+    CoreBasePermissionSync,
+    CoreChangeComment,
+    CoreChangeCommentSync,
+    CoreChangeThread,
+    CoreChangeThreadSync,
+    CoreCheck,
+    CoreCheckDefinition,
+    CoreCheckDefinitionSync,
+    CoreCheckSync,
+    CoreComment,
+    CoreCommentSync,
+    CoreCredential,
+    CoreCredentialSync,
+    CoreCustomWebhook,
+    CoreCustomWebhookSync,
+    CoreDataCheck,
+    CoreDataCheckSync,
+    CoreDataValidator,
+    CoreDataValidatorSync,
+    CoreEnvKeyValue,
+    CoreEnvKeyValueSync,
+    CoreFileCheck,
+    CoreFileCheckSync,
+    CoreFileObject,
+    CoreFileObjectSync,
+    CoreFileThread,
+    CoreFileThreadSync,
+    CoreGeneratorAction,
+    CoreGeneratorActionSync,
+    CoreGeneratorAwareGroup,
+    CoreGeneratorAwareGroupSync,
+    CoreGeneratorCheck,
+    CoreGeneratorCheckSync,
+    CoreGeneratorDefinition,
+    CoreGeneratorDefinitionSync,
+    CoreGeneratorGroup,
+    CoreGeneratorGroupSync,
+    CoreGeneratorInstance,
+    CoreGeneratorInstanceSync,
+    CoreGeneratorValidator,
+    CoreGeneratorValidatorSync,
+    CoreGenericAccount,
+    CoreGenericAccountSync,
+    CoreGenericRepository,
+    CoreGenericRepositorySync,
+    CoreGlobalPermission,
+    CoreGlobalPermissionSync,
+    CoreGraphQLQuery,
+    CoreGraphQLQueryGroup,
+    CoreGraphQLQueryGroupSync,
+    CoreGraphQLQuerySync,
+    CoreGroup,
+    CoreGroupAction,
+    CoreGroupActionSync,
+    CoreGroupSync,
+    CoreGroupTriggerRule,
+    CoreGroupTriggerRuleSync,
+    CoreIPAddressPool,
+    CoreIPAddressPoolSync,
+    CoreIPPrefixPool,
+    CoreIPPrefixPoolSync,
+    CoreKeyValue,
+    CoreKeyValueSync,
+    CoreMenu,
+    CoreMenuItem,
+    CoreMenuItemSync,
+    CoreMenuSync,
+    CoreNodeSync,
+    CoreNodeTriggerAttributeMatch,
+    CoreNodeTriggerAttributeMatchSync,
+    CoreNodeTriggerMatch,
+    CoreNodeTriggerMatchSync,
+    CoreNodeTriggerRelationshipMatch,
+    CoreNodeTriggerRelationshipMatchSync,
+    CoreNodeTriggerRule,
+    CoreNodeTriggerRuleSync,
+    CoreNumberPool,
+    CoreNumberPoolSync,
+    CoreObjectComponentTemplate,
+    CoreObjectComponentTemplateSync,
+    CoreObjectPermission,
+    CoreObjectPermissionSync,
+    CoreObjectTemplate,
+    CoreObjectTemplateSync,
+    CoreObjectThread,
+    CoreObjectThreadSync,
+    CorePasswordCredential,
+    CorePasswordCredentialSync,
+    CoreProfile,
+    CoreProfileSync,
+    CoreProposedChange,
+    CoreProposedChangeSync,
+    CoreReadOnlyRepository,
+    CoreReadOnlyRepositorySync,
+    CoreRepository,
+    CoreRepositoryGroup,
+    CoreRepositoryGroupSync,
+    CoreRepositorySync,
+    CoreRepositoryValidator,
+    CoreRepositoryValidatorSync,
+    CoreResourcePool,
+    CoreResourcePoolSync,
+    CoreSchemaCheck,
+    CoreSchemaCheckSync,
+    CoreSchemaValidator,
+    CoreSchemaValidatorSync,
+    CoreStandardCheck,
+    CoreStandardCheckSync,
+    CoreStandardGroup,
+    CoreStandardGroupSync,
+    CoreStandardWebhook,
+    CoreStandardWebhookSync,
+    CoreStaticKeyValue,
+    CoreStaticKeyValueSync,
+    CoreTaskTarget,
+    CoreTaskTargetSync,
+    CoreThread,
+    CoreThreadComment,
+    CoreThreadCommentSync,
+    CoreThreadSync,
+    CoreTransformJinja2,
+    CoreTransformJinja2Sync,
+    CoreTransformPython,
+    CoreTransformPythonSync,
+    CoreTransformation,
+    CoreTransformationSync,
+    CoreTriggerRule,
+    CoreTriggerRuleSync,
+    CoreUserValidator,
+    CoreUserValidatorSync,
+    CoreValidator,
+    CoreValidatorSync,
+    CoreWebhook,
+    CoreWebhookSync,
+    CoreWeightedPoolResource,
+    CoreWeightedPoolResourceSync,
+    InternalAccountToken,
+    InternalAccountTokenSync,
+    InternalExternalIdentity,
+    InternalExternalIdentitySync,
+    InternalIPPrefixAvailable,
+    InternalIPPrefixAvailableSync,
+    InternalIPRangeAvailable,
+    InternalIPRangeAvailableSync,
+    InternalRefreshToken,
+    InternalRefreshTokenSync,
+    IpamNamespace,
+    IpamNamespaceSync,
+    LineageOwner,
+    LineageOwnerSync,
+    LineageSource,
+    LineageSourceSync,
+)
 
 if TYPE_CHECKING:
     from infrahub_sdk.node import RelatedNode, RelationshipAttribute, RelationshipManager
@@ -51,11 +234,13 @@ class NetworkBuildingBlock(CoreNode):
     parent: RelationshipAttribute[NetworkBuildingBlock]
     children: RelationshipManager[NetworkBuildingBlock]
 
+
 class TemplateComputeGenericUnit(CoreNode):
     template_name: String
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class DcimConnector(CoreNode):
     medium: Dropdown
@@ -65,6 +250,7 @@ class DcimConnector(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class TemplateCoreArtifactTarget(CoreNode):
     template_name: String
     artifacts: RelationshipManager[CoreArtifact]
@@ -72,12 +258,14 @@ class TemplateCoreArtifactTarget(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class TemplateDcimEndpoint(CoreNode):
     template_name: String
     connector: RelationshipAttribute[DcimConnector]
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class TemplateDcimGenericDevice(CoreNode):
     description: StringOptional
@@ -91,6 +279,7 @@ class TemplateDcimGenericDevice(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     tags: RelationshipManager[BuiltinTag]
+
 
 class TemplateDcimInterface(CoreNode):
     description: StringOptional
@@ -110,6 +299,7 @@ class TemplateDcimInterface(CoreNode):
     tags: RelationshipManager[BuiltinTag]
     untagged_vlan: RelationshipAttribute[IpamVLAN]
 
+
 class TemplateDcimPhysicalDevice(CoreNode):
     position: IntegerOptional
     rack_face: Dropdown
@@ -122,11 +312,13 @@ class TemplateDcimPhysicalDevice(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class DcimEndpoint(CoreNode):
     connector: RelationshipAttribute[DcimConnector]
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class TemplateGeneratorTarget(CoreNode):
     checksum: StringOptional
@@ -134,6 +326,7 @@ class TemplateGeneratorTarget(CoreNode):
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class LocationGeneric(CoreNode):
     description: StringOptional
@@ -148,6 +341,7 @@ class LocationGeneric(CoreNode):
     parent: RelationshipAttribute[LocationGeneric]
     children: RelationshipManager[LocationGeneric]
 
+
 class OrganizationGeneric(CoreNode):
     description: StringOptional
     name: String
@@ -155,6 +349,7 @@ class OrganizationGeneric(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     tags: RelationshipManager[BuiltinTag]
+
 
 class DcimGenericDevice(CoreNode):
     description: StringOptional
@@ -168,6 +363,7 @@ class DcimGenericDevice(CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
     tags: RelationshipManager[BuiltinTag]
 
+
 class TemplateGenericInterfaceBundle(CoreNode):
     name: String
     template_name: String
@@ -175,10 +371,12 @@ class TemplateGenericInterfaceBundle(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class ComputeGenericUnit(CoreNode):
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class InterfaceHasSubInterface(CoreNode):
     member_of_groups: RelationshipManager[CoreGroup]
@@ -186,11 +384,13 @@ class InterfaceHasSubInterface(CoreNode):
     sub_interfaces: RelationshipManager[InterfaceVirtual]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class VirtualizationHostVirtualMachine(CoreNode):
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     virtual_machines: RelationshipManager[VirtualizationVirtualMachine]
+
 
 class LocationHosting(CoreNode):
     shortname: StringOptional
@@ -200,9 +400,11 @@ class LocationHosting(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class CoreIPPool(CoreNode):
     member_of_groups: RelationshipManager[CoreGroup]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class DcimInterface(CoreNode):
     description: StringOptional
@@ -220,11 +422,13 @@ class DcimInterface(CoreNode):
     tags: RelationshipManager[BuiltinTag]
     untagged_vlan: RelationshipAttribute[IpamVLAN]
 
+
 class GenericInterfaceBundle(CoreNode):
     name: String
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class TemplateInterfaceHasSubInterface(CoreNode):
     template_name: String
@@ -233,12 +437,14 @@ class TemplateInterfaceHasSubInterface(CoreNode):
     sub_interfaces: RelationshipManager[InterfaceVirtual]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class TemplateInterfaceLayer2(CoreNode):
     l2_mode: DropdownOptional
     template_name: String
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class TemplateInterfaceLayer3(CoreNode):
     dot1q_id: IntegerOptional
@@ -251,11 +457,13 @@ class TemplateInterfaceLayer3(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class InterfaceLayer2(CoreNode):
     l2_mode: DropdownOptional
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class InterfaceLayer3(CoreNode):
     dot1q_id: IntegerOptional
@@ -265,6 +473,7 @@ class InterfaceLayer3(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class GenericMlagDomain(CoreNode):
     domain_id: String
     reload_delay: Integer
@@ -273,6 +482,7 @@ class GenericMlagDomain(CoreNode):
     peer_links: RelationshipManager[InterfaceLag]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class DcimPhysicalDevice(CoreNode):
     position: IntegerOptional
@@ -284,11 +494,13 @@ class DcimPhysicalDevice(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
+
 class GeneratorTarget(CoreNode):
     checksum: StringOptional
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
+
 
 class TemplateVirtualizationHostVirtualMachine(CoreNode):
     template_name: String
@@ -296,7 +508,6 @@ class TemplateVirtualizationHostVirtualMachine(CoreNode):
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     virtual_machines: RelationshipManager[TemplateVirtualizationVirtualMachine]
-
 
 
 class AvdArtifact(CoreNode):
@@ -550,6 +761,7 @@ class EvpnL2Vlan(CoreNode):
 class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHasSubInterface, GenericInterfaceBundle):
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: Boolean
     index: StringOptional
     l2_mode: DropdownOptional
     lacp_mode: Dropdown
@@ -759,6 +971,7 @@ class LocationRack(LocationGeneric, LocationHosting, GeneratorTarget):
     name: String
     rack_type: Dropdown
     shortname: StringOptional
+    avd_tags: RelationshipManager[AvdTag]
     children: RelationshipManager[LocationGeneric]
     devices: RelationshipManager[DcimPhysicalDevice]
     l2leaf_switch_template: RelationshipAttribute[CoreObjectTemplate]
@@ -835,11 +1048,22 @@ class EvpnSvi(CoreNode):
     ip_address_virtual: IPHost
     name: String
     svi_id: Integer
+    avd_tags: RelationshipManager[AvdTag]
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
+    rack_tags: RelationshipManager[LocationRack]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     vlan: RelationshipAttribute[IpamVLAN]
     vrf: RelationshipAttribute[IpamVRF]
+
+
+class AvdTag(CoreNode):
+    description: StringOptional
+    name: String
+    member_of_groups: RelationshipManager[CoreGroup]
+    profiles: RelationshipManager[CoreProfile]
+    racks: RelationshipManager[LocationRack]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
 class EvpnTenant(CoreNode):
@@ -918,8 +1142,6 @@ class VirtualizationVirtualMachine(ComputeGenericUnit):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
-
-
 class ProfileAvdArtifact(LineageSource, CoreProfile, CoreNode):
     profile_name: String
     profile_priority: Integer
@@ -953,6 +1175,16 @@ class ProfileAvdStructuredConfigFile(LineageSource, CoreProfile, CoreNode):
     profile_priority: Integer
     member_of_groups: RelationshipManager[CoreGroup]
     related_nodes: RelationshipManager[AvdStructuredConfigFile]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
+
+
+class ProfileAvdTag(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    profile_name: String
+    profile_priority: Integer
+    member_of_groups: RelationshipManager[CoreGroup]
+    racks: RelationshipManager[LocationRack]
+    related_nodes: RelationshipManager[AvdTag]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
@@ -1165,7 +1397,9 @@ class ProfileEvpnSvi(LineageSource, CoreProfile, CoreNode):
     ip_address_virtual: IPHostOptional
     profile_name: String
     profile_priority: Integer
+    avd_tags: RelationshipManager[AvdTag]
     member_of_groups: RelationshipManager[CoreGroup]
+    rack_tags: RelationshipManager[LocationRack]
     related_nodes: RelationshipManager[EvpnSvi]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     vlan: RelationshipAttribute[IpamVLAN]
@@ -1227,6 +1461,7 @@ class ProfileInterfaceHasSubInterface(LineageSource, CoreProfile, CoreNode):
 class ProfileInterfaceLag(LineageSource, CoreProfile, CoreNode):
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: BooleanOptional
     l2_mode: DropdownOptional
     lacp_mode: DropdownOptional
     lacp_rate: DropdownOptional
@@ -1451,6 +1686,7 @@ class ProfileLocationRack(LineageSource, CoreProfile, CoreNode):
     profile_priority: Integer
     rack_type: DropdownOptional
     shortname: StringOptional
+    avd_tags: RelationshipManager[AvdTag]
     devices: RelationshipManager[DcimPhysicalDevice]
     l2leaf_switch_template: RelationshipAttribute[CoreObjectTemplate]
     leaf_switch_template: RelationshipAttribute[CoreObjectTemplate]
@@ -1749,9 +1985,15 @@ class ProfileVirtualizationVirtualMachine(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
-
-
-class TemplateComputePhysicalServer(LineageSource, TemplateComputeGenericUnit, TemplateDcimGenericDevice, TemplateGeneratorTarget, TemplateVirtualizationHostVirtualMachine, CoreObjectTemplate, CoreNode):
+class TemplateComputePhysicalServer(
+    LineageSource,
+    TemplateComputeGenericUnit,
+    TemplateDcimGenericDevice,
+    TemplateGeneratorTarget,
+    TemplateVirtualizationHostVirtualMachine,
+    CoreObjectTemplate,
+    CoreNode,
+):
     checksum: StringOptional
     description: StringOptional
     os_version: StringOptional
@@ -1773,7 +2015,14 @@ class TemplateComputePhysicalServer(LineageSource, TemplateComputeGenericUnit, T
     virtual_machines: RelationshipManager[TemplateVirtualizationVirtualMachine]
 
 
-class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcimGenericDevice, TemplateDcimPhysicalDevice, CoreObjectTemplate, CoreNode):
+class TemplateDcimDevice(
+    LineageSource,
+    TemplateCoreArtifactTarget,
+    TemplateDcimGenericDevice,
+    TemplateDcimPhysicalDevice,
+    CoreObjectTemplate,
+    CoreNode,
+):
     description: StringOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -1817,9 +2066,19 @@ class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcim
     tags: RelationshipManager[BuiltinTag]
 
 
-class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, TemplateInterfaceHasSubInterface, TemplateGenericInterfaceBundle, CoreNode):
+class TemplateInterfaceLag(
+    LineageSource,
+    CoreObjectComponentTemplate,
+    TemplateDcimInterface,
+    TemplateInterfaceLayer2,
+    TemplateInterfaceLayer3,
+    TemplateInterfaceHasSubInterface,
+    TemplateGenericInterfaceBundle,
+    CoreNode,
+):
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: Boolean
     l2_mode: DropdownOptional
     lacp_mode: Dropdown
     lacp_rate: Dropdown
@@ -1850,7 +2109,16 @@ class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateD
     untagged_vlan: RelationshipAttribute[IpamVLAN]
 
 
-class TemplateInterfacePhysical(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, TemplateDcimEndpoint, TemplateInterfaceHasSubInterface, CoreNode):
+class TemplateInterfacePhysical(
+    LineageSource,
+    CoreObjectComponentTemplate,
+    TemplateDcimInterface,
+    TemplateInterfaceLayer2,
+    TemplateInterfaceLayer3,
+    TemplateDcimEndpoint,
+    TemplateInterfaceHasSubInterface,
+    CoreNode,
+):
     description: StringOptional
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
@@ -1881,7 +2149,14 @@ class TemplateInterfacePhysical(LineageSource, CoreObjectComponentTemplate, Temp
     untagged_vlan: RelationshipAttribute[IpamVLAN]
 
 
-class TemplateInterfaceVirtual(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, CoreNode):
+class TemplateInterfaceVirtual(
+    LineageSource,
+    CoreObjectComponentTemplate,
+    TemplateDcimInterface,
+    TemplateInterfaceLayer2,
+    TemplateInterfaceLayer3,
+    CoreNode,
+):
     description: StringOptional
     dot1q_id: IntegerOptional
     l2_mode: DropdownOptional
@@ -1910,7 +2185,9 @@ class TemplateInterfaceVirtual(LineageSource, CoreObjectComponentTemplate, Templ
     untagged_vlan: RelationshipAttribute[IpamVLAN]
 
 
-class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTemplate, TemplateComputeGenericUnit, CoreNode):
+class TemplateVirtualizationVirtualMachine(
+    LineageSource, CoreObjectComponentTemplate, TemplateComputeGenericUnit, CoreNode
+):
     disk: IntegerOptional
     memory: IntegerOptional
     role: DropdownOptional
@@ -1926,4 +2203,3 @@ class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTem
     subscriber_of_groups: RelationshipManager[CoreGroup]
     subscriber_of_groups_for_instances: RelationshipManager[CoreGroup]
     vcpu_from_resource_pool: RelationshipAttribute[CoreNumberPool]
-

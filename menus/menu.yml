@@ -45,6 +45,12 @@ spec:
             kind: AvdArtifact
             icon: "mdi:file-document-outline"
 
+          - namespace: Avd
+            name: AvdTags
+            label: AVD Tags
+            kind: AvdTag
+            icon: "mdi:tag-outline"
+
     # --------- Devices ---------
     - namespace: Dcim
       name: DeviceMenu
