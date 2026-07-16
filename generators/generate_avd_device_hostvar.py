@@ -162,22 +162,143 @@ def _sort_server_endpoints(servers: dict[str, ServerEndpoint]) -> list[ServerEnd
     return sorted_servers
 
 
-def apply_lag_adapter_config(adapter: dict[str, Any], lag_node: object, *, mlag_active: bool) -> None:
+def apply_lag_adapter_config(
+    adapter: dict[str, Any],
+    lag_node: object,
+    *,
+    mlag_active: bool,
+    evpn_lag_node: object | None = None,
+) -> None:
     """Apply pyAVD port-channel and optional EVPN Ethernet Segment settings."""
-    lacp_mode = getattr(lag_node, "lacp_mode", None)
-    port_channel = {"mode": LACP_MODE_MAP.get(getattr(lacp_mode, "value", None), "active")}
+    port_channel = {"mode": LACP_MODE_MAP.get(_value(lag_node, "lacp_mode"), "active")}
     adapter["port_channel"] = port_channel
 
-    evpn_ethernet_segment = getattr(lag_node, "evpn_ethernet_segment", None)
-    if (
-        getattr(evpn_ethernet_segment, "value", False) is True
-        and not mlag_active
-        and len(set(adapter["switches"])) >= 2
-    ):
+    evpn_source = evpn_lag_node or lag_node
+    if _value(evpn_source, "evpn_ethernet_segment") is True and not mlag_active and len(set(adapter["switches"])) >= 2:
         adapter["ethernet_segment"] = {"short_esi": "auto"}
 
 
-def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inherently branchy
+def _node(value: object) -> object | None:
+    if isinstance(value, dict):
+        return value.get("node")
+    return getattr(value, "node", None)
+
+
+def _edges(value: object) -> list[object]:
+    if isinstance(value, dict):
+        return value.get("edges") or []
+    return getattr(value, "edges", None) or []
+
+
+def _field(value: object, name: str) -> object | None:
+    if isinstance(value, dict):
+        return value.get(name)
+    return getattr(value, name, None)
+
+
+def _value(value: object, name: str) -> Any:
+    attr = _field(value, name)
+    if isinstance(attr, dict):
+        return attr.get("value")
+    return getattr(attr, "value", None)
+
+
+def _typename(value: object) -> str | None:
+    if isinstance(value, dict):
+        return value.get("__typename") or value.get("typename__")
+    return getattr(value, "typename__", None)
+
+
+def _extract_vlan_config(interface: object) -> tuple[list[int], int | None]:
+    tagged_vlans: list[int] = []
+    for vlan_edge in _edges(_field(interface, "tagged_vlan")):
+        vlan_node = _node(vlan_edge)
+        if _value(vlan_node, "status") != "active":
+            continue
+        vlan_id = _value(vlan_node, "vlan_id")
+        if vlan_id:
+            tagged_vlans.append(vlan_id)
+
+    untagged_vlan = None
+    untagged_vlan_node = _node(_field(interface, "untagged_vlan"))
+    if untagged_vlan_node and _value(untagged_vlan_node, "status") == "active":
+        untagged_vlan = _value(untagged_vlan_node, "vlan_id")
+
+    return tagged_vlans, untagged_vlan
+
+
+def _apply_vlan_adapter_config(adapter: dict[str, Any], tagged_vlans: list[int], untagged_vlan: int | None) -> None:
+    if tagged_vlans:
+        adapter["mode"] = "trunk"
+        adapter["vlans"] = vlanlist_to_config(sorted(tagged_vlans))[0]
+        if untagged_vlan:
+            adapter["native_vlan"] = untagged_vlan
+    elif untagged_vlan:
+        adapter["mode"] = "access"
+        adapter["vlans"] = str(untagged_vlan)
+
+
+def _device_name(interface: object) -> str | None:
+    device = _node(_field(interface, "device"))
+    return _value(device, "name") if device else None
+
+
+def _device_role(interface: object) -> str | None:
+    device = _node(_field(interface, "device"))
+    return _value(device, "role") if device else None
+
+
+def _lag_member_adapter(
+    *,
+    lag_node: object,
+    switch_lag_node: object | None,
+    local_interface: object,
+    mlag_active: bool,
+) -> dict[str, Any] | None:
+    members = _edges(_field(lag_node, "lag_members"))
+    if not members:
+        return None
+
+    local_tagged_vlans, local_untagged_vlan = _extract_vlan_config(local_interface)
+    member_links: list[tuple[str, str, str]] = []
+    for member_edge in members:
+        member = _node(member_edge)
+        if not member:
+            continue
+        member_name = _value(member, "name")
+        connector = _node(_field(member, "connector"))
+        if not member_name or not connector:
+            continue
+
+        for endpoint_edge in _edges(_field(connector, "connected_endpoints")):
+            endpoint = _node(endpoint_edge)
+            if not endpoint or _field(endpoint, "id") == _field(member, "id"):
+                continue
+            if _typename(endpoint) != "InterfacePhysical":
+                continue
+            if _device_role(endpoint) == "l2leaf":
+                continue
+            switch_name = _device_name(endpoint)
+            switch_port = _value(endpoint, "name")
+            if switch_name and switch_port:
+                member_links.append((switch_name, switch_port, member_name))
+
+    if not member_links:
+        return None
+
+    member_links = sorted(set(member_links), key=lambda item: (item[0], sort_interface_list([item[1]])[0], item[2]))
+    adapter: dict[str, Any] = {
+        "endpoint_ports": [endpoint_port for _, _, endpoint_port in member_links],
+        "switch_ports": [switch_port for _, switch_port, _ in member_links],
+        "switches": [switch_name for switch_name, _, _ in member_links],
+    }
+    apply_lag_adapter_config(adapter, lag_node, mlag_active=mlag_active, evpn_lag_node=switch_lag_node)
+    _apply_vlan_adapter_config(adapter, local_tagged_vlans, local_untagged_vlan)
+    adapter["spanning_tree_portfast"] = "edge"
+    return adapter
+
+
+def extract_connected_endpoints(
     interfaces: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges],
     hostname: str,
     *,
@@ -193,6 +314,7 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
         List of server endpoint configs for pyAVD
     """
     servers: dict[str, ServerEndpoint] = {}  # Group by remote device name
+    server_adapter_keys: dict[str, set[str]] = {}
 
     for edge in interfaces:
         interface = edge.node
@@ -210,23 +332,8 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
             continue
 
         # Extract VLAN information (only active VLANs)
-        tagged_vlans: list[int] = []
-        tagged_vlan_edges = interface.tagged_vlan.edges
-        for vlan_edge in tagged_vlan_edges:
-            vlan_node = vlan_edge.node
-            status = vlan_node.status.value
-            if status != "active":
-                continue
-            vlan_id = vlan_node.vlan_id.value
-            if vlan_id:
-                tagged_vlans.append(vlan_id)
-
-        untagged_vlan = None
-        untagged_vlan_node = interface.untagged_vlan.node
-        if untagged_vlan_node:
-            status = untagged_vlan_node.status.value
-            if status == "active":
-                untagged_vlan = untagged_vlan_node.vlan_id.value
+        tagged_vlans, untagged_vlan = _extract_vlan_config(interface)
+        switch_lag_node = _node(_field(interface, "lag"))
 
         endpoints = link.connected_endpoints.edges or []
         for ep_edge in endpoints:
@@ -252,6 +359,28 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
                             "name": server_name,
                             "adapters": [],
                         }
+                        server_adapter_keys[server_name] = set()
+
+                    # Detect port-channel on the remote (server) endpoint
+                    endpoint_lag = getattr(endpoint, "lag", None)
+                    if endpoint_lag and endpoint_lag.node:
+                        adapter_key = f"lag:{endpoint_lag.node.id}"
+                        if adapter_key in server_adapter_keys[server_name]:
+                            continue
+                        lag_adapter = _lag_member_adapter(
+                            lag_node=endpoint_lag.node,
+                            switch_lag_node=switch_lag_node,
+                            local_interface=interface,
+                            mlag_active=mlag_active,
+                        )
+                        if lag_adapter:
+                            servers[server_name]["adapters"].append(lag_adapter)
+                            server_adapter_keys[server_name].add(adapter_key)
+                            continue
+
+                    adapter_key = f"interface:{interface.id}:{endpoint.id}"
+                    if adapter_key in server_adapter_keys[server_name]:
+                        continue
 
                     # Build adapter config
                     adapter: dict[str, Any] = {
@@ -260,27 +389,22 @@ def extract_connected_endpoints(  # noqa: C901 — endpoint extraction is inhere
                         "switches": [hostname],
                     }
 
-                    # Detect port-channel on the remote (server) endpoint
-                    endpoint_lag = getattr(endpoint, "lag", None)
                     if endpoint_lag and endpoint_lag.node:
-                        apply_lag_adapter_config(adapter, endpoint_lag.node, mlag_active=mlag_active)
+                        apply_lag_adapter_config(
+                            adapter,
+                            endpoint_lag.node,
+                            mlag_active=mlag_active,
+                            evpn_lag_node=switch_lag_node,
+                        )
 
                     # Determine mode and add VLAN config
-                    if tagged_vlans:
-                        adapter["mode"] = "trunk"
-                        # Use netutils to convert VLAN list to config string
-                        vlan_str = vlanlist_to_config(sorted(tagged_vlans))[0]
-                        adapter["vlans"] = vlan_str
-                        if untagged_vlan:
-                            adapter["native_vlan"] = untagged_vlan
-                    elif untagged_vlan:
-                        adapter["mode"] = "access"
-                        adapter["vlans"] = str(untagged_vlan)
+                    _apply_vlan_adapter_config(adapter, tagged_vlans, untagged_vlan)
 
                     # Add spanning tree portfast for server ports
                     adapter["spanning_tree_portfast"] = "edge"
 
                     servers[server_name]["adapters"].append(adapter)
+                    server_adapter_keys[server_name].add(adapter_key)
 
     return _sort_server_endpoints(servers)
 

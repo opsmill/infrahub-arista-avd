@@ -28,6 +28,16 @@ EndpointNetworkDeviceName = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceN
 EndpointNetworkDeviceRole = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimDeviceRole")
 EndpointGenericDevice = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDevice")
 EndpointGenericDeviceName = getattr(q, f"{_ep}DcimInterfaceDeviceNodeDcimGenericDeviceName")
+EndpointPhysical = getattr(q, f"{_ep}InterfacePhysical")
+EndpointPhysicalName = getattr(q, f"{_ep}InterfacePhysicalName")
+EndpointPhysicalDevice = getattr(q, f"{_ep}InterfacePhysicalDevice")
+EndpointPhysicalGenericDevice = getattr(q, f"{_ep}InterfacePhysicalDeviceNodeDcimGenericDevice")
+EndpointPhysicalGenericDeviceName = getattr(q, f"{_ep}InterfacePhysicalDeviceNodeDcimGenericDeviceName")
+EndpointPhysicalLag = getattr(q, f"{_ep}InterfacePhysicalLag")
+EndpointPhysicalLagNode = getattr(q, f"{_ep}InterfacePhysicalLagNode")
+EndpointPhysicalLagNodeName = getattr(q, f"{_ep}InterfacePhysicalLagNodeName")
+EndpointPhysicalLagNodeLacpMode = getattr(q, f"{_ep}InterfacePhysicalLagNodeLacpMode")
+EndpointPhysicalLagNodeEvpnEthernetSegment = getattr(q, f"{_ep}InterfacePhysicalLagNodeEvpnEthernetSegment")
 TaggedVlan = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan
 UntaggedVlan = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan
 
@@ -112,6 +122,132 @@ def _make_server_edge(
                                             __typename="ComputePhysicalServer",
                                             id=remote_device_id,
                                             name=EndpointGenericDeviceName(value=remote_hostname),
+                                        )
+                                    ),
+                                )
+                            )
+                        ]
+                    ),
+                )
+            ),
+        )
+    )
+
+
+def _make_lagged_server_edge() -> IfaceEdge:
+    """Build one local leaf link whose server-side LAG spans two switches."""
+    lag = EndpointPhysicalLagNode(
+        __typename="InterfaceLag",
+        id="lag-1",
+        name=EndpointPhysicalLagNodeName(value="Bond1"),
+        lacp_mode=EndpointPhysicalLagNodeLacpMode(value="active"),
+        evpn_ethernet_segment=EndpointPhysicalLagNodeEvpnEthernetSegment(value=False),
+        lag_members={
+            "edges": [
+                {
+                    "node": {
+                        "__typename": "InterfacePhysical",
+                        "id": "server-eth1",
+                        "name": {"value": "Ethernet1"},
+                        "connector": {
+                            "node": {
+                                "__typename": "NetworkLink",
+                                "id": "link-1",
+                                "connected_endpoints": {
+                                    "edges": [
+                                        {"node": {"__typename": "InterfacePhysical", "id": "server-eth1"}},
+                                        {
+                                            "node": {
+                                                "__typename": "InterfacePhysical",
+                                                "id": "leaf1-eth17",
+                                                "name": {"value": "Ethernet1/1/17"},
+                                                "device": {
+                                                    "node": {
+                                                        "__typename": "DcimDevice",
+                                                        "id": "leaf1",
+                                                        "name": {"value": "leaf-pod-b2-1-1"},
+                                                        "role": {"value": "leaf"},
+                                                    }
+                                                },
+                                            }
+                                        },
+                                    ]
+                                },
+                            }
+                        },
+                    }
+                },
+                {
+                    "node": {
+                        "__typename": "InterfacePhysical",
+                        "id": "server-eth2",
+                        "name": {"value": "Ethernet2"},
+                        "connector": {
+                            "node": {
+                                "__typename": "NetworkLink",
+                                "id": "link-2",
+                                "connected_endpoints": {
+                                    "edges": [
+                                        {"node": {"__typename": "InterfacePhysical", "id": "server-eth2"}},
+                                        {
+                                            "node": {
+                                                "__typename": "InterfacePhysical",
+                                                "id": "leaf2-eth17",
+                                                "name": {"value": "Ethernet1/1/17"},
+                                                "device": {
+                                                    "node": {
+                                                        "__typename": "DcimDevice",
+                                                        "id": "leaf2",
+                                                        "name": {"value": "leaf-pod-b2-1-2"},
+                                                        "role": {"value": "leaf"},
+                                                    }
+                                                },
+                                            }
+                                        },
+                                    ]
+                                },
+                            }
+                        },
+                    }
+                },
+            ]
+        },
+    )
+
+    return IfaceEdge(
+        node=IfaceNode(
+            __typename="InterfacePhysical",
+            id="leaf1-eth17",
+            name=IfaceName(value="Ethernet1/1/17"),
+            role=IfaceRole(value="server"),
+            tagged_vlan=TaggedVlan(edges=[]),
+            untagged_vlan=UntaggedVlan(node=None),
+            lag={
+                "node": {
+                    "__typename": "InterfaceLag",
+                    "id": "leaf1-po1117",
+                    "name": {"value": "Port-Channel1117"},
+                    "lacp_mode": {"value": "active"},
+                    "evpn_ethernet_segment": {"value": True},
+                }
+            },
+            connector=IfaceConnector(
+                node=ConnectorNode(
+                    __typename="NetworkLink",
+                    id="link-1",
+                    connected_endpoints=ConnectorEndpoints(
+                        edges=[
+                            EndpointEdge(
+                                node=EndpointPhysical(
+                                    __typename="InterfacePhysical",
+                                    id="server-eth1",
+                                    name=EndpointPhysicalName(value="Ethernet1"),
+                                    lag=EndpointPhysicalLag(node=lag),
+                                    device=EndpointPhysicalDevice(
+                                        node=EndpointPhysicalGenericDevice(
+                                            __typename="ComputePhysicalServer",
+                                            id="server-1",
+                                            name=EndpointPhysicalGenericDeviceName(value="server-b2-1-aa-esi-1"),
                                         )
                                     ),
                                 )
@@ -274,3 +410,23 @@ class TestExtractConnectedEndpointsOrdering:
 
         assert len(result) == 1
         assert result[0]["name"] == "server-a"
+
+    def test_evpn_multihomed_lag_collapses_to_multi_switch_adapter(self) -> None:
+        """Server LAG members on different non-MLAG leaves must emit one EVPN MH adapter."""
+        result = extract_connected_endpoints([_make_lagged_server_edge()], "leaf-pod-b2-1-1")
+
+        assert result == [
+            {
+                "name": "server-b2-1-aa-esi-1",
+                "adapters": [
+                    {
+                        "endpoint_ports": ["Ethernet1", "Ethernet2"],
+                        "switch_ports": ["Ethernet1/1/17", "Ethernet1/1/17"],
+                        "switches": ["leaf-pod-b2-1-1", "leaf-pod-b2-1-2"],
+                        "port_channel": {"mode": "active"},
+                        "ethernet_segment": {"short_esi": "auto"},
+                        "spanning_tree_portfast": "edge",
+                    }
+                ],
+            }
+        ]
