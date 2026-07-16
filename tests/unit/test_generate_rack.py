@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from generators.generate_rack import RackGenerator, is_mlag_enabled
+from solution_arista_avd.generator import trigger_hostvar_generation
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -35,6 +36,10 @@ def _domain(domain_id: str, *, domain_uuid: str | None = None, asn: int | None =
         domain_id=SimpleNamespace(value=domain_id),
         bgp_asn=SimpleNamespace(value=asn),
     )
+
+
+def _named_device(device_id: str, name: str) -> SimpleNamespace:
+    return SimpleNamespace(id=device_id, name=SimpleNamespace(value=name))
 
 
 def _filters_side_effect(
@@ -83,6 +88,8 @@ def _make_generator() -> RackGenerator:
     gen.node_id_pool = object()
     gen.mgmt_pool = object()
     gen.leaf_switches = [_leaf("leaf-a", "leaf-a"), _leaf("leaf-b", "leaf-b")]
+    gen.l2leaf_switches = []
+    gen.spine_switches = [_named_device("spine-a", "spine-a"), _named_device("spine-b", "spine-b")]
     return gen
 
 
@@ -199,3 +206,68 @@ async def test_get_or_allocate_mlag_domain_asn_skips_used_fabric_asns() -> None:
     )
 
     assert asn == 65102
+
+
+@pytest.mark.asyncio
+async def test_delete_stale_mlag_domains_only_deletes_current_rack_domains() -> None:
+    gen = _make_generator()
+    stale_primary = _domain("DC1_BORDER")
+    stale_pair = _domain("DC1_BORDER-2")
+    other_domain = _domain("DC1_OTHER")
+    for domain in [stale_primary, stale_pair, other_domain]:
+        domain.delete = AsyncMock()
+    gen.client.filters = AsyncMock(return_value=[stale_primary, stale_pair, other_domain])
+
+    await gen.delete_stale_mlag_domains()
+
+    stale_primary.delete.assert_awaited_once()
+    stale_pair.delete.assert_awaited_once()
+    other_domain.delete.assert_not_awaited()
+
+
+def test_hostvar_target_device_ids_deduplicates_rack_and_spine_devices() -> None:
+    gen = _make_generator()
+    gen.leaf_switches = [_named_device("leaf-a", "leaf-a"), _named_device("leaf-b", "leaf-b")]
+    gen.l2leaf_switches = [_named_device("l2leaf-a", "l2leaf-a")]
+    gen.spine_switches = [_named_device("spine-a", "spine-a"), _named_device("leaf-a", "leaf-a")]
+
+    assert gen.hostvar_target_device_ids() == ["leaf-a", "leaf-b", "l2leaf-a", "spine-a"]
+
+
+@pytest.mark.asyncio
+async def test_invalidate_hostvars_deletes_target_hostvar_files() -> None:
+    gen = _make_generator()
+    hostvar_file = SimpleNamespace(delete=AsyncMock())
+    hostvar_rel = SimpleNamespace(id="hostvar-file-1", fetch=AsyncMock(), peer=hostvar_file)
+    artifact = SimpleNamespace(hostvar_file=hostvar_rel)
+
+    async def filters_side_effect(*args: object, **kwargs: object) -> list[SimpleNamespace]:
+        kind = kwargs.get("kind", args[0] if args else None)
+        kind_name = kind if isinstance(kind, str) else getattr(kind, "__name__", str(kind))
+        if kind_name == "DcimDevice":
+            return [_named_device("leaf-a", "leaf-a")]
+        if kind_name == "AvdArtifact":
+            return [artifact]
+        return []
+
+    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
+
+    await gen.invalidate_hostvars(["leaf-a"])
+
+    hostvar_rel.fetch.assert_awaited_once()
+    hostvar_file.delete.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_trigger_hostvar_generation_limits_nodes() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    client.execute_graphql = AsyncMock()
+
+    await trigger_hostvar_generation(client, node_ids=["leaf-a", "spine-a"])
+
+    client.execute_graphql.assert_awaited_once()
+    assert client.execute_graphql.await_args.kwargs["variables"] == {
+        "id": "generator-1",
+        "nodes": ["leaf-a", "spine-a"],
+    }

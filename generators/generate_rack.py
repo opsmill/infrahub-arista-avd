@@ -14,12 +14,14 @@ from solution_arista_avd.generator import (
     set_fabric_avd_hostvars_ready,
     trigger_hostvar_generation,
 )
-from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
+from solution_arista_avd.protocols import AvdArtifact, DcimDevice, DcimInterface, LocationRack, NetworkPod
 
 from .rack_generator_query import RackGeneratorQuery
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+TASK_LOGGER = logging.getLogger("infrahub.tasks")
 
 
 def is_mlag_enabled(value: object) -> bool:
@@ -55,7 +57,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     node_id_pool: CoreNumberPool | None
     mgmt_pool: CoreIPAddressPool | None
 
-    logger = logging.getLogger("infrahub.tasks")
+    logger = TASK_LOGGER
 
     async def generate(self, data: dict) -> None:
         data: RackGeneratorQuery = RackGeneratorQuery(**data)
@@ -130,10 +132,11 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.create_leaf_switches()
 
-        if self.rack_mlag:
+        if self.rack_mlag_enabled:
             await self.create_mlag_pairs()
         else:
             self.logger.info(f"Rack {self.rack_name}: MLAG disabled, skipping MLAG pair creation")
+            await self.delete_stale_mlag_domains()
 
         await self.connect_leafs_to_spine()
 
@@ -149,8 +152,12 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         # Check if all racks in the fabric are done; if so, trigger hostvar generation
         if await check_all_racks_generated(self.client, self.fabric.id):
-            self.logger.info("All racks generated — triggering hostvar generation")
-            await trigger_hostvar_generation(self.client)
+            hostvar_target_ids = self.hostvar_target_device_ids()
+            await self.invalidate_hostvars(hostvar_target_ids)
+            self.logger.info(
+                "All racks generated — triggering hostvar generation for %s devices", len(hostvar_target_ids)
+            )
+            await trigger_hostvar_generation(self.client, node_ids=hostvar_target_ids)
 
     async def create_leaf_switches(self) -> None:
         # MLAG leafs share an ASN allocated onto the MLAG domain, so they must not
@@ -229,6 +236,69 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             leaf_b.bgp_asn.value = mlag_asn
 
             self.logger.info(f"MLAG domain {domain_id} created successfully with ASN {mlag_asn}")
+
+    async def delete_stale_mlag_domains(self) -> None:
+        """Delete MLAG domains for this rack before hostvar generation runs.
+
+        Generator tracking would eventually delete domains that are no longer
+        created by this run, but hostvar generation is triggered before the
+        tracking context exits. Removing stale domains explicitly prevents
+        downstream hostvars from seeing old MLAG state.
+        """
+        domains = await self.client.filters(kind="MlagDomain", pod__ids=[self.pod_id])
+        for domain in domains:
+            domain_id = getattr(getattr(domain, "domain_id", None), "value", None)
+            if domain_id != self.rack_name and not str(domain_id).startswith(f"{self.rack_name}-"):
+                continue
+
+            await domain.delete()
+            self.logger.info("Deleted stale MLAG domain %s for rack %s", domain_id, self.rack_name)
+
+    def hostvar_target_device_ids(self) -> list[str]:
+        """Return rack-local devices plus pod spines whose hostvars should be refreshed."""
+        devices = [*self.leaf_switches, *self.l2leaf_switches, *self.spine_switches]
+        seen: set[str] = set()
+        device_ids: list[str] = []
+        for device in devices:
+            if device.id in seen:
+                continue
+            seen.add(device.id)
+            device_ids.append(device.id)
+        return device_ids
+
+    async def invalidate_hostvars(self, device_ids: list[str]) -> None:
+        """Remove existing hostvar files for targeted devices before regeneration.
+
+        The hostvar generator marks the fabric ready once every device has a
+        hostvar file. If existing target files remain in place, the first
+        regenerated device can flip the fabric back to ready before the rest of
+        the targeted devices have refreshed. Deleting only the target files
+        makes the existing readiness check wait for the full target set.
+        """
+        if not device_ids:
+            return
+
+        devices = await self.client.filters(kind=DcimDevice, ids=device_ids)
+        for device in devices:
+            hostname = device.name.value
+            artifacts = await self.client.filters(kind=AvdArtifact, name__value=hostname)
+            if not artifacts:
+                continue
+
+            artifact = artifacts[0]
+            if not artifact.hostvar_file.id:
+                continue
+
+            try:
+                await artifact.hostvar_file.fetch()
+                hostvar_file = artifact.hostvar_file.peer
+            except Exception as exc:  # noqa: BLE001 - a missing file is already invalidated
+                self.logger.debug("Could not fetch hostvar file for %s before invalidation: %s", hostname, exc)
+                continue
+
+            if hostvar_file:
+                await hostvar_file.delete()
+                self.logger.info("Invalidated hostvars for %s before targeted regeneration", hostname)
 
     async def _set_device_bgp_asn(self, device_id: str, bgp_asn: int) -> None:
         """Update only DcimDevice.bgp_asn without resaving relationships from the SDK object."""
