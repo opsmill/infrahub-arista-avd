@@ -290,6 +290,8 @@ infrahubctl protocols --out src/solution_arista_avd/protocols.py
 - Infrahub (Neo4j graph); IP pools are `CoreIPPrefixPool` / `CoreIPAddressPool` built-ins (015-schema-driven-ip-pools)
 - Python >=3.11, <3.14 + `pyavd>=5.0.0` (`get_device_test_catalog`, `pyavd.api.anta.AVDFabricData`, `AVDCatalogGenerationSettings`, `pyavd.validate_structured_config`), `infrahub-sdk[all]>=1.19.0` (`InfrahubTransform`) (001-avd-anta-catalog)
 - Infrahub (Neo4j graph); structured config already stored as `Avd.StructuredConfigFile` artifacts (001-avd-anta-catalog)
+- Python >=3.11, <3.14 (downstream only; this cycle is schema YAML + `infrahubctl protocols` regeneration) + `infrahub-sdk` (`infrahubctl schema check` / `schema load` / `protocols`); `pyavd` unaffected this cycle (002-bgp-asn-schema)
+- Infrahub (Neo4j graph). ASN becomes a graph node; pools are `CoreNumberPool` built-ins (002-bgp-asn-schema)
 
 ## Recent Changes
 - 001-enforce-protocols: Added Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0

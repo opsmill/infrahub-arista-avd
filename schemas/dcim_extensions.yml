@@ -71,6 +71,14 @@ extensions:
           cardinality: one
           optional: true
           identifier: "pod__device"
+        - name: asn
+          label: BGP ASN
+          peer: RoutingAsn
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "device__asn"
+          order_weight: 1650
         - name: avd_artifact
           peer: AvdArtifact
           kind: Attribute
