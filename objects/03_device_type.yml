@@ -8,3 +8,9 @@ spec:
       manufacturer: ["Dell"]
     - name: "PowerSwitch S5232F-ON"
       manufacturer: ["Dell"]
+    # Arista datacenter switches (issue #70). Names match the real Arista SKUs
+    # and the lab's eos-intf-mapping files (DCS-7050SX3-48YC8 / DCS-7050CX3-32S).
+    - name: "DCS-7050SX3-48YC8"
+      manufacturer: ["Arista"]
+    - name: "DCS-7050CX3-32S"
+      manufacturer: ["Arista"]

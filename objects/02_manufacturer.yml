@@ -5,3 +5,4 @@ spec:
   kind: OrganizationManufacturer
   data:
     - name: Dell
+    - name: Arista

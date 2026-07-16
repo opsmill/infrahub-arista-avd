@@ -1,0 +1,118 @@
+query ContainerLabTopology($name: String!) {
+  NetworkFabric(name__value: $name) {
+    edges {
+      node {
+        name {
+          value
+        }
+        children {
+          edges {
+            node {
+              __typename
+              ... on NetworkPod {
+                devices {
+                  edges {
+                    node {
+                      __typename
+                      ... on DcimDevice {
+                        id
+                        name {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                        device_type {
+                          node {
+                            name {
+                              value
+                            }
+                          }
+                        }
+                        mgmt_ip {
+                          node {
+                            ... on IpamIPAddress {
+                              address {
+                                value
+                              }
+                            }
+                          }
+                        }
+                        interfaces {
+                          edges {
+                            node {
+                              __typename
+                              ... on DcimEndpoint {
+                                connector {
+                                  node {
+                                    id
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                racks {
+                  edges {
+                    node {
+                      devices {
+                        edges {
+                          node {
+                            __typename
+                            ... on DcimDevice {
+                              id
+                              name {
+                                value
+                              }
+                              role {
+                                value
+                              }
+                              device_type {
+                                node {
+                                  name {
+                                    value
+                                  }
+                                }
+                              }
+                              mgmt_ip {
+                                node {
+                                  ... on IpamIPAddress {
+                                    address {
+                                      value
+                                    }
+                                  }
+                                }
+                              }
+                              interfaces {
+                                edges {
+                                  node {
+                                    __typename
+                                    ... on DcimEndpoint {
+                                      connector {
+                                        node {
+                                          id
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
