@@ -386,6 +386,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
             "mlag_peer_l3_ipv4_pool": None,
         },
         uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        rack_info={"name": None, "mlag": None, "leaf_names": []},
         mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=[],
         connected_endpoints=[],
