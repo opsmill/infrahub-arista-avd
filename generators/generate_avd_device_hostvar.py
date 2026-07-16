@@ -354,10 +354,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
     async def _extract_pool_prefix(self, pool_ref: object, pool_kind: str) -> str | None:
         """Extract the first resource prefix from a pool relationship reference."""
-        if not pool_ref or not pool_ref.node:
+        pool_node = getattr(pool_ref, "node", None)
+        if pool_ref is None or pool_node is None:
             return None
 
-        pool = await self.client.get(kind=pool_kind, id=pool_ref.node.id, include=["resources"])
+        pool = await self.client.get(kind=pool_kind, id=pool_node.id, include=["resources"])
         await pool.resources.fetch()
 
         for resource_peer in pool.resources.peers:
@@ -372,10 +373,30 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         return None
 
     @staticmethod
-    def _get_attr_value(obj: object, attr_name: str) -> str | int | bool | None:
+    def _get_first_attr(obj: object, *names: str) -> object | None:
+        """Return the first present attribute/relationship by name, preserving falsey objects."""
+        for name in names:
+            attr = getattr(obj, name, None)
+            if attr is not None:
+                return attr
+        return None
+
+    @staticmethod
+    def _get_first_attr_value(obj: object, *names: str) -> str | int | bool | None:
+        """Return the first non-None Infrahub attribute value by name, preserving falsey values."""
+        for name in names:
+            attr = getattr(obj, name, None)
+            if attr is None:
+                continue
+            value = attr.value
+            if value is not None:
+                return value
+        return None
+
+    @classmethod
+    def _get_attr_value(cls, obj: object, attr_name: str) -> str | int | bool | None:
         """Safely get an attribute value from a GraphQL node."""
-        attr = getattr(obj, attr_name, None)
-        return attr.value if attr else None
+        return cls._get_first_attr_value(obj, attr_name)
 
     async def _require_pool_prefix(self, pool_ref: object, pool_kind: str, fabric_name: object, pool_label: str) -> str:
         """Resolve a mandatory pool's first prefix, failing loudly if unset or empty.
@@ -413,7 +434,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
         # Auto-generated Pydantic model renames mlag_l3_pool to mlag_l_3_pool
-        mlag_l3_ref = getattr(pod, "mlag_l_3_pool", None) or getattr(pod, "mlag_l3_pool", None)
+        mlag_l3_ref = self._get_first_attr(pod, "mlag_l_3_pool", "mlag_l3_pool")
         mlag_l3 = await self._extract_pool_prefix(mlag_l3_ref, "CoreIPAddressPool")
 
         return {
@@ -628,7 +649,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars["underlay_routing_protocol"] = underlay_routing_protocol
         if overlay_routing_protocol:
             hostvars["overlay_routing_protocol"] = overlay_routing_protocol
-        if p2p_uplinks_mtu:
+        if p2p_uplinks_mtu is not None:
             hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
         if spanning_tree_mode:
             hostvars["spanning_tree_mode"] = spanning_tree_mode
@@ -636,7 +657,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars["spanning_tree_priority"] = spanning_tree_priority
 
         # Loopback offset for leaf devices
-        if loopback_ipv4_offset and role == "leaf":
+        if loopback_ipv4_offset is not None and role == "leaf":
             hostvars.setdefault(node_type_key, {})
             hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
             hostvars[node_type_key]["defaults"]["loopback_ipv4_offset"] = loopback_ipv4_offset
@@ -765,12 +786,15 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         virtual_router_mac = None if is_l2leaf else self._get_attr_value(fabric, "virtual_router_mac")
         underlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "underlay_routing_protocol")
         overlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "overlay_routing_protocol")
-        p2p_uplinks_mtu = None if is_l2leaf else self._get_attr_value(fabric, "p2p_uplinks_mtu")
+        p2p_uplinks_mtu = (
+            None if is_l2leaf else self._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu")
+        )
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
         spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
         # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
-        loopback_offset_attr = getattr(pod, "loopback_ipv_4_offset", None) or getattr(pod, "loopback_ipv4_offset", None)
-        loopback_ipv4_offset = None if is_l2leaf else (loopback_offset_attr.value if loopback_offset_attr else None)
+        loopback_ipv4_offset = (
+            None if is_l2leaf else self._get_first_attr_value(pod, "loopback_ipv_4_offset", "loopback_ipv4_offset")
+        )
 
         # BGP peer group passwords (not applicable for L2 leafs)
         bgp_passwords: dict[str, str | None] = {"evpn_overlay": None, "underlay": None, "mlag": None}
