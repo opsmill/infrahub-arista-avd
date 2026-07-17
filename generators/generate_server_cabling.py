@@ -50,7 +50,7 @@ class ServerCablingGenerator(InfrahubGenerator):
             return
 
         # Build sorted interface maps (same pattern as pod/rack generators)
-        server_iface_objects = await self.client.filters(kind=DcimInterface, device__name__value=server_hostname)
+        server_iface_objects = await self.client.filters(kind=InterfacePhysical, device__name__value=server_hostname)
 
         # Populate the SDK store with the server device using its actual typename
         # (e.g. ComputePhysicalServer, not DcimDevice) so interface.device.peer resolves
@@ -275,6 +275,8 @@ class ServerCablingGenerator(InfrahubGenerator):
         interfaces = []
         for edge in server_node.get("interfaces", {}).get("edges", []):
             node = edge["node"]
+            if node.get("__typename") != "InterfacePhysical":
+                continue
             vlans = self._extract_vlans(node)
             interfaces.append(
                 {

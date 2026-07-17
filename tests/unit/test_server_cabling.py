@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from generators.generate_server_cabling import ServerCablingGenerator
+from solution_arista_avd.protocols import InterfacePhysical
 
 
 def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
@@ -87,6 +88,7 @@ def _make_interface(
         }
 
     return {
+        "__typename": "InterfacePhysical",
         "id": iface_id,
         "name": {"value": name},
         "role": {"value": "server"},
@@ -95,6 +97,14 @@ def _make_interface(
         "tagged_vlan": {"edges": tagged_edges},
         "untagged_vlan": untagged_vlan or {"node": None},
         "profiles": profiles,
+    }
+
+
+def _make_non_physical_interface(iface_id: str, typename: str) -> dict:
+    """Build a non-physical interface node as returned outside the InterfacePhysical fragment."""
+    return {
+        "__typename": typename,
+        "id": iface_id,
     }
 
 
@@ -207,6 +217,55 @@ class TestIdempotency:
         gen._assign_vlans.assert_awaited_once()
         gen._create_server_port_channel.assert_awaited_once()
         gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1", ["leaf-1"])
+
+    @pytest.mark.asyncio
+    async def test_already_cabled_server_ignores_non_physical_interfaces(self) -> None:
+        gen = _make_generator()
+        gen._is_server_cabled = AsyncMock(return_value=True)  # type: ignore[method-assign]
+        gen._assign_vlans = AsyncMock()  # type: ignore[method-assign]
+        gen._create_server_port_channel = AsyncMock()  # type: ignore[method-assign]
+
+        data = _make_server_data(
+            interfaces=[
+                _make_interface("iface-1", "Ethernet1"),
+                _make_non_physical_interface("bond-1", "InterfaceLag"),
+                _make_non_physical_interface("vlan-100", "InterfaceVirtual"),
+            ]
+        )
+        mock_leaf = _make_mock_leaf()
+        mock_server_iface = MagicMock()
+        mock_server_iface.id = "iface-1"
+        mock_server_iface.name.value = "Ethernet1"
+        mock_server_iface.device.peer = MagicMock()
+        mock_server_iface.device.display_label = "server-1"
+        leaf_iface = _make_mock_leaf_interface("leaf-eth1", "Ethernet1", leaf=mock_leaf)
+        gen._existing_cabling_plan = AsyncMock(return_value=[(mock_server_iface, leaf_iface)])  # type: ignore[method-assign]
+
+        gen.client.filters = AsyncMock(
+            side_effect=[
+                [mock_leaf],
+                [mock_server_iface],
+                [leaf_iface],
+            ]
+        )
+
+        with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
+            await gen.generate(data)
+
+        mock_connect.assert_not_called()
+        gen._is_server_cabled.assert_awaited_once_with(
+            [
+                {
+                    "id": "iface-1",
+                    "name": "Ethernet1",
+                    "tagged_vlan_ids": [],
+                    "untagged_vlan_id": None,
+                }
+            ]
+        )
+        assert gen.client.filters.await_args_list[1].kwargs["kind"] is InterfacePhysical
+        gen._assign_vlans.assert_awaited_once()
+        gen._create_server_port_channel.assert_awaited_once()
 
 
 class TestDualHomedCabling:
