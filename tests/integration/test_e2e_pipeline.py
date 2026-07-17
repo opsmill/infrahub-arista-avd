@@ -60,6 +60,9 @@ if TYPE_CHECKING:
 REPO_NAME = "e2e-repository"
 # The cascade runs on this branch; trigger rules only fire off `main`.
 PIPELINE_BRANCH = "e2e-pipeline"
+SERVER_CABLING_RACK = "Rack-B2-1"
+SERVER_CABLING_SERVER = "e2e-server-b2-1"
+SERVER_CABLING_TEMPLATE = "compute-server-dual"
 
 
 @pytest.mark.e2e
@@ -299,6 +302,63 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         )
         assert ip_report["with_mgmt"] > 0, "no devices have an allocated management IP"
 
+    # --- Component 10b: server cabling trigger -----------------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_server_cabling_trigger_creates_links_and_lags(self, client: InfrahubClient) -> None:
+        """Creating a server in the servers group triggers server cabling and creates links/LAGs."""
+        await wait_until(
+            fetch=lambda: _server_cabling_prerequisites(client, PIPELINE_BRANCH),
+            ready=lambda r: (
+                r["rack_complete"]
+                and r["leaf_count"] == 2
+                and r["leaf1_server_ports"] > 0
+                and r["leaf2_server_ports"] > 0
+            ),
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe=f"{SERVER_CABLING_RACK} leaves and server-role ports",
+        )
+
+        rack = await client.get(kind="LocationRack", name__value=SERVER_CABLING_RACK, branch=PIPELINE_BRANCH)
+        template = await client.get(
+            kind="TemplateComputePhysicalServer",
+            template_name__value=SERVER_CABLING_TEMPLATE,
+            branch=PIPELINE_BRANCH,
+        )
+        server = await client.create(
+            kind="ComputePhysicalServer",
+            branch=PIPELINE_BRANCH,
+            name=SERVER_CABLING_SERVER,
+            rack={"id": rack.id},
+            object_template={"id": template.id},
+            status="provisioning",
+            member_of_groups=["servers"],
+        )
+        await server.save(allow_upsert=True)
+
+        report = await wait_until(
+            fetch=lambda: _server_cabling_report(client, PIPELINE_BRANCH, SERVER_CABLING_SERVER),
+            ready=lambda r: (
+                r["server_link_count"] == 2
+                and r["server_physical_count"] == 2
+                and r["server_connected_count"] == 2
+                and r["server_bond_count"] == 1
+                and r["leaf_port_channel_count"] == 2
+                and r["leaf_port_channel_member_count"] == 2
+            ),
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe=f"server cabling output for {SERVER_CABLING_SERVER}",
+        )
+
+        assert report["server_physical_lags"] == {"Ethernet1": "Bond1", "Ethernet2": "Bond1"}
+        assert report["server_bond_members"] == ["Ethernet1", "Ethernet2"]
+        assert report["server_link_count"] == 2
+        assert report["leaf_port_channel_count"] == 2
+        assert report["leaf_port_channel_member_count"] == 2
+        assert report["leaf_port_channel_ids"] == [1117, 1117]
+        print(f"server cabling report: {report}", flush=True)
+
     # --- Component 11: AVD structured config (via trigger cascade) ---------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_structured_config_cascade(self, client: InfrahubClient) -> None:
@@ -451,6 +511,181 @@ async def _device_ip_report(client: InfrahubClient, branch: str) -> dict:
         "with_loopback": len(loopbacks),
         "with_mgmt": with_mgmt,
         "duplicate_loopbacks": duplicate_loopbacks,
+    }
+
+
+async def _server_cabling_prerequisites(client: InfrahubClient, branch: str) -> dict:
+    """Report whether Rack-B2-1 is ready for server-cabling validation."""
+    query = """
+    query ServerCablingPrerequisites($rack: String!) {
+      LocationRack(name__value: $rack) {
+        edges {
+          node {
+            generation_complete { value }
+          }
+        }
+      }
+      DcimDevice(role__value: "leaf") {
+        edges {
+          node {
+            name { value }
+            rack { node { name { value } } }
+            interfaces(role__value: "server") {
+              edges {
+                node {
+                  __typename
+                  ... on InterfacePhysical {
+                    name { value }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    resp = await client.execute_graphql(query=query, variables={"rack": SERVER_CABLING_RACK}, branch_name=branch)
+    rack_edges = resp["LocationRack"]["edges"]
+    rack_complete = bool(rack_edges and rack_edges[0]["node"]["generation_complete"]["value"])
+    leaves = [
+        edge["node"]
+        for edge in resp["DcimDevice"]["edges"]
+        if edge["node"].get("rack", {}).get("node", {}).get("name", {}).get("value") == SERVER_CABLING_RACK
+    ]
+    ports_by_leaf = {
+        leaf["name"]["value"]: len(
+            [
+                iface_edge
+                for iface_edge in leaf["interfaces"]["edges"]
+                if iface_edge["node"].get("__typename") == "InterfacePhysical"
+            ]
+        )
+        for leaf in leaves
+    }
+    return {
+        "rack_complete": rack_complete,
+        "leaf_count": len(leaves),
+        "leaf1_server_ports": ports_by_leaf.get("leaf-pod-b2-1-1", 0),
+        "leaf2_server_ports": ports_by_leaf.get("leaf-pod-b2-1-2", 0),
+    }
+
+
+async def _server_cabling_report(client: InfrahubClient, branch: str, server_name: str) -> dict:
+    """Summarize server-cabling links, server Bond1, and switch-side Port-Channels."""
+    query = """
+    query ServerCablingReport($server: String!) {
+      ComputePhysicalServer(name__value: $server) {
+        edges {
+          node {
+            interfaces {
+              edges {
+                node {
+                  __typename
+                  ... on InterfacePhysical {
+                    name { value }
+                    connector { node { name { value } } }
+                    lag { node { name { value } } }
+                  }
+                  ... on InterfaceLag {
+                    name { value }
+                    lag_members {
+                      edges {
+                        node {
+                          name { value }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      NetworkLink {
+        edges {
+          node {
+            name { value }
+          }
+        }
+      }
+      InterfaceLag {
+        edges {
+          node {
+            name { value }
+            channel_id { value }
+            device { node { name { value } } }
+            lag_members {
+              edges {
+                node {
+                  name { value }
+                  device { node { name { value } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    resp = await client.execute_graphql(query=query, variables={"server": server_name}, branch_name=branch)
+
+    server_edges = resp["ComputePhysicalServer"]["edges"]
+    if not server_edges:
+        return {
+            "server_link_count": 0,
+            "server_physical_count": 0,
+            "server_connected_count": 0,
+            "server_physical_lags": {},
+            "server_bond_count": 0,
+            "server_bond_members": [],
+            "leaf_port_channel_count": 0,
+            "leaf_port_channel_member_count": 0,
+            "leaf_port_channel_ids": [],
+        }
+
+    physical_interfaces = []
+    server_bonds = []
+    for edge in server_edges[0]["node"]["interfaces"]["edges"]:
+        node = edge["node"]
+        if node["__typename"] == "InterfacePhysical":
+            physical_interfaces.append(node)
+        elif node["__typename"] == "InterfaceLag" and node["name"]["value"] == "Bond1":
+            server_bonds.append(node)
+
+    server_links = [
+        edge["node"]["name"]["value"]
+        for edge in resp["NetworkLink"]["edges"]
+        if server_name in edge["node"]["name"]["value"]
+    ]
+    server_physical_lags = {
+        iface["name"]["value"]: iface.get("lag", {}).get("node", {}).get("name", {}).get("value")
+        for iface in physical_interfaces
+    }
+    server_bond_members = sorted(
+        member_edge["node"]["name"]["value"] for bond in server_bonds for member_edge in bond["lag_members"]["edges"]
+    )
+
+    leaf_port_channels = []
+    for edge in resp["InterfaceLag"]["edges"]:
+        node = edge["node"]
+        if node["name"]["value"] != "Port-Channel1117":
+            continue
+        device_name = node.get("device", {}).get("node", {}).get("name", {}).get("value")
+        if device_name in {"leaf-pod-b2-1-1", "leaf-pod-b2-1-2"}:
+            leaf_port_channels.append(node)
+
+    return {
+        "server_link_count": len(server_links),
+        "server_physical_count": len(physical_interfaces),
+        "server_connected_count": sum(1 for iface in physical_interfaces if iface.get("connector", {}).get("node")),
+        "server_physical_lags": server_physical_lags,
+        "server_bond_count": len(server_bonds),
+        "server_bond_members": server_bond_members,
+        "leaf_port_channel_count": len(leaf_port_channels),
+        "leaf_port_channel_member_count": sum(len(lag["lag_members"]["edges"]) for lag in leaf_port_channels),
+        "leaf_port_channel_ids": sorted(lag["channel_id"]["value"] for lag in leaf_port_channels),
     }
 
 
