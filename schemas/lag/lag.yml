@@ -56,6 +56,20 @@ nodes:
         description: "LACP mode for the aggregated interface"
         default_value: active
         order_weight: 1750
+      - name: channel_id
+        label: Channel ID
+        kind: Number
+        optional: true
+        description: "Numeric Port-Channel ID used by EOS switch LAGs"
+        parameters:
+          min_value: 1
+        order_weight: 1760
+      - name: evpn_ethernet_segment
+        label: EVPN Ethernet Segment
+        kind: Boolean
+        description: "Enable EVPN all-active Ethernet Segment for this server LAG"
+        default_value: false
+        order_weight: 1775
     relationships:
       - name: lag_members
         common_parent: device
