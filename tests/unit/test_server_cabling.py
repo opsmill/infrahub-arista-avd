@@ -178,7 +178,6 @@ class TestIdempotency:
     async def test_already_cabled_server_reconciles_without_reconnecting(self) -> None:
         gen = _make_generator()
         gen._is_server_cabled = AsyncMock(return_value=True)  # type: ignore[method-assign]
-        gen._existing_cabling_plan = AsyncMock(return_value=[(MagicMock(), MagicMock())])  # type: ignore[method-assign]
         gen._assign_vlans = AsyncMock()  # type: ignore[method-assign]
         gen._create_server_port_channel = AsyncMock()  # type: ignore[method-assign]
 
@@ -191,6 +190,7 @@ class TestIdempotency:
         mock_server_iface.device.peer = MagicMock()
         mock_server_iface.device.display_label = "server-1"
         leaf_iface = _make_mock_leaf_interface("leaf-eth1", "Ethernet1", leaf=mock_leaf)
+        gen._existing_cabling_plan = AsyncMock(return_value=[(mock_server_iface, leaf_iface)])  # type: ignore[method-assign]
 
         gen.client.filters = AsyncMock(
             side_effect=[
@@ -206,7 +206,7 @@ class TestIdempotency:
         mock_connect.assert_not_called()
         gen._assign_vlans.assert_awaited_once()
         gen._create_server_port_channel.assert_awaited_once()
-        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")
+        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1", ["leaf-1"])
 
 
 class TestDualHomedCabling:
@@ -727,7 +727,7 @@ class TestAvdCascadeTrigger:
             gen._assign_vlans = AsyncMock()
             await gen.generate(data)
 
-        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")
+        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1", ["leaf-1"])
 
     @pytest.mark.asyncio
     async def test_cascade_not_called_when_no_rack(self) -> None:
@@ -791,7 +791,38 @@ class TestAvdCascadeTrigger:
 
         gen.client.get = AsyncMock(side_effect=[mock_rack, mock_pod])
 
-        await gen._trigger_avd_cascade("rack-1", "server-1")
+        await gen._trigger_avd_cascade("rack-1", "server-1", ["leaf-1", "leaf-2"])
 
         # Verify hostvars set to False
         mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)
+        mock_trigger.assert_awaited_once_with(gen.client, node_ids=["leaf-1", "leaf-2"])
+
+    @pytest.mark.asyncio
+    @patch("generators.generate_server_cabling.trigger_hostvar_generation", new_callable=AsyncMock)
+    @patch("generators.generate_server_cabling.set_fabric_avd_hostvars_ready", new_callable=AsyncMock)
+    async def test_trigger_avd_cascade_skips_hostvars_without_leaf_targets(
+        self,
+        mock_set_ready: AsyncMock,
+        mock_trigger: AsyncMock,
+    ) -> None:
+        """_trigger_avd_cascade marks fabric stale but skips hostvars without leaf targets."""
+        gen = _make_generator(mock_cascade=False)
+
+        mock_fabric = MagicMock()
+        mock_fabric.id = "fabric-1"
+        mock_fabric.name.value = "Fabric-A"
+
+        mock_pod = MagicMock()
+        mock_pod.parent.fetch = AsyncMock()
+        mock_pod.parent.peer = mock_fabric
+
+        mock_rack = MagicMock()
+        mock_rack.pod.fetch = AsyncMock()
+        mock_rack.pod.peer.id = "pod-1"
+
+        gen.client.get = AsyncMock(side_effect=[mock_rack, mock_pod])
+
+        await gen._trigger_avd_cascade("rack-1", "server-1", [])
+
+        mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)
+        mock_trigger.assert_not_awaited()

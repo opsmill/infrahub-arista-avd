@@ -178,15 +178,18 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         produced devices, which also proves the trigger cascade started.
         """
         gen_def = await client.get(kind="CoreGeneratorDefinition", name__value=GENERATOR_FABRIC, branch=PIPELINE_BRANCH)
+        fabrics = await client.all(kind="NetworkFabric", branch=PIPELINE_BRANCH)
+        fabric_ids = [fabric.id for fabric in fabrics]
+        assert fabric_ids, "no fabrics found on the pipeline branch"
         await client.execute_graphql(
             query="""
-            mutation RunGenerator($id: String!) {
-                CoreGeneratorDefinitionRun(data: { id: $id }) {
+            mutation RunGenerator($id: String!, $nodes: [String!]!) {
+                CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
                     ok
                 }
             }
             """,
-            variables={"id": gen_def.id},
+            variables={"id": gen_def.id, "nodes": fabric_ids},
             branch_name=PIPELINE_BRANCH,
         )
 

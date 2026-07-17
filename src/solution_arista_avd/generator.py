@@ -237,6 +237,13 @@ async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> b
 
 async def _trigger_generator(client: InfrahubClient, name: str, node_ids: list[str] | None = None) -> None:
     """Trigger a generator by name via CoreGeneratorDefinition mutation."""
+    if node_ids is None:
+        logger.warning("Skipping %s trigger: target node IDs are required", name)
+        return
+    if not node_ids:
+        logger.warning("Skipping %s trigger: no target node IDs found", name)
+        return
+
     generator_defs = await client.filters(kind="CoreGeneratorDefinition", name__value=name)
     if not generator_defs:
         logger.error("Could not find CoreGeneratorDefinition '%s'", name)
@@ -247,7 +254,7 @@ async def _trigger_generator(client: InfrahubClient, name: str, node_ids: list[s
 
     await client.execute_graphql(
         query="""
-        mutation RunGenerator($id: String!, $nodes: [String!]) {
+        mutation RunGenerator($id: String!, $nodes: [String!]!) {
             CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
                 ok
             }

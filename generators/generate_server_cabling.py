@@ -101,8 +101,9 @@ class ServerCablingGenerator(InfrahubGenerator):
         # and switch-side LAGs.
         await self._create_server_port_channel(server_hostname, cabling_plan)
 
-        # Trigger AVD hostvar regeneration cascade
-        await self._trigger_avd_cascade(rack_id, server_hostname)
+        # Trigger AVD hostvar regeneration for the leaves connected to this server.
+        hostvar_target_ids = self._connected_leaf_device_ids(cabling_plan)
+        await self._trigger_avd_cascade(rack_id, server_hostname, hostvar_target_ids)
 
     async def _create_server_port_channel(
         self,
@@ -234,7 +235,19 @@ class ServerCablingGenerator(InfrahubGenerator):
         mlag_domain_ids.discard(None)
         return bool(mlag_domain_ids)
 
-    async def _trigger_avd_cascade(self, rack_id: str, server_hostname: str) -> None:
+    @classmethod
+    def _connected_leaf_device_ids(cls, cabling_plan: list[tuple[DcimInterface, DcimInterface]]) -> list[str]:
+        leaf_ids: list[str] = []
+        for _, leaf_iface in cls._sort_cabling_plan_by_leaf_port(cabling_plan):
+            device_rel = getattr(leaf_iface, "device", None)
+            leaf_id = getattr(device_rel, "id", None)
+            if not isinstance(leaf_id, str):
+                leaf_id = getattr(getattr(device_rel, "peer", None), "id", None)
+            if isinstance(leaf_id, str) and leaf_id not in leaf_ids:
+                leaf_ids.append(leaf_id)
+        return leaf_ids
+
+    async def _trigger_avd_cascade(self, rack_id: str, server_hostname: str, hostvar_target_ids: list[str]) -> None:
         """Navigate from rack to fabric and trigger AVD hostvar regeneration."""
         rack = await self.client.get(LocationRack, id=rack_id)
         await rack.pod.fetch()  # type: ignore[union-attr]
@@ -243,12 +256,19 @@ class ServerCablingGenerator(InfrahubGenerator):
         fabric = pod.parent.peer  # type: ignore[union-attr]
 
         self.logger.info(
-            "Server %s cabled — triggering AVD cascade for fabric %s",
+            "Server %s cabled — triggering AVD cascade for fabric %s and %d leaf target(s)",
             server_hostname,
             fabric.name.value,
+            len(hostvar_target_ids),
         )
         await set_fabric_avd_hostvars_ready(self.client, fabric.id, False)
-        await trigger_hostvar_generation(self.client)
+        if not hostvar_target_ids:
+            self.logger.warning(
+                "Server %s cabled but no connected leaf target IDs were found; skipping hostvar generation",
+                server_hostname,
+            )
+            return
+        await trigger_hostvar_generation(self.client, node_ids=hostvar_target_ids)
 
     def _get_server_interfaces(self, server_node: dict) -> list[dict[str, Any]]:
         """Extract server interfaces with their VLANs from the GQL response."""
