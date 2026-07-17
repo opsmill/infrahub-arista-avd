@@ -7893,6 +7893,23 @@ type NestedPaginatedDcimPlatform {
   permissions: PaginatedObjectPermission!
 }
 
+type RoutingAsn implements CoreNode {
+  """Unique identifier"""
+  id: String!
+
+  """Human friendly identifier"""
+  hfid: [String!]
+  display_label: String
+  asn: NumberAttribute
+}
+
+type NestedEdgedRoutingAsn {
+  node: RoutingAsn
+  node_metadata: InfrahubNodeMetadata
+  properties: RelationshipProperty
+  relationship_metadata: InfrahubRelationshipMetadata
+}
+
 """
 A configurable network device for managing and directing data traffic, including routers, switches...
 """
@@ -7935,6 +7952,7 @@ type DcimDevice implements DcimPhysicalDevice & CoreNode & CoreArtifactTarget & 
 
   """None"""
   bgp_asn: NumberAttribute
+  asn: NestedEdgedRoutingAsn!
 
   """None"""
   node_id: NumberAttribute
@@ -8814,6 +8832,12 @@ type InterfaceLag implements DcimInterface & CoreNode & InterfaceHasSubInterface
 
   """LACP mode for the aggregated interface"""
   lacp_mode: Dropdown
+
+  """Numeric Port-Channel ID used by EOS switch LAGs"""
+  channel_id: NumberAttribute
+
+  """Enable EVPN all-active Ethernet Segment hostvars for this server LAG"""
+  evpn_ethernet_segment: CheckboxAttribute
   lag_members(offset: Int, limit: Int, order: OrderInput, ids: [ID], isnull: Boolean, display_label__value: String, display_label__values: [String], display_label__isnull: Boolean, name__value: String, name__values: [String], name__source__id: ID, name__owner__id: ID, name__is_protected: Boolean, status__value: String, status__values: [String], status__source__id: ID, status__owner__id: ID, status__is_protected: Boolean, index__value: String, index__values: [String], index__source__id: ID, index__owner__id: ID, index__is_protected: Boolean, role__value: String, role__values: [String], role__source__id: ID, role__owner__id: ID, role__is_protected: Boolean, mtu__value: BigInt, mtu__values: [BigInt], mtu__source__id: ID, mtu__owner__id: ID, mtu__is_protected: Boolean, description__value: String, description__values: [String], description__source__id: ID, description__owner__id: ID, description__is_protected: Boolean, l2_mode__value: String, l2_mode__values: [String], l2_mode__source__id: ID, l2_mode__owner__id: ID, l2_mode__is_protected: Boolean, dot1q_id__value: BigInt, dot1q_id__values: [BigInt], dot1q_id__source__id: ID, dot1q_id__owner__id: ID, dot1q_id__is_protected: Boolean, mac_address__value: String, mac_address__values: [String], mac_address__source__id: ID, mac_address__owner__id: ID, mac_address__is_protected: Boolean): NestedPaginatedInterfacePhysical!
   mlag_peer_link: NestedEdgedMlagDomain!
 }
@@ -9362,6 +9386,7 @@ type MlagDomain implements CoreNode & GenericMlagDomain {
 
   """Authoritative BGP ASN shared by the MLAG peer pair"""
   bgp_asn: NumberAttribute
+  asn: NestedEdgedRoutingAsn!
 
   """Time in seconds to wait before bringing up the MLAG after a reload"""
   reload_delay: NumberAttribute
