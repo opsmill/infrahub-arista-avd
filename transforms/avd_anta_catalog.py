@@ -18,7 +18,17 @@ from pyavd.api.anta import AVDFabricData
 
 from solution_arista_avd.protocols import AvdStructuredConfigFile
 
-from .avd_anta_catalog_query import AvdAntaCatalogQuery, DeviceNode, ParentNode
+from .avd_anta_catalog_query import (
+    AvdAntaCatalogQuery,
+    AvdAntaCatalogQueryDcimDeviceEdgesNode,
+    AvdAntaCatalogQueryTargetEdgesNode,
+    AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabric,
+)
+
+# Readable aliases for the verbose generated query model classes.
+TargetNode = AvdAntaCatalogQueryTargetEdgesNode
+DeviceNode = AvdAntaCatalogQueryDcimDeviceEdgesNode
+FabricNode = AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabric
 
 
 class AvdAntaCatalogTransform(InfrahubTransform):
@@ -35,7 +45,7 @@ class AvdAntaCatalogTransform(InfrahubTransform):
         if not target or not hostname:
             return "# ANTA catalog: device not found"
 
-        fabric = self._fabric_of(target)
+        fabric = self._target_fabric(target)
         if fabric is None:
             return f"# ANTA catalog: no fabric for {hostname}"
         fabric_name = fabric.name.value if fabric.name else fabric.id
@@ -53,10 +63,22 @@ class AvdAntaCatalogTransform(InfrahubTransform):
         return catalog.dump().yaml()
 
     @staticmethod
-    def _fabric_of(device: DeviceNode) -> ParentNode | None:
-        """Return the device's fabric node (``pod.parent``), or None."""
+    def _target_fabric(target: TargetNode) -> FabricNode | None:
+        """Return the target device's fabric node (``pod.parent``), or None.
+
+        The parent is a discriminated union; only a ``NetworkFabric`` carries the
+        ``name``/``anta_enabled`` fields the catalog gating needs.
+        """
+        pod = target.pod.node if target.pod else None
+        parent = pod.parent.node if pod and pod.parent else None
+        return parent if isinstance(parent, FabricNode) else None
+
+    @staticmethod
+    def _device_fabric_id(device: DeviceNode) -> str | None:
+        """Return the id of the fabric (``pod.parent``) a device belongs to."""
         pod = device.pod.node if device.pod else None
-        return pod.parent.node if pod and pod.parent else None
+        parent = pod.parent.node if pod and pod.parent else None
+        return parent.id if parent else None
 
     async def _fabric_structured_configs(
         self, parsed: AvdAntaCatalogQuery, fabric_id: str
@@ -67,8 +89,7 @@ class AvdAntaCatalogTransform(InfrahubTransform):
             device = edge.node
             if not device or not device.name or not device.name.value:
                 continue
-            fabric = self._fabric_of(device)
-            if fabric is None or fabric.id != fabric_id:
+            if self._device_fabric_id(device) != fabric_id:
                 continue
             sc = await self._download_structured_config(device)
             if sc is not None:
