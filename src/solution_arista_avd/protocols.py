@@ -438,9 +438,19 @@ class AvdEvpn(CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
+class NetworkSpanningTreePriority(CoreNode):
+    priority: Integer
+    role: Dropdown
+    fabric: RelationshipAttribute[NetworkFabric]
+    member_of_groups: RelationshipManager[CoreGroup]
+    profiles: RelationshipManager[CoreProfile]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
+
+
 class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     amount_of_super_spines: Integer
     anta_enabled: Boolean
+    avd_custom_hostvars: JSONAttributeOptional
     avd_hostvars_ready: Boolean
     bgp_evpn_overlay_password: StringOptional
     bgp_mlag_password: StringOptional
@@ -470,6 +480,7 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     ntp_servers: RelationshipManager[NetworkNtpServer]
     parent: RelationshipAttribute[NetworkBuildingBlock]
     profiles: RelationshipManager[CoreProfile]
+    spanning_tree_priorities: RelationshipManager[NetworkSpanningTreePriority]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     super_spine_switch_template: RelationshipAttribute[CoreObjectTemplate]
     uplink_pool: RelationshipAttribute[CoreIPPrefixPool]
@@ -1514,6 +1525,7 @@ class ProfileNetworkDnsServer(LineageSource, CoreProfile, CoreNode):
 class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
     amount_of_super_spines: IntegerOptional
     anta_enabled: BooleanOptional
+    avd_custom_hostvars: JSONAttributeOptional
     avd_hostvars_ready: BooleanOptional
     bgp_evpn_overlay_password: StringOptional
     bgp_mlag_password: StringOptional
@@ -1598,6 +1610,15 @@ class ProfileNetworkPod(LineageSource, CoreProfile, CoreNode):
     racks: RelationshipManager[LocationRack]
     related_nodes: RelationshipManager[NetworkPod]
     spine_switch_template: RelationshipAttribute[CoreObjectTemplate]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
+
+
+class ProfileNetworkSpanningTreePriority(LineageSource, CoreProfile, CoreNode):
+    priority: IntegerOptional
+    profile_name: String
+    profile_priority: Integer
+    member_of_groups: RelationshipManager[CoreGroup]
+    related_nodes: RelationshipManager[NetworkSpanningTreePriority]
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 

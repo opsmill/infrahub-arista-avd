@@ -59,7 +59,7 @@ def _base_hostvars(
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -176,7 +176,7 @@ def _leaf_hostvars(
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -192,6 +192,7 @@ def _leaf_hostvars(
         mlag_info=mlag_info,
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -249,7 +250,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -271,6 +272,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         },
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -431,7 +433,7 @@ def _multi_switch_adapter() -> dict:
 async def test_tenants_hostvars_validate_against_pyavd():
     """EVPN tenant payload (incl. l2vlan vni_override) must pass pyAVD validation.
 
-    Regression guard for the AVD 6.2 upgrade, which renamed the l2vlan key to
+    Regression guard for the AVD 6.3 target, which expects the l2vlan key to be
     `vni_override` and rejects the old `vni` key with an invalid-key error.
     """
     svi = SimpleNamespace(
@@ -630,7 +632,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         overlay_routing_protocol=None,
         p2p_uplinks_mtu=p2p_uplinks_mtu,
         spanning_tree_mode=None,
-        spanning_tree_priority=None,
+        spanning_tree_priorities={},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -646,6 +648,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
     assert hostvars["p2p_uplinks_mtu"] == 1500

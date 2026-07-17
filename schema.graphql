@@ -9055,6 +9055,7 @@ type NetworkFabric implements NetworkBuildingBlock & CoreNode & CoreArtifactTarg
 
   """STP priority (must be multiple of 4096, e.g. 4096, 8192, 16384)"""
   spanning_tree_priority: NumberAttribute
+  spanning_tree_priorities(offset: Int, limit: Int, order: OrderInput, ids: [ID], isnull: Boolean): NestedPaginatedNetworkSpanningTreePriority!
   super_spine_switch_template: NestedEdgedCoreObjectTemplate!
   node_id_pool: NestedEdgedCoreNumberPool!
   asn_pool: NestedEdgedCoreNumberPool!
@@ -9071,6 +9072,20 @@ type NetworkFabric implements NetworkBuildingBlock & CoreNode & CoreArtifactTarg
 type EdgedNetworkFabric {
   node: NetworkFabric
   node_metadata: InfrahubNodeMetadata
+}
+
+type NetworkSpanningTreePriority {
+  role: Dropdown
+  priority: NumberAttribute
+}
+
+type NestedEdgedNetworkSpanningTreePriority {
+  node: NetworkSpanningTreePriority
+}
+
+type NestedPaginatedNetworkSpanningTreePriority {
+  count: Int!
+  edges: [NestedEdgedNetworkSpanningTreePriority!]!
 }
 
 type NestedEdgedNetworkFabric {

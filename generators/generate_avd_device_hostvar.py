@@ -1028,7 +1028,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         overlay_routing_protocol: str | None,
         p2p_uplinks_mtu: int | None,
         spanning_tree_mode: str | None,
-        spanning_tree_priority: int | None,
+        spanning_tree_priorities: dict[str, int],
         loopback_ipv4_offset: int | None,
         bgp_passwords: dict[str, str | None],
         management: dict[str, Any],
@@ -1094,9 +1094,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if p2p_uplinks_mtu is not None:
             hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
         if spanning_tree_mode:
-            hostvars["spanning_tree_mode"] = spanning_tree_mode
-        if spanning_tree_priority is not None:
-            hostvars["spanning_tree_priority"] = spanning_tree_priority
+            hostvars["spanning_tree_settings"] = {"mode": spanning_tree_mode}
+
+        role_priority = spanning_tree_priorities.get(role)
+        if role_priority is not None:
+            hostvars.setdefault(node_type_key, {})
+            hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
+            hostvars[node_type_key]["defaults"]["spanning_tree_priority"] = role_priority
 
         # Loopback offset for leaf devices
         if loopback_ipv4_offset is not None and role == "leaf":
@@ -1237,7 +1241,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             None if is_l2leaf else self._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu")
         )
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
-        spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
+        spanning_tree_priorities: dict[str, int] = {}
+        spanning_tree_priority_edges = getattr(getattr(fabric, "spanning_tree_priorities", None), "edges", None) or []
+        for edge in spanning_tree_priority_edges:
+            priority_node = edge.node
+            if not priority_node:
+                continue
+            priority_role = self._get_attr_value(priority_node, "role")
+            priority_value = self._get_attr_value(priority_node, "priority")
+            if priority_role and priority_value is not None:
+                spanning_tree_priorities[priority_role] = priority_value
         # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
         loopback_ipv4_offset = (
             None if is_l2leaf else self._get_first_attr_value(pod, "loopback_ipv_4_offset", "loopback_ipv4_offset")
@@ -1315,7 +1328,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             overlay_routing_protocol=overlay_routing_protocol,
             p2p_uplinks_mtu=p2p_uplinks_mtu,
             spanning_tree_mode=spanning_tree_mode,
-            spanning_tree_priority=spanning_tree_priority,
+            spanning_tree_priorities=spanning_tree_priorities,
             loopback_ipv4_offset=loopback_ipv4_offset,
             bgp_passwords=bgp_passwords,
             management=management,

@@ -24,8 +24,11 @@ Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overv
 | `loopback_ipv4_address` | string | `DcimDevice.loopback_ip` | Optional; stripped of CIDR. |
 | `mgmt_ip` | string | `DcimDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |
+| `spanning_tree_settings.mode` | string | `NetworkFabric.spanning_tree_mode.value` | Optional; pyAVD 6.3 fabric-wide STP mode (`mstp`, `rstp`, `rapid-pvst`, or `none`). |
 
 The builder for these basics lives in [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) as `_build_hostvars()`. (The role→AVD-type mapping it uses, `ROLE_TO_AVD_TYPE`, lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py).)
+
+Role-specific STP priorities are modeled as `NetworkSpanningTreePriority` child objects on the fabric. When a child exists for the device role, the hostvars builder emits it under the matching AVD node type defaults, for example `l3leaf.defaults.spanning_tree_priority: 8192`. The legacy fabric-level `spanning_tree_priority` field is still present for non-destructive migration compatibility but is ignored by hostvar generation.
 
 ## Uplink fields — `spine`, `leaf`, `l2leaf`
 
@@ -172,6 +175,14 @@ Common validation failures:
   "loopback_ipv4_address": "10.255.1.1",
   "mgmt_ip": "10.255.0.11/24",
   "mgmt_gateway": "10.255.0.1",
+  "spanning_tree_settings": {
+    "mode": "mstp"
+  },
+  "l3leaf": {
+    "defaults": {
+      "spanning_tree_priority": 8192
+    }
+  },
   "uplink_interfaces": ["Ethernet1", "Ethernet2"],
   "uplink_switches": ["spine-A1-1", "spine-A1-2"],
   "uplink_switch_interfaces": ["Ethernet1", "Ethernet1"],
