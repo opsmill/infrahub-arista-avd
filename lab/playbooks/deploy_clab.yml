@@ -20,17 +20,12 @@
   connection: local
   gather_facts: false
   vars:
-    fabric: Fabric-A
+    # Mandatory: the play fails with the hint below if -e fabric=... is not set.
+    fabric: "{{ undef(hint='Set the fabric name, e.g. -e fabric=Fabric-A') }}"
     lab_dir: "{{ playbook_dir }}/.."
     topology_file: "{{ lab_dir }}/topology.clab.yml"
     config_dir: "{{ lab_dir }}/configs"
   tasks:
-    - name: Fail early if the fabric was not provided
-      ansible.builtin.assert:
-        that:
-          - fabric | length > 0
-        fail_msg: "Set the fabric name, e.g. -e fabric=Fabric-A"
-
     - name: Fetch the ContainerLab Topology artifact from Infrahub
       opsmill.infrahub.artifact_fetch:
         artifact_name: "ContainerLab Topology"

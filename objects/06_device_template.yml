@@ -189,12 +189,9 @@ spec:
           - template_name: "Arista7050CX3SpineSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
-          - template_name: "Arista7050CX3SpineSwitchEthernet[1-27]/1"
-            name: "Ethernet[1-27]/1"
+          - template_name: "Arista7050CX3SpineSwitchEthernet[1-32]/1"
+            name: "Ethernet[1-32]/1"
             profiles: ["profile-interface-leaf"]
-          - template_name: "Arista7050CX3SpineSwitchEthernet[28-32]/1"
-            name: "Ethernet[28-32]/1"
-            profiles: ["profile-interface-super-spine"]
     - template_name: "arista-7050sx3-48yc8-leaf-switch"
       role: "leaf"
       device_type: ["Arista", "DCS-7050SX3-48YC8"]
