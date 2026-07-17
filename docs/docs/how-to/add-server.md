@@ -61,7 +61,7 @@ For a newly added server, the generator:
 3. Selects the first available leaf port index that is free on all target leaves.
 4. Creates `NetworkLink` objects between the server interfaces and selected leaf physical interfaces.
 5. Copies tagged and untagged VLANs from server interfaces and server interface profiles onto the paired leaf physical interfaces.
-6. Reconciles already-cabled servers by rebuilding the cabling plan from existing `NetworkLink` objects, then reapplying VLANs and LAG state.
+6. For idempotence, reconciles already-cabled servers by rebuilding the cabling plan from existing `NetworkLink` objects, then reapplying VLANs and LAG state.
 7. For dual-homed, multi-leaf servers, creates server-side `Bond1`.
 8. Creates one switch-side `InterfaceLag` named `Port-Channel<ID>` on each attached leaf. The `channel_id` is derived from the selected leaf port number and is owned in Infrahub.
 9. Attaches each leaf physical interface to its local switch-side LAG.
