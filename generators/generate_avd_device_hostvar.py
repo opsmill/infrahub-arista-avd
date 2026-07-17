@@ -238,8 +238,7 @@ def _lag_channel_id(lag_node: object | None, *, require_port_channel_name: bool)
     channel_id = int(channel_id)
     if parsed_channel_id is not None and parsed_channel_id != channel_id:
         raise ValueError(
-            f"Switch LAG name '{lag_name}' implies channel ID {parsed_channel_id}, "
-            f"but channel_id is {channel_id}"
+            f"Switch LAG name '{lag_name}' implies channel ID {parsed_channel_id}, but channel_id is {channel_id}"
         )
     if require_port_channel_name and parsed_channel_id is None:
         raise ValueError(f"Switch LAG with channel_id {channel_id} must be named Port-Channel{channel_id}")
@@ -448,8 +447,7 @@ def _add_switch_lag_adapter(
         link_channel_id = _lag_channel_id(link_lag, require_port_channel_name=True)
         if link_channel_id != channel_id:
             raise ValueError(
-                f"Conflicting switch LAG channel ID for server '{server_name}': "
-                f"{channel_id} != {link_channel_id}"
+                f"Conflicting switch LAG channel ID for server '{server_name}': {channel_id} != {link_channel_id}"
             )
         for field in ("lacp_mode", "evpn_ethernet_segment"):
             link_value = _value(link_lag, field)
