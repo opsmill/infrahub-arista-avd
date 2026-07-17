@@ -1,0 +1,63 @@
+---
+# ============================================================================
+# EVPN Services for the Fabric-C fabric
+# Tenant "Arista" with VRF10 routed and stretched services.
+# ============================================================================
+
+# VRF for the Infrahub-AVD dual-DC lab.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVRF
+  data:
+    - name: IH-VRF10
+      namespace: default
+      vrf_vni: 10
+---
+# EVPN Tenant linked to the generated lab fabric.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnTenant
+  data:
+    - name: Arista
+      mac_vrf_vni_base: 10000
+      fabrics:
+        - "Fabric-C"
+      vrfs:
+        - IH-VRF10
+---
+# SVIs for IH-VRF10. Tags let AVD scope local vs stretched services.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnSvi
+  data:
+    - name: "VRF10_DC1"
+      svi_id: 11
+      ip_address_virtual: "10.10.11.1/24"
+      enabled: true
+      vrf: IH-VRF10
+      # fabric_tags requires PR #68 and must be refactored to the new
+      # SVI tag model. Keep commented out so this seed data loads on main.
+      # fabric_tags:
+      #   - DC1
+    - name: "VRF10_DC2"
+      svi_id: 12
+      ip_address_virtual: "10.10.12.1/24"
+      enabled: true
+      vrf: IH-VRF10
+      # fabric_tags requires PR #68 and must be refactored to the new
+      # SVI tag model. Keep commented out so this seed data loads on main.
+      # fabric_tags:
+      #   - DC2
+    - name: "VRF10_STRETCHED"
+      svi_id: 19
+      ip_address_virtual: "10.10.19.1/24"
+      enabled: true
+      vrf: IH-VRF10
+      # fabric_tags requires PR #68 and must be refactored to the new
+      # SVI tag model. Keep commented out so this seed data loads on main.
+      # fabric_tags:
+      #   - DC1
+      #   - DC2
