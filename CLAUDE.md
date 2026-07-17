@@ -164,6 +164,7 @@ the ASN / node-id / management / loopback pools and activates the loopback.
 | `AvdFabricDocTransform` | Generates markdown fabric documentation |
 | `AvdDeviceDocTransform` | Generates markdown device documentation |
 | `AvdAntaCatalogTransform` | Generates a per-device ANTA test catalog (YAML) from structured config; gated by the fabric `anta_enabled` flag (renders a disabled marker when off). Needs fabric-wide structured configs to build `AVDFabricData`. |
+| `ContainerLabTopology` | Renders a ContainerLab topology (`topology.clab.yml`, per fabric) from the fabric's devices/cabling: `arista_ceos` nodes with mgmt IPs, and links with interface names translated `Ethernet<N>[/<M>]` → `eth<N>[_<M>]` (cEOS default mapping). Collection/translation are module-level pure helpers. Deploy via `lab/playbooks/deploy_clab.yml` (`opsmill.infrahub` + ContainerLab). See `lab/README.md`. Per-device-type `EosIntfMapping.json` binds are deferred to a schema-first cycle (a `CoreFileObject` on `DcimDeviceType`). |
 
 **Transform File Structure:**
 - `<transform>.py` - Transform class implementation
@@ -294,6 +295,8 @@ infrahubctl protocols --out src/solution_arista_avd/protocols.py
 - Infrahub (Neo4j graph). ASN becomes a graph node; pools are `CoreNumberPool` built-ins (002-bgp-asn-schema)
 - Python >=3.11, <3.14 + `infrahub-sdk[all]` (generators, `CoreNumberPool` allocation), `pyavd>=5.0.0` (hostvar/config consumer) (002-asn-generation-fix)
 - Infrahub (Neo4j graph); ASN numbers allocated from `CoreNumberPool` built-ins into `Routing.Asn` nodes (002-asn-generation-fix)
+- Python >=3.11, <3.14 (repo runs 3.12) + `infrahub-sdk[all]` (`InfrahubTransform`, `execute_graphql`); Jinja2 (via SDK); PyYAML for safe serialization/round-trip validation; `opsmill.infrahub` + ContainerLab (Ansible workflow only) (003-generate-containerlab-topology)
+- Infrahub (Neo4j graph) — read-only via GraphQL; interface-mapping files are static repo resources under `lab/configs/eos-intf-mapping/` (003-generate-containerlab-topology)
 
 ## Recent Changes
 - 001-enforce-protocols: Added Python >=3.11, <3.14 + infrahub-sdk==1.18.1, pyavd>=5.0.0

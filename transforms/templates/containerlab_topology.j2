@@ -1,0 +1,28 @@
+---
+name: {{ name }}
+
+{% if mgmt_subnet %}
+mgmt:
+  network: {{ mgmt_network }}
+  ipv4-subnet: {{ mgmt_subnet }}
+
+{% endif %}
+topology:
+  kinds:
+    {{ kind }}:
+      image: {{ image }}
+      startup-config: configs/{{ '__clabNodeName__' }}.cfg
+
+  nodes:
+{% for node in nodes %}
+    {{ node.name }}:
+      kind: {{ node.kind }}
+{% if node.mgmt_ipv4 %}
+      mgmt-ipv4: {{ node.mgmt_ipv4 }}
+{% endif %}
+{% endfor %}
+
+  links:
+{% for link in links %}
+    - endpoints: ["{{ link.a }}", "{{ link.b }}"]
+{% endfor %}

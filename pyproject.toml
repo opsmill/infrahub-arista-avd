@@ -103,6 +103,9 @@ ignore = [
 # Generated Pydantic models mirroring GraphQL responses: the nested type names
 # are machine-generated and unavoidably exceed the line length.
 "*_query.py" = ["E501"]
+# Standalone operational scripts are run directly (not imported as a package)
+# and manipulate sys.path before importing the solution package.
+"scripts/*.py" = ["INP001"]
 # Tests legitimately reach into private members and use local imports / unused
 # fixture arguments; return-type annotations add no value here.
 "tests/**/*.py" = ["SLF001", "ARG001", "ARG002", "ANN201", "RUF029", "E501"]

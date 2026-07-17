@@ -48,6 +48,9 @@ queries:
   - name: generate_server_cabling
     file_path: "./generators/generate_server_cabling.gql"
 
+  - name: containerlab_topology
+    file_path: "./transforms/containerlab_topology.gql"
+
 
 generator_definitions:
   - name: generate-avd-device-hostvar
@@ -146,6 +149,9 @@ python_transforms:
   - name: avd_anta_catalog
     class_name: AvdAntaCatalogTransform
     file_path: "./transforms/avd_anta_catalog.py"
+  - name: containerlab_topology
+    class_name: ContainerLabTopology
+    file_path: "./transforms/containerlab_topology.py"
 
 artifact_definitions:
   - name: "cabling_plan"
@@ -183,3 +189,10 @@ artifact_definitions:
     content_type: "application/yaml"
     targets: "avd_devices"
     transformation: "avd_anta_catalog"
+  - name: "containerlab_topology"
+    artifact_name: "ContainerLab Topology"
+    parameters:
+      name: "name__value"
+    content_type: "application/yaml"
+    targets: "fabrics"
+    transformation: "containerlab_topology"

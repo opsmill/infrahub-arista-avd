@@ -1,0 +1,5 @@
+# Runtime artifacts fetched/rendered at deploy time
+/topology.clab.yml
+/configs/*.cfg
+clab-*/
+.clab.*

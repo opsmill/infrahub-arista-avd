@@ -43,6 +43,7 @@ ARTIFACT_AVD_EOS_CONFIG = "AVD EOS Configuration"
 ARTIFACT_AVD_FABRIC_DOC = "AVD Fabric Documentation"
 ARTIFACT_AVD_DEVICE_DOC = "AVD Device Documentation"
 ARTIFACT_AVD_ANTA_CATALOG = "AVD ANTA Catalog"
+ARTIFACT_CONTAINERLAB_TOPOLOGY = "ContainerLab Topology"
 
 ALL_ARTIFACT_NAMES = [
     ARTIFACT_CABLING_PLAN,
@@ -50,7 +51,16 @@ ALL_ARTIFACT_NAMES = [
     ARTIFACT_AVD_FABRIC_DOC,
     ARTIFACT_AVD_DEVICE_DOC,
     ARTIFACT_AVD_ANTA_CATALOG,
+    ARTIFACT_CONTAINERLAB_TOPOLOGY,
 ]
+
+# Arista device types + object templates seeded for issue #70, with the interface
+# count each object template must expand to (Ethernet ports + 1 Loopback0).
+ARISTA_DEVICE_TYPES = ("DCS-7050SX3-48YC8", "DCS-7050CX3-32S")
+ARISTA_TEMPLATE_INTERFACE_COUNTS = {
+    "arista-7050cx3-32s-spine-switch": 33,  # 32x 100G QSFP + Loopback0
+    "arista-7050sx3-48yc8-leaf-switch": 57,  # 48x 25G + 8x 100G QSFP + Loopback0
+}
 
 # Marker the ANTA transform emits when the fabric has ANTA disabled
 # (transforms/avd_anta_catalog.py). Used to assert the catalog is *populated*.

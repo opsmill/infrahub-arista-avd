@@ -173,3 +173,42 @@ spec:
           - template_name: "DellS5232FLeafStorageSwitchEthernet1/1/[33-34]"
             name: Ethernet1/1/[33-34]
             profiles: ["profile-interface-mlag-peer"]
+
+    # Arista datacenter switches (issue #70). Port layouts match the real
+    # platforms and the lab's eos-intf-mapping files:
+    #   7050CX3-32S  -> 32x 100G QSFP, EOS names Ethernet1/1 .. Ethernet32/1 (spine)
+    #   7050SX3-48YC8 -> 48x 25G SFP (Ethernet1-48) + 8x 100G QSFP (Ethernet49/1-56/1) (leaf)
+    - template_name: "arista-7050cx3-32s-spine-switch"
+      role: "spine"
+      device_type: ["Arista", "DCS-7050CX3-32S"]
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "Arista7050CX3SpineSwitchLoopback0"
+            name: "Loopback0"
+            role: "loopback"
+          - template_name: "Arista7050CX3SpineSwitchEthernet[1-32]/1"
+            name: "Ethernet[1-32]/1"
+            profiles: ["profile-interface-leaf"]
+    - template_name: "arista-7050sx3-48yc8-leaf-switch"
+      role: "leaf"
+      device_type: ["Arista", "DCS-7050SX3-48YC8"]
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "Arista7050SX3LeafSwitchLoopback0"
+            name: "Loopback0"
+            role: "loopback"
+          - template_name: "Arista7050SX3LeafSwitchEthernet[1-48]"
+            name: "Ethernet[1-48]"
+            profiles: ["profile-interface-server"]
+          - template_name: "Arista7050SX3LeafSwitchEthernet[49-54]/1"
+            name: "Ethernet[49-54]/1"
+            profiles: ["profile-interface-spine"]
+          - template_name: "Arista7050SX3LeafSwitchEthernet[55-56]/1"
+            name: "Ethernet[55-56]/1"
+            profiles: ["profile-interface-mlag-peer"]

@@ -32,6 +32,7 @@ import os
 from typing import TYPE_CHECKING
 
 import pytest
+import yaml
 from infrahub_sdk.protocols import CoreGenericRepository
 from infrahub_sdk.testing.docker import TestInfrahubDockerClient
 from infrahub_sdk.testing.repository import GitRepo
@@ -39,8 +40,11 @@ from infrahub_sdk.testing.repository import GitRepo
 from .helpers import (
     ALL_ARTIFACT_NAMES,
     ANTA_DISABLED_MARKER,
+    ARISTA_DEVICE_TYPES,
+    ARISTA_TEMPLATE_INTERFACE_COUNTS,
     ARTIFACT_AVD_ANTA_CATALOG,
     ARTIFACT_AVD_EOS_CONFIG,
+    ARTIFACT_CONTAINERLAB_TOPOLOGY,
     ARTIFACT_TIMEOUT,
     GENERATOR_FABRIC,
     GENERATOR_TIMEOUT,
@@ -105,7 +109,17 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             print(result.stderr, flush=True)
         assert result.returncode == 0, f"object load failed:\n{result.stdout}\n{result.stderr}"
         assert await client.all(kind="OrganizationManufacturer", branch=default_branch), "no manufacturers loaded"
-        assert await client.all(kind="DcimDeviceType", branch=default_branch), "no device types loaded"
+        device_types = {dt.name.value for dt in await client.all(kind="DcimDeviceType", branch=default_branch)}
+        assert device_types, "no device types loaded"
+        # Issue #70: Arista device types + object templates with the right port layout.
+        missing_types = set(ARISTA_DEVICE_TYPES) - device_types
+        assert not missing_types, f"Arista device types not loaded: {missing_types}"
+        template_counts = await _template_interface_counts(
+            client, default_branch, list(ARISTA_TEMPLATE_INTERFACE_COUNTS)
+        )
+        assert template_counts == ARISTA_TEMPLATE_INTERFACE_COUNTS, (
+            f"Arista object templates wrong/absent: expected {ARISTA_TEMPLATE_INTERFACE_COUNTS}, got {template_counts}"
+        )
 
     # --- Component 3: target groups (main) ---------------------------------
     @pytest.mark.asyncio(loop_scope="class")
@@ -399,6 +413,42 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             "ANTA catalog rendered the disabled marker despite anta_enabled"
         )
 
+        # ContainerLab Topology is fabric-scoped and, unlike the device-scoped
+        # EOS/ANTA artifacts, does not auto-cascade on the branch — so generate it
+        # explicitly for each fabric target on the branch, then read a populated
+        # render (this also proves the transform renders server-side on a branch).
+        definitions = await client.all(kind="CoreArtifactDefinition", branch=PIPELINE_BRANCH)
+        clab_def = next((d for d in definitions if d.artifact_name.value == ARTIFACT_CONTAINERLAB_TOPOLOGY), None)
+        assert clab_def, "ContainerLab Topology artifact definition not registered"
+        for fabric in await client.all(kind="NetworkFabric", branch=PIPELINE_BRANCH):
+            resp = await client._post(
+                f"{client.address}/api/artifact/generate/{clab_def.id}?branch={PIPELINE_BRANCH}",
+                payload={"nodes": [fabric.id]},
+            )
+            resp.raise_for_status()
+
+        def _has_populated_topology(contents: list[str]) -> bool:
+            return any((yaml.safe_load(c).get("topology") or {}).get("nodes") for c in contents if c and c.strip())
+
+        clab_contents = await wait_until(
+            fetch=lambda: _fetch_ready_artifact_contents(client, PIPELINE_BRANCH, ARTIFACT_CONTAINERLAB_TOPOLOGY),
+            ready=_has_populated_topology,
+            timeout=ARTIFACT_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="a populated ContainerLab topology artifact on the branch",
+        )
+        topos = [yaml.safe_load(c) for c in clab_contents if c and c.strip()]
+        populated = [t for t in topos if (t.get("topology") or {}).get("nodes")]
+        topo = max(populated, key=lambda t: len(t["topology"]["nodes"]))
+        assert topo.get("name"), "ContainerLab topology has no fabric name"
+        nodes = topo["topology"]["nodes"]
+        links = topo["topology"]["links"]
+        assert links, "ContainerLab topology has no links"
+        assert all(n["kind"] == "arista_ceos" for n in nodes.values()), "non-cEOS node in topology"
+        # Interface names must be ContainerLab short form, never raw EOS names.
+        untranslated = [ep for link in links for ep in link["endpoints"] if "Ethernet" in ep]
+        assert not untranslated, f"untranslated EOS interface names in links: {untranslated[:5]}"
+
     async def _wait_for_ready_artifact(
         self, client: InfrahubClient, branch: str, artifact_name: str, definitions: list
     ) -> None:
@@ -421,6 +471,25 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             interval=POLL_INTERVAL,
             describe=f"Ready artifact '{artifact_name}'",
         )
+
+
+async def _template_interface_counts(client: InfrahubClient, branch: str, template_names: list[str]) -> dict[str, int]:
+    """Return {template_name: interface_count} for the given object templates (issue #70)."""
+    resp = await client.execute_graphql(
+        query="""
+        query($names: [String!]) {
+          TemplateDcimDevice(template_name__values: $names) {
+            edges { node { template_name { value } interfaces { count } } }
+          }
+        }
+        """,
+        variables={"names": template_names},
+        branch_name=branch,
+    )
+    return {
+        edge["node"]["template_name"]["value"]: edge["node"]["interfaces"]["count"]
+        for edge in resp["TemplateDcimDevice"]["edges"]
+    }
 
 
 async def _asn_report(client: InfrahubClient, branch: str) -> dict:
@@ -735,6 +804,31 @@ async def _trigger_all_artifacts(client: InfrahubClient, branch: str, definition
             payload={"nodes": []},
         )
         resp.raise_for_status()
+
+
+async def _fetch_ready_artifact_contents(client: InfrahubClient, branch: str, artifact_name: str) -> list[str]:
+    """Return the content of every Ready artifact of ``artifact_name`` on ``branch``.
+
+    Used for fabric-scoped artifacts where several targets (and possibly an early
+    empty render) share one name, so the caller can pick a populated one.
+    """
+    query = (
+        "query {\n"
+        f'  CoreArtifact(name__value: "{artifact_name}") {{\n'
+        "    edges { node { status { value } storage_id { value } } }\n"
+        "  }\n"
+        "}"
+    )
+    resp = await client.execute_graphql(query=query, branch_name=branch)
+    contents: list[str] = []
+    for edge in resp["CoreArtifact"]["edges"]:
+        node = edge["node"]
+        if node.get("status", {}).get("value") != "Ready":
+            continue
+        storage_id = node.get("storage_id", {}).get("value")
+        if storage_id:
+            contents.append(await client.object_store.get(identifier=storage_id))
+    return contents
 
 
 async def _fetch_ready_artifact_content(
