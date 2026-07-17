@@ -70,14 +70,6 @@ For a newly added server, the generator:
 
 The resulting hostvars include `port_channel.channel_id` for switch-side server LAGs, so pyAVD receives the explicit Port-Channel ID from Infrahub.
 
-## Behavior change
-
-Before this branch's switch-side LAG ownership changes, Add Server cabled physical links, copied VLANs, created only the server-side `Bond1`, and left switch Port-Channel IDs implicit for AVD/pyAVD.
-
-In this flow, Infrahub owns switch-side `Port-Channel<ID>` through `InterfaceLag.channel_id`. Server cabling creates the switch LAGs, attaches the leaf physical ports to those LAGs, and hostvar generation emits the explicit channel ID.
-
-The Add Server membership race is handled by the portal's atomic `member_of_groups` upsert. This branch does not change the seeded group kinds or trigger definitions for that fix.
-
 ## If the wait times out
 
 The portal waits a fixed 60 seconds for the generator chain to finish. On a busy machine the chain can take longer. If the proposed change shows no updated device configs:
