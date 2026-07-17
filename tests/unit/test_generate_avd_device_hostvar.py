@@ -4,9 +4,14 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
+import yaml
+from pyavd import get_avd_facts, validate_inputs
 
-from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar
+from generators.generate_avd_device_hostvar import (
+    GenerateAVDDeviceHostvar,
+    _add_switch_lag_adapter,  # noqa: PLC2701 - focused unit coverage for internal conflict validation
+    apply_lag_adapter_config,
+)
 
 
 def _attr(value: object) -> SimpleNamespace:
@@ -17,10 +22,18 @@ def _rel(peers: list[object]) -> SimpleNamespace:
     return SimpleNamespace(fetch=AsyncMock(), peers=[SimpleNamespace(peer=p) for p in peers])
 
 
+def _custom(value: object) -> SimpleNamespace:
+    return SimpleNamespace(avd_custom_hostvars=_attr(value))
+
+
 def _make_generator() -> GenerateAVDDeviceHostvar:
     gen = GenerateAVDDeviceHostvar.__new__(GenerateAVDDeviceHostvar)
     gen.client = AsyncMock()
     return gen
+
+
+def _named_peer(name: str) -> SimpleNamespace:
+    return SimpleNamespace(name=_attr(name))
 
 
 def _base_hostvars(
@@ -28,6 +41,8 @@ def _base_hostvars(
     *,
     rack_info: dict | None = None,
     mlag_info: dict | None = None,
+    connected_endpoints: list[dict] | None = None,
+    custom_hostvars: dict | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -59,8 +74,8 @@ def _base_hostvars(
         rack_info=rack_info or {"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"]},
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
-        connected_endpoints=[],
-        custom_hostvars={},
+        connected_endpoints=connected_endpoints or [],
+        custom_hostvars=custom_hostvars or {},
     )
 
 
@@ -287,6 +302,133 @@ def test_mlag_leaf_without_domain_asn_fails() -> None:
         )
 
 
+@pytest.mark.parametrize("value", [None, "", {}, []])
+def test_extract_custom_hostvars_ignores_empty_values(value: object) -> None:
+    assert GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom(value)) == {}
+
+
+def test_extract_custom_hostvars_parses_yaml_string() -> None:
+    hostvars = GenerateAVDDeviceHostvar._extract_custom_hostvars(
+        _custom(
+            """
+            custom_structured_configuration_prefix:
+              - custom
+            nested:
+              enabled: true
+            """
+        )
+    )
+
+    assert hostvars == {
+        "custom_structured_configuration_prefix": ["custom"],
+        "nested": {"enabled": True},
+    }
+
+
+@pytest.mark.parametrize("value", [["invalid"], "invalid"])
+def test_extract_custom_hostvars_rejects_non_mapping_values(value: object) -> None:
+    with pytest.raises(TypeError, match="avd_custom_hostvars must be a mapping"):
+        GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom(value))
+
+
+def test_extract_custom_hostvars_rejects_malformed_yaml_string() -> None:
+    with pytest.raises(yaml.YAMLError):
+        GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom("not: [closed"))
+
+
+def test_merge_custom_hostvars_scope_precedence_and_replacement() -> None:
+    merged = GenerateAVDDeviceHostvar._merge_custom_hostvars(
+        {
+            "fabric_only": True,
+            "scope": "fabric",
+            "nested": {"fabric": True, "winner": "fabric"},
+            "servers": [{"name": "fabric-server"}],
+        },
+        {
+            "pod_only": True,
+            "scope": "pod",
+            "nested": {"pod": True, "winner": "pod"},
+            "servers": [{"name": "pod-server"}],
+        },
+        {
+            "device_only": True,
+            "scope": "device",
+            "nested": {"device": True, "winner": "device"},
+        },
+    )
+
+    assert merged == {
+        "fabric_only": True,
+        "pod_only": True,
+        "device_only": True,
+        "scope": "device",
+        "nested": {"fabric": True, "pod": True, "device": True, "winner": "device"},
+        "servers": [{"name": "pod-server"}],
+    }
+
+
+def test_deep_merge_does_not_mutate_inputs() -> None:
+    base = {"nested": {"keep": True, "replace": "base"}, "items": ["base"]}
+    overlay = {"nested": {"replace": "overlay"}, "items": ["overlay"]}
+
+    merged = GenerateAVDDeviceHostvar._deep_merge(base, overlay)
+
+    assert merged == {"nested": {"keep": True, "replace": "overlay"}, "items": ["overlay"]}
+    assert base == {"nested": {"keep": True, "replace": "base"}, "items": ["base"]}
+    assert overlay == {"nested": {"replace": "overlay"}, "items": ["overlay"]}
+
+
+def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
+    custom_hostvars = {
+        "fabric_name": "custom-fabric",
+        "custom_only": {"enabled": True},
+        "l3leaf": {
+            "defaults": {"platform": "custom-platform"},
+            "nodes": [{"name": "custom-leaf", "id": 999}],
+        },
+        "servers": [{"name": "custom-server"}],
+    }
+
+    hostvars = _base_hostvars([], custom_hostvars=custom_hostvars)
+
+    assert hostvars["fabric_name"] == "Fabric-A"
+    assert hostvars["custom_only"] == {"enabled": True}
+    assert hostvars["l3leaf"]["defaults"] == {"platform": "custom-platform"}
+    assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
+    assert hostvars["l3leaf"]["nodes"][0]["id"] == 3
+    assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
+    assert hostvars["l3leaf"]["nodes"][0]["loopback_ipv4_address"] == "10.0.0.3"
+    assert hostvars["l3leaf"]["nodes"][0]["mgmt_ip"] == "192.168.0.3"
+    assert hostvars["servers"] == [{"name": "custom-server"}]
+    assert custom_hostvars["l3leaf"]["nodes"] == [{"name": "custom-leaf", "id": 999}]
+
+
+def _lag(
+    lacp_mode: str = "active",
+    evpn_ethernet_segment: bool = False,
+    *,
+    name: str | None = None,
+    channel_id: int | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=_attr(name) if name else None,
+        channel_id=_attr(channel_id) if channel_id is not None else None,
+        lacp_mode=_attr(lacp_mode),
+        evpn_ethernet_segment=_attr(evpn_ethernet_segment),
+    )
+
+
+def _multi_switch_adapter() -> dict:
+    return {
+        "switches": ["leaf1", "leaf2"],
+        "switch_ports": ["Ethernet1", "Ethernet1"],
+        "endpoint_ports": ["eth1", "eth2"],
+        "mode": "trunk",
+        "vlans": "11,19",
+        "spanning_tree_portfast": "edge",
+    }
+
+
 @pytest.mark.anyio
 async def test_tenants_hostvars_validate_against_pyavd():
     """EVPN tenant payload (incl. l2vlan vni_override) must pass pyAVD validation.
@@ -327,6 +469,119 @@ async def test_tenants_hostvars_validate_against_pyavd():
     assert not validate_inputs(hostvars).validation_result.violations
     # get_avd_facts is where the invalid key surfaced as a hard KeyError pre-fix.
     get_avd_facts({"leaf1": hostvars})
+
+
+@pytest.mark.anyio
+async def test_svi_rack_tags_emit_rack_names() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([_named_peer("Rack-B"), _named_peer("Rack-A")]),
+        avd_tags=_rel([]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["tags"] == ["Rack-A", "Rack-B"]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_svi_avd_tags_emit_tag_names() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([]),
+        avd_tags=_rel([_named_peer("storage"), _named_peer("compute")]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["tags"] == ["compute", "storage"]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+def test_mixed_svi_tags_are_deduplicated_with_rack_names_first() -> None:
+    tags = GenerateAVDDeviceHostvar._build_svi_tags(
+        [_named_peer("shared"), _named_peer("Rack-A"), _named_peer("shared")],
+        [_named_peer("blue"), _named_peer("shared"), _named_peer("blue")],
+    )
+
+    assert tags == ["Rack-A", "shared", "blue"]
+
+
+@pytest.mark.anyio
+async def test_empty_svi_tag_relationships_omit_tags() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([]),
+        avd_tags=_rel([]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert "tags" not in tenants_data[0]["vrfs"][0]["svis"][0]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+def test_rack_avd_tags_emit_node_group_filter_tags() -> None:
+    hostvars = _base_hostvars(
+        [],
+        rack_info={"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"], "avd_tags": ["storage", "compute"]},
+    )
+
+    node_group = hostvars["l3leaf"]["node_groups"][0]
+    assert node_group["filter"] == {"tags": ["compute", "storage"]}
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_rack_avd_tags_are_fetched_by_rack_id() -> None:
+    gen = _make_generator()
+    rack = SimpleNamespace(avd_tags=_rel([_named_peer("storage"), _named_peer("compute")]))
+    gen.client.get = AsyncMock(return_value=rack)
+
+    tags = await gen._fetch_rack_avd_tags("rack-1")
+
+    assert tags == ["compute", "storage"]
+    gen.client.get.assert_awaited_once_with(kind="LocationRack", id="rack-1", include=["avd_tags"])
 
 
 def test_generated_only_p2p_mtu_resolves() -> None:
@@ -389,8 +644,8 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
             "mlag_peer_l3_ipv4_pool": None,
         },
         uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
-        rack_info={"name": "Rack-A", "mlag": False, "leaf_names": ["leaf1"]},
-        mlag_info={"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
+        rack_info={"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"]},
+        mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=[],
         connected_endpoints=[],
         custom_hostvars={},
@@ -399,114 +654,133 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
     assert hostvars["p2p_uplinks_mtu"] == 1500
 
 
-def _role_hostvars(
-    *,
-    role: str,
-    spanning_tree_mode: str | None = "mstp",
-    spanning_tree_priorities: dict[str, int] | None = None,
-    custom_hostvars: dict | None = None,
-) -> dict:
-    hostname = role.replace("_", "-") + "1"
-    return GenerateAVDDeviceHostvar._build_hostvars(
-        hostname=hostname,
-        role=role,
-        bgp_asn=65001,
-        node_id=1,
-        loopback_ip="10.0.0.1",
-        mgmt_ip="192.168.0.1",
-        fabric_name="Fabric-A",
-        mgmt_gateway=None,
-        virtual_router_mac="00:1c:73:00:00:99",
-        underlay_routing_protocol="ebgp",
-        overlay_routing_protocol="ebgp",
-        p2p_uplinks_mtu=9000,
-        spanning_tree_mode=spanning_tree_mode,
-        spanning_tree_priorities=spanning_tree_priorities or {},
-        loopback_ipv4_offset=None,
-        bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
-        management={},
-        pools={
-            "uplink_ipv4_pool": "10.1.0.0/24",
-            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
-            "loopback_ipv4_pool": "10.0.0.0/24",
-            "mlag_peer_ipv4_pool": None,
-            "mlag_peer_l3_ipv4_pool": None,
-        },
-        uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
-        rack_info={"name": "Rack-A", "mlag": False, "leaf_names": [hostname]},
-        mlag_info={"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
+def test_lag_without_evpn_knob_preserves_port_channel_only() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=False), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "active"}
+    assert "ethernet_segment" not in adapter
+
+
+def test_evpn_lag_multi_switch_non_mlag_emits_ethernet_segment() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=False)
+
+    assert adapter["ethernet_segment"] == {"short_esi": "auto"}
+
+
+def test_evpn_lag_with_mlag_active_does_not_emit_ethernet_segment() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=True)
+
+    assert "ethernet_segment" not in adapter
+
+
+def test_evpn_lag_single_switch_does_not_emit_ethernet_segment() -> None:
+    adapter = _multi_switch_adapter()
+    adapter["switches"] = ["leaf1"]
+    adapter["switch_ports"] = ["Ethernet1"]
+    adapter["endpoint_ports"] = ["eth1"]
+
+    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=False)
+
+    assert "ethernet_segment" not in adapter
+
+
+def test_disabled_lacp_mode_maps_to_pyavd_on() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(lacp_mode="disabled"), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "on"}
+
+
+def test_switch_lag_channel_id_is_emitted() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117", channel_id=1117), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "active", "channel_id": 1117}
+
+
+def test_switch_lag_name_only_channel_id_is_parsed() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117"), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "active", "channel_id": 1117}
+
+
+def test_switch_lag_channel_id_name_mismatch_fails() -> None:
+    adapter = _multi_switch_adapter()
+
+    with pytest.raises(ValueError, match="implies channel ID 1117, but channel_id is 42"):
+        apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117", channel_id=42), mlag_active=False)
+
+
+def test_conflicting_switch_lag_ids_fail() -> None:
+    server = {"name": "server1", "adapters": []}
+    groups: dict[tuple[str, int], dict] = {}
+
+    with pytest.raises(ValueError, match="Conflicting switch LAG channel ID"):
+        _add_switch_lag_adapter(
+            server,
+            groups,
+            server_name="server1",
+            switch_lag_node=_lag(name="Port-Channel1117", channel_id=1117),
+            endpoint_lag_node=None,
+            links=[
+                {
+                    "endpoint_port": "Ethernet1",
+                    "switch_port": "Ethernet1/1/17",
+                    "switch": "leaf1",
+                    "switch_lag": _lag(name="Port-Channel42", channel_id=42),
+                    "vlan": ((11,), None),
+                }
+            ],
+        )
+
+
+def test_conflicting_switch_lag_vlans_fail() -> None:
+    server = {"name": "server1", "adapters": []}
+    groups: dict[tuple[str, int], dict] = {}
+
+    with pytest.raises(ValueError, match="Conflicting VLANs"):
+        _add_switch_lag_adapter(
+            server,
+            groups,
+            server_name="server1",
+            switch_lag_node=_lag(name="Port-Channel1117", channel_id=1117),
+            endpoint_lag_node=None,
+            links=[
+                {
+                    "endpoint_port": "Ethernet1",
+                    "switch_port": "Ethernet1/1/17",
+                    "switch": "leaf1",
+                    "switch_lag": _lag(name="Port-Channel1117", channel_id=1117),
+                    "vlan": ((11,), None),
+                },
+                {
+                    "endpoint_port": "Ethernet2",
+                    "switch_port": "Ethernet1/1/17",
+                    "switch": "leaf2",
+                    "switch_lag": _lag(name="Port-Channel1117", channel_id=1117),
+                    "vlan": ((12,), None),
+                },
+            ],
+        )
+
+
+def test_server_lag_evpn_hostvars_validate_against_pyavd() -> None:
+    adapter = _multi_switch_adapter()
+    apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117", evpn_ethernet_segment=True), mlag_active=False)
+
+    hostvars = _base_hostvars(
         tenants_data=[],
-        connected_endpoints=[],
-        custom_hostvars=custom_hostvars or {},
+        connected_endpoints=[{"name": "server1", "adapters": [adapter]}],
     )
 
-
-def test_spanning_tree_mode_uses_avd_63_settings_key() -> None:
-    hostvars = _role_hostvars(role="leaf", spanning_tree_mode="mstp")
-
-    assert hostvars["spanning_tree_settings"] == {"mode": "mstp"}
-    assert "spanning_tree_mode" not in hostvars
-
-
-def test_spanning_tree_none_mode_is_emitted_as_settings() -> None:
-    hostvars = _role_hostvars(role="leaf", spanning_tree_mode="none")
-
-    assert hostvars["spanning_tree_settings"] == {"mode": "none"}
-
-
-def test_spanning_tree_legacy_top_level_and_structured_config_are_absent() -> None:
-    hostvars = _role_hostvars(role="leaf", spanning_tree_priorities={"leaf": 8192})
-
-    assert "spanning_tree_mode" not in hostvars
-    assert "spanning_tree_priority" not in hostvars
-    assert "structured_config" not in hostvars["l3leaf"]["nodes"][0]
-
-
-@pytest.mark.parametrize(
-    ("role", "node_type_key", "priority"),
-    [
-        ("super_spine", "super_spine", 4096),
-        ("spine", "spine", 4096),
-        ("leaf", "l3leaf", 8192),
-        ("l2leaf", "l2leaf", 12288),
-    ],
-)
-def test_spanning_tree_priority_is_emitted_under_role_defaults(role: str, node_type_key: str, priority: int) -> None:
-    hostvars = _role_hostvars(role=role, spanning_tree_priorities={role: priority})
-
-    assert hostvars[node_type_key]["defaults"]["spanning_tree_priority"] == priority
     assert not validate_inputs(hostvars).validation_result.violations
-
-
-def test_missing_spanning_tree_priority_lets_pyavd_defaults_apply() -> None:
-    hostvars = _role_hostvars(role="leaf", spanning_tree_priorities={})
-
-    assert "defaults" not in hostvars["l3leaf"] or "spanning_tree_priority" not in hostvars["l3leaf"]["defaults"]
-    assert not validate_inputs(hostvars).validation_result.violations
-
-
-def test_custom_hostvars_overlay_can_override_spanning_tree_defaults() -> None:
-    hostvars = _role_hostvars(
-        role="leaf",
-        spanning_tree_priorities={"leaf": 8192},
-        custom_hostvars={
-            "spanning_tree_settings": {"mode": "rapid-pvst"},
-            "l3leaf": {"defaults": {"spanning_tree_priority": 4096}},
-        },
-    )
-
-    assert hostvars["spanning_tree_settings"] == {"mode": "rapid-pvst"}
-    assert hostvars["l3leaf"]["defaults"]["spanning_tree_priority"] == 4096
-
-
-def test_pyavd_63_smoke_builds_facts_and_structured_config() -> None:
-    hostvars = _role_hostvars(role="leaf", spanning_tree_priorities={"leaf": 8192})
-    inputs = {"leaf1": hostvars}
-
-    facts = get_avd_facts(inputs)
-    structured_config = get_device_structured_config(hostname="leaf1", inputs=hostvars, avd_facts=facts)
-    structured_config_dict = (
-        structured_config._as_dict() if hasattr(structured_config, "_as_dict") else structured_config
-    )
-
-    assert structured_config_dict["hostname"] == "leaf1"

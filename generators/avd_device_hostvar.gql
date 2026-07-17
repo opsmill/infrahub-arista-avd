@@ -20,6 +20,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
         node_id {
           value
         }
+        avd_custom_hostvars {
+          value
+        }
         loopback_ip {
           node {
             __typename
@@ -119,6 +122,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
               }
             }
             loopback_ipv4_offset {
+              value
+            }
+            avd_custom_hostvars {
               value
             }
             parent {
@@ -287,6 +293,26 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                     }
                   }
                 }
+                lag {
+                  node {
+                    __typename
+                    id
+                    name {
+                      value
+                    }
+                    ... on InterfaceLag {
+                      channel_id {
+                        value
+                      }
+                      lacp_mode {
+                        value
+                      }
+                      evpn_ethernet_segment {
+                        value
+                      }
+                    }
+                  }
+                }
                 connector {
                   node {
                     __typename
@@ -327,8 +353,105 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                   value
                                 }
                                 ... on InterfaceLag {
+                                  channel_id {
+                                    value
+                                  }
                                   lacp_mode {
                                     value
+                                  }
+                                  evpn_ethernet_segment {
+                                    value
+                                  }
+                                  lag_members {
+                                    edges {
+                                      node {
+                                        __typename
+                                        id
+                                        name {
+                                          value
+                                        }
+                                        connector {
+                                          node {
+                                            __typename
+                                            id
+                                            connected_endpoints {
+                                              edges {
+                                                node {
+                                                  __typename
+                                                  id
+                                                  ... on InterfacePhysical {
+                                                    name {
+                                                      value
+                                                    }
+                                                    role {
+                                                      value
+                                                    }
+                                                    lag {
+                                                      node {
+                                                        __typename
+                                                        id
+                                                        name {
+                                                          value
+                                                        }
+                                                        ... on InterfaceLag {
+                                                          channel_id {
+                                                            value
+                                                          }
+                                                          lacp_mode {
+                                                            value
+                                                          }
+                                                          evpn_ethernet_segment {
+                                                            value
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    tagged_vlan {
+                                                      edges {
+                                                        node {
+                                                          __typename
+                                                          vlan_id {
+                                                            value
+                                                          }
+                                                          status {
+                                                            value
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    untagged_vlan {
+                                                      node {
+                                                        __typename
+                                                        vlan_id {
+                                                          value
+                                                        }
+                                                        status {
+                                                          value
+                                                        }
+                                                      }
+                                                    }
+                                                    device {
+                                                      node {
+                                                        __typename
+                                                        id
+                                                        name {
+                                                          value
+                                                        }
+                                                        ... on DcimDevice {
+                                                          role {
+                                                            value
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
                                   }
                                 }
                               }

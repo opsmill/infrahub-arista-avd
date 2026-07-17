@@ -154,7 +154,7 @@ extensions:
           label: AVD Custom Hostvars
           kind: JSON
           optional: true
-          description: "pyAVD hostvars merged into every device in this fabric"
+          description: "Fabric-scope custom pyAVD hostvars; generated values take precedence."
           order_weight: 11400
       relationships:
         - name: uplink_pool
@@ -229,6 +229,12 @@ extensions:
           default_value: 0
           description: "Offset for leaf loopback IDs to avoid overlap with spines"
           order_weight: 9000
+        - name: avd_custom_hostvars
+          label: AVD Custom Hostvars
+          kind: JSON
+          optional: true
+          description: "Pod-scope custom pyAVD hostvars; generated values take precedence."
+          order_weight: 9100
       relationships:
         - name: mlag_peer_pool
           label: MLAG Peer Pool
