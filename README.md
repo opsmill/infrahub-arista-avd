@@ -27,7 +27,7 @@ The full pipeline, from a high-level fabric design to versioned, deployable conf
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python package manager)
 - Python 3.11+
-- PyAVD ≥ 6.2.0 (bundled in the custom Docker image — no separate install required)
+- pyAVD >= 6.3.0, < 6.4.0 (bundled in the custom Docker image -- no separate install required)
 
 ## Quick Start
 

@@ -4,6 +4,51 @@
 # fabric, pod, MLAG domain, VRF, and device nodes.
 version: "1.0"
 
+nodes:
+  - name: SpanningTreePriority
+    namespace: Network
+    description: "Fabric spanning-tree priority for one AVD node role"
+    label: Spanning Tree Priority
+    include_in_menu: false
+    human_friendly_id:
+      - fabric__name__value
+      - role__value
+    order_by:
+      - fabric__name__value
+      - role__value
+    display_label: role__value
+    uniqueness_constraints:
+      - [fabric, role__value]
+    attributes:
+      - name: role
+        kind: Dropdown
+        choices:
+          - name: super_spine
+            label: Super Spine
+            color: "#A9CCE3"
+          - name: spine
+            label: Spine
+            color: "#A9DFBF"
+          - name: leaf
+            label: Leaf
+            color: "#D2B4DE"
+          - name: l2leaf
+            label: L2 Leaf
+            color: "#F9E79F"
+        order_weight: 1000
+      - name: priority
+        kind: Number
+        description: "STP priority for this role (must be a multiple of 4096)"
+        order_weight: 1100
+    relationships:
+      - name: fabric
+        peer: NetworkFabric
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: "fabric__spanning_tree_priorities"
+        order_weight: 1200
+
 extensions:
   nodes:
     # --- NetworkFabric: L3LS fabric-wide settings ---
@@ -69,12 +114,16 @@ extensions:
               label: Rapid PVST+
               description: "Rapid Per-VLAN Spanning Tree Plus"
               color: "#D2B4DE"
+            - name: none
+              label: None
+              description: "Disable spanning tree"
+              color: "#F5B7B1"
           order_weight: 10400
         - name: spanning_tree_priority
           label: Spanning Tree Priority
           kind: Number
           optional: true
-          description: "STP priority (must be multiple of 4096, e.g. 4096, 8192, 16384)"
+          description: "Deprecated legacy STP priority. Use spanning-tree priority child objects instead."
           order_weight: 10500
         - name: bgp_evpn_overlay_password
           label: BGP EVPN Overlay Password
@@ -101,6 +150,12 @@ extensions:
           default_value: false
           description: "Generate ANTA test catalogs for this fabric's devices."
           order_weight: 11300
+        - name: avd_custom_hostvars
+          label: AVD Custom Hostvars
+          kind: JSON
+          optional: true
+          description: "Fabric-scope custom pyAVD hostvars; generated values take precedence."
+          order_weight: 11400
       relationships:
         - name: uplink_pool
           label: Uplink IP Pool
@@ -154,6 +209,15 @@ extensions:
           optional: true
           description: "Local user accounts for devices in this fabric"
           order_weight: 12200
+        - name: spanning_tree_priorities
+          label: Spanning Tree Priorities
+          peer: NetworkSpanningTreePriority
+          kind: Component
+          cardinality: many
+          optional: true
+          identifier: "fabric__spanning_tree_priorities"
+          description: "Role-specific spanning-tree priorities for AVD node type defaults"
+          order_weight: 12300
 
     # --- NetworkPod: MLAG IP pool relationships + loopback offset ---
     - kind: NetworkPod
@@ -165,6 +229,12 @@ extensions:
           default_value: 0
           description: "Offset for leaf loopback IDs to avoid overlap with spines"
           order_weight: 9000
+        - name: avd_custom_hostvars
+          label: AVD Custom Hostvars
+          kind: JSON
+          optional: true
+          description: "Pod-scope custom pyAVD hostvars; generated values take precedence."
+          order_weight: 9100
       relationships:
         - name: mlag_peer_pool
           label: MLAG Peer Pool

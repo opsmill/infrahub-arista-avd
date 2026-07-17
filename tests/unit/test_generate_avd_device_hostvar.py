@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+import yaml
 from pyavd import get_avd_facts, validate_inputs
 
 from generators.generate_avd_device_hostvar import (
@@ -21,10 +22,18 @@ def _rel(peers: list[object]) -> SimpleNamespace:
     return SimpleNamespace(fetch=AsyncMock(), peers=[SimpleNamespace(peer=p) for p in peers])
 
 
+def _custom(value: object) -> SimpleNamespace:
+    return SimpleNamespace(avd_custom_hostvars=_attr(value))
+
+
 def _make_generator() -> GenerateAVDDeviceHostvar:
     gen = GenerateAVDDeviceHostvar.__new__(GenerateAVDDeviceHostvar)
     gen.client = AsyncMock()
     return gen
+
+
+def _named_peer(name: str) -> SimpleNamespace:
+    return SimpleNamespace(name=_attr(name))
 
 
 def _base_hostvars(
@@ -33,6 +42,7 @@ def _base_hostvars(
     rack_info: dict | None = None,
     mlag_info: dict | None = None,
     connected_endpoints: list[dict] | None = None,
+    custom_hostvars: dict | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -49,7 +59,7 @@ def _base_hostvars(
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -65,6 +75,7 @@ def _base_hostvars(
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
         connected_endpoints=connected_endpoints or [],
+        custom_hostvars=custom_hostvars or {},
     )
 
 
@@ -165,7 +176,7 @@ def _leaf_hostvars(
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -181,6 +192,7 @@ def _leaf_hostvars(
         mlag_info=mlag_info,
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -238,7 +250,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         overlay_routing_protocol="ebgp",
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
-        spanning_tree_priority=4096,
+        spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -260,6 +272,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         },
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
 
@@ -287,6 +300,107 @@ def test_mlag_leaf_without_domain_asn_fails() -> None:
                 "peer_names": ["leaf1", "leaf2"],
             },
         )
+
+
+@pytest.mark.parametrize("value", [None, "", {}, []])
+def test_extract_custom_hostvars_ignores_empty_values(value: object) -> None:
+    assert GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom(value)) == {}
+
+
+def test_extract_custom_hostvars_parses_yaml_string() -> None:
+    hostvars = GenerateAVDDeviceHostvar._extract_custom_hostvars(
+        _custom(
+            """
+            custom_structured_configuration_prefix:
+              - custom
+            nested:
+              enabled: true
+            """
+        )
+    )
+
+    assert hostvars == {
+        "custom_structured_configuration_prefix": ["custom"],
+        "nested": {"enabled": True},
+    }
+
+
+@pytest.mark.parametrize("value", [["invalid"], "invalid"])
+def test_extract_custom_hostvars_rejects_non_mapping_values(value: object) -> None:
+    with pytest.raises(TypeError, match="avd_custom_hostvars must be a mapping"):
+        GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom(value))
+
+
+def test_extract_custom_hostvars_rejects_malformed_yaml_string() -> None:
+    with pytest.raises(yaml.YAMLError):
+        GenerateAVDDeviceHostvar._extract_custom_hostvars(_custom("not: [closed"))
+
+
+def test_merge_custom_hostvars_scope_precedence_and_replacement() -> None:
+    merged = GenerateAVDDeviceHostvar._merge_custom_hostvars(
+        {
+            "fabric_only": True,
+            "scope": "fabric",
+            "nested": {"fabric": True, "winner": "fabric"},
+            "servers": [{"name": "fabric-server"}],
+        },
+        {
+            "pod_only": True,
+            "scope": "pod",
+            "nested": {"pod": True, "winner": "pod"},
+            "servers": [{"name": "pod-server"}],
+        },
+        {
+            "device_only": True,
+            "scope": "device",
+            "nested": {"device": True, "winner": "device"},
+        },
+    )
+
+    assert merged == {
+        "fabric_only": True,
+        "pod_only": True,
+        "device_only": True,
+        "scope": "device",
+        "nested": {"fabric": True, "pod": True, "device": True, "winner": "device"},
+        "servers": [{"name": "pod-server"}],
+    }
+
+
+def test_deep_merge_does_not_mutate_inputs() -> None:
+    base = {"nested": {"keep": True, "replace": "base"}, "items": ["base"]}
+    overlay = {"nested": {"replace": "overlay"}, "items": ["overlay"]}
+
+    merged = GenerateAVDDeviceHostvar._deep_merge(base, overlay)
+
+    assert merged == {"nested": {"keep": True, "replace": "overlay"}, "items": ["overlay"]}
+    assert base == {"nested": {"keep": True, "replace": "base"}, "items": ["base"]}
+    assert overlay == {"nested": {"replace": "overlay"}, "items": ["overlay"]}
+
+
+def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
+    custom_hostvars = {
+        "fabric_name": "custom-fabric",
+        "custom_only": {"enabled": True},
+        "l3leaf": {
+            "defaults": {"platform": "custom-platform"},
+            "nodes": [{"name": "custom-leaf", "id": 999}],
+        },
+        "servers": [{"name": "custom-server"}],
+    }
+
+    hostvars = _base_hostvars([], custom_hostvars=custom_hostvars)
+
+    assert hostvars["fabric_name"] == "Fabric-A"
+    assert hostvars["custom_only"] == {"enabled": True}
+    assert hostvars["l3leaf"]["defaults"] == {"platform": "custom-platform"}
+    assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
+    assert hostvars["l3leaf"]["nodes"][0]["id"] == 3
+    assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
+    assert hostvars["l3leaf"]["nodes"][0]["loopback_ipv4_address"] == "10.0.0.3"
+    assert hostvars["l3leaf"]["nodes"][0]["mgmt_ip"] == "192.168.0.3"
+    assert hostvars["servers"] == [{"name": "custom-server"}]
+    assert custom_hostvars["l3leaf"]["nodes"] == [{"name": "custom-leaf", "id": 999}]
 
 
 def _lag(
@@ -319,7 +433,7 @@ def _multi_switch_adapter() -> dict:
 async def test_tenants_hostvars_validate_against_pyavd():
     """EVPN tenant payload (incl. l2vlan vni_override) must pass pyAVD validation.
 
-    Regression guard for the AVD 6.2 upgrade, which renamed the l2vlan key to
+    Regression guard for the AVD 6.3 target, which expects the l2vlan key to be
     `vni_override` and rejects the old `vni` key with an invalid-key error.
     """
     svi = SimpleNamespace(
@@ -355,6 +469,119 @@ async def test_tenants_hostvars_validate_against_pyavd():
     assert not validate_inputs(hostvars).validation_result.violations
     # get_avd_facts is where the invalid key surfaced as a hard KeyError pre-fix.
     get_avd_facts({"leaf1": hostvars})
+
+
+@pytest.mark.anyio
+async def test_svi_rack_tags_emit_rack_names() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([_named_peer("Rack-B"), _named_peer("Rack-A")]),
+        avd_tags=_rel([]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["tags"] == ["Rack-A", "Rack-B"]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_svi_avd_tags_emit_tag_names() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([]),
+        avd_tags=_rel([_named_peer("storage"), _named_peer("compute")]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["tags"] == ["compute", "storage"]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+def test_mixed_svi_tags_are_deduplicated_with_rack_names_first() -> None:
+    tags = GenerateAVDDeviceHostvar._build_svi_tags(
+        [_named_peer("shared"), _named_peer("Rack-A"), _named_peer("shared")],
+        [_named_peer("blue"), _named_peer("shared"), _named_peer("blue")],
+    )
+
+    assert tags == ["Rack-A", "shared", "blue"]
+
+
+@pytest.mark.anyio
+async def test_empty_svi_tag_relationships_omit_tags() -> None:
+    svi = SimpleNamespace(
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([]),
+        avd_tags=_rel([]),
+    )
+    vrf = SimpleNamespace(
+        name=_attr("VRF1"),
+        vrf_vni=_attr(None),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    tenant = SimpleNamespace(name=_attr("T1"), mac_vrf_vni_base=_attr(10000), vrfs=_rel([vrf]), l2vlans=_rel([]))
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert "tags" not in tenants_data[0]["vrfs"][0]["svis"][0]
+    assert not validate_inputs(_base_hostvars(tenants_data)).validation_result.violations
+
+
+def test_rack_avd_tags_emit_node_group_filter_tags() -> None:
+    hostvars = _base_hostvars(
+        [],
+        rack_info={"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"], "avd_tags": ["storage", "compute"]},
+    )
+
+    node_group = hostvars["l3leaf"]["node_groups"][0]
+    assert node_group["filter"] == {"tags": ["compute", "storage"]}
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_rack_avd_tags_are_fetched_by_rack_id() -> None:
+    gen = _make_generator()
+    rack = SimpleNamespace(avd_tags=_rel([_named_peer("storage"), _named_peer("compute")]))
+    gen.client.get = AsyncMock(return_value=rack)
+
+    tags = await gen._fetch_rack_avd_tags("rack-1")
+
+    assert tags == ["compute", "storage"]
+    gen.client.get.assert_awaited_once_with(kind="LocationRack", id="rack-1", include=["avd_tags"])
 
 
 def test_generated_only_p2p_mtu_resolves() -> None:
@@ -405,7 +632,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         overlay_routing_protocol=None,
         p2p_uplinks_mtu=p2p_uplinks_mtu,
         spanning_tree_mode=None,
-        spanning_tree_priority=None,
+        spanning_tree_priorities={},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
@@ -421,6 +648,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         mlag_info={"domain_id": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=[],
         connected_endpoints=[],
+        custom_hostvars={},
     )
 
     assert hostvars["p2p_uplinks_mtu"] == 1500

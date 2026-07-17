@@ -41,6 +41,11 @@ extensions:
           label: Node ID
           kind: Number
           optional: true
+        - name: avd_custom_hostvars
+          label: AVD Custom Hostvars
+          kind: JSON
+          optional: true
+          description: "Device-scope custom pyAVD hostvars; generated values take precedence."
       relationships:
         - name: loopback_ip
           peer: IpamIPAddress

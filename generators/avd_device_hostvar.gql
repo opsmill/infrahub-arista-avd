@@ -20,6 +20,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
         node_id {
           value
         }
+        avd_custom_hostvars {
+          value
+        }
         loopback_ip {
           node {
             __typename
@@ -121,6 +124,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             loopback_ipv4_offset {
               value
             }
+            avd_custom_hostvars {
+              value
+            }
             parent {
               node {
                 __typename
@@ -183,8 +189,17 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   spanning_tree_mode {
                     value
                   }
-                  spanning_tree_priority {
-                    value
+                  spanning_tree_priorities {
+                    edges {
+                      node {
+                        role {
+                          value
+                        }
+                        priority {
+                          value
+                        }
+                      }
+                    }
                   }
                   bgp_evpn_overlay_password {
                     value
@@ -193,6 +208,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                     value
                   }
                   bgp_mlag_password {
+                    value
+                  }
+                  avd_custom_hostvars {
                     value
                   }
                   dns_servers {

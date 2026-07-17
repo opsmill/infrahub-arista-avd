@@ -4,8 +4,10 @@ import hashlib
 import logging
 import operator
 import re
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, TypedDict
 
+import yaml
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
@@ -41,6 +43,7 @@ class RackInfo(TypedDict):
     name: str | None
     mlag: bool | None
     leaf_names: list[str]
+    avd_tags: list[str]
 
 
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
@@ -628,6 +631,48 @@ def extract_connected_endpoints(  # noqa: C901
 
 
 class GenerateAVDDeviceHostvar(InfrahubGenerator):
+    @staticmethod
+    def _peer_name(peer: object) -> str | None:
+        name = getattr(peer, "name", None)
+        if not name:
+            return None
+        return name.value
+
+    @classmethod
+    def _build_svi_tags(cls, rack_tag_peers: list[object], avd_tag_peers: list[object]) -> list[str]:
+        rack_tags = sorted({name for peer in rack_tag_peers if (name := cls._peer_name(peer))})
+        rack_tag_set = set(rack_tags)
+        avd_tags = sorted(
+            {name for peer in avd_tag_peers if (name := cls._peer_name(peer)) and name not in rack_tag_set}
+        )
+        return [*rack_tags, *avd_tags]
+
+    @classmethod
+    async def _fetch_relationship_peers(cls, obj: object, relationship_name: str) -> list[object]:
+        relationship = getattr(obj, relationship_name, None)
+        if relationship is None:
+            return []
+
+        await relationship.fetch()
+        return [peer.peer for peer in getattr(relationship, "peers", [])]
+
+    @classmethod
+    async def _fetch_relationship_peer_names(cls, obj: object, relationship_name: str) -> list[str]:
+        return sorted(
+            {
+                name
+                for peer in await cls._fetch_relationship_peers(obj, relationship_name)
+                if (name := cls._peer_name(peer))
+            }
+        )
+
+    async def _fetch_rack_avd_tags(self, rack_id: str | None) -> list[str]:
+        if not rack_id:
+            return []
+
+        rack = await self.client.get(kind="LocationRack", id=rack_id, include=["avd_tags"])
+        return await self._fetch_relationship_peer_names(rack, "avd_tags")
+
     async def _build_tenants_hostvars(self, fabric_id: str) -> list[dict[str, Any]]:
         """Build AVD-compatible tenants structure from EVPN data.
 
@@ -679,6 +724,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                     }
                     if svi.ip_address_virtual and svi.ip_address_virtual.value:
                         svi_data["ip_address_virtual"] = str(svi.ip_address_virtual.value)
+                    rack_tag_peers = await self._fetch_relationship_peers(svi, "rack_tags")
+                    avd_tag_peers = await self._fetch_relationship_peers(svi, "avd_tags")
+                    svi_tags = self._build_svi_tags(rack_tag_peers, avd_tag_peers)
+                    if svi_tags:
+                        svi_data["tags"] = svi_tags
                     svis_list.append(svi_data)
 
                 if svis_list:
@@ -874,6 +924,40 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return result
 
+    @classmethod
+    def _extract_custom_hostvars(cls, source: object) -> dict[str, Any]:
+        """Parse custom pyAVD hostvars from a GraphQL object."""
+        raw_value = cls._gql_val(source, "avd_custom_hostvars")
+        if raw_value in (None, "", [], {}):
+            return {}
+
+        parsed = yaml.safe_load(raw_value) if isinstance(raw_value, str) else raw_value
+        if parsed in (None, "", [], {}):
+            return {}
+        if not isinstance(parsed, dict):
+            raise TypeError("avd_custom_hostvars must be a mapping")
+        return deepcopy(parsed)
+
+    @classmethod
+    def _deep_merge(cls, base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+        """Recursively merge ``overlay`` over ``base`` without mutating either input."""
+        merged = deepcopy(base)
+        for key, value in overlay.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = cls._deep_merge(merged[key], value)
+            else:
+                merged[key] = deepcopy(value)
+        return merged
+
+    @classmethod
+    def _merge_custom_hostvars(cls, *scopes: dict[str, Any]) -> dict[str, Any]:
+        """Merge custom hostvar scopes in ascending precedence order."""
+        merged: dict[str, Any] = {}
+        for scope in scopes:
+            if scope:
+                merged = cls._deep_merge(merged, scope)
+        return merged
+
     @staticmethod
     def _extract_mlag_info(device: object) -> dict[str, Any]:
         """Extract MLAG domain info for a device, including peer names."""
@@ -908,7 +992,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         """Extract rack grouping data for leaf node_groups."""
         device_rack = getattr(device, "rack", None)
         if not device_rack or not device_rack.node:
-            return {"name": None, "mlag": None, "leaf_names": []}
+            return {"name": None, "mlag": None, "leaf_names": [], "avd_tags": []}
 
         rack = device_rack.node
         rack_name = rack.name.value if getattr(rack, "name", None) else None
@@ -926,7 +1010,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                     continue
                 leaf_names.append(node.name.value)
 
-        return {"name": rack_name, "mlag": rack_mlag, "leaf_names": sorted(leaf_names)}
+        return {"name": rack_name, "mlag": rack_mlag, "leaf_names": sorted(leaf_names), "avd_tags": []}
 
     @staticmethod
     def _build_hostvars(  # noqa: C901 — assembles the full AVD hostvars payload
@@ -944,7 +1028,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         overlay_routing_protocol: str | None,
         p2p_uplinks_mtu: int | None,
         spanning_tree_mode: str | None,
-        spanning_tree_priority: int | None,
+        spanning_tree_priorities: dict[str, int],
         loopback_ipv4_offset: int | None,
         bgp_passwords: dict[str, str | None],
         management: dict[str, Any],
@@ -954,6 +1038,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
+        custom_hostvars: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
         avd_type = get_avd_type(role)
@@ -1009,9 +1094,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if p2p_uplinks_mtu is not None:
             hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
         if spanning_tree_mode:
-            hostvars["spanning_tree_mode"] = spanning_tree_mode
-        if spanning_tree_priority is not None:
-            hostvars["spanning_tree_priority"] = spanning_tree_priority
+            hostvars["spanning_tree_settings"] = {"mode": spanning_tree_mode}
+
+        role_priority = spanning_tree_priorities.get(role)
+        if role_priority is not None:
+            hostvars.setdefault(node_type_key, {})
+            hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
+            hostvars[node_type_key]["defaults"]["spanning_tree_priority"] = role_priority
 
         # Loopback offset for leaf devices
         if loopback_ipv4_offset is not None and role == "leaf":
@@ -1053,6 +1142,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         # non-MLAG rack groups every rack leaf together and disables MLAG at the
         # node-group level rather than in l3leaf.defaults.
         if role == "leaf":
+            avd_tags = sorted(dict.fromkeys(rack_info.get("avd_tags", [])))
             if mlag_info["domain_id"]:
                 mlag_bgp_asn = mlag_info.get("bgp_asn")
                 if mlag_bgp_asn is None:
@@ -1068,6 +1158,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
                 if effective_vrmac:
                     node_group["virtual_router_mac_address"] = effective_vrmac
+                if avd_tags:
+                    node_group["filter"] = {"tags": avd_tags}
                 hostvars[node_type_key]["node_groups"] = [node_group]
             else:
                 rack_name = rack_info.get("name")
@@ -1077,6 +1169,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                         "group": rack_name,
                         "nodes": [{"name": leaf_name} for leaf_name in leaf_names],
                     }
+                    if avd_tags:
+                        node_group["filter"] = {"tags": avd_tags}
                     if rack_info.get("mlag") is False:
                         node_group["mlag"] = False
                     hostvars[node_type_key]["node_groups"] = [node_group]
@@ -1085,6 +1179,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars["tenants"] = tenants_data
         if connected_endpoints:
             hostvars["servers"] = connected_endpoints
+
+        if custom_hostvars:
+            hostvars = GenerateAVDDeviceHostvar._deep_merge(custom_hostvars, hostvars)
 
         return hostvars
 
@@ -1144,7 +1241,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             None if is_l2leaf else self._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu")
         )
         spanning_tree_mode = self._get_attr_value(fabric, "spanning_tree_mode")
-        spanning_tree_priority = self._get_attr_value(fabric, "spanning_tree_priority")
+        spanning_tree_priorities: dict[str, int] = {}
+        spanning_tree_priority_edges = getattr(getattr(fabric, "spanning_tree_priorities", None), "edges", None) or []
+        for edge in spanning_tree_priority_edges:
+            priority_node = edge.node
+            if not priority_node:
+                continue
+            priority_role = self._get_attr_value(priority_node, "role")
+            priority_value = self._get_attr_value(priority_node, "priority")
+            if priority_role and priority_value is not None:
+                spanning_tree_priorities[priority_role] = priority_value
         # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
         loopback_ipv4_offset = (
             None if is_l2leaf else self._get_first_attr_value(pod, "loopback_ipv_4_offset", "loopback_ipv4_offset")
@@ -1161,6 +1267,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract management settings from fabric (applies to all device types)
         management = self._extract_management_settings(fabric)
+        custom_hostvars = self._merge_custom_hostvars(
+            self._extract_custom_hostvars(fabric),
+            self._extract_custom_hostvars(pod),
+            self._extract_custom_hostvars(device),
+        )
 
         # Extract configurable IP pools (not applicable for L2 leafs)
         if is_l2leaf:
@@ -1179,6 +1290,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any] = {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []}
         if not is_l2leaf:
             rack_info = self._extract_rack_info(device)
+            rack_info["avd_tags"] = await self._fetch_rack_avd_tags(device.rack.node.id if device.rack.node else None)
             mlag_info = self._extract_mlag_info(device)
             # Extract mlag_peer interface names for AVD mlag_interfaces
             if mlag_info["domain_id"] and iface_edges:
@@ -1216,7 +1328,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             overlay_routing_protocol=overlay_routing_protocol,
             p2p_uplinks_mtu=p2p_uplinks_mtu,
             spanning_tree_mode=spanning_tree_mode,
-            spanning_tree_priority=spanning_tree_priority,
+            spanning_tree_priorities=spanning_tree_priorities,
             loopback_ipv4_offset=loopback_ipv4_offset,
             bgp_passwords=bgp_passwords,
             management=management,
@@ -1226,6 +1338,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
+            custom_hostvars=custom_hostvars,
         )
 
         # Validate hostvars against pyAVD schema before saving

@@ -39,7 +39,12 @@ def _fetch_fabric_topology(client: InfrahubClient, fabric_name: str, branch: str
           overlay_routing_protocol { value }
           p2p_uplinks_mtu { value }
           spanning_tree_mode { value }
-          spanning_tree_priority { value }
+          spanning_tree_priorities {
+            edges { node {
+              role { value }
+              priority { value }
+            } }
+          }
           amount_of_super_spines { value }
           children {
             edges { node {
@@ -561,9 +566,16 @@ def _render_fabric_settings(data: dict[str, Any]) -> None:
             st.markdown(f"**{k}:** `{v}`")
 
     with col2:
+        stp_priorities = []
+        for edge in fabric.get("spanning_tree_priorities", {}).get("edges", []):
+            node = edge.get("node") or {}
+            role = node.get("role", {}).get("value")
+            priority = node.get("priority", {}).get("value")
+            if role and priority is not None:
+                stp_priorities.append(f"{role}: {priority}")
         settings = {
             "Spanning Tree Mode": fabric.get("spanning_tree_mode", {}).get("value", "—"),
-            "Spanning Tree Priority": fabric.get("spanning_tree_priority", {}).get("value", "—"),
+            "Spanning Tree Priorities": ", ".join(sorted(stp_priorities)) or "—",
         }
         for k, v in settings.items():
             st.markdown(f"**{k}:** `{v}`")

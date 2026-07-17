@@ -23,7 +23,14 @@ spec:
       loopback_pool: "Fabric-A-Loopback-Pool"
       # STP settings
       spanning_tree_mode: "mstp"
-      spanning_tree_priority: 4096
+      spanning_tree_priorities:
+        data:
+          - role: spine
+            priority: 4096
+          - role: leaf
+            priority: 8192
+          - role: l2leaf
+            priority: 12288
       # BGP peer group passwords
       bgp_evpn_overlay_password: "$6$evpn_overlay$examplehash"
       bgp_underlay_password: "$6$underlay$examplehash"
@@ -79,7 +86,14 @@ spec:
       loopback_pool: "Fabric-B-Loopback-Pool"
       # STP settings
       spanning_tree_mode: "mstp"
-      spanning_tree_priority: 4096
+      spanning_tree_priorities:
+        data:
+          - role: spine
+            priority: 4096
+          - role: leaf
+            priority: 8192
+          - role: l2leaf
+            priority: 12288
       # BGP peer group passwords
       bgp_evpn_overlay_password: "$6$evpn_overlay$examplehash"
       bgp_underlay_password: "$6$underlay$examplehash"
