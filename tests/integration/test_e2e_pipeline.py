@@ -659,10 +659,14 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
         for edge in resp["NetworkLink"]["edges"]
         if server_name in edge["node"]["name"]["value"]
     ]
-    server_physical_lags = {
-        iface["name"]["value"]: iface.get("lag", {}).get("node", {}).get("name", {}).get("value")
-        for iface in physical_interfaces
-    }
+    server_physical_lags = {}
+    server_connected_count = 0
+    for iface in physical_interfaces:
+        lag_node = (iface.get("lag") or {}).get("node") or {}
+        connector_node = (iface.get("connector") or {}).get("node") or {}
+        server_physical_lags[iface["name"]["value"]] = (lag_node.get("name") or {}).get("value")
+        if connector_node:
+            server_connected_count += 1
     server_bond_members = sorted(
         member_edge["node"]["name"]["value"] for bond in server_bonds for member_edge in bond["lag_members"]["edges"]
     )
@@ -679,7 +683,7 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
     return {
         "server_link_count": len(server_links),
         "server_physical_count": len(physical_interfaces),
-        "server_connected_count": sum(1 for iface in physical_interfaces if iface.get("connector", {}).get("node")),
+        "server_connected_count": server_connected_count,
         "server_physical_lags": server_physical_lags,
         "server_bond_count": len(server_bonds),
         "server_bond_members": server_bond_members,
