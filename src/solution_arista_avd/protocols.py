@@ -1933,4 +1933,3 @@ class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTem
     subscriber_of_groups: RelationshipManager[CoreGroup]
     subscriber_of_groups_for_instances: RelationshipManager[CoreGroup]
     vcpu_from_resource_pool: RelationshipAttribute[CoreNumberPool]
-

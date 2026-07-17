@@ -4,8 +4,10 @@ import hashlib
 import logging
 import operator
 import re
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, TypedDict
 
+import yaml
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
@@ -238,8 +240,7 @@ def _lag_channel_id(lag_node: object | None, *, require_port_channel_name: bool)
     channel_id = int(channel_id)
     if parsed_channel_id is not None and parsed_channel_id != channel_id:
         raise ValueError(
-            f"Switch LAG name '{lag_name}' implies channel ID {parsed_channel_id}, "
-            f"but channel_id is {channel_id}"
+            f"Switch LAG name '{lag_name}' implies channel ID {parsed_channel_id}, but channel_id is {channel_id}"
         )
     if require_port_channel_name and parsed_channel_id is None:
         raise ValueError(f"Switch LAG with channel_id {channel_id} must be named Port-Channel{channel_id}")
@@ -448,8 +449,7 @@ def _add_switch_lag_adapter(
         link_channel_id = _lag_channel_id(link_lag, require_port_channel_name=True)
         if link_channel_id != channel_id:
             raise ValueError(
-                f"Conflicting switch LAG channel ID for server '{server_name}': "
-                f"{channel_id} != {link_channel_id}"
+                f"Conflicting switch LAG channel ID for server '{server_name}': {channel_id} != {link_channel_id}"
             )
         for field in ("lacp_mode", "evpn_ethernet_segment"):
             link_value = _value(link_lag, field)
@@ -876,6 +876,40 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return result
 
+    @classmethod
+    def _extract_custom_hostvars(cls, source: object) -> dict[str, Any]:
+        """Parse custom pyAVD hostvars from a GraphQL object."""
+        raw_value = cls._gql_val(source, "avd_custom_hostvars")
+        if raw_value in (None, "", [], {}):
+            return {}
+
+        parsed = yaml.safe_load(raw_value) if isinstance(raw_value, str) else raw_value
+        if parsed in (None, "", [], {}):
+            return {}
+        if not isinstance(parsed, dict):
+            raise TypeError("avd_custom_hostvars must be a mapping")
+        return deepcopy(parsed)
+
+    @classmethod
+    def _deep_merge(cls, base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+        """Recursively merge ``overlay`` over ``base`` without mutating either input."""
+        merged = deepcopy(base)
+        for key, value in overlay.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = cls._deep_merge(merged[key], value)
+            else:
+                merged[key] = deepcopy(value)
+        return merged
+
+    @classmethod
+    def _merge_custom_hostvars(cls, *scopes: dict[str, Any]) -> dict[str, Any]:
+        """Merge custom hostvar scopes in ascending precedence order."""
+        merged: dict[str, Any] = {}
+        for scope in scopes:
+            if scope:
+                merged = cls._deep_merge(merged, scope)
+        return merged
+
     @staticmethod
     def _extract_mlag_info(device: object) -> dict[str, Any]:
         """Extract MLAG domain info for a device, including peer names."""
@@ -956,6 +990,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
+        custom_hostvars: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
         avd_type = get_avd_type(role)
@@ -1088,6 +1123,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if connected_endpoints:
             hostvars["servers"] = connected_endpoints
 
+        if custom_hostvars:
+            hostvars = GenerateAVDDeviceHostvar._deep_merge(custom_hostvars, hostvars)
+
         return hostvars
 
     async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
@@ -1163,6 +1201,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract management settings from fabric (applies to all device types)
         management = self._extract_management_settings(fabric)
+        custom_hostvars = self._merge_custom_hostvars(
+            self._extract_custom_hostvars(fabric),
+            self._extract_custom_hostvars(pod),
+            self._extract_custom_hostvars(device),
+        )
 
         # Extract configurable IP pools (not applicable for L2 leafs)
         if is_l2leaf:
@@ -1228,6 +1271,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
+            custom_hostvars=custom_hostvars,
         )
 
         # Validate hostvars against pyAVD schema before saving
