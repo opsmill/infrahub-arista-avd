@@ -548,6 +548,7 @@ class EvpnL2Vlan(CoreNode):
 
 
 class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHasSubInterface, GenericInterfaceBundle):
+    channel_id: IntegerOptional
     description: StringOptional
     dot1q_id: IntegerOptional
     evpn_ethernet_segment: Boolean
@@ -1226,6 +1227,7 @@ class ProfileInterfaceHasSubInterface(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileInterfaceLag(LineageSource, CoreProfile, CoreNode):
+    channel_id: IntegerOptional
     description: StringOptional
     dot1q_id: IntegerOptional
     evpn_ethernet_segment: BooleanOptional
@@ -1820,6 +1822,7 @@ class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcim
 
 
 class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, TemplateInterfaceHasSubInterface, TemplateGenericInterfaceBundle, CoreNode):
+    channel_id: IntegerOptional
     description: StringOptional
     dot1q_id: IntegerOptional
     evpn_ethernet_segment: Boolean
@@ -1832,6 +1835,7 @@ class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateD
     role: DropdownOptional
     status: Dropdown
     template_name: String
+    channel_id_from_resource_pool: RelationshipAttribute[CoreNumberPool]
     device: RelationshipAttribute[TemplateDcimGenericDevice]
     dot1q_id_from_resource_pool: RelationshipAttribute[CoreNumberPool]
     ip_address: RelationshipAttribute[IpamIPAddress]

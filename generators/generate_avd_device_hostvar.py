@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import operator
+import re
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from infrahub_sdk.generator import InfrahubGenerator
@@ -43,6 +44,7 @@ class RackInfo(TypedDict):
 
 
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
+PORT_CHANNEL_RE = re.compile(r"^Port-Channel(?P<channel_id>\d+)$")
 
 
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
@@ -168,9 +170,16 @@ def apply_lag_adapter_config(
     *,
     mlag_active: bool,
     evpn_lag_node: object | None = None,
+    endpoint_lag_node: object | None = None,
 ) -> None:
     """Apply pyAVD port-channel and optional EVPN Ethernet Segment settings."""
     port_channel = {"mode": LACP_MODE_MAP.get(_value(lag_node, "lacp_mode"), "active")}
+    channel_id = _lag_channel_id(lag_node, require_port_channel_name=False)
+    if channel_id is not None:
+        port_channel["channel_id"] = channel_id
+    endpoint_port_channel = _value(endpoint_lag_node, "name") if endpoint_lag_node else None
+    if endpoint_port_channel:
+        port_channel["endpoint_port_channel"] = endpoint_port_channel
     adapter["port_channel"] = port_channel
 
     evpn_source = evpn_lag_node or lag_node
@@ -209,6 +218,34 @@ def _typename(value: object) -> str | None:
     return getattr(value, "typename__", None)
 
 
+def _lag_channel_id(lag_node: object | None, *, require_port_channel_name: bool) -> int | None:
+    if lag_node is None:
+        return None
+
+    lag_name = _value(lag_node, "name")
+    channel_id = _value(lag_node, "channel_id")
+    parsed_channel_id = None
+    if lag_name:
+        match = PORT_CHANNEL_RE.match(str(lag_name))
+        if match:
+            parsed_channel_id = int(match.group("channel_id"))
+        elif require_port_channel_name:
+            raise ValueError(f"Switch LAG name '{lag_name}' must match Port-Channel<ID>")
+
+    if channel_id is None:
+        return parsed_channel_id
+
+    channel_id = int(channel_id)
+    if parsed_channel_id is not None and parsed_channel_id != channel_id:
+        raise ValueError(
+            f"Switch LAG name '{lag_name}' implies channel ID {parsed_channel_id}, "
+            f"but channel_id is {channel_id}"
+        )
+    if require_port_channel_name and parsed_channel_id is None:
+        raise ValueError(f"Switch LAG with channel_id {channel_id} must be named Port-Channel{channel_id}")
+    return channel_id
+
+
 def _extract_vlan_config(interface: object) -> tuple[list[int], int | None]:
     tagged_vlans: list[int] = []
     for vlan_edge in _edges(_field(interface, "tagged_vlan")):
@@ -236,6 +273,11 @@ def _apply_vlan_adapter_config(adapter: dict[str, Any], tagged_vlans: list[int],
     elif untagged_vlan:
         adapter["mode"] = "access"
         adapter["vlans"] = str(untagged_vlan)
+
+
+def _vlan_signature(interface: object) -> tuple[tuple[int, ...], int | None]:
+    tagged_vlans, untagged_vlan = _extract_vlan_config(interface)
+    return tuple(sorted(tagged_vlans)), untagged_vlan
 
 
 def _device_name(interface: object) -> str | None:
@@ -292,13 +334,163 @@ def _lag_member_adapter(
         "switch_ports": [switch_port for _, switch_port, _ in member_links],
         "switches": [switch_name for switch_name, _, _ in member_links],
     }
-    apply_lag_adapter_config(adapter, lag_node, mlag_active=mlag_active, evpn_lag_node=switch_lag_node)
+    apply_lag_adapter_config(
+        adapter,
+        lag_node,
+        mlag_active=mlag_active,
+        evpn_lag_node=switch_lag_node,
+        endpoint_lag_node=lag_node,
+    )
     _apply_vlan_adapter_config(adapter, local_tagged_vlans, local_untagged_vlan)
     adapter["spanning_tree_portfast"] = "edge"
     return adapter
 
 
-def extract_connected_endpoints(
+def _switch_lag_member_links(
+    *,
+    server_lag_node: object | None,
+    fallback_switch_lag_node: object,
+    fallback_local_interface: object,
+    fallback_endpoint: object,
+    hostname: str,
+) -> list[dict[str, Any]]:
+    members = _edges(_field(server_lag_node, "lag_members")) if server_lag_node else []
+    if not members:
+        return [
+            {
+                "endpoint_port": _value(fallback_endpoint, "name"),
+                "switch_port": _value(fallback_local_interface, "name"),
+                "switch": hostname,
+                "switch_lag": fallback_switch_lag_node,
+                "vlan": _vlan_signature(fallback_local_interface),
+            }
+        ]
+
+    links: list[dict[str, Any]] = []
+    for member_edge in members:
+        member = _node(member_edge)
+        if not member:
+            continue
+        endpoint_port = _value(member, "name")
+        connector = _node(_field(member, "connector"))
+        if not endpoint_port or not connector:
+            continue
+        for endpoint_edge in _edges(_field(connector, "connected_endpoints")):
+            endpoint = _node(endpoint_edge)
+            if not endpoint or _field(endpoint, "id") == _field(member, "id"):
+                continue
+            if _typename(endpoint) != "InterfacePhysical" or _device_role(endpoint) == "l2leaf":
+                continue
+            switch_name = _device_name(endpoint)
+            switch_port = _value(endpoint, "name")
+            if not switch_name or not switch_port:
+                continue
+            switch_lag_node = _node(_field(endpoint, "lag")) or fallback_switch_lag_node
+            links.append(
+                {
+                    "endpoint_port": endpoint_port,
+                    "switch_port": switch_port,
+                    "switch": switch_name,
+                    "switch_lag": switch_lag_node,
+                    "vlan": _vlan_signature(endpoint),
+                }
+            )
+
+    return links
+
+
+def _add_switch_lag_adapter(
+    server: ServerEndpoint,
+    groups: dict[tuple[str, int], dict[str, Any]],
+    *,
+    server_name: str,
+    switch_lag_node: object,
+    endpoint_lag_node: object | None,
+    links: list[dict[str, Any]],
+) -> None:
+    channel_id = _lag_channel_id(switch_lag_node, require_port_channel_name=True)
+    if channel_id is None:
+        lag_name = _value(switch_lag_node, "name")
+        raise ValueError(f"Switch LAG '{lag_name}' is missing channel_id and cannot derive one from its name")
+
+    key = (server_name, channel_id)
+    lacp_mode = _value(switch_lag_node, "lacp_mode")
+    evpn_ethernet_segment = _value(switch_lag_node, "evpn_ethernet_segment")
+    endpoint_port_channel = _value(endpoint_lag_node, "name") if endpoint_lag_node else None
+    group = groups.setdefault(
+        key,
+        {
+            "server": server,
+            "channel_id": channel_id,
+            "lacp_mode": lacp_mode,
+            "evpn_ethernet_segment": evpn_ethernet_segment,
+            "endpoint_port_channel": endpoint_port_channel,
+            "links": {},
+            "vlan": None,
+        },
+    )
+
+    expected = {
+        "channel_id": channel_id,
+        "lacp_mode": lacp_mode,
+        "evpn_ethernet_segment": evpn_ethernet_segment,
+        "endpoint_port_channel": endpoint_port_channel,
+    }
+    for field, expected_value in expected.items():
+        if group[field] != expected_value:
+            raise ValueError(
+                f"Conflicting switch LAG {field} for server '{server_name}' channel {channel_id}: "
+                f"{group[field]!r} != {expected_value!r}"
+            )
+
+    for link in links:
+        link_lag = link["switch_lag"]
+        link_channel_id = _lag_channel_id(link_lag, require_port_channel_name=True)
+        if link_channel_id != channel_id:
+            raise ValueError(
+                f"Conflicting switch LAG channel ID for server '{server_name}': "
+                f"{channel_id} != {link_channel_id}"
+            )
+        for field in ("lacp_mode", "evpn_ethernet_segment"):
+            link_value = _value(link_lag, field)
+            if link_value != group[field]:
+                raise ValueError(
+                    f"Conflicting switch LAG {field} for server '{server_name}' channel {channel_id}: "
+                    f"{group[field]!r} != {link_value!r}"
+                )
+        if group["vlan"] is None:
+            group["vlan"] = link["vlan"]
+        elif group["vlan"] != link["vlan"]:
+            raise ValueError(f"Conflicting VLANs for server '{server_name}' channel {channel_id}")
+        group["links"][link["switch"], link["switch_port"], link["endpoint_port"]] = link
+
+
+def _flush_switch_lag_groups(groups: dict[tuple[str, int], dict[str, Any]], *, mlag_active: bool) -> None:
+    for group in groups.values():
+        links = sorted(
+            group["links"].values(),
+            key=lambda item: (item["switch"], sort_interface_list([item["switch_port"]])[0], item["endpoint_port"]),
+        )
+        adapter: dict[str, Any] = {
+            "endpoint_ports": [link["endpoint_port"] for link in links],
+            "switch_ports": [link["switch_port"] for link in links],
+            "switches": [link["switch"] for link in links],
+            "port_channel": {
+                "mode": LACP_MODE_MAP.get(group["lacp_mode"], "active"),
+                "channel_id": group["channel_id"],
+            },
+            "spanning_tree_portfast": "edge",
+        }
+        if group["endpoint_port_channel"]:
+            adapter["port_channel"]["endpoint_port_channel"] = group["endpoint_port_channel"]
+        tagged_vlans, untagged_vlan = group["vlan"] or ((), None)
+        _apply_vlan_adapter_config(adapter, list(tagged_vlans), untagged_vlan)
+        if group["evpn_ethernet_segment"] is True and not mlag_active and len(set(adapter["switches"])) >= 2:
+            adapter["ethernet_segment"] = {"short_esi": "auto"}
+        group["server"]["adapters"].append(adapter)
+
+
+def extract_connected_endpoints(  # noqa: C901
     interfaces: list[GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges],
     hostname: str,
     *,
@@ -315,6 +507,7 @@ def extract_connected_endpoints(
     """
     servers: dict[str, ServerEndpoint] = {}  # Group by remote device name
     server_adapter_keys: dict[str, set[str]] = {}
+    switch_lag_groups: dict[tuple[str, int], dict[str, Any]] = {}
 
     for edge in interfaces:
         interface = edge.node
@@ -363,6 +556,31 @@ def extract_connected_endpoints(
 
                     # Detect port-channel on the remote (server) endpoint
                     endpoint_lag = getattr(endpoint, "lag", None)
+                    endpoint_lag_node = endpoint_lag.node if endpoint_lag and endpoint_lag.node else None
+                    if switch_lag_node:
+                        channel_id = _lag_channel_id(switch_lag_node, require_port_channel_name=True)
+                        if channel_id is None:
+                            lag_name = _value(switch_lag_node, "name")
+                            raise ValueError(
+                                f"Switch LAG '{lag_name}' is missing channel_id and cannot derive one from its name"
+                            )
+                        links = _switch_lag_member_links(
+                            server_lag_node=endpoint_lag_node,
+                            fallback_switch_lag_node=switch_lag_node,
+                            fallback_local_interface=interface,
+                            fallback_endpoint=endpoint,
+                            hostname=hostname,
+                        )
+                        _add_switch_lag_adapter(
+                            servers[server_name],
+                            switch_lag_groups,
+                            server_name=server_name,
+                            switch_lag_node=switch_lag_node,
+                            endpoint_lag_node=endpoint_lag_node,
+                            links=links,
+                        )
+                        continue
+
                     if endpoint_lag and endpoint_lag.node:
                         adapter_key = f"lag:{endpoint_lag.node.id}"
                         if adapter_key in server_adapter_keys[server_name]:
@@ -395,6 +613,7 @@ def extract_connected_endpoints(
                             endpoint_lag.node,
                             mlag_active=mlag_active,
                             evpn_lag_node=switch_lag_node,
+                            endpoint_lag_node=endpoint_lag.node,
                         )
 
                     # Determine mode and add VLAN config
@@ -406,6 +625,7 @@ def extract_connected_endpoints(
                     servers[server_name]["adapters"].append(adapter)
                     server_adapter_keys[server_name].add(adapter_key)
 
+    _flush_switch_lag_groups(switch_lag_groups, mlag_active=mlag_active)
     return _sort_server_endpoints(servers)
 
 

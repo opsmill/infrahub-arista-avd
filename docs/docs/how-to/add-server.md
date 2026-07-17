@@ -34,7 +34,7 @@ Click **Add Server**. The portal performs:
 
 1. **Create branch** named `add-server-<server-name>` (if you weren't already on a non-default branch).
 2. **Create the server** (`ComputePhysicalServer`) in the chosen rack, using the template's interface layout and marking status `provisioning`.
-3. **Add the server to the `servers` group** — this triggers the server-cabling generator and the AVD cascade.
+3. **Create the server as a member of the `servers` group** — this triggers the server-cabling generator and the AVD cascade.
 4. **Wait ~60 seconds** for the generator chain to run: server cabling, hostvar regeneration, and structured config updates for the affected leaf switches.
 5. **Create a proposed change** summarising the new server.
 
@@ -49,6 +49,34 @@ In the proposed change:
 1. **Data tab** — confirm the new server exists with its interfaces and cabling.
 2. **Artifacts tab** — the leaves this server cables into should have updated EOS configurations reflecting the new access/trunk ports.
 3. Approve and **Merge**.
+
+## Automated cabling flow
+
+The server-cabling generator runs when a server is added to the `servers` group. The portal commits the new `ComputePhysicalServer` and its `servers` group membership in the same upsert, so the generator sees the target as a group member as soon as it runs.
+
+For a newly added server, the generator:
+
+1. Reads the server rack and server interfaces from the generator query.
+2. Finds leaf switches in the same rack and their `server` role physical interfaces.
+3. Selects the first available leaf port index that is free on all target leaves.
+4. Creates `NetworkLink` objects between the server interfaces and selected leaf physical interfaces.
+5. Copies tagged and untagged VLANs from server interfaces and server interface profiles onto the paired leaf physical interfaces.
+6. Reconciles already-cabled servers by rebuilding the cabling plan from existing `NetworkLink` objects, then reapplying VLANs and LAG state.
+7. For dual-homed, multi-leaf servers, creates server-side `Bond1`.
+8. Creates one switch-side `InterfaceLag` named `Port-Channel<ID>` on each attached leaf. The `channel_id` is derived from the selected leaf port number and is owned in Infrahub.
+9. Attaches each leaf physical interface to its local switch-side LAG.
+10. Sets EVPN Ethernet Segment on switch-side LAGs when the server is attached across non-MLAG leaves.
+11. Marks AVD hostvars as not ready for the fabric and triggers hostvar generation, which cascades into structured config generation.
+
+The resulting hostvars include `port_channel.channel_id` for switch-side server LAGs, so pyAVD receives the explicit Port-Channel ID from Infrahub.
+
+## Behavior change
+
+Before this branch's switch-side LAG ownership changes, Add Server cabled physical links, copied VLANs, created only the server-side `Bond1`, and left switch Port-Channel IDs implicit for AVD/pyAVD.
+
+In this flow, Infrahub owns switch-side `Port-Channel<ID>` through `InterfaceLag.channel_id`. Server cabling creates the switch LAGs, attaches the leaf physical ports to those LAGs, and hostvar generation emits the explicit channel ID.
+
+The Add Server membership race is handled by the portal's atomic `member_of_groups` upsert. This branch does not change the seeded group kinds or trigger definitions for that fix.
 
 ## If the wait times out
 

@@ -60,6 +60,7 @@ def _make_uplink_edge(
             role=IfaceRole(value=role),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
+            lag={"node": None},
             connector=IfaceConnector(
                 node=ConnectorNode(
                     __typename="NetworkLink",
@@ -106,6 +107,7 @@ def _make_server_edge(
             role=IfaceRole(value="server"),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
+            lag={"node": None},
             connector=IfaceConnector(
                 node=ConnectorNode(
                     __typename="NetworkLink",
@@ -136,10 +138,11 @@ def _make_server_edge(
 
 def _make_lagged_server_edge() -> IfaceEdge:
     """Build one local leaf link whose server-side LAG spans two switches."""
-    lag = EndpointPhysicalLagNode(
-        __typename="InterfaceLag",
+    lag = EndpointPhysicalLagNode.model_construct(
+        typename__="InterfaceLag",
         id="lag-1",
         name=EndpointPhysicalLagNodeName(value="Bond1"),
+        channel_id=None,
         lacp_mode=EndpointPhysicalLagNodeLacpMode(value="active"),
         evpn_ethernet_segment=EndpointPhysicalLagNodeEvpnEthernetSegment(value=False),
         lag_members={
@@ -227,6 +230,7 @@ def _make_lagged_server_edge() -> IfaceEdge:
                     "__typename": "InterfaceLag",
                     "id": "leaf1-po1117",
                     "name": {"value": "Port-Channel1117"},
+                    "channel_id": {"value": 1117},
                     "lacp_mode": {"value": "active"},
                     "evpn_ethernet_segment": {"value": True},
                 }
@@ -248,6 +252,63 @@ def _make_lagged_server_edge() -> IfaceEdge:
                                             __typename="ComputePhysicalServer",
                                             id="server-1",
                                             name=EndpointPhysicalGenericDeviceName(value="server-b2-1-aa-esi-1"),
+                                        )
+                                    ),
+                                )
+                            )
+                        ]
+                    ),
+                )
+            ),
+        )
+    )
+
+
+def _make_switch_lagged_server_edge(
+    *,
+    iface_id: str,
+    iface_name: str,
+    switch_name: str,
+    server_iface_id: str,
+    server_iface_name: str,
+    channel_id: int,
+) -> IfaceEdge:
+    """Build a local leaf link with only a switch-side LAG modeled."""
+    return IfaceEdge(
+        node=IfaceNode(
+            __typename="InterfacePhysical",
+            id=iface_id,
+            name=IfaceName(value=iface_name),
+            role=IfaceRole(value="server"),
+            tagged_vlan=TaggedVlan(edges=[]),
+            untagged_vlan=UntaggedVlan(node=None),
+            lag={
+                "node": {
+                    "__typename": "InterfaceLag",
+                    "id": f"{switch_name}-po{channel_id}",
+                    "name": {"value": f"Port-Channel{channel_id}"},
+                    "channel_id": {"value": channel_id},
+                    "lacp_mode": {"value": "active"},
+                    "evpn_ethernet_segment": {"value": True},
+                }
+            },
+            connector=IfaceConnector(
+                node=ConnectorNode(
+                    __typename="NetworkLink",
+                    id=f"link-{iface_id}",
+                    connected_endpoints=ConnectorEndpoints(
+                        edges=[
+                            EndpointEdge(
+                                node=EndpointPhysical(
+                                    __typename="InterfacePhysical",
+                                    id=server_iface_id,
+                                    name=EndpointPhysicalName(value=server_iface_name),
+                                    lag=EndpointPhysicalLag(node=None),
+                                    device=EndpointPhysicalDevice(
+                                        node=EndpointPhysicalGenericDevice(
+                                            __typename="ComputePhysicalServer",
+                                            id="server-1",
+                                            name=EndpointPhysicalGenericDeviceName(value="server-a"),
                                         )
                                     ),
                                 )
@@ -423,10 +484,47 @@ class TestExtractConnectedEndpointsOrdering:
                         "endpoint_ports": ["Ethernet1", "Ethernet2"],
                         "switch_ports": ["Ethernet1/1/17", "Ethernet1/1/17"],
                         "switches": ["leaf-pod-b2-1-1", "leaf-pod-b2-1-2"],
-                        "port_channel": {"mode": "active"},
+                        "port_channel": {
+                            "mode": "active",
+                            "channel_id": 1117,
+                            "endpoint_port_channel": "Bond1",
+                        },
                         "ethernet_segment": {"short_esi": "auto"},
                         "spanning_tree_portfast": "edge",
                     }
                 ],
+            }
+        ]
+
+    def test_switch_lag_without_server_bond_emits_port_channel(self) -> None:
+        """Switch-side Port-Channel modeling is enough to emit pyAVD port_channel."""
+        edges = [
+            _make_switch_lagged_server_edge(
+                iface_id="leaf1-eth17",
+                iface_name="Ethernet1/1/17",
+                switch_name="leaf-pod-b2-1-1",
+                server_iface_id="server-eth1",
+                server_iface_name="Ethernet1",
+                channel_id=1117,
+            ),
+            _make_switch_lagged_server_edge(
+                iface_id="leaf2-eth17",
+                iface_name="Ethernet1/1/17",
+                switch_name="leaf-pod-b2-1-2",
+                server_iface_id="server-eth2",
+                server_iface_name="Ethernet2",
+                channel_id=1117,
+            ),
+        ]
+
+        result = extract_connected_endpoints(edges, "leaf-pod-b2-1-1")
+
+        assert result[0]["adapters"] == [
+            {
+                "endpoint_ports": ["Ethernet1", "Ethernet2"],
+                "switch_ports": ["Ethernet1/1/17", "Ethernet1/1/17"],
+                "switches": ["leaf-pod-b2-1-1", "leaf-pod-b2-1-1"],
+                "port_channel": {"mode": "active", "channel_id": 1117},
+                "spanning_tree_portfast": "edge",
             }
         ]

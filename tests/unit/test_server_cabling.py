@@ -103,6 +103,8 @@ def _make_mock_leaf(leaf_id: str = "leaf-1", hostname: str = "leaf-pod1-1-1") ->
     leaf = MagicMock()
     leaf.id = leaf_id
     leaf.name.value = hostname
+    leaf.mlag_domain = None
+    leaf.mlag_domain_id = None
     return leaf
 
 
@@ -119,9 +121,11 @@ def _make_mock_leaf_interface(
     iface.save = AsyncMock()
     if leaf:
         iface.device.peer = leaf
+        iface.device.id = leaf.id
         iface.device.display_label = leaf.name.value
     else:
         iface.device.peer = _make_mock_leaf()
+        iface.device.id = iface.device.peer.id
         iface.device.display_label = "leaf-pod1-1-1"
     iface.connector.id = "existing-link" if has_connector else None
     return iface
@@ -168,21 +172,41 @@ class TestSingleHomedCabling:
 
 
 class TestIdempotency:
-    """Re-running the generator on an already-cabled server is a no-op."""
+    """Re-running the generator on an already-cabled server reconciles generated state."""
 
     @pytest.mark.asyncio
-    async def test_already_cabled_server_skips(self) -> None:
+    async def test_already_cabled_server_reconciles_without_reconnecting(self) -> None:
         gen = _make_generator()
         gen._is_server_cabled = AsyncMock(return_value=True)  # type: ignore[method-assign]
+        gen._existing_cabling_plan = AsyncMock(return_value=[(MagicMock(), MagicMock())])  # type: ignore[method-assign]
+        gen._assign_vlans = AsyncMock()  # type: ignore[method-assign]
+        gen._create_server_port_channel = AsyncMock()  # type: ignore[method-assign]
 
         iface = _make_interface("iface-1", "Ethernet1")
         data = _make_server_data(interfaces=[iface])
+        mock_leaf = _make_mock_leaf()
+        mock_server_iface = MagicMock()
+        mock_server_iface.id = "iface-1"
+        mock_server_iface.name.value = "Ethernet1"
+        mock_server_iface.device.peer = MagicMock()
+        mock_server_iface.device.display_label = "server-1"
+        leaf_iface = _make_mock_leaf_interface("leaf-eth1", "Ethernet1", leaf=mock_leaf)
+
+        gen.client.filters = AsyncMock(
+            side_effect=[
+                [mock_leaf],
+                [mock_server_iface],
+                [leaf_iface],
+            ]
+        )
 
         with patch("generators.generate_server_cabling.connect_interface_maps", new_callable=AsyncMock) as mock_connect:
             await gen.generate(data)
 
         mock_connect.assert_not_called()
-        gen._trigger_avd_cascade.assert_not_awaited()
+        gen._assign_vlans.assert_awaited_once()
+        gen._create_server_port_channel.assert_awaited_once()
+        gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1")
 
 
 class TestDualHomedCabling:
@@ -231,6 +255,65 @@ class TestDualHomedCabling:
             mock_connect.assert_called_once()
             cabling_plan = mock_connect.call_args.kwargs["cabling_plan"]
             assert len(cabling_plan) == 2
+
+    @pytest.mark.asyncio
+    async def test_dual_homed_creates_server_and_switch_lags(self) -> None:
+        gen = _make_generator()
+
+        mock_leaf1 = _make_mock_leaf("leaf-1", "leaf-pod1-1-1")
+        mock_leaf2 = _make_mock_leaf("leaf-2", "leaf-pod1-1-2")
+        leaf1_iface = _make_mock_leaf_interface("leaf1-eth17", "Ethernet1/1/17", leaf=mock_leaf1)
+        leaf2_iface = _make_mock_leaf_interface("leaf2-eth17", "Ethernet1/1/17", leaf=mock_leaf2)
+
+        server_device = MagicMock()
+        server_device.id = "server-1-id"
+        server_iface1 = MagicMock()
+        server_iface1.id = "iface-1"
+        server_iface1.name.value = "Ethernet1"
+        server_iface1.device.id = server_device.id
+        server_iface1.save = AsyncMock()
+        server_iface2 = MagicMock()
+        server_iface2.id = "iface-2"
+        server_iface2.name.value = "Ethernet2"
+        server_iface2.device.id = server_device.id
+        server_iface2.save = AsyncMock()
+
+        server_lag = MagicMock()
+        server_lag.id = "server-bond-id"
+        server_lag.save = AsyncMock()
+        leaf1_lag = MagicMock()
+        leaf1_lag.id = "leaf1-po-id"
+        leaf1_lag.save = AsyncMock()
+        leaf2_lag = MagicMock()
+        leaf2_lag.id = "leaf2-po-id"
+        leaf2_lag.save = AsyncMock()
+
+        gen.client.get = AsyncMock(side_effect=[server_iface1, server_iface1, server_iface2, leaf1_iface, leaf2_iface])
+        gen.client.create = AsyncMock(side_effect=[server_lag, leaf1_lag, leaf2_lag])
+
+        await gen._create_server_port_channel(
+            "server-1",
+            [(server_iface1, leaf1_iface), (server_iface2, leaf2_iface)],
+        )
+
+        create_calls = gen.client.create.await_args_list
+        assert create_calls[0].kwargs == {
+            "name": "Bond1",
+            "device": {"id": "server-1-id"},
+            "lacp_mode": "active",
+            "lacp_rate": "fast",
+            "status": "active",
+            "role": "server",
+        }
+        assert create_calls[0].args == ("InterfaceLag",)
+        assert create_calls[1].kwargs["name"] == "Port-Channel1117"
+        assert create_calls[1].kwargs["channel_id"] == 1117
+        assert create_calls[1].kwargs["evpn_ethernet_segment"] is True
+        assert create_calls[2].kwargs["name"] == "Port-Channel1117"
+        assert create_calls[2].kwargs["channel_id"] == 1117
+        assert create_calls[2].kwargs["evpn_ethernet_segment"] is True
+        assert leaf1_iface.lag == {"id": "leaf1-po-id"}
+        assert leaf2_iface.lag == {"id": "leaf2-po-id"}
 
 
 class TestVlanAssignment:

@@ -283,6 +283,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                       value
                     }
                     ... on InterfaceLag {
+                      channel_id {
+                        value
+                      }
                       lacp_mode {
                         value
                       }
@@ -332,6 +335,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                   value
                                 }
                                 ... on InterfaceLag {
+                                  channel_id {
+                                    value
+                                  }
                                   lacp_mode {
                                     value
                                   }
@@ -361,6 +367,26 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                                     }
                                                     role {
                                                       value
+                                                    }
+                                                    lag {
+                                                      node {
+                                                        __typename
+                                                        id
+                                                        name {
+                                                          value
+                                                        }
+                                                        ... on InterfaceLag {
+                                                          channel_id {
+                                                            value
+                                                          }
+                                                          lacp_mode {
+                                                            value
+                                                          }
+                                                          evpn_ethernet_segment {
+                                                            value
+                                                          }
+                                                        }
+                                                      }
                                                     }
                                                     tagged_vlan {
                                                       edges {

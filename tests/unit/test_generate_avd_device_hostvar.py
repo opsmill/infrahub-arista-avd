@@ -6,7 +6,11 @@ from unittest.mock import AsyncMock
 import pytest
 from pyavd import get_avd_facts, validate_inputs
 
-from generators.generate_avd_device_hostvar import GenerateAVDDeviceHostvar, apply_lag_adapter_config
+from generators.generate_avd_device_hostvar import (
+    GenerateAVDDeviceHostvar,
+    _add_switch_lag_adapter,  # noqa: PLC2701 - focused unit coverage for internal conflict validation
+    apply_lag_adapter_config,
+)
 
 
 def _attr(value: object) -> SimpleNamespace:
@@ -285,8 +289,16 @@ def test_mlag_leaf_without_domain_asn_fails() -> None:
         )
 
 
-def _lag(lacp_mode: str = "active", evpn_ethernet_segment: bool = False) -> SimpleNamespace:
+def _lag(
+    lacp_mode: str = "active",
+    evpn_ethernet_segment: bool = False,
+    *,
+    name: str | None = None,
+    channel_id: int | None = None,
+) -> SimpleNamespace:
     return SimpleNamespace(
+        name=_attr(name) if name else None,
+        channel_id=_attr(channel_id) if channel_id is not None else None,
         lacp_mode=_attr(lacp_mode),
         evpn_ethernet_segment=_attr(evpn_ethernet_segment),
     )
@@ -458,9 +470,85 @@ def test_disabled_lacp_mode_maps_to_pyavd_on() -> None:
     assert adapter["port_channel"] == {"mode": "on"}
 
 
+def test_switch_lag_channel_id_is_emitted() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117", channel_id=1117), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "active", "channel_id": 1117}
+
+
+def test_switch_lag_name_only_channel_id_is_parsed() -> None:
+    adapter = _multi_switch_adapter()
+
+    apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117"), mlag_active=False)
+
+    assert adapter["port_channel"] == {"mode": "active", "channel_id": 1117}
+
+
+def test_switch_lag_channel_id_name_mismatch_fails() -> None:
+    adapter = _multi_switch_adapter()
+
+    with pytest.raises(ValueError, match="implies channel ID 1117, but channel_id is 42"):
+        apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117", channel_id=42), mlag_active=False)
+
+
+def test_conflicting_switch_lag_ids_fail() -> None:
+    server = {"name": "server1", "adapters": []}
+    groups: dict[tuple[str, int], dict] = {}
+
+    with pytest.raises(ValueError, match="Conflicting switch LAG channel ID"):
+        _add_switch_lag_adapter(
+            server,
+            groups,
+            server_name="server1",
+            switch_lag_node=_lag(name="Port-Channel1117", channel_id=1117),
+            endpoint_lag_node=None,
+            links=[
+                {
+                    "endpoint_port": "Ethernet1",
+                    "switch_port": "Ethernet1/1/17",
+                    "switch": "leaf1",
+                    "switch_lag": _lag(name="Port-Channel42", channel_id=42),
+                    "vlan": ((11,), None),
+                }
+            ],
+        )
+
+
+def test_conflicting_switch_lag_vlans_fail() -> None:
+    server = {"name": "server1", "adapters": []}
+    groups: dict[tuple[str, int], dict] = {}
+
+    with pytest.raises(ValueError, match="Conflicting VLANs"):
+        _add_switch_lag_adapter(
+            server,
+            groups,
+            server_name="server1",
+            switch_lag_node=_lag(name="Port-Channel1117", channel_id=1117),
+            endpoint_lag_node=None,
+            links=[
+                {
+                    "endpoint_port": "Ethernet1",
+                    "switch_port": "Ethernet1/1/17",
+                    "switch": "leaf1",
+                    "switch_lag": _lag(name="Port-Channel1117", channel_id=1117),
+                    "vlan": ((11,), None),
+                },
+                {
+                    "endpoint_port": "Ethernet2",
+                    "switch_port": "Ethernet1/1/17",
+                    "switch": "leaf2",
+                    "switch_lag": _lag(name="Port-Channel1117", channel_id=1117),
+                    "vlan": ((12,), None),
+                },
+            ],
+        )
+
+
 def test_server_lag_evpn_hostvars_validate_against_pyavd() -> None:
     adapter = _multi_switch_adapter()
-    apply_lag_adapter_config(adapter, _lag(evpn_ethernet_segment=True), mlag_active=False)
+    apply_lag_adapter_config(adapter, _lag(name="Port-Channel1117", evpn_ethernet_segment=True), mlag_active=False)
 
     hostvars = _base_hostvars(
         tenants_data=[],
