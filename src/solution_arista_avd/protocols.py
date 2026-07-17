@@ -355,6 +355,7 @@ class RoutingBGPPeerGroup(CoreNode):
 
 
 class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
+    avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
     index: IntegerOptional
     name: String
@@ -433,15 +434,6 @@ class AvdEvpn(CoreNode):
     name: String
     overlay_bgp_rtc: Boolean
     fabric: RelationshipManager[NetworkFabric]
-    member_of_groups: RelationshipManager[CoreGroup]
-    profiles: RelationshipManager[CoreProfile]
-    subscriber_of_groups: RelationshipManager[CoreGroup]
-
-
-class NetworkSpanningTreePriority(CoreNode):
-    priority: Integer
-    role: Dropdown
-    fabric: RelationshipAttribute[NetworkFabric]
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
     subscriber_of_groups: RelationshipManager[CoreGroup]
@@ -685,6 +677,7 @@ class DcimPlatform(CoreNode):
 
 class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
     amount_of_spines: Integer
+    avd_custom_hostvars: JSONAttributeOptional
     checksum: StringOptional
     index: Integer
     leaf_interface_sorting_method: Dropdown
@@ -772,6 +765,7 @@ class LocationRack(LocationGeneric, LocationHosting, GeneratorTarget):
     name: String
     rack_type: Dropdown
     shortname: StringOptional
+    avd_tags: RelationshipManager[AvdTag]
     children: RelationshipManager[LocationGeneric]
     devices: RelationshipManager[DcimPhysicalDevice]
     l2leaf_switch_template: RelationshipAttribute[CoreObjectTemplate]
@@ -815,6 +809,15 @@ class IpamRouteTarget(CoreNode):
     vrf: RelationshipManager[IpamVRF]
 
 
+class NetworkSpanningTreePriority(CoreNode):
+    priority: Integer
+    role: Dropdown
+    fabric: RelationshipAttribute[NetworkFabric]
+    member_of_groups: RelationshipManager[CoreGroup]
+    profiles: RelationshipManager[CoreProfile]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
+
+
 class RoutingStaticRoute(CoreNode):
     distance: IntegerOptional
     gateway: StringOptional
@@ -848,11 +851,22 @@ class EvpnSvi(CoreNode):
     ip_address_virtual: IPHost
     name: String
     svi_id: Integer
+    avd_tags: RelationshipManager[AvdTag]
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
+    rack_tags: RelationshipManager[LocationRack]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     vlan: RelationshipAttribute[IpamVLAN]
     vrf: RelationshipAttribute[IpamVRF]
+
+
+class AvdTag(CoreNode):
+    description: StringOptional
+    name: String
+    member_of_groups: RelationshipManager[CoreGroup]
+    profiles: RelationshipManager[CoreProfile]
+    racks: RelationshipManager[LocationRack]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
 class EvpnTenant(CoreNode):
@@ -969,6 +983,16 @@ class ProfileAvdStructuredConfigFile(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
+class ProfileAvdTag(LineageSource, CoreProfile, CoreNode):
+    description: StringOptional
+    profile_name: String
+    profile_priority: Integer
+    member_of_groups: RelationshipManager[CoreGroup]
+    racks: RelationshipManager[LocationRack]
+    related_nodes: RelationshipManager[AvdTag]
+    subscriber_of_groups: RelationshipManager[CoreGroup]
+
+
 class ProfileBuiltinIPAddress(LineageSource, CoreProfile, CoreNode):
     address: IPHostOptional
     description: StringOptional
@@ -1040,6 +1064,7 @@ class ProfileDcimConnector(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileDcimDevice(LineageSource, CoreProfile, CoreNode):
+    avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -1178,7 +1203,9 @@ class ProfileEvpnSvi(LineageSource, CoreProfile, CoreNode):
     ip_address_virtual: IPHostOptional
     profile_name: String
     profile_priority: Integer
+    avd_tags: RelationshipManager[AvdTag]
     member_of_groups: RelationshipManager[CoreGroup]
+    rack_tags: RelationshipManager[LocationRack]
     related_nodes: RelationshipManager[EvpnSvi]
     subscriber_of_groups: RelationshipManager[CoreGroup]
     vlan: RelationshipAttribute[IpamVLAN]
@@ -1466,6 +1493,7 @@ class ProfileLocationRack(LineageSource, CoreProfile, CoreNode):
     profile_priority: Integer
     rack_type: DropdownOptional
     shortname: StringOptional
+    avd_tags: RelationshipManager[AvdTag]
     devices: RelationshipManager[DcimPhysicalDevice]
     l2leaf_switch_template: RelationshipAttribute[CoreObjectTemplate]
     leaf_switch_template: RelationshipAttribute[CoreObjectTemplate]
@@ -1593,6 +1621,7 @@ class ProfileNetworkNtpServer(LineageSource, CoreProfile, CoreNode):
 
 class ProfileNetworkPod(LineageSource, CoreProfile, CoreNode):
     amount_of_spines: IntegerOptional
+    avd_custom_hostvars: JSONAttributeOptional
     checksum: StringOptional
     index: IntegerOptional
     leaf_interface_sorting_method: DropdownOptional
@@ -1799,6 +1828,7 @@ class TemplateComputePhysicalServer(LineageSource, TemplateComputeGenericUnit, T
 
 
 class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcimGenericDevice, TemplateDcimPhysicalDevice, CoreObjectTemplate, CoreNode):
+    avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -1954,3 +1984,4 @@ class TemplateVirtualizationVirtualMachine(LineageSource, CoreObjectComponentTem
     subscriber_of_groups: RelationshipManager[CoreGroup]
     subscriber_of_groups_for_instances: RelationshipManager[CoreGroup]
     vcpu_from_resource_pool: RelationshipAttribute[CoreNumberPool]
+

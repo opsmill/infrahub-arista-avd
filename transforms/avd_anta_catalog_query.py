@@ -1,84 +1,162 @@
 from __future__ import annotations
 
+from typing import Annotated, Literal, Optional, Union
+
 from pydantic import BaseModel, Field
 
 
 class AvdAntaCatalogQuery(BaseModel):
-    # `target` is the requested device (filtered by name); `dcim_device` is every
-    # device, used to gather fabric-wide structured configs for the catalog.
-    target: DeviceList = Field(alias="target")
-    dcim_device: DeviceList = Field(alias="DcimDevice")
+    target: "AvdAntaCatalogQueryTarget"
+    dcim_device: "AvdAntaCatalogQueryDcimDevice" = Field(alias="DcimDevice")
 
 
-class DeviceList(BaseModel):
-    edges: list[DeviceEdge]
+class AvdAntaCatalogQueryTarget(BaseModel):
+    edges: list["AvdAntaCatalogQueryTargetEdges"]
 
 
-class DeviceEdge(BaseModel):
-    node: DeviceNode | None
+class AvdAntaCatalogQueryTargetEdges(BaseModel):
+    node: Optional["AvdAntaCatalogQueryTargetEdgesNode"]
 
 
-class DeviceNode(BaseModel):
+class AvdAntaCatalogQueryTargetEdgesNode(BaseModel):
     id: str
-    name: StrValue | None = None
-    pod: Pod | None = None
-    avd_artifact: AvdArtifact | None = None
+    name: Optional["AvdAntaCatalogQueryTargetEdgesNodeName"]
+    pod: "AvdAntaCatalogQueryTargetEdgesNodePod"
 
 
-class Pod(BaseModel):
-    node: PodNode | None
+class AvdAntaCatalogQueryTargetEdgesNodeName(BaseModel):
+    value: Optional[str]
 
 
-class PodNode(BaseModel):
+class AvdAntaCatalogQueryTargetEdgesNodePod(BaseModel):
+    node: Optional["AvdAntaCatalogQueryTargetEdgesNodePodNode"]
+
+
+class AvdAntaCatalogQueryTargetEdgesNodePodNode(BaseModel):
     id: str
-    parent: Parent | None = None
+    parent: "AvdAntaCatalogQueryTargetEdgesNodePodNodeParent"
 
 
-class Parent(BaseModel):
-    node: ParentNode | None
+class AvdAntaCatalogQueryTargetEdgesNodePodNodeParent(BaseModel):
+    node: Optional[
+        Annotated[
+            Union[
+                "AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkBuildingBlock",
+                "AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabric",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
 
 
-class ParentNode(BaseModel):
+class AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkBuildingBlock(
+    BaseModel
+):
+    typename__: Literal["NetworkBuildingBlock", "NetworkPod"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+
+
+class AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabric(BaseModel):
+    typename__: Literal["NetworkFabric"] = Field(alias="__typename")
     id: str
-    typename: str | None = Field(default=None, alias="__typename")
-    name: StrValue | None = None
-    anta_enabled: BoolValue | None = None
+    name: Optional[
+        "AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabricName"
+    ]
+    anta_enabled: Optional[
+        "AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabricAntaEnabled"
+    ]
 
 
-class AvdArtifact(BaseModel):
-    node: AvdArtifactNode | None
+class AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabricName(BaseModel):
+    value: Optional[str]
 
 
-class AvdArtifactNode(BaseModel):
+class AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabricAntaEnabled(
+    BaseModel
+):
+    value: Optional[bool]
+
+
+class AvdAntaCatalogQueryDcimDevice(BaseModel):
+    edges: list["AvdAntaCatalogQueryDcimDeviceEdges"]
+
+
+class AvdAntaCatalogQueryDcimDeviceEdges(BaseModel):
+    node: Optional["AvdAntaCatalogQueryDcimDeviceEdgesNode"]
+
+
+class AvdAntaCatalogQueryDcimDeviceEdgesNode(BaseModel):
     id: str
-    structured_config_file: StructuredConfigFile
+    name: Optional["AvdAntaCatalogQueryDcimDeviceEdgesNodeName"]
+    pod: "AvdAntaCatalogQueryDcimDeviceEdgesNodePod"
+    avd_artifact: "AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifact"
 
 
-class StructuredConfigFile(BaseModel):
-    node: StructuredConfigFileNode | None
+class AvdAntaCatalogQueryDcimDeviceEdgesNodeName(BaseModel):
+    value: Optional[str]
 
 
-class StructuredConfigFileNode(BaseModel):
+class AvdAntaCatalogQueryDcimDeviceEdgesNodePod(BaseModel):
+    node: Optional["AvdAntaCatalogQueryDcimDeviceEdgesNodePodNode"]
+
+
+class AvdAntaCatalogQueryDcimDeviceEdgesNodePodNode(BaseModel):
     id: str
+    parent: "AvdAntaCatalogQueryDcimDeviceEdgesNodePodNodeParent"
 
 
-class StrValue(BaseModel):
-    value: str | None
+class AvdAntaCatalogQueryDcimDeviceEdgesNodePodNodeParent(BaseModel):
+    node: Optional["AvdAntaCatalogQueryDcimDeviceEdgesNodePodNodeParentNode"]
 
 
-class BoolValue(BaseModel):
-    value: bool | None
+class AvdAntaCatalogQueryDcimDeviceEdgesNodePodNodeParentNode(BaseModel):
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+
+
+class AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
+    node: Optional["AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNode"]
+
+
+class AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
+    id: str
+    structured_config_file: (
+        "AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile"
+    )
+
+
+class AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile(
+    BaseModel
+):
+    node: Optional[
+        "AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode"
+    ]
+
+
+class AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode(
+    BaseModel
+):
+    id: str
 
 
 AvdAntaCatalogQuery.model_rebuild()
-DeviceList.model_rebuild()
-DeviceEdge.model_rebuild()
-DeviceNode.model_rebuild()
-Pod.model_rebuild()
-PodNode.model_rebuild()
-Parent.model_rebuild()
-ParentNode.model_rebuild()
-AvdArtifact.model_rebuild()
-AvdArtifactNode.model_rebuild()
-StructuredConfigFile.model_rebuild()
-StructuredConfigFileNode.model_rebuild()
+AvdAntaCatalogQueryTarget.model_rebuild()
+AvdAntaCatalogQueryTargetEdges.model_rebuild()
+AvdAntaCatalogQueryTargetEdgesNode.model_rebuild()
+AvdAntaCatalogQueryTargetEdgesNodePod.model_rebuild()
+AvdAntaCatalogQueryTargetEdgesNodePodNode.model_rebuild()
+AvdAntaCatalogQueryTargetEdgesNodePodNodeParent.model_rebuild()
+AvdAntaCatalogQueryTargetEdgesNodePodNodeParentNodeNetworkFabric.model_rebuild()
+AvdAntaCatalogQueryDcimDevice.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdges.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdgesNode.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdgesNodePod.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdgesNodePodNode.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdgesNodePodNodeParent.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()
+AvdAntaCatalogQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile.model_rebuild()
