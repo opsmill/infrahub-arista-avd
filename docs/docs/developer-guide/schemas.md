@@ -142,7 +142,7 @@ An EVPN tenant. Attributes: `name` (unique), `mac_vrf_vni_base`, `description`. 
 
 ### `EvpnSvi` — `Evpn.Svi`
 
-An SVI. Attributes: `name`, `svi_id`, `ip_address_virtual`, `enabled`. Relationships: `vrf` → `IpamVRF` (parent), `vlan` → `IpamVLAN`.
+An SVI. Attributes: `name`, `svi_id`, `ip_address_virtual`, `enabled`. Relationships: `vrf` → `IpamVRF` (parent), `vlan` → `IpamVLAN`, `rack_tags` → `LocationRack`, `avd_tags` → `AvdTag`.
 
 ### `EvpnL2Vlan` — `Evpn.L2Vlan`
 
@@ -166,7 +166,11 @@ Child file nodes holding the per-device hostvars and structured-config JSON. Bot
 
 ### `AvdEvpn` — `Avd.Evpn`
 
-Fabric-level EVPN settings. Attributes: `name`, `ebgp_multihop`, `overlay_bgp_rtc`. Relationships: `fabric` → `NetworkFabric`.
+AVD EVPN fabric-wide settings. Attributes include `ebgp_multihop` and `overlay_bgp_rtc`. Relationships: `fabric` → `NetworkFabric`.
+
+### `AvdTag` — `Avd.Tag`
+
+AVD-specific fabric tag object. Attributes: `name`, `description`. Relationships: `racks` → `LocationRack`; reciprocal rack assignments emit pyAVD node-group `filter.tags`, and SVI `avd_tags` emit pyAVD SVI `tags`.
 
 ## Generator target
 
@@ -193,7 +197,7 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 - [`schemas/logical_design.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/logical_design.yml) — `Network.Fabric`, `Network.Pod`.
 - [`schemas/base/location.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/location.yml) + [`schemas/location_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/location_extensions.yml) — `Location.Hall`, `Location.Rack`.
 - [`schemas/base/ipam.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/ipam.yml) + [`schemas/ipam_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/ipam_extensions.yml) — IPAM nodes (the `Prefix` `role`/`status` dropdowns live in the extension).
-- [`schemas/avd/avd.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/avd/avd.yml) — `Avd.Evpn`.
+- [`schemas/avd/avd.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/avd/avd.yml) — `Avd.Evpn`, `Avd.Tag`.
 - [`schemas/objects/objects.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/objects/objects.yml) — `Avd.Artifact`, `Avd.HostvarFile`, `Avd.StructuredConfigFile` (see [AvdArtifact & File Storage](./avd/artifacts.md) for the full reference).
 - Generated protocols: [`src/solution_arista_avd/protocols.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/protocols.py) — regenerate after any schema change with:
   ```bash

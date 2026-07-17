@@ -83,3 +83,11 @@ nodes:
         kind: Generic
         cardinality: many
         identifier: "rack__device"
+      - name: avd_tags
+        label: AVD Tags
+        peer: AvdTag
+        branch: aware
+        kind: Attribute
+        cardinality: many
+        optional: true
+        identifier: "rack__avd_tags"
