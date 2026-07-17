@@ -334,3 +334,27 @@ async def test_trigger_hostvar_generation_limits_nodes() -> None:
         "id": "generator-1",
         "nodes": ["leaf-a", "spine-a"],
     }
+
+
+@pytest.mark.asyncio
+async def test_trigger_hostvar_generation_skips_without_node_ids() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    client.execute_graphql = AsyncMock()
+
+    await trigger_hostvar_generation(client)
+
+    client.filters.assert_not_awaited()
+    client.execute_graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_trigger_hostvar_generation_skips_empty_node_ids() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    client.execute_graphql = AsyncMock()
+
+    await trigger_hostvar_generation(client, node_ids=[])
+
+    client.filters.assert_not_awaited()
+    client.execute_graphql.assert_not_awaited()

@@ -355,7 +355,6 @@ class RoutingBGPPeerGroup(CoreNode):
 
 
 class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
-    avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
     index: IntegerOptional
     name: String
@@ -549,8 +548,10 @@ class EvpnL2Vlan(CoreNode):
 
 
 class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHasSubInterface, GenericInterfaceBundle):
+    channel_id: IntegerOptional
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: Boolean
     index: StringOptional
     l2_mode: DropdownOptional
     lacp_mode: Dropdown
@@ -673,7 +674,6 @@ class DcimPlatform(CoreNode):
 
 class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
     amount_of_spines: Integer
-    avd_custom_hostvars: JSONAttributeOptional
     checksum: StringOptional
     index: Integer
     leaf_interface_sorting_method: Dropdown
@@ -1029,7 +1029,6 @@ class ProfileDcimConnector(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileDcimDevice(LineageSource, CoreProfile, CoreNode):
-    avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
     index: IntegerOptional
     node_id: IntegerOptional
@@ -1228,8 +1227,10 @@ class ProfileInterfaceHasSubInterface(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileInterfaceLag(LineageSource, CoreProfile, CoreNode):
+    channel_id: IntegerOptional
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: BooleanOptional
     l2_mode: DropdownOptional
     lacp_mode: DropdownOptional
     lacp_rate: DropdownOptional
@@ -1580,7 +1581,6 @@ class ProfileNetworkNtpServer(LineageSource, CoreProfile, CoreNode):
 
 class ProfileNetworkPod(LineageSource, CoreProfile, CoreNode):
     amount_of_spines: IntegerOptional
-    avd_custom_hostvars: JSONAttributeOptional
     checksum: StringOptional
     index: IntegerOptional
     leaf_interface_sorting_method: DropdownOptional
@@ -1822,8 +1822,10 @@ class TemplateDcimDevice(LineageSource, TemplateCoreArtifactTarget, TemplateDcim
 
 
 class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateDcimInterface, TemplateInterfaceLayer2, TemplateInterfaceLayer3, TemplateInterfaceHasSubInterface, TemplateGenericInterfaceBundle, CoreNode):
+    channel_id: IntegerOptional
     description: StringOptional
     dot1q_id: IntegerOptional
+    evpn_ethernet_segment: Boolean
     l2_mode: DropdownOptional
     lacp_mode: Dropdown
     lacp_rate: Dropdown
@@ -1833,6 +1835,7 @@ class TemplateInterfaceLag(LineageSource, CoreObjectComponentTemplate, TemplateD
     role: DropdownOptional
     status: Dropdown
     template_name: String
+    channel_id_from_resource_pool: RelationshipAttribute[CoreNumberPool]
     device: RelationshipAttribute[TemplateDcimGenericDevice]
     dot1q_id_from_resource_pool: RelationshipAttribute[CoreNumberPool]
     ip_address: RelationshipAttribute[IpamIPAddress]
