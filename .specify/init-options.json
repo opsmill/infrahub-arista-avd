@@ -1,11 +1,9 @@
 {
-  "ai": "claude",
-  "ai_commands_dir": null,
-  "ai_skills": false,
-  "branch_numbering": "sequential",
+  "ai": "codex",
+  "ai_skills": true,
+  "feature_numbering": "sequential",
   "here": true,
-  "offline": false,
-  "preset": "infrahub",
-  "script": "sh",
-  "speckit_version": "0.4.4.dev0"
+  "integration": "codex",
+  "script": "py",
+  "speckit_version": "0.13.0"
 }

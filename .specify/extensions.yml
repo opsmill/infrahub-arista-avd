@@ -1,0 +1,32 @@
+installed:
+- infrahub-speckit
+settings:
+  auto_execute_hooks: true
+hooks:
+  before_specify:
+  - extension: infrahub-speckit
+    command: speckit.infrahub-speckit.route-specify
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.infrahub-speckit.route-specify?
+    description: Infrahub artifact routing before specification
+    condition: null
+  before_plan:
+  - extension: infrahub-speckit
+    command: speckit.infrahub-speckit.route-plan
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.infrahub-speckit.route-plan?
+    description: Infrahub artifact routing before planning
+    condition: null
+  before_implement:
+  - extension: infrahub-speckit
+    command: speckit.infrahub-speckit.route-implement
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Execute speckit.infrahub-speckit.route-implement?
+    description: Infrahub artifact routing before implementation
+    condition: null

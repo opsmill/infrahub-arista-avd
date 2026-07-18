@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "infrahub-speckit": {
+      "version": "3.0.1",
+      "source": "local",
+      "manifest_hash": "sha256:1db08eaeb747f08ce25a7064bfd4c4806fd63a7584818d5b949136d52eed1e80",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.infrahub-speckit.route-specify",
+          "speckit.infrahub-speckit.route-plan",
+          "speckit.infrahub-speckit.route-implement"
+        ],
+        "codex": [
+          "speckit.infrahub-speckit.route-specify",
+          "speckit.infrahub-speckit.route-plan",
+          "speckit.infrahub-speckit.route-implement"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-07-18T23:14:50.931304+00:00"
+    }
+  }
+}

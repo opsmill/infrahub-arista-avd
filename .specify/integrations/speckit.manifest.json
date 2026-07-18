@@ -1,0 +1,12 @@
+{
+  "integration": "speckit",
+  "version": "0.13.0",
+  "installed_at": "2026-07-17T23:24:19.803690+00:00",
+  "files": {
+    ".specify/templates/constitution-template.md": "ce7549540fa45543cca797a150201d868e64495fdff39dc38246fb17bd4024b3",
+    ".specify/templates/checklist-template.md": "709d8ab8384a3a49f5e0f64479f71553ef6d6f8bb4f00281b05f47837993b536",
+    ".specify/templates/tasks-template.md": "fc29a233f6f5a27ca31f1aa46b596af6500c627441c6e62b2bc4a1d721525842",
+    ".specify/templates/spec-template.md": "3945437fc35cd30a5b2bf7beea680337c3516826d3efa5a6b92c4a7eca1ba28e",
+    ".specify/templates/plan-template.md": "7e637502d41eccf0ca672496636365691fdca62ef37b27ec07fcb412dbfa90d4"
+  }
+}
