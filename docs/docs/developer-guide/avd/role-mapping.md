@@ -20,6 +20,7 @@ Infrahub's `DcimDevice.role.value` is a string enum that the hostvars generator 
 | `super_spine` | `super-spine` |
 | `spine` | `spine` |
 | `leaf` | `l3leaf` |
+| `border_leaf` | `l3leaf` |
 | `l2leaf` | `l2leaf` |
 
 ## The mapping in code
@@ -30,6 +31,7 @@ ROLE_TO_AVD_TYPE: dict[str, str] = {
     "super_spine": "super-spine",
     "spine": "spine",
     "leaf": "l3leaf",
+    "border_leaf": "l3leaf",
     "l2leaf": "l2leaf",
 }
 
@@ -52,6 +54,7 @@ The role governs several downstream behaviours in the hostvars generator and in 
 | `super_spine` | — (top of fabric) | No | No |
 | `spine` | `super_spine` | No | No |
 | `leaf` | `spine` | Yes | Yes (if peer set) |
+| `border_leaf` | `spine` | Yes | Yes (if peer set) |
 | `l2leaf` | `leaf` | No (skipped) | Yes (if peer set) |
 
 See [Hostvars Reference](./hostvars.md) for exactly which fields each role emits.

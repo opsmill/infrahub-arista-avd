@@ -25,6 +25,7 @@ Regenerate the typed protocol classes after any schema change (see [the command 
 | `base/organization.yml` | `Organization.Generic`, `Organization.Manufacturer`, `Organization.Provider` |
 | `logical_design.yml` | `Network.Fabric`, `Network.Pod`, `Network.BuildingBlock` |
 | `dcim_extensions.yml` | `Network.Link`, plus device extensions (`role`, `bgp_asn`, `node_id`, loopback/mgmt, pod/rack relations) and the interface `role`/`description`/`ip_address` extensions |
+| `dci.yml` | `Network.DciLink` and the `NetworkFabric.dci_pool` DCI addressing source |
 | `l3ls_extensions.yml` | L3LS fabric attributes (routing protocols, MTU, spanning-tree, EVPN overlay) and pod/rack/VRF/MLAG extensions |
 | `location_extensions.yml` | `Location.Hall`, `Location.Rack` (`rack_type`, leaf counts, `generation_complete`) |
 | `ipam_extensions.yml` | `Ipam.Prefix` `role` and `status` dropdowns |
@@ -49,7 +50,7 @@ The device and interface `role` dropdowns that the fabric uses are defined in `d
 Top-level container for a datacenter fabric. Inherits `Network.BuildingBlock` and `CoreArtifactTarget`; parents `NetworkPod`.
 
 - **Attributes**: `name` (unique), `index`, `amount_of_super_spines` (default 4), interface-sorting methods, `mgmt_gateway`, `avd_hostvars_ready`. L3LS attributes (via `l3ls_extensions.yml`): `underlay_routing_protocol` (`ebgp`/`ospf`), `overlay_routing_protocol` (`ebgp`/`ibgp`), `p2p_uplinks_mtu`, `spanning_tree_mode`, `virtual_router_mac`, EVPN/underlay/MLAG passwords, `anta_enabled`.
-- **Relationships**: `uplink_pool` / `vtep_pool` / `loopback_pool` → `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` → `CoreNumberPool`, `mgmt_pool` → `CoreIPAddressPool`, `avd_evpn` → `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` → management kinds.
+- **Relationships**: `uplink_pool` / `vtep_pool` / `loopback_pool` / `dci_pool` → `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` → `CoreNumberPool`, `mgmt_pool` → `CoreIPAddressPool`, `avd_evpn` → `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` → management kinds.
 
 ### `NetworkPod` — `Network.Pod`
 
@@ -65,6 +66,14 @@ Hierarchical base for `NetworkFabric` and `NetworkPod`. Attributes: `name` (uniq
 ### `NetworkLink` — `Network.Link`
 
 A cabled connection between interfaces. Inherits `Dcim.Connector`, so it carries `name` and `medium` (`mmf`, `smf`, `copper`) and relates to `connected_endpoints` → `DcimEndpoint`.
+
+### `NetworkDciLink` — `Network.DciLink`
+
+A point-to-point DCI connection between two Border Leaf devices. It inherits `Dcim.Connector`, so it reuses the same `name`, `medium`, and `connected_endpoints` physical endpoint behavior as `NetworkLink`.
+
+- **Attributes**: `include_in_underlay_protocol` (Boolean, default `true`), `endpoint_1_bgp_asn`, and `endpoint_2_bgp_asn`.
+- **Relationships**: inherited `connected_endpoints`; no DCI-specific endpoint, pool, subnet, endpoint IP, speed, BFD, MTU, external-network, or EVPN Gateway fields are added.
+- **Addressing source**: `NetworkFabric.dci_pool`; the hostvars generator allocates one `/31` from this pool per valid DCI link.
 
 ## Devices and interfaces
 
@@ -180,7 +189,7 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 
 ## Dropdown reference
 
-**Device role** (`DcimDevice.role`): `super_spine`, `spine`, `leaf`, `l2leaf`.
+**Device role** (`DcimDevice.role`): `super_spine`, `spine`, `leaf`, `border_leaf`, `l2leaf`.
 
 **Interface role** (`DcimInterface.role`): `uplink`, `access`, `spine`, `super_spine`, `leaf`, `loopback`, `server`, `storage`, `mlag_peer`.
 

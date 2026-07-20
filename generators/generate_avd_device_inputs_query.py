@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 
 class GenerateAvdDeviceInputsQuery(BaseModel):
     dcim_device: "GenerateAvdDeviceInputsQueryDcimDevice" = Field(alias="DcimDevice")
+    network_dci_link: "GenerateAvdDeviceInputsQueryNetworkDciLink" = Field(
+        alias="NetworkDciLink"
+    )
 
 
 class GenerateAvdDeviceInputsQueryDcimDevice(BaseModel):
@@ -367,6 +370,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     uplink_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUplinkPool"
     vtep_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPool"
     loopback_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool"
+    dci_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPool"
     spanning_tree_mode: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreeMode"
     ]
@@ -522,6 +526,38 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeDefaultPrefixLength(
+    BaseModel
+):
+    value: Optional[Any]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPool(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNode(
+    BaseModel
+):
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeName"
+    ]
+    default_prefix_length: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeDefaultPrefixLength"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeDefaultPrefixLength(
     BaseModel
 ):
     value: Optional[Any]
@@ -967,7 +1003,9 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfac
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNode(
     BaseModel
 ):
-    typename__: Literal["DcimConnector", "NetworkLink"] = Field(alias="__typename")
+    typename__: Literal["DcimConnector", "NetworkDciLink", "NetworkLink"] = Field(
+        alias="__typename"
+    )
     id: Optional[str]
     connected_endpoints: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpoints"
 
@@ -1251,7 +1289,9 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfac
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalLagNodeLagMembersEdgesNodeConnectorNode(
     BaseModel
 ):
-    typename__: Literal["DcimConnector", "NetworkLink"] = Field(alias="__typename")
+    typename__: Literal["DcimConnector", "NetworkDciLink", "NetworkLink"] = Field(
+        alias="__typename"
+    )
     id: Optional[str]
     connected_endpoints: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalLagNodeLagMembersEdgesNodeConnectorNodeConnectedEndpoints"
 
@@ -1493,6 +1533,240 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfac
     value: Optional[str]
 
 
+class GenerateAvdDeviceInputsQueryNetworkDciLink(BaseModel):
+    edges: list["GenerateAvdDeviceInputsQueryNetworkDciLinkEdges"]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdges(BaseModel):
+    node: Optional["GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNode"]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNode(BaseModel):
+    id: str
+    display_label: Optional[str]
+    name: Optional["GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeName"]
+    include_in_underlay_protocol: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeIncludeInUnderlayProtocol"
+    ]
+    endpoint_1_bgp_asn: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeEndpoint1BgpAsn"
+    ]
+    endpoint_2_bgp_asn: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeEndpoint2BgpAsn"
+    ]
+    connected_endpoints: (
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpoints"
+    )
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeName(BaseModel):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeIncludeInUnderlayProtocol(
+    BaseModel
+):
+    value: Optional[bool]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeEndpoint1BgpAsn(BaseModel):
+    value: Optional[Any]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeEndpoint2BgpAsn(BaseModel):
+    value: Optional[Any]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpoints(BaseModel):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeDcimEndpoint",
+                "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysical",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeDcimEndpoint(
+    BaseModel
+):
+    typename__: Literal["DcimEndpoint"] = Field(alias="__typename")
+    id: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysical(
+    BaseModel
+):
+    typename__: Literal["InterfacePhysical"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalName"
+    ]
+    device: "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice"
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDevice",
+                "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDevice(
+    BaseModel
+):
+    typename__: Literal["ComputePhysicalServer", "DcimGenericDevice"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDeviceName"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDeviceName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice(
+    BaseModel
+):
+    typename__: Literal["DcimDevice"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceName"
+    ]
+    role: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceRole"
+    ]
+    pod: "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod"
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceRole(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNode(
+    BaseModel
+):
+    parent: "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParent"
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParent(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkBuildingBlock",
+                "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabric",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkBuildingBlock(
+    BaseModel
+):
+    typename__: Literal["NetworkBuildingBlock", "NetworkPod"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabric(
+    BaseModel
+):
+    typename__: Literal["NetworkFabric"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricName"
+    ]
+    dci_pool: "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPool"
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPool(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNode(
+    BaseModel
+):
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNodeName"
+    ]
+    default_prefix_length: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNodeDefaultPrefixLength"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNodeName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNodeDefaultPrefixLength(
+    BaseModel
+):
+    value: Optional[Any]
+
+
 GenerateAvdDeviceInputsQuery.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDevice.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdges.model_rebuild()
@@ -1530,6 +1804,8 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVte
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPool.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePriorities.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdges.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNode.model_rebuild()
@@ -1586,3 +1862,18 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysi
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalLagNodeLagMembersEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalLagNodeLagMembersEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDevice.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalLagNodeLagMembersEdgesNodeConnectorNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLink.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNode.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpoints.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysical.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDevice.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNode.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParent.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabric.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPool.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkDciLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNode.model_rebuild()

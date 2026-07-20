@@ -186,6 +186,17 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                       }
                     }
                   }
+                  dci_pool {
+                    node {
+                      id
+                      name {
+                        value
+                      }
+                      default_prefix_length {
+                        value
+                      }
+                    }
+                  }
                   spanning_tree_mode {
                     value
                   }
@@ -466,6 +477,80 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                 ... on DcimDevice {
                                   role {
                                     value
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  NetworkDciLink {
+    edges {
+      node {
+        __typename
+        id
+        display_label
+        name {
+          value
+        }
+        include_in_underlay_protocol {
+          value
+        }
+        endpoint_1_bgp_asn {
+          value
+        }
+        endpoint_2_bgp_asn {
+          value
+        }
+        connected_endpoints {
+          edges {
+            node {
+              __typename
+              id
+              ... on InterfacePhysical {
+                name {
+                  value
+                }
+                device {
+                  node {
+                    __typename
+                    id
+                    name {
+                      value
+                    }
+                    ... on DcimDevice {
+                      role {
+                        value
+                      }
+                      pod {
+                        node {
+                          parent {
+                            node {
+                              __typename
+                              id
+                              ... on NetworkFabric {
+                                name {
+                                  value
+                                }
+                                dci_pool {
+                                  node {
+                                    id
+                                    name {
+                                      value
+                                    }
+                                    default_prefix_length {
+                                      value
+                                    }
                                   }
                                 }
                               }

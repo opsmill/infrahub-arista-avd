@@ -17,6 +17,7 @@ class TestGetAvdType:
             ("super_spine", "super-spine"),
             ("spine", "spine"),
             ("leaf", "l3leaf"),
+            ("border_leaf", "l3leaf"),
             ("l2leaf", "l2leaf"),
         ],
     )
@@ -35,5 +36,5 @@ class TestRoleMapping:
 
     def test_all_roles_defined(self) -> None:
         """Ensure all expected roles are defined."""
-        expected_roles = {"super_spine", "spine", "leaf", "l2leaf"}
+        expected_roles = {"super_spine", "spine", "leaf", "border_leaf", "l2leaf"}
         assert set(ROLE_TO_AVD_TYPE.keys()) == expected_roles

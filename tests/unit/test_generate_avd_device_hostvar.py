@@ -11,6 +11,7 @@ from generators.generate_avd_device_hostvar import (
     GenerateAVDDeviceHostvar,
     _add_switch_lag_adapter,  # noqa: PLC2701 - focused unit coverage for internal conflict validation
     apply_lag_adapter_config,
+    build_dci_l3_edge_p2p_links,
 )
 
 
@@ -36,6 +37,90 @@ def _named_peer(name: str) -> SimpleNamespace:
     return SimpleNamespace(name=_attr(name))
 
 
+def _pool(pool_id: str = "pool-1") -> SimpleNamespace:
+    return SimpleNamespace(id=pool_id, name=_attr("DCI-Pool"))
+
+
+def _fabric_with_dci_pool() -> dict:
+    return {"dci_pool": {"node": _pool()}}
+
+
+def _dci_endpoint(
+    *,
+    endpoint_id: str,
+    device_id: str,
+    device_name: str,
+    interface_name: str,
+    role: str = "border_leaf",
+    speed: str | None = "100g",
+) -> dict:
+    endpoint = {
+        "__typename": "InterfacePhysical",
+        "id": endpoint_id,
+        "name": {"value": interface_name},
+        "device": {
+            "node": {
+                "__typename": "DcimDevice",
+                "id": device_id,
+                "name": {"value": device_name},
+                "role": {"value": role},
+            }
+        },
+    }
+    if speed is not None:
+        endpoint["speed"] = {"value": speed}
+    return endpoint
+
+
+def _dci_link(
+    link_id: str = "dci-1",
+    *,
+    name: str = "DCI-1",
+    endpoint_1: dict | None = None,
+    endpoint_2: dict | None = None,
+    asn_1: int | None = 65101,
+    asn_2: int | None = 65201,
+    include_in_underlay_protocol: bool | None = True,
+) -> dict:
+    link = {
+        "__typename": "NetworkDciLink",
+        "id": link_id,
+        "display_label": name,
+        "name": {"value": name},
+        "endpoint_1_bgp_asn": {"value": asn_1},
+        "endpoint_2_bgp_asn": {"value": asn_2},
+        "connected_endpoints": {
+            "edges": [
+                {
+                    "node": endpoint_1
+                    or _dci_endpoint(
+                        endpoint_id="dc1-eth5",
+                        device_id="dc1-leaf1",
+                        device_name="ih-dc1-leaf1a",
+                        interface_name="Ethernet5",
+                    )
+                },
+                {
+                    "node": endpoint_2
+                    or _dci_endpoint(
+                        endpoint_id="dc2-eth5",
+                        device_id="dc2-leaf1",
+                        device_name="ih-dc2-leaf1a",
+                        interface_name="Ethernet5",
+                    )
+                },
+            ]
+        },
+    }
+    if include_in_underlay_protocol is not None:
+        link["include_in_underlay_protocol"] = {"value": include_in_underlay_protocol}
+    return link
+
+
+def _mock_prefix(prefix: str) -> SimpleNamespace:
+    return SimpleNamespace(prefix=_attr(prefix))
+
+
 def _base_hostvars(
     tenants_data: list[dict],
     *,
@@ -43,11 +128,13 @@ def _base_hostvars(
     mlag_info: dict | None = None,
     connected_endpoints: list[dict] | None = None,
     custom_hostvars: dict | None = None,
+    role: str = "leaf",
+    dci_l3_edge_p2p_links: list[dict] | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
         hostname="leaf1",
-        role="leaf",
+        role=role,
         bgp_asn=65001,
         node_id=3,
         loopback_ip="10.0.0.3",
@@ -75,6 +162,7 @@ def _base_hostvars(
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
         connected_endpoints=connected_endpoints or [],
+        dci_l3_edge_p2p_links=dci_l3_edge_p2p_links,
         custom_hostvars=custom_hostvars or {},
     )
 
@@ -127,6 +215,236 @@ def test_non_mlag_leaf_sets_avd_mlag_false_on_rack_node_group() -> None:
     assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
     assert "mlag" not in hostvars["l3leaf"].get("defaults", {})
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_border_leaf_builds_l3leaf_hostvars() -> None:
+    hostvars = _base_hostvars([], role="border_leaf")
+
+    assert hostvars["type"] == "l3leaf"
+    assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
+    assert hostvars["l3leaf"]["node_groups"][0]["nodes"] == [{"name": "leaf1"}]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_p2p_link_output_with_resolved_speed() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        fabric=_fabric_with_dci_pool(),
+        dci_links=[_dci_link()],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == [
+        {
+            "nodes": ["ih-dc1-leaf1a", "ih-dc2-leaf1a"],
+            "interfaces": ["Ethernet5", "Ethernet5"],
+            "as": [65101, 65201],
+            "ip": ["172.16.0.0/31", "172.16.0.1/31"],
+            "include_in_underlay_protocol": True,
+            "speed": "100g",
+        }
+    ]
+    gen.client.allocate_next_ip_prefix.assert_awaited_once()
+
+    hostvars = _base_hostvars([], dci_l3_edge_p2p_links=p2p_links)
+    assert "p2p_links_profiles" not in hostvars["l3_edge"]
+    assert "profile" not in hostvars["l3_edge"]["p2p_links"][0]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_omits_speed_when_unresolved() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        fabric=_fabric_with_dci_pool(),
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    speed=None,
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    speed=None,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert "speed" not in p2p_links[0]
+    assert not validate_inputs(_base_hostvars([], dci_l3_edge_p2p_links=p2p_links)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_uses_default_underlay_when_unset() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        fabric=_fabric_with_dci_pool(),
+        dci_links=[_dci_link(include_in_underlay_protocol=None)],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links[0]["include_in_underlay_protocol"] is True
+
+
+@pytest.mark.anyio
+async def test_invalid_dci_link_reports_non_border_leaf_context() -> None:
+    gen = _make_generator()
+
+    with pytest.raises(ValueError, match="both endpoints must be Border Leaf"):
+        await build_dci_l3_edge_p2p_links(
+            gen.client,
+            fabric=_fabric_with_dci_pool(),
+            dci_links=[
+                _dci_link(
+                    endpoint_2=_dci_endpoint(
+                        endpoint_id="dc2-eth5",
+                        device_id="dc2-leaf1",
+                        device_name="ih-dc2-leaf1a",
+                        interface_name="Ethernet5",
+                        role="leaf",
+                    )
+                )
+            ],
+            hostname="ih-dc1-leaf1a",
+        )
+
+
+@pytest.mark.anyio
+async def test_duplicate_dci_endpoint_pairs_are_rejected_before_allocation() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    with pytest.raises(ValueError, match="duplicate endpoint-interface pair"):
+        await build_dci_l3_edge_p2p_links(
+            gen.client,
+            fabric=_fabric_with_dci_pool(),
+            dci_links=[_dci_link("dci-1", name="DCI-1"), _dci_link("dci-2", name="DCI-2")],
+            hostname="ih-dc1-leaf1a",
+        )
+
+    gen.client.allocate_next_ip_prefix.assert_awaited_once()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("link", "match"),
+    [
+        (
+            {
+                **_dci_link(),
+                "connected_endpoints": {
+                    "edges": [
+                        {
+                            "node": _dci_endpoint(
+                                endpoint_id="a", device_id="a", device_name="a", interface_name="Ethernet1"
+                            )
+                        }
+                    ]
+                },
+            },
+            "exactly two",
+        ),
+        (
+            {**_dci_link(), "connected_endpoints": {"edges": [{"node": {"__typename": "DcimInterface", "id": "bad"}}]}},
+            "not a physical",
+        ),
+        (
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="a", device_id="same", device_name="same-a", interface_name="Ethernet1"
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="b", device_id="same", device_name="same-b", interface_name="Ethernet2"
+                ),
+            ),
+            "different devices",
+        ),
+        (_dci_link(asn_1=None), "both endpoint BGP ASN"),
+    ],
+)
+async def test_invalid_dci_links_report_actionable_context(link: dict, match: str) -> None:
+    gen = _make_generator()
+
+    with pytest.raises(ValueError, match=match):
+        await build_dci_l3_edge_p2p_links(
+            gen.client,
+            fabric=_fabric_with_dci_pool(),
+            dci_links=[link],
+            hostname="ih-dc1-leaf1a",
+        )
+
+
+@pytest.mark.anyio
+async def test_dci_link_requires_fabric_dci_pool() -> None:
+    gen = _make_generator()
+
+    with pytest.raises(ValueError, match="missing dci_pool"):
+        await build_dci_l3_edge_p2p_links(
+            gen.client,
+            fabric={"dci_pool": {"node": None}},
+            dci_links=[_dci_link()],
+            hostname="ih-dc1-leaf1a",
+        )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("count", [10, 100, 250])
+async def test_dci_link_scale_ordering_and_no_duplicate_entries(count: int) -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(
+        side_effect=[_mock_prefix(f"172.16.{index // 128}.{(index % 128) * 2}/31") for index in range(count)]
+    )
+    links = [
+        _dci_link(
+            f"dci-{index:03}",
+            name=f"DCI-{index:03}",
+            endpoint_1=_dci_endpoint(
+                endpoint_id=f"dc1-eth{index}",
+                device_id="dc1-leaf1",
+                device_name="ih-dc1-leaf1a",
+                interface_name=f"Ethernet{index + 1}",
+                speed=None,
+            ),
+            endpoint_2=_dci_endpoint(
+                endpoint_id=f"dc2-eth{index}",
+                device_id=f"dc2-leaf{index}",
+                device_name=f"ih-dc2-leaf{index:03}",
+                interface_name=f"Ethernet{index + 1}",
+                speed=None,
+            ),
+        )
+        for index in reversed(range(count))
+    ]
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        fabric=_fabric_with_dci_pool(),
+        dci_links=links,
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert len(p2p_links) == count
+    assert p2p_links[0]["nodes"] == ["ih-dc1-leaf1a", "ih-dc2-leaf000"]
+    assert p2p_links[-1]["nodes"] == ["ih-dc1-leaf1a", f"ih-dc2-leaf{count - 1:03}"]
+    assert len({tuple(link["nodes"] + link["interfaces"]) for link in p2p_links}) == count
 
 
 def test_mlag_leaf_uses_rack_node_group_and_domain_id() -> None:

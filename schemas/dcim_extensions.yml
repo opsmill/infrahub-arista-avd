@@ -33,6 +33,8 @@ extensions:
               label: Spine
             - name: leaf
               label: Leaf
+            - name: border_leaf
+              label: Border Leaf
             - name: l2leaf
               label: L2 Leaf
               description: "L2 Leaf Switch (access layer, no EVPN)"
