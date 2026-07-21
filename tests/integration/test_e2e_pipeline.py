@@ -295,26 +295,24 @@ class TestE2EPipeline(TestInfrahubDockerClient):
     @pytest.mark.asyncio(loop_scope="class")
     async def test_cabling_and_ip_allocation(self, client: InfrahubClient) -> None:
         """Links exist and every L3 device has a unique loopback + a management IP (FR-009)."""
-        links = await client.all(kind="NetworkLink", branch=PIPELINE_BRANCH)
-        assert links, "no NetworkLink cabling created"
-
-        l3_device_count = 0
-        for role in ("super_spine", "spine", "leaf"):
-            l3_device_count += len(await client.filters(kind="DcimDevice", role__value=role, branch=PIPELINE_BRANCH))
-
-        ip_report = await _device_ip_report(client, PIPELINE_BRANCH)
+        report = await wait_until(
+            fetch=lambda: _cabling_and_ip_report(client, PIPELINE_BRANCH),
+            ready=lambda r: (
+                r["network_link_count"] > 0
+                and r["with_loopback"] >= r["l3_device_count"] > 0
+                and not r["duplicate_loopbacks"]
+                and r["with_mgmt"] > 0
+            ),
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="NetworkLink cabling and device IP allocation",
+        )
         print(
-            f"ip report: total={ip_report['total']} with_loopback={ip_report['with_loopback']} "
-            f"with_mgmt={ip_report['with_mgmt']} duplicate_loopbacks={ip_report['duplicate_loopbacks']}",
+            f"cabling/ip report: links={report['network_link_count']} l3_devices={report['l3_device_count']} "
+            f"total={report['total']} with_loopback={report['with_loopback']} "
+            f"with_mgmt={report['with_mgmt']} duplicate_loopbacks={report['duplicate_loopbacks']}",
             flush=True,
         )
-        assert ip_report["with_loopback"] >= l3_device_count > 0, (
-            f"expected every L3 device to have a loopback; {ip_report['with_loopback']} have one"
-        )
-        assert not ip_report["duplicate_loopbacks"], (
-            f"duplicate loopback addresses allocated: {ip_report['duplicate_loopbacks']}"
-        )
-        assert ip_report["with_mgmt"] > 0, "no devices have an allocated management IP"
 
     # --- Component 10b: server cabling trigger -----------------------------
     @pytest.mark.asyncio(loop_scope="class")
@@ -580,6 +578,19 @@ async def _device_ip_report(client: InfrahubClient, branch: str) -> dict:
         "with_loopback": len(loopbacks),
         "with_mgmt": with_mgmt,
         "duplicate_loopbacks": duplicate_loopbacks,
+    }
+
+
+async def _cabling_and_ip_report(client: InfrahubClient, branch: str) -> dict:
+    ip_report = await _device_ip_report(client, branch)
+    links = await client.all(kind="NetworkLink", branch=branch)
+    l3_device_count = 0
+    for role in ("super_spine", "spine", "leaf"):
+        l3_device_count += len(await client.filters(kind="DcimDevice", role__value=role, branch=branch))
+    return {
+        **ip_report,
+        "network_link_count": len(links),
+        "l3_device_count": l3_device_count,
     }
 
 
