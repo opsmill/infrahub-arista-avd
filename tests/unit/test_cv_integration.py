@@ -3,11 +3,12 @@ from __future__ import annotations
 import inspect
 import time
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import pytest
 from infrahub_sdk.exceptions import NodeNotFoundError, SchemaNotFoundError
 
+from checks import cv_config_check
 from checks.cv_config_check import CVConfigValidationCheck
 from checks.cv_config_check_query import CVConfigCheckQuery
 from checks.cv_helpers import (
@@ -545,6 +546,91 @@ async def test_workspace_tracking_schema_absence_does_not_fail() -> None:
     check.client = cast("Any", FakeClient())
 
     await check._track_workspace("ws-1", "Workspace", "fabric-1", "pc-1", "built")
+
+
+@pytest.mark.asyncio
+async def test_deploy_and_build_blocks_inactive_inventory_device_after_successful_build(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    check = CVConfigValidationCheck(branch="cv-check-test", client=cast("Any", SimpleNamespace()))
+    tracked_statuses: list[str] = []
+
+    config_path = tmp_path / "leaf-1.cfg"
+    config_path.write_text("hostname leaf-1\n")
+    eos_config = cv_config_check.CVEosConfig(
+        file=str(config_path),
+        device=cv_config_check.CVDevice(
+            avd_device=cv_config_check.AvdDevice(hostname="leaf-1"), serial_number="SERIAL1"
+        ),
+        configlet_name="Infrahub_leaf-1",
+    )
+    inventory_devices = [
+        cv_config_check.CVDevice(
+            avd_device=cv_config_check.AvdDevice(hostname="leaf-1"), serial_number="SERIAL1", streaming=True
+        ),
+        cv_config_check.CVDevice(
+            avd_device=cv_config_check.AvdDevice(hostname="leaf-2"), serial_number="SERIAL2", streaming=False
+        ),
+    ]
+
+    class FakeCVClient:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+    async def ensure_workspace_pending(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def verify_devices(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def deploy_configs(*, configs: list[cv_config_check.CVEosConfig], result: Any, cv_client: Any) -> None:
+        result.deployed_configs.extend(configs)
+
+    async def finalize_workspace(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def track_workspace(ws_id: str, ws_name: str, fabric_id: str, proposed_change_id: str, status: str) -> None:
+        tracked_statuses.append(status)
+
+    token_value = "cv-" + "token"
+    monkeypatch.setattr("checks.cv_config_check.CVClient", FakeCVClient)
+    monkeypatch.setattr(check, "_ensure_workspace_pending", ensure_workspace_pending)
+    monkeypatch.setattr("checks.cv_config_check.verify_devices_on_cv", verify_devices)
+    monkeypatch.setattr("checks.cv_config_check.deploy_configs_to_cv", deploy_configs)
+    monkeypatch.setattr("checks.cv_config_check.finalize_workspace_on_cv", finalize_workspace)
+    monkeypatch.setattr(check, "_track_workspace", track_workspace)
+
+    await check._deploy_and_build(
+        cv_config=SimpleNamespace(
+            servers=["www.cv.example.com"],
+            token=token_value,
+            username=None,
+            password=None,
+            verify_certs=True,
+            proxy_host=None,
+            proxy_port=None,
+            proxy_username=None,
+            proxy_password=None,
+        ),
+        ws_id="ws-1",
+        ws_name="Workspace",
+        ws_description="description",
+        proposed_change_id="pc-1",
+        eos_configs=[eos_config],
+        fabric_name="Fabric-DC1",
+        fabric_id="fabric-1",
+        inventory_devices=inventory_devices,
+    )
+
+    assert tracked_statuses == ["abandoned"]
+    assert any("inactive" in error["message"] and "leaf-2" in error["message"] for error in check.errors)
+    assert any("workspace built successfully" in log["message"] for log in check.logs)
 
 
 def test_check_does_not_submit_or_register_lifecycle_hooks() -> None:

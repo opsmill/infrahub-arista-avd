@@ -37,10 +37,11 @@ Blank optional values are treated as unset.
 | Managed target fabric has no confirmed member devices | Informational result after CloudVision setup; serial-number and inventory eligibility pass with zero devices; no workspace validation |
 | Any confirmed managed-fabric device lacks a serial number | Failing result listing every missing serial device before inventory or workspace validation |
 | Any serial-numbered managed-fabric device is missing from CloudVision inventory | Failing result listing every missing inventory device before workspace validation |
+| Any targeted CloudVision device is inactive | Failing result listing every inactive device, even when the workspace build itself succeeds |
 | Managed-fabric eligibility passes but no devices have structured configs | Informational result; no workspace validation |
 | Structured-config file selected for workspace deployment cannot be downloaded, decoded, or rendered | Failing result identifying affected device |
 | CloudVision build failure | Failing result with fabric and workspace location |
-| Successful workspace build | Passing result with workspace location and deployment counts |
+| Successful workspace build and all targeted CloudVision devices are active | Passing result with workspace location and deployment counts |
 
 ## Workspace Behavior
 
@@ -58,3 +59,4 @@ Blank optional values are treated as unset.
 - Runtime failures are reported as check failures or informational skips, not uncaught tracebacks.
 - CloudVision credential, authentication, and connection setup is validated before target-device eligibility decisions only for fabrics where `cloudvision_managed` is true.
 - Missing CloudVision inventory membership is blocking for every serial-numbered device in a managed fabric.
+- Inactive CloudVision device state is blocking for every targeted CloudVision device in a managed fabric and must not be downgraded to a warning when workspace build succeeds.

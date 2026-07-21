@@ -264,3 +264,10 @@ Task: "Document deployment boundary in docs/docs/cloudvision.md"
 - [X] T058 Move the CloudVision validation guide from `docs/docs/developer-guide/cloudvision.md` into the user-facing guide/navigation and remove the developer-guide sidebar placement per User input / plan: documentation navigation
 - [X] T059 Update the moved CloudVision guide so it matches the current implementation, including managed-fabric gating, validation order, optional workspace tracking, deterministic workspace reuse, rollback-to-pending behavior, source-branch proposed-change lookup, and validation-only scope per T047 / current implementation
 - [X] T060 Update PR #73 body with a concise summary of how CloudVision validation works and the implementation choices documented in the moved guide per User input / PR body
+
+## Phase 9: Convergence
+
+- [X] T061 Add inactive targeted CloudVision device unit coverage, including the false-positive case where workspace build succeeds but an inventory-confirmed device is inactive, in `tests/unit/test_cv_integration.py` per FR-025 / SC-009 (missing)
+- [X] T062 Enforce blocking `log_error` results for every inactive targeted CloudVision device in `checks/cv_config_check.py`, using CloudVision inventory streaming state and preventing a passing result even when workspace build succeeds, per FR-025 (missing)
+- [X] T063 Document that inactive CloudVision devices fail `cv-config-validation` even when workspace build succeeds in `docs/docs/cloudvision.md` per plan: user documentation (missing)
+- [X] T064 Re-run focused unit, ruff, mypy, and local validation for the inactive-device change and record that the remote integration run was stopped by user direction in `specs/004-cv-config-validation/quickstart.md` per User input / validation evidence

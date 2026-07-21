@@ -37,7 +37,9 @@ For a managed fabric, validation first authenticates to CloudVision, then
 requires every confirmed device in the fabric to have a serial number and to
 exist in CloudVision inventory. Devices outside the target fabric are ignored,
 and missing optional relationships are treated as absent membership rather than
-runtime failures.
+runtime failures. Inventory-confirmed devices must also be active in
+CloudVision; inactive targeted devices fail validation even if the workspace
+build itself succeeds.
 
 After eligibility passes, only devices with generated structured-config
 artifacts are deployed to the validation workspace. If no generated

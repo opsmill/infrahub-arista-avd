@@ -247,3 +247,9 @@ ansible/*.md5
 *.swp
 .vscode/
 .idea/
+
+# Node.js/docs dependencies
+node_modules/
+
+# Local environment variants
+.env*

@@ -46,6 +46,16 @@
 - Treat missing inventory devices as warnings and skip them: rejected because the spec requires missing inventory membership to block the proposed change.
 - Treat missing serial numbers as informational when no structured configs exist: rejected because serial-number eligibility precedes the generated-config availability check for managed fabrics.
 
+## Decision: Treat inactive CloudVision devices as blocking validation failures
+
+**Rationale**: A CloudVision workspace build can succeed even when one or more targeted devices are inactive and not streaming. That state is not a valid managed-fabric validation outcome, so the check must inspect CloudVision device state for the targeted fabric and fail when any targeted CloudVision device is inactive, even if workspace build reports success.
+
+**Alternatives considered**:
+
+- Rely only on CloudVision workspace build status: rejected because inactive devices can produce a false positive where the workspace builds while CloudVision still shows inactive devices.
+- Treat inactive devices as warnings after a successful build: rejected because FR-025 requires inactive targeted CloudVision devices to fail `cv-config-validation`.
+- Skip inactive devices during deployment validation: rejected because every targeted CloudVision device in the managed fabric must be considered for the proposed-change safety gate.
+
 ## Decision: Use generated structured configs only for the workspace validation set
 
 **Rationale**: After CloudVision authentication, serial-number validation, and inventory validation succeed for all devices in the managed fabric, only devices with generated structured-config artifacts can be converted to EOS CLI configuration and deployed into the validation workspace. If none are available, the check records an informational result and does not create or build a CloudVision workspace.

@@ -8,7 +8,7 @@
 
 ## Summary
 
-Add an Infrahub proposed-change validation check that validates generated EOS configurations in CloudVision before a proposed change can merge. The design adds a fabric-level `cloudvision_managed` Boolean gate, validates CloudVision credentials and authentication only when at least one target fabric is managed, keeps validation scoped to fabric targets, requires every device in each managed fabric to have a serial number and exist in CloudVision inventory, builds a deterministic CloudVision workspace per proposed change and fabric when generated structured configs are available, and records workspace tracking in Infrahub when the tracking schema is loaded. Post-merge workspace submission and deletion-time abandonment remain out of scope for this feature.
+Add an Infrahub proposed-change validation check that validates generated EOS configurations in CloudVision before a proposed change can merge. The design adds a fabric-level `cloudvision_managed` Boolean gate, validates CloudVision credentials and authentication only when at least one target fabric is managed, keeps validation scoped to fabric targets, requires every device in each managed fabric to have a serial number, exist in CloudVision inventory, and be active in CloudVision, builds a deterministic CloudVision workspace per proposed change and fabric when generated structured configs are available, and records workspace tracking in Infrahub when the tracking schema is loaded. Post-merge workspace submission and deletion-time abandonment remain out of scope for this feature.
 
 ## Technical Context
 
@@ -26,7 +26,7 @@ Add an Infrahub proposed-change validation check that validates generated EOS co
 
 **Performance Goals**: Complete validation within 10 minutes for a representative fabric of up to 50 CloudVision-managed devices
 
-**Constraints**: Do not contact CloudVision for unmanaged fabrics; do not submit CloudVision workspaces after merge; do not abandon workspaces on proposed-change deletion in this feature; fail fast when CloudVision credentials, authentication, or connection setup cannot be established for managed fabrics; fail before workspace validation when any managed-fabric device is missing a serial number or absent from CloudVision inventory; avoid runtime tracebacks for missing optional relationships; keep CloudVision credentials out of committed files; keep check registration compatible with Infrahub check definition rules
+**Constraints**: Do not contact CloudVision for unmanaged fabrics; do not submit CloudVision workspaces after merge; do not abandon workspaces on proposed-change deletion in this feature; fail fast when CloudVision credentials, authentication, or connection setup cannot be established for managed fabrics; fail before a passing result when any managed-fabric device is missing a serial number, absent from CloudVision inventory, or inactive in CloudVision, even if the CloudVision workspace build succeeds; avoid runtime tracebacks for missing optional relationships; keep CloudVision credentials out of committed files; keep check registration compatible with Infrahub check definition rules
 
 **Scale/Scope**: One targeted check run per fabric target in a proposed change; deterministic workspace identity per proposed change and fabric; optional workspace tracking object per built validation workspace
 

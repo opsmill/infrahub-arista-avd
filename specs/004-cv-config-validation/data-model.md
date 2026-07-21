@@ -58,6 +58,7 @@
 - A device is part of the managed-fabric eligibility set when it belongs to the target fabric, regardless of whether it has generated structured-config artifacts.
 - Every device in the managed-fabric eligibility set must have a serial number.
 - Every serial-numbered device in the managed-fabric eligibility set must exist in CloudVision inventory before workspace validation starts.
+- Every targeted CloudVision device in the managed-fabric eligibility set must be active in CloudVision; inactive devices fail validation even if workspace build succeeds.
 - Devices outside the target fabric are ignored.
 - Devices with structured-config artifacts become the workspace validation set only after authentication, serial-number, and inventory eligibility pass for the whole managed fabric.
 
@@ -176,6 +177,7 @@ rolled_back -> pending -> built
 
 - Existing non-pending workspaces must be returned to pending before deploying configs.
 - Build failure blocks the proposed change.
+- A successful build is not sufficient for a passing validation result when any targeted CloudVision device is inactive.
 - Successful build does not submit the workspace.
 
 ## Runtime Configuration

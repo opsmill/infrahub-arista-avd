@@ -133,7 +133,7 @@ class CVConfigValidationCheck(InfrahubCheck):
                 eos_configs,
                 fabric_name,
                 fabric_id,
-                inventory_count=len(inventory_devices),
+                inventory_devices=inventory_devices,
             )
 
     def _devices_in_fabric(self, parsed: CVConfigCheckQuery, fabric_id: str) -> list[CVConfigCheckDcimDeviceNode]:
@@ -257,7 +257,7 @@ class CVConfigValidationCheck(InfrahubCheck):
         eos_configs: list[CVEosConfig],
         fabric_name: str,
         fabric_id: str,
-        inventory_count: int,
+        inventory_devices: list[CVDevice],
     ) -> None:
         """Connect to CloudVision, deploy configs, and build the workspace."""
         workspace = CVWorkspace(
@@ -265,6 +265,7 @@ class CVConfigValidationCheck(InfrahubCheck):
         )
         result = DeployToCvResult(workspace=workspace)
         devices = [config.device for config in eos_configs]
+        inactive_devices = self._inactive_cv_device_names(inventory_devices)
 
         try:
             async with CVClient(
@@ -303,9 +304,25 @@ class CVConfigValidationCheck(InfrahubCheck):
             return
 
         await self._track_workspace(
-            ws_id, ws_name, fabric_id, proposed_change_id, "built" if not result.failed else "abandoned"
+            ws_id,
+            ws_name,
+            fabric_id,
+            proposed_change_id,
+            "built" if not result.failed and not inactive_devices else "abandoned",
         )
-        self._report_results(result, cv_config, fabric_name, inventory_count)
+        self._report_results(result, cv_config, fabric_name, len(inventory_devices))
+        if inactive_devices:
+            self.log_error(
+                message=(
+                    f"CloudVision devices inactive for fabric {fabric_name}: {', '.join(inactive_devices)}. "
+                    "The workspace build completed, but inactive targeted devices make validation unsafe."
+                )
+            )
+
+    @staticmethod
+    def _inactive_cv_device_names(devices: list[CVDevice]) -> list[str]:
+        """Return sorted unique device names whose CloudVision inventory state is inactive."""
+        return sorted({device.hostname for device in devices if device.streaming is False})
 
     async def _ensure_workspace_pending(
         self, cv_client: CVClient, workspace: CVWorkspace, workspace_description: str

@@ -120,6 +120,7 @@ As a change manager, I need validation to build CloudVision workspaces without s
 - **FR-022**: The check MUST NOT submit CloudVision workspaces, abandon workspaces on proposed-change deletion, or automate post-merge deployment as part of this feature.
 - **FR-023**: The check registration MUST keep the check definition, query registration, target group, and target parameters aligned so the validation receives the intended fabric data.
 - **FR-024**: After CloudVision runtime setup succeeds, when the target fabric is not found, the check MUST record an informational result and MUST NOT fail the proposed change solely because the target fabric is absent.
+- **FR-025**: The cv-config-validation check MUST fail when any targeted CloudVision device is inactive even if the CloudVision workspace build itself succeeds.
 
 ### Check Architecture
 
