@@ -313,6 +313,14 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             f"with_mgmt={report['with_mgmt']} duplicate_loopbacks={report['duplicate_loopbacks']}",
             flush=True,
         )
+        assert report["network_link_count"] > 0, "no NetworkLink cabling created"
+        assert report["with_loopback"] >= report["l3_device_count"] > 0, (
+            f"expected every L3 device to have a loopback; {report['with_loopback']} have one"
+        )
+        assert not report["duplicate_loopbacks"], (
+            f"duplicate loopback addresses allocated: {report['duplicate_loopbacks']}"
+        )
+        assert report["with_mgmt"] > 0, "no devices have an allocated management IP"
 
     # --- Component 10b: server cabling trigger -----------------------------
     @pytest.mark.asyncio(loop_scope="class")
