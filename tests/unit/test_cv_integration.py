@@ -40,7 +40,7 @@ def _device_node(
     fabric_id: str | None = "fabric-1",
     structured_config_id: str | None = None,
 ) -> dict[str, Any]:
-    pod = None
+    pod: dict[str, Any] = {"node": None}
     if fabric_id is not None:
         pod = {
             "node": {
@@ -48,7 +48,7 @@ def _device_node(
                 "parent": {"node": {"__typename": "NetworkFabric", "id": fabric_id}},
             }
         }
-    avd_artifact = None
+    avd_artifact: dict[str, Any] = {"node": None}
     if structured_config_id is not None:
         avd_artifact = {
             "node": {"id": f"artifact-{obj_id}", "structured_config_file": {"node": {"id": structured_config_id}}}

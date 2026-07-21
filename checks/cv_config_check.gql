@@ -1,4 +1,4 @@
-query CVConfigCheck($name: String!) {
+query CVConfigCheckQuery($name: String!) {
   NetworkFabric(name__value: $name) {
     edges {
       node {

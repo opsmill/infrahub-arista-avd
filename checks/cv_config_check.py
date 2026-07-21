@@ -33,7 +33,8 @@ from pyavd._cv.workflows.verify_devices_on_cv import verify_devices_in_cloudvisi
 
 from solution_arista_avd.protocols import AvdStructuredConfigFile
 
-from .cv_config_check_query import CVConfigCheckDcimDeviceNode, CVConfigCheckQuery
+from .cv_config_check_query import CVConfigCheckQuery
+from .cv_config_check_query import CVConfigCheckQueryDcimDeviceEdgesNode as CVConfigCheckDcimDeviceNode
 from .cv_helpers import (
     DEFAULT_WORKSPACE_DESCRIPTION,
     get_cloudvision_config,

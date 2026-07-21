@@ -29,7 +29,7 @@
 - [X] T006 Run schema validation from `specs/004-cv-config-validation/quickstart.md` and fix schema issues in `schemas/logical_design.yml` and `schemas/cv/cv.yml`
 - [X] T007 Regenerate protocol classes after schema changes and review generated output in `src/solution_arista_avd/protocols.py`
 - [X] T008 Add `cloudvision_managed.value` and nullable relationship fields required by `specs/004-cv-config-validation/contracts/graphql-query.md` to `checks/cv_config_check.gql`
-- [ ] T009 Regenerate the typed GraphQL response model for `checks/cv_config_check.gql` and review generated output in `checks/cv_config_check_query.py`
+- [X] T009 Regenerate the typed GraphQL response model for `checks/cv_config_check.gql` and review generated output in `checks/cv_config_check_query.py`
 - [X] T010 Align top-level query and targeted check registration with `specs/004-cv-config-validation/contracts/check-registration.md` in `.infrahub.yml`
 - [X] T011 Align live `CoreGraphQLQuery` and `CoreCheckDefinition` seed objects with `specs/004-cv-config-validation/contracts/check-registration.md` in `repository_checks.yml`
 
@@ -147,7 +147,7 @@
 - [X] T051 Run `uv run pytest tests/unit` and fix feature regressions in `tests/unit/`
 - [X] T052 Run `uv run yamllint .infrahub.yml repository_checks.yml schemas/logical_design.yml schemas/cv/cv.yml` and fix YAML findings in `.infrahub.yml`, `repository_checks.yml`, `schemas/logical_design.yml`, and `schemas/cv/cv.yml`
 - [X] T053 Re-run schema validation from `specs/004-cv-config-validation/quickstart.md` after implementation changes and fix schema issues in `schemas/logical_design.yml` and `schemas/cv/cv.yml`
-- [ ] T054 Run the full lint gate with `uv run invoke lint` and fix findings in `checks/cv_config_check.py`, `checks/cv_helpers.py`, `checks/cv_config_check_query.py`, `tests/unit/test_cv_integration.py`, `.infrahub.yml`, `repository_checks.yml`, `schemas/logical_design.yml`, and `schemas/cv/cv.yml`
+- [X] T054 Run the full lint gate with `uv run invoke lint` and fix findings in `checks/cv_config_check.py`, `checks/cv_helpers.py`, `checks/cv_config_check_query.py`, `tests/unit/test_cv_integration.py`, `.infrahub.yml`, `repository_checks.yml`, `schemas/logical_design.yml`, and `schemas/cv/cv.yml`
 - [X] T055 Add a representative 50-device mocked validation timing test for the SC-001 10-minute target in `tests/unit/test_cv_integration.py`, asserting the local non-network validation path completes within a documented threshold and recording that live CloudVision latency is excluded from the unit measurement
 - [ ] T056 Use `$infrahub-run-integration-tests` for required Infrahub integration validation and record the tested branch and commit in `specs/004-cv-config-validation/quickstart.md`
 

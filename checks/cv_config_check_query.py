@@ -1,101 +1,118 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class CVConfigCheckQuery(BaseModel):
-    network_fabric: CVConfigCheckNetworkFabric = Field(alias="NetworkFabric")
-    dcim_device: CVConfigCheckDcimDevice = Field(alias="DcimDevice")
+    network_fabric: "CVConfigCheckQueryNetworkFabric" = Field(alias="NetworkFabric")
+    dcim_device: "CVConfigCheckQueryDcimDevice" = Field(alias="DcimDevice")
 
 
-class CVConfigCheckNetworkFabric(BaseModel):
-    edges: list[CVConfigCheckNetworkFabricEdge]
+class CVConfigCheckQueryNetworkFabric(BaseModel):
+    edges: list["CVConfigCheckQueryNetworkFabricEdges"]
 
 
-class CVConfigCheckNetworkFabricEdge(BaseModel):
-    node: CVConfigCheckNetworkFabricNode | None
+class CVConfigCheckQueryNetworkFabricEdges(BaseModel):
+    node: Optional["CVConfigCheckQueryNetworkFabricEdgesNode"]
 
 
-class CVConfigCheckNetworkFabricNode(BaseModel):
+class CVConfigCheckQueryNetworkFabricEdgesNode(BaseModel):
     id: str
-    name: CVConfigCheckValueField | None
-    cloudvision_managed: CVConfigCheckBooleanField | None
+    name: Optional["CVConfigCheckQueryNetworkFabricEdgesNodeName"]
+    cloudvision_managed: Optional[
+        "CVConfigCheckQueryNetworkFabricEdgesNodeCloudvisionManaged"
+    ]
 
 
-class CVConfigCheckDcimDevice(BaseModel):
-    edges: list[CVConfigCheckDcimDeviceEdge]
+class CVConfigCheckQueryNetworkFabricEdgesNodeName(BaseModel):
+    value: Optional[str]
 
 
-class CVConfigCheckDcimDeviceEdge(BaseModel):
-    node: CVConfigCheckDcimDeviceNode | None
+class CVConfigCheckQueryNetworkFabricEdgesNodeCloudvisionManaged(BaseModel):
+    value: Optional[bool]
 
 
-class CVConfigCheckDcimDeviceNode(BaseModel):
+class CVConfigCheckQueryDcimDevice(BaseModel):
+    edges: list["CVConfigCheckQueryDcimDeviceEdges"]
+
+
+class CVConfigCheckQueryDcimDeviceEdges(BaseModel):
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNode"]
+
+
+class CVConfigCheckQueryDcimDeviceEdgesNode(BaseModel):
     id: str
-    name: CVConfigCheckValueField | None
-    serial: CVConfigCheckValueField | None
-    pod: CVConfigCheckDevicePod | None
-    avd_artifact: CVConfigCheckDeviceAvdArtifact | None
+    name: Optional["CVConfigCheckQueryDcimDeviceEdgesNodeName"]
+    serial: Optional["CVConfigCheckQueryDcimDeviceEdgesNodeSerial"]
+    pod: "CVConfigCheckQueryDcimDeviceEdgesNodePod"
+    avd_artifact: "CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifact"
 
 
-class CVConfigCheckValueField(BaseModel):
-    value: str | None
+class CVConfigCheckQueryDcimDeviceEdgesNodeName(BaseModel):
+    value: Optional[str]
 
 
-class CVConfigCheckBooleanField(BaseModel):
-    value: bool | None
+class CVConfigCheckQueryDcimDeviceEdgesNodeSerial(BaseModel):
+    value: Optional[str]
 
 
-class CVConfigCheckDevicePod(BaseModel):
-    node: CVConfigCheckDevicePodNode | None
+class CVConfigCheckQueryDcimDeviceEdgesNodePod(BaseModel):
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNodePodNode"]
 
 
-class CVConfigCheckDevicePodNode(BaseModel):
+class CVConfigCheckQueryDcimDeviceEdgesNodePodNode(BaseModel):
     id: str
-    parent: CVConfigCheckDevicePodParent | None
+    parent: "CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParent"
 
 
-class CVConfigCheckDevicePodParent(BaseModel):
-    node: CVConfigCheckDevicePodParentNode | None
+class CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParent(BaseModel):
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParentNode"]
 
 
-class CVConfigCheckDevicePodParentNode(BaseModel):
-    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(alias="__typename")
-    id: str | None
+class CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParentNode(BaseModel):
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
 
 
-class CVConfigCheckDeviceAvdArtifact(BaseModel):
-    node: CVConfigCheckDeviceAvdArtifactNode | None
+class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNode"]
 
 
-class CVConfigCheckDeviceAvdArtifactNode(BaseModel):
+class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
     id: str
-    structured_config_file: CVConfigCheckDeviceStructuredConfigFile | None
+    structured_config_file: (
+        "CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile"
+    )
 
 
-class CVConfigCheckDeviceStructuredConfigFile(BaseModel):
-    node: CVConfigCheckDeviceStructuredConfigFileNode | None
+class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile(
+    BaseModel
+):
+    node: Optional[
+        "CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode"
+    ]
 
 
-class CVConfigCheckDeviceStructuredConfigFileNode(BaseModel):
+class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode(
+    BaseModel
+):
     id: str
 
 
 CVConfigCheckQuery.model_rebuild()
-CVConfigCheckNetworkFabric.model_rebuild()
-CVConfigCheckNetworkFabricEdge.model_rebuild()
-CVConfigCheckNetworkFabricNode.model_rebuild()
-CVConfigCheckBooleanField.model_rebuild()
-CVConfigCheckDcimDevice.model_rebuild()
-CVConfigCheckDcimDeviceEdge.model_rebuild()
-CVConfigCheckDcimDeviceNode.model_rebuild()
-CVConfigCheckDevicePod.model_rebuild()
-CVConfigCheckDevicePodNode.model_rebuild()
-CVConfigCheckDevicePodParent.model_rebuild()
-CVConfigCheckDevicePodParentNode.model_rebuild()
-CVConfigCheckDeviceAvdArtifact.model_rebuild()
-CVConfigCheckDeviceAvdArtifactNode.model_rebuild()
-CVConfigCheckDeviceStructuredConfigFile.model_rebuild()
-CVConfigCheckDeviceStructuredConfigFileNode.model_rebuild()
+CVConfigCheckQueryNetworkFabric.model_rebuild()
+CVConfigCheckQueryNetworkFabricEdges.model_rebuild()
+CVConfigCheckQueryNetworkFabricEdgesNode.model_rebuild()
+CVConfigCheckQueryDcimDevice.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdges.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdgesNode.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdgesNodePod.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdgesNodePodNode.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParent.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifact.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNode.model_rebuild()
+CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile.model_rebuild()
