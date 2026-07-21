@@ -65,9 +65,9 @@ spec:
       node: RoutingAsn
       node_attribute: asn
       start_range: 65100
-      end_range: 65299
+      end_range: 65199
     - name: Fabric-C-NodeID-Pool
       node: DcimDevice
       node_attribute: node_id
       start_range: 1
-      end_range: 999
+      end_range: 100

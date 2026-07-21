@@ -30,7 +30,7 @@ spec:
       node: RoutingAsn
       node_attribute: asn
       start_range: 65000
-      end_range: 65999
+      end_range: 65050
 ---
 # Node ID Pool for Fabric-A
 apiVersion: infrahub.app/v1
@@ -42,7 +42,7 @@ spec:
       node: DcimDevice
       node_attribute: node_id
       start_range: 1
-      end_range: 9999
+      end_range: 50
 ---
 # ASN Pool for Fabric-B (separate range)
 apiVersion: infrahub.app/v1
@@ -53,8 +53,8 @@ spec:
     - name: Fabric-B-ASN-Pool
       node: RoutingAsn
       node_attribute: asn
-      start_range: 65100
-      end_range: 65199
+      start_range: 65051
+      end_range: 65099
 ---
 # Node ID Pool for Fabric-B
 apiVersion: infrahub.app/v1
@@ -66,7 +66,7 @@ spec:
       node: DcimDevice
       node_attribute: node_id
       start_range: 1
-      end_range: 9999
+      end_range: 50
 ---
 # Management IP Prefix for Fabric-A
 apiVersion: infrahub.app/v1

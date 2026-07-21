@@ -124,14 +124,35 @@ class GeneratorMixin:
         if mgmt_pool is not None:
             device_kwargs["mgmt_ip"] = mgmt_pool
 
+        existing_devices = await self.client.filters(DcimDevice, name__value=name)
+        device_existed = bool(existing_devices)
+
         device = await self.client.create(DcimDevice, **device_kwargs)  # type: ignore[type-abstract]
         await device.save(allow_upsert=True)
 
-        if asn_pool is not None:
-            await self._ensure_device_asn(device.id, asn_pool, fabric_id)
+        created_asn: RoutingAsn | None = None
+        try:
+            if asn_pool is not None:
+                created_asn = await self._ensure_device_asn(device.id, asn_pool, fabric_id)
 
-        if loopback_pool is not None:
-            await self._activate_loopback_interface(device.id)
+            if loopback_pool is not None:
+                await self._activate_loopback_interface(device.id)
+        except Exception:
+            if not device_existed:
+                try:
+                    await device.delete()
+                except Exception:
+                    logger.exception("Failed to clean up partially-created device %s after generator error", name)
+                if created_asn is not None:
+                    try:
+                        await created_asn.delete()
+                    except Exception:
+                        logger.exception(
+                            "Failed to clean up RoutingAsn %s after rolling back device %s",
+                            created_asn.id,
+                            name,
+                        )
+            raise
 
         return device
 
@@ -167,13 +188,14 @@ class GeneratorMixin:
         await routing_asn.save(update_group_context=False)
         return routing_asn
 
-    async def _ensure_device_asn(self, device_id: str, asn_pool: CoreNumberPool, fabric_id: str) -> None:
+    async def _ensure_device_asn(self, device_id: str, asn_pool: CoreNumberPool, fabric_id: str) -> RoutingAsn | None:
         """Link a device to a fabric-owned ``RoutingAsn`` (unique per device), idempotently.
 
         Re-runs must not allocate a fresh AS number: ``RoutingAsn`` is keyed only
         by its (pool-allocated) value, so the device's existing ``asn`` link is
-        the stable idempotency anchor. If the device is already linked, reuse it;
-        otherwise allocate a new ``RoutingAsn`` from the pool and attach it.
+        the stable idempotency anchor. If the device is already linked, reuse it
+        and return ``None``; otherwise allocate a new ``RoutingAsn`` from the pool,
+        attach it, and return it so callers can roll back later failures.
         """
         device = await self.client.get(  # type: ignore[type-abstract]
             DcimDevice,
@@ -182,11 +204,21 @@ class GeneratorMixin:
             exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
         )
         if device.asn.id:
-            return
+            return None
 
         routing_asn = await self.allocate_routing_asn(asn_pool, fabric_id)
         device.asn = routing_asn.id  # type: ignore[assignment]
-        await device.save(allow_upsert=True)
+        try:
+            await device.save(allow_upsert=True)
+        except Exception:
+            try:
+                await routing_asn.delete()
+            except Exception:
+                logger.exception(
+                    "Failed to clean up unlinked RoutingAsn %s after device ASN link error", routing_asn.id
+                )
+            raise
+        return routing_asn
 
     async def _activate_loopback_interface(self, device_id: str) -> None:
         """Activate a device's loopback interface and bind its pool-allocated IP.
