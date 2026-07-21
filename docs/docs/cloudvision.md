@@ -1,8 +1,8 @@
 ---
-title: CloudVision Integration
+title: CloudVision Validation
 ---
 
-# CloudVision Integration
+# CloudVision Validation
 
 The repository validates generated EOS configurations in CloudVision during
 Infrahub proposed-change validation. Post-merge workspace submission is out of
@@ -22,8 +22,8 @@ Username/password authentication is also supported with
 `CLOUDVISION_USERNAME` and `CLOUDVISION_PASSWORD`. Optional proxy settings use
 the `CLOUDVISION_PROXY_*` variables.
 
-`docker-compose.override.yml` passes these variables into the custom Infrahub
-runtime so proposed-change checks can access them.
+`docker-compose.override.yml` passes these variables into the Infrahub task
+worker so proposed-change checks can access them.
 
 ## Proposed-Change Validation
 
@@ -48,12 +48,19 @@ For each selected device, the check downloads the
 `AvdStructuredConfigFile`, renders EOS CLI with `pyavd.get_device_config()`,
 deploys the configs to a CloudVision workspace, and requests a workspace build.
 Download, JSON decode, or render failures block the proposed change with a
-device-specific error.
+device-specific error. CloudVision connection, deployment, or workspace build
+failures also block the proposed change and include the fabric and workspace
+context when available.
 
 ## Workspace Tracking
 
-Successful validation creates or updates a `CloudvisionWorkspace` object in
-Infrahub. The object tracks:
+Successful validation creates or updates a deterministic CloudVision workspace
+for the proposed change and target fabric. If the workspace already exists and
+is not pending, the check returns it to a pending state before deploying the
+latest configs and requesting a build.
+
+When the tracking schema is loaded, validation also creates or updates a
+`CloudvisionWorkspace` object in Infrahub. The object tracks:
 
 - `workspace_id`: deterministic CloudVision workspace ID
 - `proposed_change_id`: proposed change that created the workspace
@@ -62,11 +69,18 @@ Infrahub. The object tracks:
 
 The workspace ID is deterministic from proposed-change ID and fabric name, so a
 validation rerun updates the same CloudVision workspace instead of creating a
-new one.
+new one. Separate proposed changes against the same fabric receive different
+workspace IDs.
 
 The CloudVision workspace display name uses the proposed-change name and fabric
 name. Its description uses the proposed-change description, with a generic
 Infrahub validation description when the proposed change has no description.
+When the check context does not include full proposed-change metadata, the check
+looks up the open proposed change by source branch and also tries the short
+branch name for `feat/` branches.
+
+If the `CloudvisionWorkspace` schema is unavailable during rollout, tracking is
+skipped without masking CloudVision validation success or failure.
 
 ## Operational Notes
 

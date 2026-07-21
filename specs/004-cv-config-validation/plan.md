@@ -85,7 +85,7 @@ tests/
     +-- test_cv_integration.py
 
 docs/
-+-- docs/developer-guide/cloudvision.md
++-- docs/cloudvision.md
 +-- sidebars.ts
 ```
 

@@ -6,6 +6,7 @@ const sidebars: SidebarsConfig = {
     'quick-start',
     'provision-first-fabric',
     'viewing-artifacts',
+    'cloudvision',
     'troubleshooting',
     'supported-capabilities',
     {
@@ -31,7 +32,6 @@ const sidebars: SidebarsConfig = {
         'developer-guide/generators',
         'developer-guide/transforms',
         'developer-guide/concepts',
-        'developer-guide/cloudvision',
         {
           type: 'category',
           label: 'AVD Pipeline',

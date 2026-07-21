@@ -140,3 +140,9 @@ Generator idempotence validation is not required for this feature because it doe
 - Remote integration worktree: `~/git/infrahub-worktrees/cv-config-check`
 - Integration command: `INFRAHUB_TESTING_DOCKER_IMAGE=opsmill/infrahub-solution-arista-avd INFRAHUB_TESTING_IMAGE_VER=1.10.1 INFRAHUB_TESTING_TASKMGR_BACKGROUND_SVC_REPLICAS=1 GIT_CONFIG_GLOBAL=/dev/null uv run pytest tests/integration -vv --tb=short --maxfail=1`
 - Result on 2026-07-20: blocked. The tracked local patch was applied to the remote worktree and the suite reached `tests/integration/test_e2e_pipeline.py::TestE2EPipeline::test_asn_nodes_created_and_linked`, then the pytest process remained idle and was interrupted. Earlier integration tests through `test_rack_trigger_creates_leaves` passed in the verbose rerun.
+- Branch under test: `feat/cv-config-check`
+- Commit under test: `6adf4207b3b20aaa69cdb83b504e08854a8e8b47`
+- Remote integration worktree: `~/git/infrahub-worktrees/cv-config-check`
+- Integration command: `INFRAHUB_TESTING_DOCKER_IMAGE=opsmill/infrahub-solution-arista-avd INFRAHUB_TESTING_IMAGE_VER=1.10.1 INFRAHUB_TESTING_TASKMGR_BACKGROUND_SVC_REPLICAS=1 GIT_CONFIG_GLOBAL=/dev/null uv run pytest tests/integration`
+- Result on 2026-07-21: blocked. The suite completed with `22 passed, 6 failed, 32 warnings in 803.13s`; the failed tests were E2E pipeline checks that errored after the test Infrahub server reported `Unable to connect to the database` / database port 7687 connection refused. No CloudVision check assertion failure was reported in the failure summary.
+- Docs-only follow-up validation on 2026-07-21: `npm run typecheck` and `npm run build` passed from `docs/`. Integration tests were not rerun for the docs/navigation changes.

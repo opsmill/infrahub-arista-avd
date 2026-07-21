@@ -12,9 +12,9 @@
 
 **Purpose**: Confirm the current branch has the planned CloudVision check surfaces before story work continues.
 
-- [X] T001 Verify the feature file inventory from `specs/004-cv-config-validation/plan.md` exists at `checks/cv_config_check.py`, `checks/cv_helpers.py`, `checks/cv_config_check.gql`, `checks/cv_config_check_query.py`, `schemas/cv/cv.yml`, `schemas/logical_design.yml`, `repository_checks.yml`, `.infrahub.yml`, `tests/unit/test_cv_integration.py`, and `docs/docs/developer-guide/cloudvision.md`
+- [X] T001 Verify the feature file inventory from `specs/004-cv-config-validation/plan.md` exists at `checks/cv_config_check.py`, `checks/cv_helpers.py`, `checks/cv_config_check.gql`, `checks/cv_config_check_query.py`, `schemas/cv/cv.yml`, `schemas/logical_design.yml`, `repository_checks.yml`, `.infrahub.yml`, `tests/unit/test_cv_integration.py`, and `docs/docs/cloudvision.md`
 - [X] T002 [P] Reconcile CloudVision runtime environment variables from `specs/004-cv-config-validation/contracts/runtime-validation.md` with task-worker notes in `docker-compose.override.yml`
-- [X] T003 [P] Confirm CloudVision documentation navigation is discoverable through `docs/docs/developer-guide/cloudvision.md` and `docs/sidebars.ts`
+- [X] T003 [P] Confirm CloudVision documentation navigation is discoverable through `docs/docs/cloudvision.md` and `docs/sidebars.ts`
 
 ---
 
@@ -131,7 +131,7 @@
 
 - [X] T045 [US4] Keep CloudVision workspace requested state limited to built validation behavior in `checks/cv_config_check.py`
 - [X] T046 [US4] Confirm no trigger, generator, or post-merge deployment registration was added for this feature in `.infrahub.yml`
-- [X] T047 [US4] Document the out-of-scope submission, deletion abandonment, and post-merge deployment boundary in `docs/docs/developer-guide/cloudvision.md`
+- [X] T047 [US4] Document the out-of-scope submission, deletion abandonment, and post-merge deployment boundary in `docs/docs/cloudvision.md`
 
 **Checkpoint**: User Story 4 confirms validation-only behavior and leaves deployment to a separate feature.
 
@@ -149,7 +149,7 @@
 - [X] T053 Re-run schema validation from `specs/004-cv-config-validation/quickstart.md` after implementation changes and fix schema issues in `schemas/logical_design.yml` and `schemas/cv/cv.yml`
 - [X] T054 Run the full lint gate with `uv run invoke lint` and fix findings in `checks/cv_config_check.py`, `checks/cv_helpers.py`, `checks/cv_config_check_query.py`, `tests/unit/test_cv_integration.py`, `.infrahub.yml`, `repository_checks.yml`, `schemas/logical_design.yml`, and `schemas/cv/cv.yml`
 - [X] T055 Add a representative 50-device mocked validation timing test for the SC-001 10-minute target in `tests/unit/test_cv_integration.py`, asserting the local non-network validation path completes within a documented threshold and recording that live CloudVision latency is excluded from the unit measurement
-- [ ] T056 Use `$infrahub-run-integration-tests` for required Infrahub integration validation and record the tested branch and commit in `specs/004-cv-config-validation/quickstart.md`
+- [X] T056 Use `$infrahub-run-integration-tests` for required Infrahub integration validation and record the tested branch and commit in `specs/004-cv-config-validation/quickstart.md`
 
 ---
 
@@ -229,7 +229,7 @@ Task: "Implement workspace tracking upsert in checks/cv_config_check.py"
 ```text
 Task: "Add validation-only behavior tests in tests/unit/test_cv_integration.py"
 Task: "Confirm no post-merge deployment registration in .infrahub.yml"
-Task: "Document deployment boundary in docs/docs/developer-guide/cloudvision.md"
+Task: "Document deployment boundary in docs/docs/cloudvision.md"
 ```
 
 ---
@@ -257,3 +257,10 @@ Task: "Document deployment boundary in docs/docs/developer-guide/cloudvision.md"
 - `$infrahub-run-integration-tests` is required before merge because this feature changes Infrahub check code, schema, query registration, repository seed data, and docs.
 - Missing CloudVision inventory membership is blocking for managed fabrics and must use `log_error`, not warning-style `log_info`.
 - Non-blocking observations must use `log_info` because Infrahub checks do not expose a warning log API.
+
+## Phase 8: Convergence
+
+- [X] T057 Reconcile and record the current required integration validation evidence, including the tested branch, commit, result, and T056 handoff state, per Constitution IV / T056
+- [X] T058 Move the CloudVision validation guide from `docs/docs/developer-guide/cloudvision.md` into the user-facing guide/navigation and remove the developer-guide sidebar placement per User input / plan: documentation navigation
+- [X] T059 Update the moved CloudVision guide so it matches the current implementation, including managed-fabric gating, validation order, optional workspace tracking, deterministic workspace reuse, rollback-to-pending behavior, source-branch proposed-change lookup, and validation-only scope per T047 / current implementation
+- [X] T060 Update PR #73 body with a concise summary of how CloudVision validation works and the implementation choices documented in the moved guide per User input / PR body

@@ -137,7 +137,7 @@ As a change manager, I need validation to build CloudVision workspaces without s
 - **Configuration**: `.infrahub.yml` and `repository_checks.yml`
 - **Workspace tracking schema**: `schemas/cv/cv.yml`
 - **Unit coverage**: `tests/unit/test_cv_integration.py`
-- **User documentation**: `docs/docs/developer-guide/cloudvision.md`
+- **User documentation**: `docs/docs/cloudvision.md`
 
 ### Key Entities *(include if check involves specific Infrahub schema types)*
 
