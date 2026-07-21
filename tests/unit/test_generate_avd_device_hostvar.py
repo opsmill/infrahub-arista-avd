@@ -45,6 +45,10 @@ def _fabric_with_dci_pool() -> dict:
     return {"dci_pool": {"node": _pool()}}
 
 
+def _fabric_with_dci_pool_dict() -> dict:
+    return {"dci_pool": {"node": {"id": "pool-1", "name": {"value": "DCI-Pool"}}}}
+
+
 def _dci_endpoint(
     *,
     endpoint_id: str,
@@ -287,6 +291,28 @@ async def test_dci_l3_edge_omits_speed_when_unresolved() -> None:
 
     assert "speed" not in p2p_links[0]
     assert not validate_inputs(_base_hostvars([], dci_l3_edge_p2p_links=p2p_links)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_hydrates_graphql_pool_before_allocation() -> None:
+    gen = _make_generator()
+    hydrated_pool = SimpleNamespace(id="pool-1", get_kind=lambda: "CoreIPPrefixPool")
+    gen.client.get = AsyncMock(return_value=hydrated_pool)
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        fabric=_fabric_with_dci_pool_dict(),
+        dci_links=[_dci_link()],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    gen.client.get.assert_awaited_once_with(kind="CoreIPPrefixPool", id="pool-1")
+    allocation_kwargs = gen.client.allocate_next_ip_prefix.await_args.kwargs
+    assert allocation_kwargs["resource_pool"] is hydrated_pool
+    assert allocation_kwargs["member_type"] == "prefix"
+    assert allocation_kwargs["data"] == {"role": "technical"}
+    assert p2p_links[0]["ip"] == ["172.16.0.0/31", "172.16.0.1/31"]
 
 
 @pytest.mark.anyio

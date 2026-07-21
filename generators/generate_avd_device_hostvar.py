@@ -420,11 +420,19 @@ async def allocate_dci_p2p_prefix_from_pool(
     generator modules from the synced repository, but imports package modules
     from the task-worker image.
     """
+    if isinstance(pool, dict):
+        pool_id = pool.get("id")
+        if not pool_id:
+            msg = "DCI pool is missing an ID and cannot be used for prefix allocation"
+            raise ValueError(msg)
+        pool = await client.get(kind="CoreIPPrefixPool", id=pool_id)
+
     prefix = await client.allocate_next_ip_prefix(
         resource_pool=pool,
         identifier=identifier,
-        member_type="address",
+        member_type="prefix",
         prefix_length=prefix_length,
+        data={"role": "technical"},
     )
     return IPv4Network(str(prefix.prefix.value), strict=False)
 
