@@ -26,8 +26,8 @@ def _device(hostname: str, dev_id: str, *, with_sc: bool = True, fabric_id: str 
     node: dict = {
         "id": dev_id,
         "name": {"value": hostname},
-        "pod": {"node": {"id": f"pod-{dev_id}", "parent": {"node": {"id": fabric_id}}}},
-        "avd_artifact": None,
+        "pod": {"node": {"id": f"pod-{dev_id}", "parent": {"node": {"__typename": "NetworkFabric", "id": fabric_id}}}},
+        "avd_artifact": {"node": None},
     }
     if with_sc:
         node["avd_artifact"] = {
