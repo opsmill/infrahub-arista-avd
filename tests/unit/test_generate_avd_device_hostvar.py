@@ -1257,7 +1257,7 @@ def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
 
     assert hostvars["fabric_name"] == "Fabric-A"
     assert hostvars["custom_only"] == {"enabled": True}
-    assert hostvars["l3leaf"]["defaults"] == {"platform": "custom-platform", "spanning_tree_priority": 8192}
+    assert hostvars["l3leaf"]["defaults"] == {"platform": "custom-platform"}
     assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
     assert hostvars["l3leaf"]["nodes"][0]["id"] == 3
     assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
