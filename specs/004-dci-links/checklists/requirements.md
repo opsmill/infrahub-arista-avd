@@ -1,7 +1,7 @@
 # Specification Quality Checklist: DCI Links
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-07-20
+**Created**: 2026-07-21
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,10 +31,7 @@
 
 ## Notes
 
-- Validation passed after incorporating the newly added repository `AGENTS.md` guidance.
-- Validation re-run after narrowing `NetworkDciLink` to inherit from `NetworkLink` and add only the four direct DCI-specific attributes requested by the user.
-- Validation re-run after removing stale protocol language outside this feature's supported DCI attributes.
-- The spec intentionally excludes private lab details from `AGENTS.md`; those remain local runtime guidance only.
-- Validation re-run after clarifying that this phase includes generator output for AVD `l3_edge` and that a dedicated check implementation is out of scope when schema and generator behavior can enforce or report the constraints.
-- Validation re-run after removing `routing_protocol` from the spec, narrowing direct DCI link data to underlay participation plus BGP ASN values, and requiring one /31 allocation per DCI link from a DCI IP Pool.
-- Validation re-run after removing the shared DCI `p2p_links_profiles` design; generated DCI `p2p_links` entries now carry `speed` and `include_in_underlay_protocol` directly per link.
+- Validation passed after updating the feature direction to model DCI links as `NetworkLink` objects with role `dci`.
+- Validation passed with explicit removal scope for stale `NetworkDciLink` schema, query, menu, docs, tests, generated protocols, and generator intent.
+- Validation passed with preserved requirements for Border Leaf mapping to l3leaf, `NetworkFabric.dci_pool` /31 allocation, PyAVD `l3_edge` output, deterministic ordering, invalid-link reporting, and no `p2p_links_profiles`.
+- Validation passed with a required planning/task decision to consolidate or explicitly justify duplicate `allocate_p2p_prefix_from_pool` helpers.

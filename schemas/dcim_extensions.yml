@@ -14,6 +14,33 @@ nodes:
     human_friendly_id:
       - name__value
     display_label: name__value
+    attributes:
+      - name: role
+        kind: Dropdown
+        optional: true
+        order_weight: 1000
+        choices:
+          - name: dci
+            label: DCI
+      - name: include_in_underlay_protocol
+        label: Include in Underlay Protocol
+        kind: Boolean
+        optional: false
+        default_value: true
+        description: "Whether this DCI link participates in the generated underlay routing protocol."
+        order_weight: 1100
+      - name: endpoint_1_bgp_asn
+        label: Endpoint 1 BGP ASN
+        kind: Number
+        optional: true
+        description: "BGP ASN for the first endpoint after deterministic endpoint ordering."
+        order_weight: 1200
+      - name: endpoint_2_bgp_asn
+        label: Endpoint 2 BGP ASN
+        kind: Number
+        optional: true
+        description: "BGP ASN for the second endpoint after deterministic endpoint ordering."
+        order_weight: 1300
 
 extensions:
   nodes:

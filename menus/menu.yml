@@ -100,12 +100,6 @@ spec:
             kind: NetworkLink
             icon: "mdi:cable-data"
 
-          - namespace: Network
-            name: DciLinks
-            label: DCI Links
-            kind: NetworkDciLink
-            icon: "mdi:transit-connection-variant"
-
           - namespace: Dcim
             name: TypesAndModelsMenu
             label: Types & Models

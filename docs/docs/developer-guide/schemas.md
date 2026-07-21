@@ -24,8 +24,8 @@ Regenerate the typed protocol classes after any schema change (see [the command 
 | `base/location.yml` | `Location.Generic`, `Location.Hosting` base definitions |
 | `base/organization.yml` | `Organization.Generic`, `Organization.Manufacturer`, `Organization.Provider` |
 | `logical_design.yml` | `Network.Fabric`, `Network.Pod`, `Network.BuildingBlock` |
-| `dcim_extensions.yml` | `Network.Link`, plus device extensions (`role`, `bgp_asn`, `node_id`, loopback/mgmt, pod/rack relations) and the interface `role`/`description`/`ip_address` extensions |
-| `dci.yml` | `Network.DciLink` and the `NetworkFabric.dci_pool` DCI addressing source |
+| `dcim_extensions.yml` | `Network.Link`, including `role=dci` and DCI link fields, plus device extensions (`role`, `bgp_asn`, `node_id`, loopback/mgmt, pod/rack relations) and the interface `role`/`description`/`ip_address` extensions |
+| `dci.yml` | `NetworkFabric.dci_pool` DCI addressing source |
 | `l3ls_extensions.yml` | L3LS fabric attributes (routing protocols, MTU, spanning-tree, EVPN overlay) and pod/rack/VRF/MLAG extensions |
 | `location_extensions.yml` | `Location.Hall`, `Location.Rack` (`rack_type`, leaf counts, `generation_complete`) |
 | `ipam_extensions.yml` | `Ipam.Prefix` `role` and `status` dropdowns |
@@ -65,15 +65,11 @@ Hierarchical base for `NetworkFabric` and `NetworkPod`. Attributes: `name` (uniq
 
 ### `NetworkLink` — `Network.Link`
 
-A cabled connection between interfaces. Inherits `Dcim.Connector`, so it carries `name` and `medium` (`mmf`, `smf`, `copper`) and relates to `connected_endpoints` → `DcimEndpoint`.
+A cabled connection between interfaces. Inherits `Dcim.Connector`, so it carries `name` and `medium` (`mmf`, `smf`, `copper`) and relates to `connected_endpoints` → `DcimEndpoint`. A DCI connection is a normal `NetworkLink` with `role=dci`, not a separate schema node.
 
-### `NetworkDciLink` — `Network.DciLink`
-
-A point-to-point DCI connection between two Border Leaf devices. It inherits `Dcim.Connector`, so it reuses the same `name`, `medium`, and `connected_endpoints` physical endpoint behavior as `NetworkLink`.
-
-- **Attributes**: `include_in_underlay_protocol` (Boolean, default `true`), `endpoint_1_bgp_asn`, and `endpoint_2_bgp_asn`.
+- **DCI attributes**: `role` (`dci`), `include_in_underlay_protocol` (Boolean, default `true`), `endpoint_1_bgp_asn`, and `endpoint_2_bgp_asn`.
 - **Relationships**: inherited `connected_endpoints`; no DCI-specific endpoint, pool, subnet, endpoint IP, speed, BFD, MTU, external-network, or EVPN Gateway fields are added.
-- **Addressing source**: `NetworkFabric.dci_pool`; the hostvars generator allocates one `/31` from this pool per valid DCI link.
+- **Addressing source**: `NetworkFabric.dci_pool`; the hostvars generator allocates one `/31` from this pool per valid DCI-role link.
 
 ## Devices and interfaces
 

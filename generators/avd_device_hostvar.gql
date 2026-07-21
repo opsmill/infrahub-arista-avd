@@ -494,13 +494,16 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
       }
     }
   }
-  NetworkDciLink {
+  NetworkLink(role__value: "dci") {
     edges {
       node {
         __typename
         id
         display_label
         name {
+          value
+        }
+        role {
           value
         }
         include_in_underlay_protocol {

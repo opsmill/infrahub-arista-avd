@@ -354,18 +354,6 @@ class RoutingBGPPeerGroup(CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
-class NetworkDciLink(DcimConnector):
-    endpoint_1_bgp_asn: IntegerOptional
-    endpoint_2_bgp_asn: IntegerOptional
-    include_in_underlay_protocol: Boolean
-    medium: Dropdown
-    name: String
-    connected_endpoints: RelationshipManager[DcimEndpoint]
-    member_of_groups: RelationshipManager[CoreGroup]
-    profiles: RelationshipManager[CoreProfile]
-    subscriber_of_groups: RelationshipManager[CoreGroup]
-
-
 class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
     avd_custom_hostvars: JSONAttributeOptional
     description: StringOptional
@@ -592,8 +580,12 @@ class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHas
 
 
 class NetworkLink(DcimConnector):
+    endpoint_1_bgp_asn: IntegerOptional
+    endpoint_2_bgp_asn: IntegerOptional
+    include_in_underlay_protocol: Boolean
     medium: Dropdown
     name: String
+    role: DropdownOptional
     connected_endpoints: RelationshipManager[DcimEndpoint]
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
@@ -1553,19 +1545,6 @@ class ProfileNetworkBuildingBlock(LineageSource, CoreProfile, CoreNode):
     subscriber_of_groups: RelationshipManager[CoreGroup]
 
 
-class ProfileNetworkDciLink(LineageSource, CoreProfile, CoreNode):
-    endpoint_1_bgp_asn: IntegerOptional
-    endpoint_2_bgp_asn: IntegerOptional
-    include_in_underlay_protocol: BooleanOptional
-    medium: DropdownOptional
-    profile_name: String
-    profile_priority: Integer
-    connected_endpoints: RelationshipManager[DcimEndpoint]
-    member_of_groups: RelationshipManager[CoreGroup]
-    related_nodes: RelationshipManager[NetworkDciLink]
-    subscriber_of_groups: RelationshipManager[CoreGroup]
-
-
 class ProfileNetworkDnsServer(LineageSource, CoreProfile, CoreNode):
     ip_address: IPHostOptional
     profile_name: String
@@ -1616,9 +1595,13 @@ class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileNetworkLink(LineageSource, CoreProfile, CoreNode):
+    endpoint_1_bgp_asn: IntegerOptional
+    endpoint_2_bgp_asn: IntegerOptional
+    include_in_underlay_protocol: BooleanOptional
     medium: DropdownOptional
     profile_name: String
     profile_priority: Integer
+    role: DropdownOptional
     connected_endpoints: RelationshipManager[DcimEndpoint]
     member_of_groups: RelationshipManager[CoreGroup]
     related_nodes: RelationshipManager[NetworkLink]

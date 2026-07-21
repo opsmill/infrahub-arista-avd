@@ -20,146 +20,179 @@ classification mechanism, and PyAVD expects this role to behave as `l3leaf`.
 - New PyAVD node type: rejected because PyAVD already models the needed behavior
   with `l3leaf`.
 
-## R2. Network Link reuse in Infrahub schema
+## R2. DCI modeled as Network Link role
 
-**Decision**: Preserve Network Link behavior through the same `DcimConnector`
-generic that `NetworkLink` already inherits. Define `NetworkDciLink` as a
-concrete Network node that inherits `DcimConnector`, then add only DCI-specific
-fields. Do not duplicate `connected_endpoints`.
+**Decision**: Model every DCI connection as the existing `NetworkLink` kind with
+`role` set to the stable machine value `dci` and label `DCI`. Ordinary
+`NetworkLink` behavior must remain unchanged for links with no role or a
+non-DCI role.
 
-**Rationale**: The local Infrahub schema reference documents node
-`inherit_from` as generic-kind inheritance, and generics do not themselves use
-`inherit_from`. `NetworkLink` gets its physical endpoint behavior from
-`DcimConnector`, including the extension-defined `name`, `medium`, and
-`connected_endpoints` behavior. Having `NetworkDciLink` inherit the same generic
-is the schema-safe equivalent of inheriting Network Link behavior.
+**Rationale**: The current Network Link model already owns physical link
+identity and connected endpoint behavior. A role discriminator reuses that
+surface, avoids duplicate endpoint concepts, and makes DCI intent discoverable
+through the existing link workflow.
 
 **Alternatives considered**:
-- `NetworkDciLink inherit_from: [NetworkLink]`: rejected during planning because
-  `inherit_from` is documented for generic kinds, not concrete nodes.
-- Duplicate `connected_endpoints` on `NetworkDciLink`: rejected because it
-  creates a parallel endpoint model.
-- Endpoint A/B device/interface relationships: rejected by the feature scope.
+- Standalone DCI link kind: rejected because the active feature explicitly
+  requires reuse of `NetworkLink`.
+- Endpoint A/B device/interface relationships: rejected because they duplicate
+  the existing connected endpoint model.
+- Dedicated DCI pool or endpoint IP relationships on the link: rejected because
+  DCI addressing must come from `NetworkFabric.dci_pool`.
 
-## R3. DCI link direct schema surface
+## R3. Network Link DCI attribute surface
 
-**Decision**: `NetworkDciLink` directly adds only
-`include_in_underlay_protocol` and the two BGP ASN values required to build the
-PyAVD `as` list. Use `include_in_underlay_protocol` as a Boolean defaulting to
-`true`. Use two integer ASN attributes with clear labels and order weights; the
-generator maps them to endpoint order after normalizing the inherited endpoint
-pair.
+**Decision**: Extend `NetworkLink` with only these DCI-related direct fields:
+`role`, `include_in_underlay_protocol`, `endpoint_1_bgp_asn`, and
+`endpoint_2_bgp_asn`. `include_in_underlay_protocol` defaults to `true`; ASN
+fields remain optional at schema level so existing links remain valid, and the
+generator requires them only for DCI-role link eligibility.
 
-**Rationale**: The feature explicitly limits DCI-specific schema fields to
-underlay participation and BGP ASN values. Other endpoint and physical details
-come from inherited link behavior or related endpoint/interface objects.
+**Rationale**: New attributes on existing nodes must be optional or have safe
+defaults. The generator can ignore the DCI fields unless `role = dci`, while
+still reporting missing ASN values for DCI-role links with actionable context.
 
 **Alternatives considered**:
-- Routing protocol, BFD, MTU, enabled, subnet, pool, link ID, endpoint IP, or
-  endpoint description fields: rejected because the spec explicitly excludes
-  them from this phase.
-- A single untyped JSON/List ASN field: rejected because two Number attributes
-  are easier to validate, document, and map into PyAVD.
+- Required ASN attributes on all Network Links: rejected because existing
+  ordinary link data would become invalid.
+- Routing protocol, BFD, MTU, enabled, subnet, pool, link ID, endpoint IP,
+  endpoint description, name, or description fields: rejected because the spec
+  explicitly excludes them from this phase.
+- A JSON/List ASN field: rejected because two typed Number attributes are easier
+  to validate, document, and pair with deterministic endpoint ordering.
 
 ## R4. DCI IP pool source and /31 allocation
 
-**Decision**: Add a fabric-level `dci_pool` relationship from `NetworkFabric` to
-`CoreIPPrefixPool`. When DCI links exist in a fabric, the hostvars generation
-path requires that pool and allocates one `/31` prefix per valid DCI link using
-a stable identifier derived from the DCI link identity. The generator then emits
-the two host addresses as the PyAVD `ip` list for the link.
+**Decision**: Keep the fabric-level `dci_pool` relationship from
+`NetworkFabric` to `CoreIPPrefixPool`. When valid DCI-role links exist in a
+fabric, the hostvars generation path requires that pool and allocates one `/31`
+prefix per valid link using a stable identifier derived from the Network Link
+identity. The generator emits the two host addresses as the PyAVD `ip` list for
+the link.
 
-**Rationale**: The DCI link itself must not add a DCI-specific pool,
-addressing, subnet, or endpoint IP field. A fabric-level pool matches the
-existing fabric pool pattern and gives generators a branch-aware allocation
-source without placing allocation source data on each link.
+**Rationale**: The link itself must not add DCI-specific pool, addressing,
+subnet, or endpoint IP fields. A fabric-level pool matches the existing fabric
+pool pattern and gives generators a branch-aware allocation source without
+placing allocation source data on each link.
 
 **Alternatives considered**:
-- Store endpoint IPs or subnet directly on `NetworkDciLink`: rejected by scope.
+- Store endpoint IPs or subnet directly on the link: rejected by scope.
 - Reuse the fabric uplink pool: rejected because DCI addressing must come from a
   DCI IP Pool.
 - Use a pool name convention only: rejected because a typed relationship is more
   discoverable and validates the source of truth.
 
-## R5. PyAVD `l3_edge` shape
+## R5. PyAVD l3_edge shape
 
 **Decision**: Extend `generate-avd-device-hostvar` to emit native PyAVD
-`l3_edge` input. Each valid DCI link emits one deterministic
-`l3_edge.p2p_links[]` entry with `nodes`, `interfaces`, `as`, `ip`, `speed`,
-and `include_in_underlay_protocol` directly on the link entry. Do not emit or
-rely on `l3_edge.p2p_links_profiles[]` for DCI links.
+`l3_edge` input. Each valid DCI-role Network Link emits one deterministic
+`l3_edge.p2p_links[]` entry with `nodes`, `interfaces`, `as`, `ip`, and
+`include_in_underlay_protocol`. Emit `speed` only when endpoint/interface data
+provides a resolvable speed. Do not emit or rely on
+`l3_edge.p2p_links_profiles[]` for DCI links.
 
-**Rationale**: `l3_edge` is native eos_designs input. The local pyavd 6.3.0
-validation accepted the required profile-free DCI shape with zero violations,
-so no structured-config escape hatch is needed. The repository already validates
-and saves PyAVD hostvars in this generator path.
+**Rationale**: `l3_edge` is native eos_designs input and belongs in the existing
+hostvars generation path. Profile-free per-link entries keep the modeled
+operational settings directly on the DCI link output and avoid shared profile
+state.
 
 **Alternatives considered**:
 - Separate hostvar-fragment writer: rejected because generated hostvars are
   stored as one validated file per device.
 - Custom structured config: rejected because PyAVD exposes native `l3_edge`
   keys for this behavior.
+- Default speed when no interface speed is modeled: rejected by the active spec,
+  which requires `speed` only when resolvable.
 
-## R6. DCI link speed source
+## R6. Generator query and typed workflow
 
-**Decision**: Use a documented DCI default speed of `100g` unless implementation
-finds an existing typed interface speed source before tasks are generated. Do
-not add a DCI-specific speed field to `NetworkDciLink`.
+**Decision**: Update `generators/avd_device_hostvar.gql` to fetch DCI candidates
+from `NetworkLink` with `role = dci` or fetch candidate Network Links and filter
+in typed Python if server-side filtering is unavailable. Regenerate
+`generators/generate_avd_device_inputs_query.py` after the query change and keep
+production code typed against generated models.
 
-**Rationale**: The current schema search did not find an existing interface
-speed attribute, and the feature requires `speed` in every generated
-`l3_edge.p2p_links[]` entry while explicitly prohibiting DCI-specific speed on
-the link.
+**Rationale**: The project constitution requires typed GraphQL responses and
+generated return types. The generator must have link identity, role, underlay
+flag, ASN values, connected endpoint interfaces, endpoint device roles, endpoint
+fabric, and `NetworkFabric.dci_pool`.
 
 **Alternatives considered**:
-- Add `speed` on `NetworkDciLink`: rejected because the feature says speed is
-  not a direct DCI-specific attribute.
-- Omit per-link speed: rejected because the expected generator output requires
-  it.
+- Continue querying the stale standalone link kind: rejected because the kind is
+  removed from the supported model.
+- Use raw dictionaries for new DCI query data: rejected by type-safety
+  requirements.
 
 ## R7. Generator validation boundary
 
 **Decision**: Do not create a dedicated check in this phase. Enforce static
 schema properties in schema/tests and enforce derived eligibility inside the
 hostvars generator while building DCI `l3_edge` data. The generator must exclude
-or fail invalid DCI links with actionable context.
+invalid DCI-role links from `l3_edge` output and report actionable context for
+each rejected link. Generation should continue for other valid DCI links unless
+a non-link-scoped infrastructure failure prevents allocation or validation
+globally.
 
-**Rationale**: The user explicitly scoped out a dedicated check when constraints
-can be handled in schema and generators. Endpoint count, device role,
-interface/device ownership, duplicate interface pairs, ASN presence, and pool
-allocation all depend on derived data the generator must inspect.
+**Rationale**: Endpoint count, device role, interface/device ownership, duplicate
+interface pairs, ASN presence, and pool allocation all depend on derived data the
+generator must inspect. A dedicated proposed-change check would duplicate that
+logic and is explicitly not required by the feature scope.
 
 **Alternatives considered**:
 - Global proposed-change check: rejected for this phase because it adds a new
   artifact type and duplicates generator eligibility logic.
 - Silent generator skip: rejected because operators need correction context.
 
-## R8. Typed implementation workflow
+## R8. Removal and migration decision
 
-**Decision**: Implement schema changes first on an Infrahub branch, regenerate
-`src/solution_arista_avd/protocols.py`, update
-`generators/avd_device_hostvar.gql`, export the GraphQL schema, regenerate
-`generators/generate_avd_device_inputs_query.py`, and keep production generator
-code typed against generated models.
+**Decision**: Remove the previous standalone DCI link kind from committed
+schemas, generated protocols, generated GraphQL schema, generated query models,
+generator logic, menus, docs, and tests. No repository seed data migration is
+planned because this branch has no committed object data for that stale kind.
+Any local validation branch that contains trial data for the stale kind should
+be recreated or manually converted into `NetworkLink` objects with `role = dci`
+before schema load.
 
-**Rationale**: The project constitution and Infrahub skills require schema-first
-changes, generated protocols/return types instead of hand edits, and typed
-GraphQL response handling.
+**Rationale**: The active requirement is a model replacement, not compatibility
+with the earlier trial design. Keeping the stale kind would leave two endpoint
+models and make operator behavior ambiguous.
+
+**Alternatives considered**:
+- Automatic migration generator: rejected because there is no committed
+  persistent data to migrate and it would add a new operational artifact.
+- Keep both models temporarily: rejected because the feature requires a single
+  Network Link source of truth.
+
+## R9. Prefix allocation helper consolidation
+
+**Decision**: Consolidate DCI generation on a single shared
+`allocate_p2p_prefix_from_pool` implementation in
+`src/solution_arista_avd/addressing.py` unless implementation finds a concrete
+behavioral mismatch. If a second helper must remain, document the reason and add
+tests proving both helpers are intentionally distinct.
+
+**Rationale**: Duplicate allocation helpers increase the risk of divergent
+identifier construction, prefix length handling, and idempotence behavior.
+Centralizing the /31 allocation path gives DCI generation the same deterministic
+semantics in unit, integration, and live idempotence validation.
+
+**Alternatives considered**:
+- Leave both helpers undocumented: rejected because the spec explicitly calls out
+  this ambiguity.
+- Inline allocation logic in the hostvars generator: rejected because allocation
+  behavior is reusable infrastructure logic.
+
+## R10. Validation workflow
+
+**Decision**: Validate in this order: schema check/load on a branch, protocol
+regeneration, GraphQL schema export, return-type regeneration, focused unit
+tests, PyAVD validation, lint, required integration validation, and required
+generator idempotence validation when live validation is allowed.
+
+**Rationale**: This sequence follows the constitution and avoids consuming schema
+fields before Infrahub and generated types know about them.
 
 **Alternatives considered**:
 - Hand-edit generated protocol or query model files: rejected by constitution.
-- Use raw dictionaries for new DCI query data: rejected by type-safety
-  requirements.
-
-## R9. Operator visibility
-
-**Decision**: Add a DCI Links menu entry and update supported capabilities,
-schema docs, AVD role mapping docs, hostvars docs, and AVD overview docs.
-
-**Rationale**: `NetworkDciLink` is user-facing, and the capability matrix must
-show what this phase supports while making external networks and EVPN Gateway
-out of scope.
-
-**Alternatives considered**:
-- Rely on automatic menu inclusion: rejected because this repository manages
-  navigation through `menus/menu.yml`.
+- Skip integration/idempotence validation: rejected because this feature changes
+  generator behavior and generated artifacts.

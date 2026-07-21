@@ -7,6 +7,7 @@ import pytest
 import yaml
 from pyavd import get_avd_facts, validate_inputs
 
+import generators.generate_avd_device_hostvar as hostvar_module
 from generators.generate_avd_device_hostvar import (
     GenerateAVDDeviceHostvar,
     _add_switch_lag_adapter,  # noqa: PLC2701 - focused unit coverage for internal conflict validation
@@ -87,10 +88,11 @@ def _dci_link(
     include_in_underlay_protocol: bool | None = True,
 ) -> dict:
     link = {
-        "__typename": "NetworkDciLink",
+        "__typename": "NetworkLink",
         "id": link_id,
         "display_label": name,
         "name": {"value": name},
+        "role": {"value": "dci"},
         "endpoint_1_bgp_asn": {"value": asn_1},
         "endpoint_2_bgp_asn": {"value": asn_2},
         "connected_endpoints": {
@@ -227,6 +229,24 @@ def test_border_leaf_builds_l3leaf_hostvars() -> None:
     assert hostvars["type"] == "l3leaf"
     assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
     assert hostvars["l3leaf"]["node_groups"][0]["nodes"] == [{"name": "leaf1"}]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_border_leaf_mapping_is_available_to_repository_loaded_generator(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Repository-loaded generators may run beside an older installed package."""
+
+    def reject_border_leaf(role: str) -> str:
+        if role == "border_leaf":
+            msg = f"Unknown device role: {role}"
+            raise ValueError(msg)
+        return role
+
+    monkeypatch.setattr(hostvar_module, "_get_package_avd_type", reject_border_leaf)
+
+    hostvars = _base_hostvars([], role="border_leaf")
+
+    assert hostvars["type"] == "l3leaf"
+    assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
     assert not validate_inputs(hostvars).validation_result.violations
 
 

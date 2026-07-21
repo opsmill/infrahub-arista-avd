@@ -14,7 +14,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 
-from solution_arista_avd.avd import get_avd_type
+from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
 from solution_arista_avd.generator import set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
 
@@ -59,7 +59,7 @@ class DciEndpoint:
 
 
 @dataclass(frozen=True)
-class DciLinkIntent:
+class DciNetworkLinkIntent:
     link_id: str
     link_name: str
     include_in_underlay_protocol: bool
@@ -71,6 +71,13 @@ class DciLinkIntent:
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
 PORT_CHANNEL_RE = re.compile(r"^Port-Channel(?P<channel_id>\d+)$")
 LEAF_FAMILY_ROLES = {"leaf", "border_leaf"}
+
+
+def get_generator_avd_type(role: str) -> str:
+    """Resolve role mappings used by repository-loaded generator code."""
+    if role == "border_leaf":
+        return "l3leaf"
+    return _get_package_avd_type(role)
 
 
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
@@ -342,9 +349,12 @@ def _normalize_dci_endpoints(endpoints: list[DciEndpoint]) -> tuple[DciEndpoint,
     return ordered[0], ordered[1]
 
 
-def _extract_dci_link_intent(link: object, fabric: object) -> DciLinkIntent:
+def _extract_dci_network_link_intent(link: object, fabric: object) -> DciNetworkLinkIntent:
     link_id = str(_field(link, "id") or _value(link, "name") or _field(link, "display_label"))
     link_name = str(_value(link, "name") or _field(link, "display_label") or link_id)
+    if _value(link, "role") != "dci":
+        msg = f"Network Link {link_name}: role must be dci for DCI generation"
+        raise ValueError(msg)
     endpoints: list[DciEndpoint] = []
 
     for endpoint_edge in _edges(_field(link, "connected_endpoints")):
@@ -397,7 +407,7 @@ def _extract_dci_link_intent(link: object, fabric: object) -> DciLinkIntent:
     if include_in_underlay_protocol is None:
         include_in_underlay_protocol = True
 
-    return DciLinkIntent(
+    return DciNetworkLinkIntent(
         link_id=link_id,
         link_name=link_name,
         include_in_underlay_protocol=bool(include_in_underlay_protocol),
@@ -446,7 +456,7 @@ async def build_dci_l3_edge_p2p_links(
 ) -> list[dict[str, Any]]:
     """Build deterministic PyAVD l3_edge.p2p_links entries from DCI links."""
     intents = sorted(
-        (_extract_dci_link_intent(link, fabric) for link in dci_links),
+        (_extract_dci_network_link_intent(link, fabric) for link in dci_links),
         key=lambda intent: (
             intent.link_name,
             intent.endpoints[0].device_name,
@@ -1244,7 +1254,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         custom_hostvars: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
-        avd_type = get_avd_type(role)
+        avd_type = get_generator_avd_type(role)
         node_type_key = "super_spine" if role == "super_spine" else avd_type
 
         # Build node config
@@ -1524,7 +1534,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         dci_l3_edge_p2p_links: list[dict[str, Any]] = []
         raw_dci_links = [
             edge.get("node")
-            for edge in (raw_data.get("NetworkDciLink", {}).get("edges") or [])
+            for edge in (raw_data.get("NetworkLink", {}).get("edges") or [])
             if isinstance(edge, dict) and edge.get("node")
         ]
         if raw_dci_links and role in LEAF_FAMILY_ROLES:

@@ -46,34 +46,41 @@ def test_device_role_choices_keep_existing_values_and_add_border_leaf() -> None:
     assert choices["border_leaf"] == "Border Leaf"
 
 
-def test_network_dci_link_reuses_dcim_connector_physical_endpoint_behavior() -> None:
+def test_network_link_reuses_dcim_connector_physical_endpoint_behavior() -> None:
     dcim_schema = _load_yaml("schemas/dcim_extensions.yml")
-    dci_schema = _load_yaml("schemas/dci.yml")
-
     network_link = _node(dcim_schema, "Network", "Link")
-    dci_link = _node(dci_schema, "Network", "DciLink")
 
     assert "DcimConnector" in network_link["inherit_from"]
-    assert "DcimConnector" in dci_link["inherit_from"]
-    assert dci_link["include_in_menu"] is False
-    assert dci_link["human_friendly_id"] == ["name__value"]
-    assert dci_link["display_label"] == "name__value"
+    assert network_link["include_in_menu"] is False
+    assert network_link["human_friendly_id"] == ["name__value"]
+    assert network_link["display_label"] == "name__value"
 
 
-def test_network_dci_link_defines_only_allowed_direct_dci_attributes() -> None:
-    dci_link = _node(_load_yaml("schemas/dci.yml"), "Network", "DciLink")
-    attrs = _attrs(dci_link)
+def test_network_link_role_supports_dci_choice_and_stays_optional() -> None:
+    network_link = _node(_load_yaml("schemas/dcim_extensions.yml"), "Network", "Link")
+    role = _attrs(network_link)["role"]
 
-    assert set(attrs) == {"include_in_underlay_protocol", "endpoint_1_bgp_asn", "endpoint_2_bgp_asn"}
+    choices = {choice["name"]: choice.get("label") for choice in role["choices"]}
+
+    assert role["kind"] == "Dropdown"
+    assert role["optional"] is True
+    assert choices["dci"] == "DCI"
+
+
+def test_network_link_defines_only_allowed_direct_dci_attributes() -> None:
+    network_link = _node(_load_yaml("schemas/dcim_extensions.yml"), "Network", "Link")
+    attrs = _attrs(network_link)
+
+    assert set(attrs) == {"role", "include_in_underlay_protocol", "endpoint_1_bgp_asn", "endpoint_2_bgp_asn"}
     assert attrs["include_in_underlay_protocol"]["kind"] == "Boolean"
     assert attrs["include_in_underlay_protocol"]["default_value"] is True
     assert attrs["endpoint_1_bgp_asn"]["kind"] == "Number"
     assert attrs["endpoint_2_bgp_asn"]["kind"] == "Number"
 
 
-def test_network_dci_link_has_no_prohibited_direct_fields() -> None:
-    dci_link = _node(_load_yaml("schemas/dci.yml"), "Network", "DciLink")
-    direct_fields = set(_attrs(dci_link)) | set(_relationships(dci_link))
+def test_network_link_has_no_prohibited_direct_dci_fields() -> None:
+    network_link = _node(_load_yaml("schemas/dcim_extensions.yml"), "Network", "Link")
+    direct_fields = set(_attrs(network_link)) | set(_relationships(network_link))
 
     prohibited = {
         "enabled",
@@ -114,21 +121,19 @@ def test_network_fabric_dci_pool_is_optional_core_prefix_pool_relationship() -> 
     }
 
 
-def test_dci_link_uniqueness_constraints_use_infrahub_constraint_syntax() -> None:
-    dci_link = _node(_load_yaml("schemas/dci.yml"), "Network", "DciLink")
-
-    assert ["name__value"] in dci_link["uniqueness_constraints"]
-    for constraint in dci_link["uniqueness_constraints"]:
-        for field in constraint:
-            if field == "name__value":
-                continue
-            assert "__value" not in field
+def test_standalone_network_dci_link_schema_is_absent() -> None:
+    stale_name = "Dci" + "Link"
+    for schema_path in ("schemas/dci.yml", "schemas/dcim_extensions.yml"):
+        schema = _load_yaml(schema_path)
+        nodes = schema.get("nodes", [])
+        assert not any(node["namespace"] == "Network" and node["name"] == stale_name for node in nodes)
 
 
-def test_dci_links_menu_points_to_network_dci_link() -> None:
+def test_dci_links_menu_not_exposed_and_network_link_discovery_remains() -> None:
     menu = _load_yaml("menus/menu.yml")
     device_children = next(item for item in menu["spec"]["data"] if item["name"] == "DeviceMenu")["children"]["data"]
-    dci_menu = next(item for item in device_children if item["name"] == "DciLinks")
 
-    assert dci_menu["label"] == "DCI Links"
-    assert dci_menu["kind"] == "NetworkDciLink"
+    stale_kind = "Network" + "Dci" + "Link"
+    assert not any(item.get("kind") == stale_kind for item in device_children)
+    network_link_menu = next(item for item in device_children if item.get("kind") == "NetworkLink")
+    assert network_link_menu["label"] == "Connections"

@@ -61,7 +61,7 @@ For each device the generator:
 3. Extracts connected endpoints (servers) from interfaces with `role = "server"`, including tagged/untagged VLANs.
 4. For leaves, extracts MLAG peer information and the virtual router MAC.
 5. For leaves and spines, queries EVPN tenants, VRFs, SVIs, and L2 VLANs associated with the fabric (skipped entirely for `l2leaf`).
-6. For Border Leafs, evaluates `NetworkDciLink` objects in the fabric and emits valid links as profile-free PyAVD `l3_edge.p2p_links` entries using addresses allocated from `NetworkFabric.dci_pool`.
+6. For Border Leafs, evaluates `NetworkLink` objects with `role=dci` in the fabric and emits valid links as profile-free PyAVD `l3_edge.p2p_links` entries using addresses allocated from `NetworkFabric.dci_pool`.
 7. Builds a complete PyAVD `hostvars` dict (see [Hostvars Reference](./hostvars.md)).
 8. Serialises to JSON, computes a SHA256 checksum, and compares against the previous content. If changed (or absent), writes a new `AvdHostvarFile` as a child of the device's `AvdArtifact` node.
 

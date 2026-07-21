@@ -2,14 +2,13 @@
 
 ## Files
 
-- `schemas/dcim_extensions.yml`: extend `DcimDevice.role`; keep
-  `DcimConnector` as the shared physical endpoint behavior used by both ordinary
-  links and DCI links.
-- `schemas/dci.yml`: define `NetworkDciLink` and extend `NetworkFabric` with
-  the DCI pool source.
-- `schemas/ipam_extensions.yml`: add a DCI prefix role only if allocated prefixes
-  are stored with role metadata.
-- `menus/menu.yml`: expose DCI Links navigation.
+- `schemas/dcim_extensions.yml`: extend `DcimDevice.role`; keep the existing
+  `NetworkLink` physical endpoint model; add the Network Link DCI role and safe
+  DCI-specific fields.
+- `schemas/dci.yml`: extend `NetworkFabric` with the DCI pool source and remove
+  the stale standalone DCI link schema surface.
+- `menus/menu.yml`: remove stale standalone DCI link navigation and keep DCI
+  discovery aligned with existing Network Link navigation.
 
 Every new schema file must start with:
 
@@ -30,55 +29,50 @@ The existing `DcimDevice.role` dropdown must retain all current choices and add:
 
 Automation uses the machine value `border_leaf`, not the display label.
 
-## Shared Connector Behavior
+## Network Link Role Extension
 
-`NetworkLink` currently gets its physical endpoint shape by inheriting
-`DcimConnector`. Because Infrahub node `inherit_from` uses generic kinds,
-`NetworkDciLink` must inherit the same generic rather than the concrete
-`NetworkLink` node:
+The existing `NetworkLink` kind must remain the single physical link model. Add
+or extend an optional `role` dropdown on `NetworkLink` with:
 
 ```yaml
-nodes:
-  - name: Link
-    namespace: Network
-    inherit_from:
-      - DcimConnector
-
-  - name: DciLink
-    namespace: Network
-    label: DCI Link
-    include_in_menu: false
-    inherit_from:
-      - DcimConnector
+- name: dci
+  label: DCI
 ```
 
-The final implementation must preserve the existing `NetworkLink` kind and
-physical endpoint behavior.
+Existing links with no role or non-DCI role values must remain valid and must not
+trigger DCI generator behavior.
 
-## `NetworkDciLink` Attributes
+## Network Link DCI Attributes
 
-`NetworkDciLink` must directly define only these DCI-specific attributes:
+`NetworkLink` may directly define only these DCI-specific fields:
 
 | Name | Kind | Contract |
 |------|------|----------|
-| `include_in_underlay_protocol` | `Boolean` | Default `true` |
-| `endpoint_1_bgp_asn` | `Number` | Required for generation |
-| `endpoint_2_bgp_asn` | `Number` | Required for generation |
+| `role` | `Dropdown` | Optional; `dci` selects DCI generator behavior |
+| `include_in_underlay_protocol` | `Boolean` | Safe default `true`; emitted only for DCI-role output |
+| `endpoint_1_bgp_asn` | `Number` | Optional in schema, required for eligible DCI generation |
+| `endpoint_2_bgp_asn` | `Number` | Optional in schema, required for eligible DCI generation |
 
 The final ASN attribute names may vary if implementation chooses clearer local
-style, but the values must remain two BGP ASN Numbers and must not introduce
-new endpoint device/interface fields.
+style, but the values must remain two typed BGP ASN numbers and must not
+introduce new endpoint device/interface fields.
 
 ## Prohibited DCI-Specific Fields
 
-`NetworkDciLink` must not define DCI-specific `enabled`, endpoint device,
-endpoint interface, subnet, pool, link ID, endpoint IP, endpoint description,
-speed, BFD, MTU, protocol-selection, external-network, or EVPN Gateway
+`NetworkLink` must not define DCI-specific `enabled`, endpoint device, endpoint
+interface, subnet, pool, link ID, endpoint IP, endpoint description, speed, BFD,
+MTU, name, description, protocol-selection, external-network, or EVPN Gateway
 attributes or relationships.
+
+## Existing Connected Endpoint Behavior
+
+The DCI model must use the existing `NetworkLink.connected_endpoints` behavior.
+Generator logic validates exactly two physical interfaces on Border Leaf devices
+before emitting PyAVD `l3_edge` intent.
 
 ## Fabric DCI Pool
 
-`NetworkFabric` must gain an optional relationship to `CoreIPPrefixPool`:
+`NetworkFabric` must have an optional relationship to `CoreIPPrefixPool`:
 
 ```yaml
 extensions:
@@ -95,21 +89,33 @@ extensions:
 ```
 
 Existing fabric objects remain valid because the relationship is optional. The
-generator requires it only when valid DCI links need `/31` allocation.
+generator requires it only when valid DCI-role links need `/31` allocation.
 
-## Inherited Relationships
+## Removal Contract
 
-The DCI link must use inherited `DcimConnector.connected_endpoints` behavior.
-Generator logic validates exactly two physical interfaces on Border Leaf
-devices before emitting PyAVD `l3_edge` intent.
+The previous standalone DCI link kind must be absent from:
+
+- Schema definitions.
+- Generated protocol classes.
+- Exported GraphQL schema.
+- Generated query models.
+- Hostvars query and generator logic.
+- Menus.
+- Documentation.
+- Tests.
+
+No committed object-data migration is required unless implementation discovers
+repository seed data for the stale kind. Local branch trial data should be
+recreated or manually converted to `NetworkLink` objects with `role = dci`.
 
 ## Schema Validation Expectations
 
 - `uv run infrahubctl schema check schemas/ --branch <branch>` passes.
-- Protocol regeneration creates `NetworkDciLink` classes.
-- Schema contract tests confirm `NetworkDciLink` reuses the same
-  `DcimConnector` physical endpoint behavior as `NetworkLink`.
-- Schema contract tests confirm only the allowed DCI-specific attributes are
-  defined directly on `NetworkDciLink`.
-- Existing data with roles `super_spine`, `spine`, `leaf`, or `l2leaf` remains
-  valid.
+- Protocol regeneration no longer produces classes for the stale standalone DCI
+  link kind.
+- Schema contract tests confirm `NetworkLink.role` supports `dci`.
+- Schema contract tests confirm existing Network Link behavior is preserved.
+- Schema contract tests confirm only the allowed DCI-specific fields are defined
+  directly on `NetworkLink`.
+- Existing data with device roles `super_spine`, `spine`, `leaf`, or `l2leaf`
+  remains valid.

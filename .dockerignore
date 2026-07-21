@@ -73,6 +73,9 @@ Thumbs.db
 *.log
 logs/
 
+# Environment variants
+.env*
+
 # Temporary files
 *.tmp
 *.temp
@@ -83,6 +86,9 @@ logs/
 Dockerfile*
 docker-compose*.yml
 .dockerignore
+
+# Coverage
+coverage/
 
 # Development tools
 .ruff_cache/

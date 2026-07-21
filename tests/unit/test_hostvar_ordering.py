@@ -70,10 +70,11 @@ def _dci_endpoint(endpoint_id: str, device_id: str, device_name: str, interface_
 
 def _dci_link(link_id: str, name: str, local_interface: str, remote_interface: str) -> dict:
     return {
-        "__typename": "NetworkDciLink",
+        "__typename": "NetworkLink",
         "id": link_id,
         "display_label": name,
         "name": {"value": name},
+        "role": {"value": "dci"},
         "include_in_underlay_protocol": {"value": True},
         "endpoint_1_bgp_asn": {"value": 65101},
         "endpoint_2_bgp_asn": {"value": 65201},

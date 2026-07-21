@@ -1,7 +1,7 @@
 # Phase 1 Data Model: DCI Links
 
 This feature adds schema-backed DCI intent and generator behavior that emits
-PyAVD `l3_edge` input for valid DCI links.
+PyAVD `l3_edge` input for valid DCI-role Network Links.
 
 ## Entity: Border Leaf Role
 
@@ -23,55 +23,60 @@ PyAVD `l3_edge` input for valid DCI links.
 - Unknown roles still raise `ValueError`.
 - Border Leaf devices remain valid `avd_devices` generator targets.
 
-## Entity: Shared Connector Behavior
+## Entity: Network Link
 
-**Kind**: `DcimConnector` generic
-**File**: `schemas/dcim_extensions.yml`
+**Kind**: existing `NetworkLink`
+**Primary file**: `schemas/dcim_extensions.yml`
+**Purpose**: Physical link identity and connected endpoint model for ordinary
+links and DCI links.
 
-`NetworkLink` already inherits `DcimConnector`. The same generic supplies the
-physical-link behavior that DCI links must reuse:
+`NetworkLink` continues to represent ordinary physical links. A DCI link is the
+same kind with `role = dci`; the generator ignores DCI-specific fields unless
+that role value is present.
 
-- Supplies inherited `name`, `medium`, and `connected_endpoints`.
-- Provides `human_friendly_id` and `display_label` compatible with the existing
-  `NetworkLink` user experience.
+### Existing Behavior To Preserve
 
-`NetworkLink` continues to represent ordinary physical links. `NetworkDciLink`
-inherits `DcimConnector` directly so it reuses the endpoint model without
-duplicating endpoint relationships.
+- `name`, `medium`, identity, display, and `connected_endpoints` behavior remain
+  compatible with current Network Link workflows.
+- Existing links with no `role` or a non-DCI role remain valid.
+- Existing Network Link navigation remains suitable for users to discover and
+  edit DCI-role links.
 
-## Entity: DCI Link
+## Entity: Network Link DCI Role
 
-**Kind**: `NetworkDciLink`
-**Schema file**: `schemas/dci.yml`
-**Purpose**: One point-to-point DCI connection between two Border Leaf devices
-and their physical interfaces.
+**Kind**: `NetworkLink.role` dropdown choice
 
-### Direct DCI-Specific Attributes
+| Field | Value |
+|-------|-------|
+| Machine name | `dci` |
+| Label | `DCI` |
+| Applies to | Existing `NetworkLink` objects |
+| Generator behavior | Candidate for DCI `l3_edge` generation |
+
+### Validation Rules
+
+- The `role` attribute is optional so existing Network Link data remains valid.
+- `dci` is a stable machine value; automation must not depend on display label
+  text.
+- Non-DCI links must not produce DCI `l3_edge` intent.
+
+## Entity: Network Link DCI Attributes
+
+**Kind**: attributes on existing `NetworkLink`
 
 | Attribute | Kind | Required/default | Use |
 |-----------|------|------------------|-----|
-| `include_in_underlay_protocol` | `Boolean` | Default `true` | Emit directly on every generated PyAVD `p2p_links[]` entry |
-| `endpoint_1_bgp_asn` | `Number` | Required for generation | First value in generated PyAVD `as` list after stable endpoint ordering |
-| `endpoint_2_bgp_asn` | `Number` | Required for generation | Second value in generated PyAVD `as` list after stable endpoint ordering |
-
-The implementation may choose final attribute names with clearer local style,
-but the direct DCI-specific schema surface must remain limited to the underlay
-flag and the two BGP ASN values.
+| `include_in_underlay_protocol` | `Boolean` | Default `true` | Emit directly on every generated DCI PyAVD `p2p_links[]` entry |
+| `endpoint_1_bgp_asn` | `Number` | Optional in schema, required for DCI generation | First value in generated PyAVD `as` list after stable endpoint ordering |
+| `endpoint_2_bgp_asn` | `Number` | Optional in schema, required for DCI generation | Second value in generated PyAVD `as` list after stable endpoint ordering |
 
 No DCI-specific `enabled`, endpoint device/interface, subnet, pool, link ID,
-endpoint IP, endpoint description, speed, BFD, MTU, or protocol-selection fields
-are allowed on `NetworkDciLink`.
-
-### Identity and Display
-
-- `human_friendly_id`: inherited or compatible `name__value`
-- `display_label`: inherited or compatible `name__value`
-- `include_in_menu`: `false`, with navigation supplied by `menus/menu.yml`
-- Suggested label/icon: `DCI Link`, `mdi:transit-connection-variant`
+endpoint IP, endpoint description, speed, BFD, MTU, name, description, or
+protocol-selection fields are allowed on `NetworkLink`.
 
 ### Relationship Use
 
-- Use inherited `connected_endpoints` to resolve endpoint interfaces.
+- Use existing `connected_endpoints` to resolve endpoint interfaces.
 - Generator eligibility requires exactly two connected physical interfaces.
 - Each endpoint interface must resolve to a different Border Leaf device.
 - Each endpoint interface must belong to its resolved endpoint device.
@@ -84,63 +89,74 @@ are allowed on `NetworkDciLink`.
 **File**: `schemas/dci.yml`
 
 The fabric-level DCI pool is the allocation source for DCI point-to-point
-addressing. It is not a relationship on `NetworkDciLink`.
+addressing. It is not a relationship on `NetworkLink`.
 
 ### Validation Rules
 
 - `dci_pool` is optional for existing fabric data to remain valid.
-- When valid DCI links exist for a fabric, the generator requires `dci_pool`.
-- Each generated DCI link allocates exactly one `/31` prefix from this pool.
-- Allocation uses a stable identifier derived from the DCI link identity so a
-  repeated run reuses the same prefix.
+- When valid DCI-role links exist for a fabric, the generator requires
+  `dci_pool`.
+- Each generated DCI-role link allocates exactly one `/31` prefix from this
+  pool.
+- Allocation uses a stable identifier derived from the Network Link identity so
+  a repeated run reuses the same prefix.
 - Allocated host addresses are emitted in PyAVD `ip`; they are not stored as
-  DCI-specific endpoint IP attributes on the DCI link.
+  DCI-specific endpoint IP attributes on the link.
 
 ## Generated L3 Edge Intent
 
 **Output location**: per-device PyAVD hostvars generated by
 `generators/generate_avd_device_hostvar.py`
 
-The generator derives DCI `l3_edge` data from eligible `NetworkDciLink` objects.
-DCI links are sorted deterministically by link identity and endpoint identity so
-repeated generation produces stable artifacts.
+The generator derives DCI `l3_edge` data from eligible `NetworkLink` objects
+whose role value is `dci`. DCI-role links are sorted deterministically by link
+identity and endpoint identity so repeated generation produces stable artifacts.
 
 ### `l3_edge.p2p_links[]`
 
-Each valid DCI link emits one self-contained point-to-point entry. DCI links do
-not emit or rely on `l3_edge.p2p_links_profiles[]`.
+Each valid DCI-role Network Link emits one self-contained point-to-point entry.
+DCI links do not emit or rely on `l3_edge.p2p_links_profiles[]`.
 
 | PyAVD field | Source |
 |-------------|--------|
 | `nodes` | Two connected Border Leaf device names |
 | `interfaces` | Connected physical interface names paired with `nodes` |
-| `as` | `NetworkDciLink` BGP ASN values paired with the normalized endpoint order |
+| `as` | Network Link BGP ASN values paired with the normalized endpoint order |
 | `ip` | Two host addresses from the `/31` allocated from the fabric DCI pool |
-| `speed` | Existing typed interface speed if found during implementation; otherwise documented default `100g` |
-| `include_in_underlay_protocol` | DCI link value, defaulting `true` |
+| `speed` | Existing typed interface speed if endpoint/interface data provides one |
+| `include_in_underlay_protocol` | Network Link value, defaulting `true` |
 
 ## Generator Eligibility Rules
 
 | Rule | Enforcement |
 |------|-------------|
-| DCI link reuses `DcimConnector` physical endpoint behavior used by `NetworkLink` | Schema and schema contract tests |
-| Only underlay participation and two BGP ASN values are direct DCI-specific fields | Schema contract tests |
+| DCI link is an existing `NetworkLink` with `role = dci` | Schema contract tests and generator filtering |
+| Existing Network Link behavior remains valid for non-DCI links | Schema contract tests and regression tests |
+| Only role, underlay participation, and two BGP ASN values are direct DCI-specific fields | Schema contract tests |
 | Exactly two physical endpoint interfaces | Hostvars generator validation |
 | Endpoint devices are Border Leafs | Hostvars generator validation |
 | Endpoint devices and endpoint interfaces are distinct | Hostvars generator validation |
 | Duplicate active DCI endpoint-interface pair is not emitted twice | Hostvars generator validation with normalized endpoint pair keys |
 | Fabric DCI pool exists and can allocate one `/31` per valid link | Hostvars generator validation/allocation |
-| Every generated DCI `p2p_links[]` entry carries `speed` and `include_in_underlay_protocol` directly and no DCI profile is emitted | Hostvars generator tests and PyAVD validation |
+| Every generated DCI `p2p_links[]` entry carries required fields directly and no DCI profile is emitted | Hostvars generator tests and PyAVD validation |
 | Repeated generation is idempotent | Unit tests plus required generator idempotence validation |
 
-Invalid DCI links must be excluded or fail generation with actionable context.
-Silent omission is not acceptable.
+Invalid DCI-role links must be excluded from generated `l3_edge` intent and
+reported with actionable context. Silent omission is not acceptable.
+
+## Removal/Migration State
+
+The previous standalone DCI link kind is removed from committed schemas, menus,
+queries, generated models, docs, and tests. No repository object-data migration
+is required because no committed seed data exists for that stale kind. Trial data
+on local validation branches must be recreated or manually converted to
+`NetworkLink` objects with `role = dci`.
 
 ## State Transitions
 
 | State | Meaning | Transition |
 |-------|---------|------------|
-| Modeled | `NetworkDciLink` exists with inherited endpoints and ASN values | Candidate for generator evaluation |
+| Modeled | `NetworkLink` exists with `role = dci`, connected endpoints, underlay setting, and ASN values | Candidate for generator evaluation |
 | Eligible | Generator validates endpoints, roles, uniqueness, ASNs, and DCI pool allocation | Included in `l3_edge.p2p_links` |
-| Ineligible | Generator detects incomplete or invalid derived data | Excluded or generation fails with correction context |
+| Ineligible | Generator detects incomplete or invalid derived data | Excluded from generated `l3_edge` intent and reported with correction context |
 | Generated | Hostvars are saved with DCI `l3_edge` intent and PyAVD validation passes | Eligible for structured-config generation |
