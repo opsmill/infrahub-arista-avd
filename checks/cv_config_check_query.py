@@ -21,6 +21,7 @@ class CVConfigCheckNetworkFabricEdge(BaseModel):
 class CVConfigCheckNetworkFabricNode(BaseModel):
     id: str
     name: CVConfigCheckValueField | None
+    cloudvision_managed: CVConfigCheckBooleanField | None
 
 
 class CVConfigCheckDcimDevice(BaseModel):
@@ -41,6 +42,10 @@ class CVConfigCheckDcimDeviceNode(BaseModel):
 
 class CVConfigCheckValueField(BaseModel):
     value: str | None
+
+
+class CVConfigCheckBooleanField(BaseModel):
+    value: bool | None
 
 
 class CVConfigCheckDevicePod(BaseModel):
@@ -82,6 +87,7 @@ CVConfigCheckQuery.model_rebuild()
 CVConfigCheckNetworkFabric.model_rebuild()
 CVConfigCheckNetworkFabricEdge.model_rebuild()
 CVConfigCheckNetworkFabricNode.model_rebuild()
+CVConfigCheckBooleanField.model_rebuild()
 CVConfigCheckDcimDevice.model_rebuild()
 CVConfigCheckDcimDeviceEdge.model_rebuild()
 CVConfigCheckDcimDeviceNode.model_rebuild()

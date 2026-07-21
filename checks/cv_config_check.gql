@@ -6,6 +6,9 @@ query CVConfigCheck($name: String!) {
         name {
           value
         }
+        cloudvision_managed {
+          value
+        }
       }
     }
   }

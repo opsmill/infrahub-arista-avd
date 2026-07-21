@@ -28,20 +28,27 @@ runtime so proposed-change checks can access them.
 ## Proposed-Change Validation
 
 The `cv-config-validation` check uses the `cv_config_check` GraphQL query to
-collect devices for the target fabric. Devices are considered CloudVision
-managed when they have:
+collect the target fabric and related devices. The fabric must have
+`cloudvision_managed` set to `true` before CloudVision validation runs.
+Unmanaged fabrics skip CloudVision credential setup, serial-number checks,
+inventory checks, and workspace validation.
 
-- an AVD structured-config artifact
-- a serial number
+For a managed fabric, validation first authenticates to CloudVision, then
+requires every confirmed device in the fabric to have a serial number and to
+exist in CloudVision inventory. Devices outside the target fabric are ignored,
+and missing optional relationships are treated as absent membership rather than
+runtime failures.
 
-If a fabric has no serial-numbered devices with structured configs, the check
-skips CloudVision validation for that fabric. If some intended CloudVision
-devices have structured configs but are missing serial numbers, the check fails
-with a clear error listing those devices.
+After eligibility passes, only devices with generated structured-config
+artifacts are deployed to the validation workspace. If no generated
+structured-config artifacts exist for an otherwise eligible managed fabric, the
+check records an informational skip and does not create or build a workspace.
 
 For each selected device, the check downloads the
 `AvdStructuredConfigFile`, renders EOS CLI with `pyavd.get_device_config()`,
 deploys the configs to a CloudVision workspace, and requests a workspace build.
+Download, JSON decode, or render failures block the proposed change with a
+device-specific error.
 
 ## Workspace Tracking
 
@@ -64,9 +71,15 @@ Infrahub validation description when the proposed change has no description.
 ## Operational Notes
 
 CloudVision validation depends on the AVD generator chain having already
-produced structured-config artifacts. Missing artifacts make the check skip the
-device rather than submit an incomplete config.
+produced structured-config artifacts. Missing artifacts do not exempt devices
+from managed-fabric serial-number or inventory eligibility; they only remove the
+device from workspace config deployment after eligibility succeeds.
 
 CloudVision build or EOS validation failures should be handled as data fixes
 first. Add schema or generator code only when a required configuration family
 cannot be represented with the existing model.
+
+The check builds workspaces for review only. It does not submit workspaces after
+merge, abandon workspaces when a proposed change is deleted, or register
+post-merge deployment hooks. Those lifecycle actions belong in a separate
+operator-controlled workflow.

@@ -71,6 +71,13 @@ nodes:
         optional: true
         default_value: false
         branch: aware
+      - name: cloudvision_managed
+        label: CloudVision Managed
+        kind: Boolean
+        optional: false
+        default_value: false
+        branch: aware
+        order_weight: 4100
     relationships:
       - name: super_spine_switch_template
         branch: aware

@@ -15,6 +15,9 @@ spec:
                 name {
                   value
                 }
+                cloudvision_managed {
+                  value
+                }
               }
             }
           }

@@ -72,10 +72,20 @@ def get_cloudvision_config() -> CloudVision | None:
         password=password,
         verify_certs=verify_certs,
         proxy_host=_env_value("CLOUDVISION_PROXY_HOST"),
-        proxy_port=int(proxy_port) if proxy_port else None,
+        proxy_port=_parse_optional_int(proxy_port),
         proxy_username=_env_value("CLOUDVISION_PROXY_USERNAME"),
         proxy_password=_env_value("CLOUDVISION_PROXY_PASSWORD"),
     )
+
+
+def _parse_optional_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        LOGGER.warning("Ignoring invalid CLOUDVISION_PROXY_PORT value")
+        return None
 
 
 def get_workspace_id(proposed_change_id: str, fabric_name: str) -> str:
@@ -88,12 +98,16 @@ def get_workspace_name(proposed_change_name: str, fabric_name: str) -> str:
     return f"Infrahub Proposed Changes {proposed_change_name} - Fabric {fabric_name}"
 
 
-def get_workspace_description(proposed_change_description: str | None) -> str:
+def get_workspace_description(
+    proposed_change_description: str | None, proposed_change_id: str | None = None, fabric_name: str | None = None
+) -> str:
     """Return a CloudVision workspace description with a safe fallback."""
     if proposed_change_description:
         stripped = proposed_change_description.strip()
         if stripped:
             return stripped
+    if proposed_change_id and fabric_name:
+        return f"Infrahub CloudVision validation for proposed change {proposed_change_id} on fabric {fabric_name}"
     return DEFAULT_WORKSPACE_DESCRIPTION
 
 
