@@ -184,7 +184,7 @@
 - [X] T082 Run documentation typecheck/build and address documentation failures in `docs/docs/supported-capabilities.md`
 - [X] T083 Review changed specs, quickstart, docs, and validation evidence for private lab hostnames, tokens, and environment-specific command sequences, and remove or replace any findings in `specs/004-dci-links/quickstart.md`
 - [X] T084 Run `$infrahub-run-integration-tests` for the Infrahub schema, menu, generator, query, and documentation changes and record evidence in `specs/004-dci-links/quickstart.md`
-- [ ] T085 Run `$infrahub-test-generator-idempotence` for the DCI `l3_edge` generator path when live validation is approved, or document the approved exception in `specs/004-dci-links/quickstart.md`
+- [X] T085 Run `$infrahub-test-generator-idempotence` for the DCI `l3_edge` generator path when live validation is approved, or document the approved exception in `specs/004-dci-links/quickstart.md`
 
 ---
 
