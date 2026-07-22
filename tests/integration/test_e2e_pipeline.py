@@ -28,7 +28,9 @@ Heavy: excluded from the per-PR fast path and run in CI's
 
 from __future__ import annotations
 
+import json
 import os
+from operator import itemgetter
 from typing import TYPE_CHECKING
 
 import pytest
@@ -64,9 +66,14 @@ if TYPE_CHECKING:
 REPO_NAME = "e2e-repository"
 # The cascade runs on this branch; trigger rules only fire off `main`.
 PIPELINE_BRANCH = "e2e-pipeline"
+GENERATOR_AVD_HOSTVAR = "generate-avd-device-hostvar"
 SERVER_CABLING_RACK = "Rack-B2-1"
 SERVER_CABLING_SERVER = "e2e-server-b2-1"
 SERVER_CABLING_TEMPLATE = "compute-server-dual"
+DCI_POOL_PREFIX = "10.253.253.0/24"
+DCI_POOL_NAME = "E2E-DCI-Pool"
+DCI_LINK_NAME = "e2e-dci-link"
+DCI_INTERFACE_NAME = "Ethernet999"
 
 
 @pytest.mark.e2e
@@ -392,6 +399,31 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         )
         print(f"structured config present on all {report['total']} devices", flush=True)
 
+    # --- Component 11b: DCI link hostvars ----------------------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_dci_link_generates_l3_edge_hostvars(self, client: InfrahubClient) -> None:
+        """A NetworkLink with role dci between Border Leafs generates stored l3_edge hostvars."""
+        setup = await _create_dci_link_scenario(client, PIPELINE_BRANCH)
+        await _run_generator_for_nodes(client, PIPELINE_BRANCH, GENERATOR_AVD_HOSTVAR, setup["device_ids"])
+
+        report = await wait_until(
+            fetch=lambda: _dci_hostvars_report(client, PIPELINE_BRANCH, setup["device_names"]),
+            ready=lambda r: r["ready"] and len(r["unique_matching_links"]) == 1,
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe=f"DCI l3_edge hostvars for {DCI_LINK_NAME}",
+        )
+
+        link = report["unique_matching_links"][0]
+        assert link["nodes"] == setup["device_names"]
+        assert link["interfaces"] == setup["interface_names"]
+        assert link["as"] == setup["expected_as"]
+        assert link["ip"] == ["10.253.253.0/31", "10.253.253.1/31"]
+        assert link["include_in_underlay_protocol"] is True
+        assert "profile" not in link
+        assert all("p2p_links_profiles" not in hostvars.get("l3_edge", {}) for hostvars in report["hostvars"].values())
+        print(f"dci hostvars report: {report}", flush=True)
+
     # --- Component 12: artifacts generated ---------------------------------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_artifacts_generated(self, client: InfrahubClient) -> None:
@@ -593,7 +625,7 @@ async def _cabling_and_ip_report(client: InfrahubClient, branch: str) -> dict:
     ip_report = await _device_ip_report(client, branch)
     links = await client.all(kind="NetworkLink", branch=branch)
     l3_device_count = 0
-    for role in ("super_spine", "spine", "leaf"):
+    for role in ("super_spine", "spine", "leaf", "border_leaf"):
         l3_device_count += len(await client.filters(kind="DcimDevice", role__value=role, branch=branch))
     return {
         **ip_report,
@@ -809,6 +841,200 @@ async def _devices_without_structured_config(client: InfrahubClient, branch: str
         if not scf:
             without.append(node["name"]["value"])
     return {"total": len(edges), "without": without}
+
+
+async def _create_dci_link_scenario(client: InfrahubClient, branch: str) -> dict:
+    """Create one complete DCI link using the shared connector workflow."""
+    candidates = await _dci_leaf_candidates(client, branch)
+    assert len(candidates) >= 2, f"expected two leaves with spare physical interfaces, got {candidates}"
+    left, right = candidates[:2]
+
+    await _ensure_dci_pool(client, branch, left["fabric_id"])
+
+    for device_id in (left["device_id"], right["device_id"]):
+        device = await client.get(kind="DcimDevice", id=device_id, branch=branch)
+        device.role.value = "border_leaf"
+        await device.save(allow_upsert=True)
+
+    dci_link = await client.create(
+        kind="NetworkLink",
+        branch=branch,
+        name=DCI_LINK_NAME,
+        medium="smf",
+        role="dci",
+        include_in_underlay_protocol=True,
+    )
+    await dci_link.save(allow_upsert=True)
+
+    for endpoint in (left, right):
+        dci_interface = await client.create(
+            kind="InterfacePhysical",
+            branch=branch,
+            name=DCI_INTERFACE_NAME,
+            device={"id": endpoint["device_id"]},
+        )
+        await dci_interface.save(allow_upsert=True)
+        iface = await client.get(kind="InterfacePhysical", id=dci_interface.id, branch=branch, include=["connector"])
+        iface.connector = dci_link
+        iface.status.value = "active"
+        await iface.save(allow_upsert=True)
+        endpoint["interface_id"] = dci_interface.id
+        endpoint["interface_name"] = DCI_INTERFACE_NAME
+
+    return {
+        "device_ids": [left["device_id"], right["device_id"]],
+        "device_names": [left["device_name"], right["device_name"]],
+        "interface_names": [left["interface_name"], right["interface_name"]],
+        # Candidates are sorted by device name, matching the generator's endpoint
+        # ordering, so the AS list follows the same order.
+        "expected_as": [left["device_asn"], right["device_asn"]],
+    }
+
+
+async def _dci_leaf_candidates(client: InfrahubClient, branch: str) -> list[dict]:
+    query = """
+    query DciLeafCandidates {
+      DcimDevice(role__value: "leaf") {
+        edges {
+          node {
+            id
+            name { value }
+            asn { node { asn { value } } }
+            pod { node { parent { node { id name { value } } } } }
+          }
+        }
+      }
+    }
+    """
+    resp = await client.execute_graphql(query=query, branch_name=branch)
+    candidates = []
+    seen_fabric_id = None
+    for edge in resp["DcimDevice"]["edges"]:
+        device = edge["node"]
+        fabric = device.get("pod", {}).get("node", {}).get("parent", {}).get("node")
+        if not fabric:
+            continue
+        asn_node = (device.get("asn") or {}).get("node")
+        device_asn = asn_node["asn"]["value"] if asn_node and asn_node.get("asn") else None
+        if device_asn is None:
+            continue
+        if seen_fabric_id is None:
+            seen_fabric_id = fabric["id"]
+        if fabric["id"] != seen_fabric_id:
+            continue
+        candidates.append(
+            {
+                "device_id": device["id"],
+                "device_name": device["name"]["value"],
+                "device_asn": int(device_asn),
+                "fabric_id": fabric["id"],
+                "fabric_name": fabric["name"]["value"],
+                "interface_id": None,
+                "interface_name": DCI_INTERFACE_NAME,
+            }
+        )
+    return sorted(candidates, key=itemgetter("device_name"))
+
+
+async def _ensure_dci_pool(client: InfrahubClient, branch: str, fabric_id: str) -> None:
+    prefix = await client.create(kind="IpamPrefix", branch=branch, prefix=DCI_POOL_PREFIX, role="technical")
+    await prefix.save(allow_upsert=True)
+    pool = await client.create(
+        kind="CoreIPPrefixPool",
+        branch=branch,
+        name=DCI_POOL_NAME,
+        default_member_type="prefix",
+        default_prefix_type="IpamPrefix",
+        default_prefix_length=31,
+        ip_namespace="default",
+        resources=[DCI_POOL_PREFIX],
+    )
+    await pool.save(allow_upsert=True)
+
+    fabric = await client.get(kind="NetworkFabric", id=fabric_id, branch=branch, include=["dci_pool"])
+    fabric.dci_pool = pool
+    await fabric.save(allow_upsert=True)
+
+
+async def _run_generator_for_nodes(
+    client: InfrahubClient, branch: str, generator_name: str, node_ids: list[str]
+) -> None:
+    gen_def = await client.get(kind="CoreGeneratorDefinition", name__value=generator_name, branch=branch)
+    for node_id in node_ids:
+        await client.execute_graphql(
+            query="""
+            mutation RunGenerator($id: String!, $nodes: [String!]!) {
+                CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
+                    ok
+                }
+            }
+            """,
+            variables={"id": gen_def.id, "nodes": [node_id]},
+            branch_name=branch,
+        )
+
+
+async def _dci_hostvars_report(client: InfrahubClient, branch: str, device_names: list[str]) -> dict:
+    query = """
+    query DciHostvars($names: [String!]) {
+      DcimDevice(name__values: $names) {
+        edges {
+          node {
+            name { value }
+            avd_artifact {
+              node {
+                hostvar_file { node { storage_id { value } } }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    resp = await client.execute_graphql(query=query, variables={"names": device_names}, branch_name=branch)
+    hostvars = {}
+    for edge in resp["DcimDevice"]["edges"]:
+        node = edge["node"]
+        storage_id = (
+            node.get("avd_artifact", {})
+            .get("node", {})
+            .get("hostvar_file", {})
+            .get("node", {})
+            .get("storage_id", {})
+            .get("value")
+        )
+        if not storage_id:
+            continue
+        hostvars[node["name"]["value"]] = json.loads(await client.object_store.get(identifier=storage_id))
+
+    matching_links = []
+    for device_hostvars in hostvars.values():
+        matching_links.extend(
+            link
+            for link in device_hostvars.get("l3_edge", {}).get("p2p_links", [])
+            if link.get("nodes") == device_names or link.get("nodes") == list(reversed(device_names))
+        )
+
+    unique_matching_links = list(
+        {
+            (
+                tuple(link.get("nodes", [])),
+                tuple(link.get("interfaces", [])),
+                tuple(link.get("as", [])),
+                tuple(link.get("ip", [])),
+                link.get("include_in_underlay_protocol"),
+                link.get("speed"),
+            ): link
+            for link in matching_links
+        }.values()
+    )
+
+    return {
+        "ready": set(hostvars) == set(device_names),
+        "hostvars": hostvars,
+        "matching_links": matching_links,
+        "unique_matching_links": unique_matching_links,
+    }
 
 
 async def _trigger_all_artifacts(client: InfrahubClient, branch: str, definitions: list) -> None:

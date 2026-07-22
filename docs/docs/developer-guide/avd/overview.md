@@ -57,12 +57,13 @@ flowchart TD
 For each device the generator:
 
 1. Extracts device attributes — name, role, BGP ASN, node ID, loopback, management IP.
-2. Determines the **uplink role** based on the device's role: `spine → super_spine` interfaces, `leaf → spine` interfaces, `l2leaf → leaf` interfaces, `super_spine →` no uplinks.
+2. Determines the **uplink role** based on the device's role: `spine → super_spine` interfaces, `leaf` and `border_leaf → spine` interfaces, `l2leaf → leaf` interfaces, `super_spine →` no uplinks.
 3. Extracts connected endpoints (servers) from interfaces with `role = "server"`, including tagged/untagged VLANs.
 4. For leaves, extracts MLAG peer information and the virtual router MAC.
 5. For leaves and spines, queries EVPN tenants, VRFs, SVIs, and L2 VLANs associated with the fabric (skipped entirely for `l2leaf`).
-6. Builds a complete PyAVD `hostvars` dict (see [Hostvars Reference](./hostvars.md)).
-7. Serialises to JSON, computes a SHA256 checksum, and compares against the previous content. If changed (or absent), writes a new `AvdHostvarFile` as a child of the device's `AvdArtifact` node.
+6. For Border Leafs, evaluates `NetworkLink` objects with `role=dci` in the fabric and emits valid links as profile-free PyAVD `l3_edge.p2p_links` entries using addresses allocated from `NetworkFabric.dci_pool`.
+7. Builds a complete PyAVD `hostvars` dict (see [Hostvars Reference](./hostvars.md)).
+8. Serialises to JSON, computes a SHA256 checksum, and compares against the previous content. If changed (or absent), writes a new `AvdHostvarFile` as a child of the device's `AvdArtifact` node.
 
 ### Phase 2 — Structured Config
 

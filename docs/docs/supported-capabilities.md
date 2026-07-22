@@ -26,6 +26,7 @@ Some boundaries below are marked *confirm scope* and are being finalized with th
 | Capability | Status | Notes |
 |------------|:------:|-------|
 | Allocate loopback, interconnect, and management prefixes/IPs from pools | ✅ | Drawn from branch-aware pools so parallel work does not collide. |
+| Allocate DCI point-to-point /31 prefixes from a fabric DCI pool | ✅ | `NetworkFabric.dci_pool` is the authoritative source for generated DCI `l3_edge` addressing. |
 | Allocate BGP ASNs and node IDs from pools | ✅ | Assigned automatically during generation. |
 
 ## Services (VLAN / EVPN / VRF / MLAG / LAG / routing)
@@ -38,6 +39,7 @@ Some boundaries below are marked *confirm scope* and are being finalized with th
 | MLAG (domain + peer) | 🟡 | Modeled and wired into hostvars; **confirm** supported scope. |
 | Server LAG | 🟡 | Modeled and wired into hostvars; **confirm** supported scope. |
 | BGP peer groups | 🟡 | Wired into hostvars and produce config; **confirm** supported scope. |
+| DCI links between Border Leafs | ✅ | `NetworkLink` objects with `role=dci` reuse shared physical endpoints and generate PyAVD `l3_edge.p2p_links`; external networks and EVPN Gateway are out of scope for this phase. |
 | Route targets | 🟡 | Modeled but AVD-derived (not fed as input). |
 | Prefix lists, route maps, static routes | 🟡 | Reconciled *from* AVD output via the backfill generator, not authored as inputs. |
 

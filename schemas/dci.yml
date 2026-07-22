@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+extensions:
+  nodes:
+    - kind: NetworkFabric
+      relationships:
+        - name: dci_pool
+          label: DCI IP Pool
+          peer: CoreIPPrefixPool
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "fabric__dci_pool"
+          description: "IP prefix pool used to allocate /31 point-to-point prefixes for DCI links."
+          order_weight: 10700

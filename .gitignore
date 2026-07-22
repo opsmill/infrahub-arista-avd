@@ -193,6 +193,14 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# Node.js documentation workspace
+node_modules/
+docs/node_modules/
+docs/build/
+
+# Environment variants
+.env*
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

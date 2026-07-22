@@ -463,6 +463,7 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     asn_pool: RelationshipAttribute[CoreNumberPool]
     avd_evpn: RelationshipAttribute[AvdEvpn]
     children: RelationshipManager[NetworkPod]
+    dci_pool: RelationshipAttribute[CoreIPPrefixPool]
     dns_servers: RelationshipManager[NetworkDnsServer]
     local_users: RelationshipManager[NetworkLocalUser]
     loopback_pool: RelationshipAttribute[CoreIPPrefixPool]
@@ -579,8 +580,10 @@ class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHas
 
 
 class NetworkLink(DcimConnector):
+    include_in_underlay_protocol: Boolean
     medium: Dropdown
     name: String
+    role: DropdownOptional
     connected_endpoints: RelationshipManager[DcimEndpoint]
     member_of_groups: RelationshipManager[CoreGroup]
     profiles: RelationshipManager[CoreProfile]
@@ -1574,6 +1577,7 @@ class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
     artifacts: RelationshipManager[CoreArtifact]
     asn_pool: RelationshipAttribute[CoreNumberPool]
     avd_evpn: RelationshipAttribute[AvdEvpn]
+    dci_pool: RelationshipAttribute[CoreIPPrefixPool]
     dns_servers: RelationshipManager[NetworkDnsServer]
     local_users: RelationshipManager[NetworkLocalUser]
     loopback_pool: RelationshipAttribute[CoreIPPrefixPool]
@@ -1589,9 +1593,11 @@ class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileNetworkLink(LineageSource, CoreProfile, CoreNode):
+    include_in_underlay_protocol: BooleanOptional
     medium: DropdownOptional
     profile_name: String
     profile_priority: Integer
+    role: DropdownOptional
     connected_endpoints: RelationshipManager[DcimEndpoint]
     member_of_groups: RelationshipManager[CoreGroup]
     related_nodes: RelationshipManager[NetworkLink]

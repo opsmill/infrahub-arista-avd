@@ -1,5 +1,6 @@
 """Unit tests for the AVD hostvar generator's tenant/EVPN payload."""
 
+import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -7,10 +8,13 @@ import pytest
 import yaml
 from pyavd import get_avd_facts, validate_inputs
 
+import generators.generate_avd_device_hostvar as hostvar_module
 from generators.generate_avd_device_hostvar import (
     GenerateAVDDeviceHostvar,
     _add_switch_lag_adapter,  # noqa: PLC2701 - focused unit coverage for internal conflict validation
+    allocate_dci_p2p_prefix_from_pool,
     apply_lag_adapter_config,
+    build_dci_l3_edge_p2p_links,
 )
 
 
@@ -36,6 +40,101 @@ def _named_peer(name: str) -> SimpleNamespace:
     return SimpleNamespace(name=_attr(name))
 
 
+# Sentinel so tests can pass `pool=None` to model a fabric with no DCI pool,
+# distinct from "use the default pool".
+_NO_POOL = object()
+
+
+def _pool(pool_id: str = "pool-1") -> SimpleNamespace:
+    return SimpleNamespace(id=pool_id, name=_attr("DCI-Pool"))
+
+
+def _dci_endpoint(
+    *,
+    endpoint_id: str,
+    device_id: str,
+    device_name: str,
+    interface_name: str,
+    role: str = "border_leaf",
+    device_asn: int | None = 65101,
+    pool: object = _NO_POOL,
+    fabric_name: str = "fabric-a",
+    speed: str | None = "100g",
+) -> dict:
+    pool_node = _pool() if pool is _NO_POOL else pool
+    fabric_node = {
+        "__typename": "NetworkFabric",
+        "name": {"value": fabric_name},
+        "dci_pool": {"node": pool_node},
+    }
+    endpoint = {
+        "__typename": "InterfacePhysical",
+        "id": endpoint_id,
+        "name": {"value": interface_name},
+        "device": {
+            "node": {
+                "__typename": "DcimDevice",
+                "id": device_id,
+                "name": {"value": device_name},
+                "role": {"value": role},
+                "asn": {"node": {"asn": {"value": device_asn}} if device_asn is not None else None},
+                "pod": {"node": {"parent": {"node": fabric_node}}},
+            }
+        },
+    }
+    if speed is not None:
+        endpoint["speed"] = {"value": speed}
+    return endpoint
+
+
+def _dci_link(
+    link_id: str = "dci-1",
+    *,
+    name: str = "DCI-1",
+    endpoint_1: dict | None = None,
+    endpoint_2: dict | None = None,
+    include_in_underlay_protocol: bool | None = True,
+) -> dict:
+    link = {
+        "__typename": "NetworkLink",
+        "id": link_id,
+        "display_label": name,
+        "name": {"value": name},
+        "role": {"value": "dci"},
+        "connected_endpoints": {
+            "edges": [
+                {
+                    "node": endpoint_1
+                    or _dci_endpoint(
+                        endpoint_id="dc1-eth5",
+                        device_id="dc1-leaf1",
+                        device_name="ih-dc1-leaf1a",
+                        interface_name="Ethernet5",
+                        device_asn=65101,
+                    )
+                },
+                {
+                    "node": endpoint_2
+                    or _dci_endpoint(
+                        endpoint_id="dc2-eth5",
+                        device_id="dc2-leaf1",
+                        device_name="ih-dc2-leaf1a",
+                        interface_name="Ethernet5",
+                        device_asn=65201,
+                    )
+                },
+            ]
+        },
+    }
+    if include_in_underlay_protocol is not None:
+        link["include_in_underlay_protocol"] = {"value": include_in_underlay_protocol}
+    return link
+
+
+def _mock_prefix(prefix: str) -> SimpleNamespace:
+    return SimpleNamespace(prefix=_attr(prefix))
+
+
 def _base_hostvars(
     tenants_data: list[dict],
     *,
@@ -43,11 +142,13 @@ def _base_hostvars(
     mlag_info: dict | None = None,
     connected_endpoints: list[dict] | None = None,
     custom_hostvars: dict | None = None,
+    role: str = "leaf",
+    dci_l3_edge_p2p_links: list[dict] | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
         hostname="leaf1",
-        role="leaf",
+        role=role,
         bgp_asn=65001,
         node_id=3,
         loopback_ip="10.0.0.3",
@@ -75,6 +176,7 @@ def _base_hostvars(
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
         connected_endpoints=connected_endpoints or [],
+        dci_l3_edge_p2p_links=dci_l3_edge_p2p_links,
         custom_hostvars=custom_hostvars or {},
     )
 
@@ -127,6 +229,539 @@ def test_non_mlag_leaf_sets_avd_mlag_false_on_rack_node_group() -> None:
     assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
     assert "mlag" not in hostvars["l3leaf"].get("defaults", {})
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_border_leaf_builds_l3leaf_hostvars() -> None:
+    hostvars = _base_hostvars([], role="border_leaf")
+
+    assert hostvars["type"] == "l3leaf"
+    assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
+    assert hostvars["l3leaf"]["node_groups"][0]["nodes"] == [{"name": "leaf1"}]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_border_leaf_mapping_is_available_to_repository_loaded_generator(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Repository-loaded generators may run beside an older installed package."""
+
+    def reject_border_leaf(role: str) -> str:
+        if role == "border_leaf":
+            msg = f"Unknown device role: {role}"
+            raise ValueError(msg)
+        return role
+
+    monkeypatch.setattr(hostvar_module, "_get_package_avd_type", reject_border_leaf)
+
+    hostvars = _base_hostvars([], role="border_leaf")
+
+    assert hostvars["type"] == "l3leaf"
+    assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_p2p_link_output_with_resolved_speed() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[_dci_link()],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == [
+        {
+            "nodes": ["ih-dc1-leaf1a", "ih-dc2-leaf1a"],
+            "interfaces": ["Ethernet5", "Ethernet5"],
+            "as": [65101, 65201],
+            "ip": ["172.16.0.0/31", "172.16.0.1/31"],
+            "include_in_underlay_protocol": True,
+            "speed": "100g",
+        }
+    ]
+    gen.client.allocate_next_ip_prefix.assert_awaited_once()
+
+    hostvars = _base_hostvars([], dci_l3_edge_p2p_links=p2p_links)
+    assert "p2p_links_profiles" not in hostvars["l3_edge"]
+    assert "profile" not in hostvars["l3_edge"]["p2p_links"][0]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_omits_speed_when_unresolved() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    speed=None,
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    speed=None,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert "speed" not in p2p_links[0]
+    assert not validate_inputs(_base_hostvars([], dci_l3_edge_p2p_links=p2p_links)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_hydrates_graphql_pool_before_allocation() -> None:
+    gen = _make_generator()
+    hydrated_pool = SimpleNamespace(id="pool-1", get_kind=lambda: "CoreIPPrefixPool")
+    gen.client.get = AsyncMock(return_value=hydrated_pool)
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    graphql_pool = {"id": "pool-1", "name": {"value": "DCI-Pool"}}
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=65101,
+                    pool=graphql_pool,
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=65201,
+                    pool=graphql_pool,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    gen.client.get.assert_awaited_once_with(kind="CoreIPPrefixPool", id="pool-1")
+    allocation_kwargs = gen.client.allocate_next_ip_prefix.await_args.kwargs
+    assert allocation_kwargs["resource_pool"] is hydrated_pool
+    assert allocation_kwargs["member_type"] == "prefix"
+    assert allocation_kwargs["data"] == {"role": "technical"}
+    assert p2p_links[0]["ip"] == ["172.16.0.0/31", "172.16.0.1/31"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("hostname", ["ih-dc1-leaf1a", "ih-dc2-leaf1a"])
+async def test_dci_cross_fabric_uses_single_deterministic_pool(hostname: str) -> None:
+    """Both border leafs must allocate the DCI /31 from the same pool.
+
+    The two endpoints can live in different fabrics with different DCI pools, yet
+    each device generates its hostvars independently. The pool is chosen from the
+    sorted-first endpoint's fabric, so both sides allocate the same prefix under
+    the shared link identifier — otherwise the two ends would get mismatched IPs.
+    """
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+    pool_dc1 = _pool("pool-dc1")
+    pool_dc2 = _pool("pool-dc2")
+    link = _dci_link(
+        endpoint_1=_dci_endpoint(
+            endpoint_id="dc1-eth5",
+            device_id="dc1-leaf1",
+            device_name="ih-dc1-leaf1a",
+            interface_name="Ethernet5",
+            device_asn=65101,
+            pool=pool_dc1,
+            fabric_name="fabric-dc1",
+        ),
+        endpoint_2=_dci_endpoint(
+            endpoint_id="dc2-eth5",
+            device_id="dc2-leaf1",
+            device_name="ih-dc2-leaf1a",
+            interface_name="Ethernet5",
+            device_asn=65201,
+            pool=pool_dc2,
+            fabric_name="fabric-dc2",
+        ),
+    )
+
+    p2p_links = await build_dci_l3_edge_p2p_links(gen.client, dci_links=[link], hostname=hostname)
+
+    assert p2p_links[0]["ip"] == ["172.16.0.0/31", "172.16.0.1/31"]
+    assert p2p_links[0]["as"] == [65101, 65201]
+    allocation_kwargs = gen.client.allocate_next_ip_prefix.await_args.kwargs
+    # sorted-first endpoint (dc1) owns the allocation regardless of the generating device
+    assert allocation_kwargs["resource_pool"] is pool_dc1
+    assert allocation_kwargs["identifier"] == "dci-link:dci-1"
+
+
+@pytest.mark.anyio
+async def test_dci_pool_falls_back_to_peer_endpoint_when_first_fabric_has_none() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+    pool_dc2 = _pool("pool-dc2")
+    link = _dci_link(
+        endpoint_1=_dci_endpoint(
+            endpoint_id="dc1-eth5",
+            device_id="dc1-leaf1",
+            device_name="ih-dc1-leaf1a",
+            interface_name="Ethernet5",
+            device_asn=65101,
+            pool=None,
+        ),
+        endpoint_2=_dci_endpoint(
+            endpoint_id="dc2-eth5",
+            device_id="dc2-leaf1",
+            device_name="ih-dc2-leaf1a",
+            interface_name="Ethernet5",
+            device_asn=65201,
+            pool=pool_dc2,
+        ),
+    )
+
+    p2p_links = await build_dci_l3_edge_p2p_links(gen.client, dci_links=[link], hostname="ih-dc1-leaf1a")
+
+    assert len(p2p_links) == 1
+    assert gen.client.allocate_next_ip_prefix.await_args.kwargs["resource_pool"] is pool_dc2
+
+
+@pytest.mark.anyio
+async def test_dci_ospf_underlay_omits_as_and_relaxes_asn_requirement() -> None:
+    """With a non-eBGP underlay, the DCI link is emitted without `as`.
+
+    Endpoint devices are not required to carry a BGP ASN when the underlay
+    routing protocol is OSPF; the link is still generated for reachability.
+    """
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=None,
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=None,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+        underlay_routing_protocol="ospf",
+    )
+
+    assert len(p2p_links) == 1
+    assert "as" not in p2p_links[0]
+    assert p2p_links[0]["ip"] == ["172.16.0.0/31", "172.16.0.1/31"]
+    assert not validate_inputs(_base_hostvars([], dci_l3_edge_p2p_links=p2p_links)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_ebgp_underlay_requires_asn(caplog: pytest.LogCaptureFixture) -> None:
+    """With an eBGP underlay, a missing endpoint device ASN skips the link."""
+    gen = _make_generator()
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=None,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+        underlay_routing_protocol="ebgp",
+    )
+
+    assert p2p_links == []
+    assert "must have a BGP ASN when the underlay routing protocol is eBGP" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_dci_l3_edge_uses_default_underlay_when_unset() -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[_dci_link(include_in_underlay_protocol=None)],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links[0]["include_in_underlay_protocol"] is True
+
+
+@pytest.mark.anyio
+async def test_invalid_dci_link_reports_non_border_leaf_context(caplog: pytest.LogCaptureFixture) -> None:
+    gen = _make_generator()
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    role="leaf",
+                )
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == []
+    assert "both endpoints must be Border Leaf" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_duplicate_dci_endpoint_pairs_are_reported_without_reallocating(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[_dci_link("dci-1", name="DCI-1"), _dci_link("dci-2", name="DCI-2")],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert len(p2p_links) == 1
+    assert "duplicate endpoint-interface pair" in caplog.text
+    gen.client.allocate_next_ip_prefix.assert_awaited_once()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("link", "match"),
+    [
+        (
+            {
+                **_dci_link(),
+                "connected_endpoints": {
+                    "edges": [
+                        {
+                            "node": _dci_endpoint(
+                                endpoint_id="a", device_id="a", device_name="a", interface_name="Ethernet1"
+                            )
+                        }
+                    ]
+                },
+            },
+            "exactly two",
+        ),
+        (
+            {**_dci_link(), "connected_endpoints": {"edges": [{"node": {"__typename": "DcimInterface", "id": "bad"}}]}},
+            "not a physical",
+        ),
+        (
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="a", device_id="same", device_name="same-a", interface_name="Ethernet1"
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="b", device_id="same", device_name="same-b", interface_name="Ethernet2"
+                ),
+            ),
+            "different devices",
+        ),
+        (
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=None,
+                ),
+            ),
+            "both endpoint devices must have a BGP ASN",
+        ),
+    ],
+)
+async def test_invalid_dci_links_report_actionable_context(
+    link: dict,
+    match: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    gen = _make_generator()
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[link],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == []
+    assert match in caplog.text
+
+
+@pytest.mark.anyio
+async def test_dci_link_requires_fabric_dci_pool(caplog: pytest.LogCaptureFixture) -> None:
+    gen = _make_generator()
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=65101,
+                    pool=None,
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=65201,
+                    pool=None,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == []
+    assert "neither endpoint fabric defines a dci_pool" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_mixed_valid_and_invalid_dci_links_emit_valid_and_report_invalid(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    valid = _dci_link("dci-valid", name="DCI-Valid")
+    invalid = _dci_link(
+        "dci-invalid",
+        name="DCI-Invalid",
+        endpoint_2=_dci_endpoint(
+            endpoint_id="dc2-eth6",
+            device_id="dc2-leaf2",
+            device_name="ih-dc2-leaf2a",
+            interface_name="Ethernet6",
+            role="leaf",
+        ),
+    )
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[invalid, valid],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == [
+        {
+            "nodes": ["ih-dc1-leaf1a", "ih-dc2-leaf1a"],
+            "interfaces": ["Ethernet5", "Ethernet5"],
+            "as": [65101, 65201],
+            "ip": ["172.16.0.0/31", "172.16.0.1/31"],
+            "include_in_underlay_protocol": True,
+            "speed": "100g",
+        }
+    ]
+    assert "DCI-Invalid" in caplog.text
+    assert "both endpoints must be Border Leaf" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_dci_allocation_failure_reports_link_and_continues(caplog: pytest.LogCaptureFixture) -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(side_effect=ValueError("pool exhausted"))
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[_dci_link()],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == []
+    assert "pool exhausted" in caplog.text
+
+
+def test_dci_allocation_helper_documents_repository_loaded_generator_exception() -> None:
+    assert allocate_dci_p2p_prefix_from_pool.__doc__
+    assert "repository-loaded generator" in allocate_dci_p2p_prefix_from_pool.__doc__
+    assert "task-worker image" in allocate_dci_p2p_prefix_from_pool.__doc__
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("count", [10, 100, 250])
+async def test_dci_link_scale_ordering_and_no_duplicate_entries(count: int) -> None:
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(
+        side_effect=[_mock_prefix(f"172.16.{index // 128}.{(index % 128) * 2}/31") for index in range(count)]
+    )
+    links = [
+        _dci_link(
+            f"dci-{index:03}",
+            name=f"DCI-{index:03}",
+            endpoint_1=_dci_endpoint(
+                endpoint_id=f"dc1-eth{index}",
+                device_id="dc1-leaf1",
+                device_name="ih-dc1-leaf1a",
+                interface_name=f"Ethernet{index + 1}",
+                speed=None,
+            ),
+            endpoint_2=_dci_endpoint(
+                endpoint_id=f"dc2-eth{index}",
+                device_id=f"dc2-leaf{index}",
+                device_name=f"ih-dc2-leaf{index:03}",
+                interface_name=f"Ethernet{index + 1}",
+                speed=None,
+            ),
+        )
+        for index in reversed(range(count))
+    ]
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=links,
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert len(p2p_links) == count
+    assert p2p_links[0]["nodes"] == ["ih-dc1-leaf1a", "ih-dc2-leaf000"]
+    assert p2p_links[-1]["nodes"] == ["ih-dc1-leaf1a", f"ih-dc2-leaf{count - 1:03}"]
+    assert len({tuple(link["nodes"] + link["interfaces"]) for link in p2p_links}) == count
 
 
 def test_mlag_leaf_uses_rack_node_group_and_domain_id() -> None:

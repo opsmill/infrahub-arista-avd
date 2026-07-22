@@ -30,7 +30,7 @@ The builder for these basics lives in [`generators/generate_avd_device_hostvar.p
 
 Role-specific STP priorities are modeled as `NetworkSpanningTreePriority` child objects on the fabric. When a child exists for the device role, the hostvars builder emits it under the matching AVD node type defaults, for example `l3leaf.defaults.spanning_tree_priority: 8192`. The legacy fabric-level `spanning_tree_priority` field is still present for non-destructive migration compatibility but is ignored by hostvar generation.
 
-## Uplink fields — `spine`, `leaf`, `l2leaf`
+## Uplink fields — `spine`, `leaf`, `border_leaf`, `l2leaf`
 
 Super-spines have no uplinks; all other roles do.
 
@@ -51,6 +51,7 @@ Which *remote* role supplies the uplink depends on the local role:
 | `super_spine` | none (top of fabric) |
 | `spine` | `super_spine` |
 | `leaf` | `spine` |
+| `border_leaf` | `spine` |
 | `l2leaf` | `leaf` |
 
 Enforced in [`generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py).
@@ -66,9 +67,9 @@ No additional fields beyond top-level. Super-spines sit at the top of the fabric
 - Uplink block (above) with upstream `super_spine` devices.
 - No leaf-level extensions (no MLAG, no virtual MAC).
 
-### `leaf`
+### `leaf` and `border_leaf`
 
-Leaves carry the richest hostvars:
+Leaves and Border Leafs map to PyAVD `l3leaf` and carry the richest hostvars:
 
 | Field | Notes |
 |-------|-------|
@@ -80,6 +81,29 @@ Leaves carry the richest hostvars:
 | `l3_interfaces` / SVIs | Emitted from `EvpnSvi` objects attached to VLANs on this leaf's L2 domain. |
 | `connected_endpoints` | Per interface with `role = "server"` (see below). |
 | EVPN tenants/VRFs/VLANs | Derived from `EvpnTenant` → `IpamVRF` → `EvpnSvi` → `IpamVLAN` chain filtered to this fabric. |
+
+Border Leafs additionally consume valid `NetworkLink` objects with `role=dci` and emit PyAVD `l3_edge.p2p_links` entries. Each DCI link must have exactly two inherited physical endpoints and both endpoint devices must use role `border_leaf`. When the fabric underlay routing protocol is **eBGP**, both endpoint devices must have a BGP ASN assigned and each end's `as` is taken from the endpoint device's own `asn`; with a non-BGP underlay (e.g. OSPF) the link is still emitted for reachability, `as` is omitted, and no ASN is required. Point-to-point addresses are allocated as one `/31` per link; the pool is taken deterministically from the sorted-first endpoint's `NetworkFabric.dci_pool` (falling back to the peer's), so both border leafs — even in different fabrics — allocate the same prefix. Endpoint IPs are not stored as DCI-specific link fields.
+
+Generated DCI entries are self-contained and do not use `l3_edge.p2p_links_profiles` or per-link `profile` references:
+
+```json
+{
+  "l3_edge": {
+    "p2p_links": [
+      {
+        "nodes": ["ih-dc1-leaf1a", "ih-dc2-leaf1a"],
+        "interfaces": ["Ethernet5", "Ethernet5"],
+        "as": [65101, 65201],
+        "ip": ["172.16.0.0/31", "172.16.0.1/31"],
+        "include_in_underlay_protocol": true,
+        "speed": "100g"
+      }
+    ]
+  }
+}
+```
+
+`speed` is emitted only when endpoint/interface data provides a resolvable speed. When it cannot be resolved, the key is omitted and pyAVD uses its normal behavior.
 
 ### `l2leaf`
 

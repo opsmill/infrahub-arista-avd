@@ -12,6 +12,8 @@ import asyncio
 import time
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from infrahub_sdk.exceptions import GraphQLError
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
@@ -104,9 +106,13 @@ async def wait_until(
     deadline = time.monotonic() + timeout
     last: Any = None
     while True:
-        last = await fetch()
-        if ready(last):
-            return last
+        try:
+            last = await fetch()
+        except GraphQLError as exc:
+            last = exc
+        else:
+            if ready(last):
+                return last
         if time.monotonic() >= deadline:
             msg = f"{describe}: timed out after {timeout}s; last observed: {_summarize(last)}"
             raise AssertionError(msg)

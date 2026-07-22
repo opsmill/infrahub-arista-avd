@@ -5,6 +5,8 @@ import logging
 import operator
 import re
 from copy import deepcopy
+from dataclasses import dataclass
+from ipaddress import IPv4Network
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import yaml
@@ -12,7 +14,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 
-from solution_arista_avd.avd import get_avd_type
+from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
 from solution_arista_avd.generator import set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
 
@@ -46,8 +48,38 @@ class RackInfo(TypedDict):
     avd_tags: list[str]
 
 
+@dataclass(frozen=True)
+class DciEndpoint:
+    device_id: str
+    device_name: str
+    device_role: str | None
+    interface_id: str
+    interface_name: str
+    device_bgp_asn: int | None = None
+    fabric_pool: object | None = None
+    speed: str | None = None
+
+
+@dataclass(frozen=True)
+class DciNetworkLinkIntent:
+    link_id: str
+    link_name: str
+    include_in_underlay_protocol: bool
+    endpoints: tuple[DciEndpoint, DciEndpoint]
+    asns: tuple[int | None, int | None]
+    pool: object
+
+
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
 PORT_CHANNEL_RE = re.compile(r"^Port-Channel(?P<channel_id>\d+)$")
+LEAF_FAMILY_ROLES = {"leaf", "border_leaf"}
+
+
+def get_generator_avd_type(role: str) -> str:
+    """Resolve role mappings used by repository-loaded generator code."""
+    if role == "border_leaf":
+        return "l3leaf"
+    return _get_package_avd_type(role)
 
 
 async def check_fabric_hostvars_ready(client: InfrahubClient, fabric_id: str) -> bool:
@@ -290,6 +322,240 @@ def _device_name(interface: object) -> str | None:
 def _device_role(interface: object) -> str | None:
     device = _node(_field(interface, "device"))
     return _value(device, "role") if device else None
+
+
+def _device_id(interface: object) -> str | None:
+    device = _node(_field(interface, "device"))
+    return _field(device, "id") if device else None
+
+
+def _device_bgp_asn(interface: object) -> int | None:
+    """Return the endpoint device's own BGP ASN (via its RoutingAsn relationship)."""
+    device = _node(_field(interface, "device"))
+    asn = _value(_node(_field(device, "asn")), "asn") if device else None
+    return int(asn) if asn is not None else None
+
+
+def _endpoint_fabric_pool(interface: object) -> object | None:
+    """Return the DCI prefix pool of the fabric that owns the endpoint device."""
+    device = _node(_field(interface, "device"))
+    pod = _node(_field(device, "pod")) if device else None
+    fabric = _node(_field(pod, "parent")) if pod else None
+    return _node(_field(fabric, "dci_pool")) if fabric else None
+
+
+def _extract_interface_speed(interface: object) -> str | None:
+    for field in ("speed", "link_speed", "interface_speed"):
+        speed = _value(interface, field)
+        if speed:
+            return str(speed)
+    return None
+
+
+def _normalize_dci_endpoints(endpoints: list[DciEndpoint]) -> tuple[DciEndpoint, DciEndpoint]:
+    if len(endpoints) != 2:
+        msg = f"DCI link must have exactly two physical endpoints, found {len(endpoints)}"
+        raise ValueError(msg)
+
+    ordered = tuple(
+        sorted(
+            endpoints,
+            key=lambda endpoint: (endpoint.device_name, sort_interface_list([endpoint.interface_name])[0]),
+        )
+    )
+    return ordered[0], ordered[1]
+
+
+def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
+    link_id = str(_field(link, "id") or _value(link, "name") or _field(link, "display_label"))
+    link_name = str(_value(link, "name") or _field(link, "display_label") or link_id)
+    if _value(link, "role") != "dci":
+        msg = f"Network Link {link_name}: role must be dci for DCI generation"
+        raise ValueError(msg)
+    endpoints: list[DciEndpoint] = []
+
+    for endpoint_edge in _edges(_field(link, "connected_endpoints")):
+        endpoint = _node(endpoint_edge)
+        if not endpoint:
+            continue
+        if _typename(endpoint) != "InterfacePhysical":
+            msg = f"DCI link {link_name}: endpoint {_field(endpoint, 'id')} is not a physical interface"
+            raise ValueError(msg)
+        device_id = _device_id(endpoint)
+        device_name = _device_name(endpoint)
+        interface_name = _value(endpoint, "name")
+        if not device_id or not device_name or not interface_name:
+            msg = f"DCI link {link_name}: endpoint is missing device or interface identity"
+            raise ValueError(msg)
+        endpoints.append(
+            DciEndpoint(
+                device_id=str(device_id),
+                device_name=str(device_name),
+                device_role=_device_role(endpoint),
+                interface_id=str(_field(endpoint, "id")),
+                interface_name=str(interface_name),
+                device_bgp_asn=_device_bgp_asn(endpoint),
+                fabric_pool=_endpoint_fabric_pool(endpoint),
+                speed=_extract_interface_speed(endpoint),
+            )
+        )
+
+    endpoint_1, endpoint_2 = _normalize_dci_endpoints(endpoints)
+    if endpoint_1.device_role != "border_leaf" or endpoint_2.device_role != "border_leaf":
+        msg = f"DCI link {link_name}: both endpoints must be Border Leaf devices"
+        raise ValueError(msg)
+    if endpoint_1.device_id == endpoint_2.device_id:
+        msg = f"DCI link {link_name}: endpoints must use different devices"
+        raise ValueError(msg)
+    if endpoint_1.interface_id == endpoint_2.interface_id:
+        msg = f"DCI link {link_name}: endpoints must use different interfaces"
+        raise ValueError(msg)
+
+    # A DCI /31 must come from a single pool so both border leafs (which generate
+    # independently, potentially in different fabrics) allocate the same prefix
+    # under the shared link identifier. Pick it deterministically from the
+    # sorted-first endpoint's fabric, falling back to the peer's.
+    pool = endpoint_1.fabric_pool or endpoint_2.fabric_pool
+    if pool is None:
+        msg = f"DCI link {link_name}: neither endpoint fabric defines a dci_pool"
+        raise ValueError(msg)
+
+    include_in_underlay_protocol = _value(link, "include_in_underlay_protocol")
+    if include_in_underlay_protocol is None:
+        include_in_underlay_protocol = True
+
+    return DciNetworkLinkIntent(
+        link_id=link_id,
+        link_name=link_name,
+        include_in_underlay_protocol=bool(include_in_underlay_protocol),
+        endpoints=(endpoint_1, endpoint_2),
+        asns=(endpoint_1.device_bgp_asn, endpoint_2.device_bgp_asn),
+        pool=pool,
+    )
+
+
+def _uses_ebgp_underlay(underlay_routing_protocol: str | None) -> bool:
+    return (underlay_routing_protocol or "").lower() == "ebgp"
+
+
+async def allocate_dci_p2p_prefix_from_pool(
+    client: InfrahubClient,
+    pool: object,
+    *,
+    identifier: str,
+    prefix_length: int = 31,
+) -> IPv4Network:
+    """Allocate or reuse a stable DCI point-to-point prefix from a prefix pool.
+
+    Keep this helper local to the repository-loaded generator: Infrahub imports
+    generator modules from the synced repository, but imports package modules
+    from the task-worker image.
+    """
+    if isinstance(pool, dict):
+        pool_id = pool.get("id")
+        if not pool_id:
+            msg = "DCI pool is missing an ID and cannot be used for prefix allocation"
+            raise ValueError(msg)
+        pool = await client.get(kind="CoreIPPrefixPool", id=pool_id)
+
+    prefix = await client.allocate_next_ip_prefix(
+        resource_pool=pool,
+        identifier=identifier,
+        member_type="prefix",
+        prefix_length=prefix_length,
+        data={"role": "technical"},
+    )
+    return IPv4Network(str(prefix.prefix.value), strict=False)
+
+
+async def build_dci_l3_edge_p2p_links(
+    client: InfrahubClient,
+    *,
+    dci_links: list[object],
+    hostname: str,
+    underlay_routing_protocol: str | None = "ebgp",
+) -> list[dict[str, Any]]:
+    """Build deterministic PyAVD l3_edge.p2p_links entries from DCI links.
+
+    BGP ASNs are only required (and emitted as ``as``) when the fabric underlay
+    routing protocol is eBGP. With a non-BGP underlay (e.g. OSPF) the p2p link is
+    still emitted for reachability, but without ``as`` and without requiring the
+    endpoint devices to carry an ASN.
+    """
+    ebgp_underlay = _uses_ebgp_underlay(underlay_routing_protocol)
+    intents: list[DciNetworkLinkIntent] = []
+    for link in dci_links:
+        try:
+            intents.append(_extract_dci_network_link_intent(link))
+        except ValueError as exc:
+            logger.warning("Skipping invalid DCI Network Link: %s", exc)
+
+    intents = sorted(
+        intents,
+        key=lambda intent: (
+            intent.link_name,
+            intent.endpoints[0].device_name,
+            sort_interface_list([intent.endpoints[0].interface_name])[0],
+            intent.endpoints[1].device_name,
+            sort_interface_list([intent.endpoints[1].interface_name])[0],
+        ),
+    )
+
+    seen_pairs: set[tuple[tuple[str, str], tuple[str, str]]] = set()
+    p2p_links: list[dict[str, Any]] = []
+    for intent in intents:
+        endpoint_pair = tuple(sorted((endpoint.device_id, endpoint.interface_id) for endpoint in intent.endpoints))
+        if endpoint_pair in seen_pairs:
+            logger.warning(
+                "Skipping invalid DCI Network Link: DCI link %s: duplicate endpoint-interface pair", intent.link_name
+            )
+            continue
+        seen_pairs.add(endpoint_pair)
+
+        if hostname not in {endpoint.device_name for endpoint in intent.endpoints}:
+            continue
+
+        if ebgp_underlay and (intent.asns[0] is None or intent.asns[1] is None):
+            logger.warning(
+                "Skipping invalid DCI Network Link: DCI link %s: both endpoint devices must have a BGP ASN "
+                "when the underlay routing protocol is eBGP",
+                intent.link_name,
+            )
+            continue
+
+        try:
+            prefix = await allocate_dci_p2p_prefix_from_pool(
+                client,
+                intent.pool,
+                identifier=f"dci-link:{intent.link_id}",
+                prefix_length=31,
+            )
+        except ValueError as exc:
+            logger.warning("Skipping invalid DCI Network Link: %s", exc)
+            continue
+        addresses = [f"{address}/31" for address in prefix.hosts()]
+        if len(addresses) != 2:
+            logger.warning(
+                "Skipping invalid DCI Network Link: DCI link %s: allocated prefix %s did not produce two /31 host addresses",
+                intent.link_name,
+                prefix,
+            )
+            continue
+
+        p2p_link: dict[str, Any] = {
+            "nodes": [intent.endpoints[0].device_name, intent.endpoints[1].device_name],
+            "interfaces": [intent.endpoints[0].interface_name, intent.endpoints[1].interface_name],
+            "ip": addresses,
+            "include_in_underlay_protocol": intent.include_in_underlay_protocol,
+        }
+        if ebgp_underlay:
+            p2p_link["as"] = [intent.asns[0], intent.asns[1]]
+        speed = intent.endpoints[0].speed or intent.endpoints[1].speed
+        if speed:
+            p2p_link["speed"] = speed
+        p2p_links.append(p2p_link)
+
+    return p2p_links
 
 
 def _lag_member_adapter(
@@ -1006,7 +1272,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 if not node or not getattr(node, "name", None):
                     continue
                 role = getattr(node, "role", None)
-                if role and role.value != "leaf":
+                if role and role.value not in LEAF_FAMILY_ROLES:
                     continue
                 leaf_names.append(node.name.value)
 
@@ -1038,17 +1304,19 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_info: dict[str, Any],
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
+        dci_l3_edge_p2p_links: list[dict[str, Any]] | None = None,
         custom_hostvars: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
-        avd_type = get_avd_type(role)
+        avd_type = get_generator_avd_type(role)
         node_type_key = "super_spine" if role == "super_spine" else avd_type
 
         # Build node config
         node_config: dict[str, Any] = {"name": hostname}
         if node_id is not None:
             node_config["id"] = node_id
-        is_mlag_leaf = bool(mlag_info.get("domain_id")) and role == "leaf"
+        is_leaf_family = role in LEAF_FAMILY_ROLES
+        is_mlag_leaf = bool(mlag_info.get("domain_id")) and is_leaf_family
         if bgp_asn is not None and not is_mlag_leaf:
             node_config["bgp_as"] = str(bgp_asn)
         if loopback_ip:
@@ -1073,11 +1341,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
 
         # Extract MLAG peer interfaces for leaf devices (AVD needs mlag_interfaces)
-        if mlag_info["domain_id"] and role == "leaf" and "mlag_peer_interfaces" in mlag_info:
+        if mlag_info["domain_id"] and is_leaf_family and "mlag_peer_interfaces" in mlag_info:
             node_config["mlag_interfaces"] = mlag_info["mlag_peer_interfaces"]
 
         # Leaf devices with SVIs need virtual_router_mac at node level
-        if role == "leaf" and virtual_router_mac and tenants_data:
+        if is_leaf_family and virtual_router_mac and tenants_data:
             node_config["virtual_router_mac_address"] = virtual_router_mac
 
         # Build hostvars
@@ -1103,7 +1371,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars[node_type_key]["defaults"]["spanning_tree_priority"] = role_priority
 
         # Loopback offset for leaf devices
-        if loopback_ipv4_offset is not None and role == "leaf":
+        if loopback_ipv4_offset is not None and is_leaf_family:
             hostvars.setdefault(node_type_key, {})
             hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
             hostvars[node_type_key]["defaults"]["loopback_ipv4_offset"] = loopback_ipv4_offset
@@ -1141,7 +1409,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         # multiple pairs yields several domains) and lists only its peer pair. A
         # non-MLAG rack groups every rack leaf together and disables MLAG at the
         # node-group level rather than in l3leaf.defaults.
-        if role == "leaf":
+        if is_leaf_family:
             avd_tags = sorted(dict.fromkeys(rack_info.get("avd_tags", [])))
             if mlag_info["domain_id"]:
                 mlag_bgp_asn = mlag_info.get("bgp_asn")
@@ -1179,6 +1447,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars["tenants"] = tenants_data
         if connected_endpoints:
             hostvars["servers"] = connected_endpoints
+        if dci_l3_edge_p2p_links:
+            hostvars["l3_edge"] = {"p2p_links": dci_l3_edge_p2p_links}
 
         if custom_hostvars:
             hostvars = GenerateAVDDeviceHostvar._deep_merge(custom_hostvars, hostvars)
@@ -1186,6 +1456,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         return hostvars
 
     async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
+        raw_data = data
         data: GenerateAvdDeviceInputsQuery = GenerateAvdDeviceInputsQuery(**data)
         device = data.dcim_device.edges[0].node
         pod = device.pod.node
@@ -1221,7 +1492,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         uplink_role = None
         if role == "spine":
             uplink_role = "super_spine"
-        elif role == "leaf":
+        elif role in LEAF_FAMILY_ROLES:
             uplink_role = "spine"
         elif role == "l2leaf":
             uplink_role = "leaf"
@@ -1314,6 +1585,20 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if not is_l2leaf:
             tenants_data = await self._build_tenants_hostvars(fabric.id)
 
+        dci_l3_edge_p2p_links: list[dict[str, Any]] = []
+        raw_dci_links = [
+            edge.get("node")
+            for edge in (raw_data.get("NetworkLink", {}).get("edges") or [])
+            if isinstance(edge, dict) and edge.get("node")
+        ]
+        if raw_dci_links and role == "border_leaf":
+            dci_l3_edge_p2p_links = await build_dci_l3_edge_p2p_links(
+                self.client,
+                dci_links=raw_dci_links,
+                hostname=hostname,
+                underlay_routing_protocol=underlay_routing_protocol,
+            )
+
         hostvars = self._build_hostvars(
             hostname=hostname,
             role=role,
@@ -1338,6 +1623,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             mlag_info=mlag_info,
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
+            dci_l3_edge_p2p_links=dci_l3_edge_p2p_links,
             custom_hostvars=custom_hostvars,
         )
 

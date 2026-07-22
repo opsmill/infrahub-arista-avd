@@ -14,6 +14,21 @@ nodes:
     human_friendly_id:
       - name__value
     display_label: name__value
+    attributes:
+      - name: role
+        kind: Dropdown
+        optional: true
+        order_weight: 1000
+        choices:
+          - name: dci
+            label: DCI
+      - name: include_in_underlay_protocol
+        label: Include in Underlay Protocol
+        kind: Boolean
+        optional: false
+        default_value: true
+        description: "Whether this DCI link participates in the generated underlay routing protocol."
+        order_weight: 1100
 
 extensions:
   nodes:
@@ -33,6 +48,8 @@ extensions:
               label: Spine
             - name: leaf
               label: Leaf
+            - name: border_leaf
+              label: Border Leaf
             - name: l2leaf
               label: L2 Leaf
               description: "L2 Leaf Switch (access layer, no EVPN)"
