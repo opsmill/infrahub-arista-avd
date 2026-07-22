@@ -82,7 +82,7 @@ Leaves and Border Leafs map to PyAVD `l3leaf` and carry the richest hostvars:
 | `connected_endpoints` | Per interface with `role = "server"` (see below). |
 | EVPN tenants/VRFs/VLANs | Derived from `EvpnTenant` → `IpamVRF` → `EvpnSvi` → `IpamVLAN` chain filtered to this fabric. |
 
-Border Leafs additionally consume valid `NetworkLink` objects with `role=dci` in their fabric and emit PyAVD `l3_edge.p2p_links` entries. Each DCI link must have exactly two inherited physical endpoints, both endpoint devices must use role `border_leaf`, and both DCI ASN attributes must be set. Point-to-point addresses are allocated as one `/31` per link from `NetworkFabric.dci_pool`; endpoint IPs are not stored as DCI-specific link fields.
+Border Leafs additionally consume valid `NetworkLink` objects with `role=dci` and emit PyAVD `l3_edge.p2p_links` entries. Each DCI link must have exactly two inherited physical endpoints, both endpoint devices must use role `border_leaf`, and both endpoint devices must have a BGP ASN assigned (each end's `as` is taken from the endpoint device's own `asn`). Point-to-point addresses are allocated as one `/31` per link; the pool is taken deterministically from the sorted-first endpoint's `NetworkFabric.dci_pool` (falling back to the peer's), so both border leafs — even in different fabrics — allocate the same prefix. Endpoint IPs are not stored as DCI-specific link fields.
 
 Generated DCI entries are self-contained and do not use `l3_edge.p2p_links_profiles` or per-link `profile` references:
 

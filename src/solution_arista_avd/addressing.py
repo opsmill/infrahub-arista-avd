@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from ipaddress import IPv4Network
 from typing import TYPE_CHECKING, cast
 
 from .protocols import DcimInterface
@@ -14,26 +13,6 @@ if TYPE_CHECKING:
     from infrahub_sdk.protocols import CoreIPPrefixPool
 
     from .protocols import IpamIPAddress, IpamPrefix
-
-
-async def allocate_p2p_prefix_from_pool(
-    client: InfrahubClient,
-    pool: CoreIPPrefixPool,
-    *,
-    identifier: str,
-    prefix_length: int = 31,
-) -> IPv4Network:
-    """Allocate or reuse a stable point-to-point prefix from a prefix pool."""
-    prefix = cast(
-        "IpamPrefix",
-        await client.allocate_next_ip_prefix(
-            resource_pool=pool,
-            identifier=identifier,
-            member_type="address",
-            prefix_length=prefix_length,
-        ),
-    )
-    return IPv4Network(str(prefix.prefix.value), strict=False)
 
 
 async def assign_ip_address_to_interface(

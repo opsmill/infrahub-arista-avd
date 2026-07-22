@@ -9435,10 +9435,8 @@ type NetworkLink implements DcimConnector & CoreNode {
   role: Dropdown
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttribute
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttribute
 }
 
 """A physical cable or connection between two endpoints"""
@@ -12325,14 +12323,11 @@ type ProfileNetworkLink implements CoreNode & CoreProfile & LineageSource {
   role: Dropdown
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttribute
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttribute
 
   """None"""
   medium: Dropdown
-  related_nodes(offset: Int, limit: Int, order: OrderInput, ids: [ID], isnull: Boolean, display_label__value: String, display_label__values: [String], display_label__isnull: Boolean, include_in_underlay_protocol__value: Boolean, include_in_underlay_protocol__values: [Boolean], include_in_underlay_protocol__source__id: ID, include_in_underlay_protocol__owner__id: ID, include_in_underlay_protocol__is_protected: Boolean, role__value: String, role__values: [String], role__source__id: ID, role__owner__id: ID, role__is_protected: Boolean, endpoint_2_bgp_asn__value: BigInt, endpoint_2_bgp_asn__values: [BigInt], endpoint_2_bgp_asn__source__id: ID, endpoint_2_bgp_asn__owner__id: ID, endpoint_2_bgp_asn__is_protected: Boolean, endpoint_1_bgp_asn__value: BigInt, endpoint_1_bgp_asn__values: [BigInt], endpoint_1_bgp_asn__source__id: ID, endpoint_1_bgp_asn__owner__id: ID, endpoint_1_bgp_asn__is_protected: Boolean, name__value: String, name__values: [String], name__source__id: ID, name__owner__id: ID, name__is_protected: Boolean, medium__value: String, medium__values: [String], medium__source__id: ID, medium__owner__id: ID, medium__is_protected: Boolean): NestedPaginatedNetworkLink!
   connected_endpoints(offset: Int, limit: Int, order: OrderInput, ids: [ID], isnull: Boolean): NestedPaginatedDcimEndpoint!
 }
 
@@ -31119,18 +31114,6 @@ type Query {
     role__source__id: ID
     role__owner__id: ID
     role__is_protected: Boolean
-    endpoint_2_bgp_asn__value: BigInt
-    endpoint_2_bgp_asn__values: [BigInt]
-    endpoint_2_bgp_asn__isnull: Boolean
-    endpoint_2_bgp_asn__source__id: ID
-    endpoint_2_bgp_asn__owner__id: ID
-    endpoint_2_bgp_asn__is_protected: Boolean
-    endpoint_1_bgp_asn__value: BigInt
-    endpoint_1_bgp_asn__values: [BigInt]
-    endpoint_1_bgp_asn__isnull: Boolean
-    endpoint_1_bgp_asn__source__id: ID
-    endpoint_1_bgp_asn__owner__id: ID
-    endpoint_1_bgp_asn__is_protected: Boolean
     name__value: String
     name__values: [String]
     name__isnull: Boolean
@@ -49558,18 +49541,6 @@ type Query {
     role__source__id: ID
     role__owner__id: ID
     role__is_protected: Boolean
-    endpoint_2_bgp_asn__value: BigInt
-    endpoint_2_bgp_asn__values: [BigInt]
-    endpoint_2_bgp_asn__isnull: Boolean
-    endpoint_2_bgp_asn__source__id: ID
-    endpoint_2_bgp_asn__owner__id: ID
-    endpoint_2_bgp_asn__is_protected: Boolean
-    endpoint_1_bgp_asn__value: BigInt
-    endpoint_1_bgp_asn__values: [BigInt]
-    endpoint_1_bgp_asn__isnull: Boolean
-    endpoint_1_bgp_asn__source__id: ID
-    endpoint_1_bgp_asn__owner__id: ID
-    endpoint_1_bgp_asn__is_protected: Boolean
     medium__value: String
     medium__values: [String]
     medium__isnull: Boolean
@@ -49627,16 +49598,6 @@ type Query {
     related_nodes__role__source__id: ID
     related_nodes__role__owner__id: ID
     related_nodes__role__is_protected: Boolean
-    related_nodes__endpoint_2_bgp_asn__value: BigInt
-    related_nodes__endpoint_2_bgp_asn__values: [BigInt]
-    related_nodes__endpoint_2_bgp_asn__source__id: ID
-    related_nodes__endpoint_2_bgp_asn__owner__id: ID
-    related_nodes__endpoint_2_bgp_asn__is_protected: Boolean
-    related_nodes__endpoint_1_bgp_asn__value: BigInt
-    related_nodes__endpoint_1_bgp_asn__values: [BigInt]
-    related_nodes__endpoint_1_bgp_asn__source__id: ID
-    related_nodes__endpoint_1_bgp_asn__owner__id: ID
-    related_nodes__endpoint_1_bgp_asn__is_protected: Boolean
     related_nodes__name__value: String
     related_nodes__name__values: [String]
     related_nodes__name__source__id: ID
@@ -69387,10 +69348,8 @@ input NetworkLinkCreateInput {
   role: TextAttributeCreate
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttributeCreate
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttributeCreate
   name: TextAttributeCreate
   medium: TextAttributeCreate
   member_of_groups: [RelatedNodeInput]
@@ -69416,10 +69375,8 @@ input NetworkLinkUpdateInput {
   role: TextAttributeUpdate
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttributeUpdate
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttributeUpdate
   name: TextAttributeUpdate
   medium: TextAttributeUpdate
   member_of_groups: [RelatedNodeInput]
@@ -69445,10 +69402,8 @@ input NetworkLinkUpsertInput {
   role: TextAttributeUpdate
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttributeUpdate
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttributeUpdate
   name: TextAttributeUpdate
   medium: TextAttributeUpdate
   member_of_groups: [RelatedNodeInput]
@@ -74976,10 +74931,8 @@ input ProfileNetworkLinkCreateInput {
   role: TextAttributeCreate
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttributeCreate
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttributeCreate
   medium: TextAttributeCreate
   related_nodes: [RelatedNodeInput]
   connected_endpoints: [RelatedNodeInput]
@@ -75012,10 +74965,8 @@ input ProfileNetworkLinkUpdateInput {
   role: TextAttributeUpdate
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttributeUpdate
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttributeUpdate
   medium: TextAttributeUpdate
   related_nodes: [RelatedNodeInput]
   connected_endpoints: [RelatedNodeInput]
@@ -75048,10 +74999,8 @@ input ProfileNetworkLinkUpsertInput {
   role: TextAttributeUpdate
 
   """BGP ASN for the second endpoint after deterministic endpoint ordering."""
-  endpoint_2_bgp_asn: NumberAttributeUpdate
 
   """BGP ASN for the first endpoint after deterministic endpoint ordering."""
-  endpoint_1_bgp_asn: NumberAttributeUpdate
   medium: TextAttributeUpdate
   related_nodes: [RelatedNodeInput]
   connected_endpoints: [RelatedNodeInput]

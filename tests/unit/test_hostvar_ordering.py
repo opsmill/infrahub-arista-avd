@@ -52,7 +52,9 @@ def _attr(value: object) -> SimpleNamespace:
     return SimpleNamespace(value=value)
 
 
-def _dci_endpoint(endpoint_id: str, device_id: str, device_name: str, interface_name: str) -> dict:
+def _dci_endpoint(
+    endpoint_id: str, device_id: str, device_name: str, interface_name: str, device_asn: int = 65101
+) -> dict:
     return {
         "__typename": "InterfacePhysical",
         "id": endpoint_id,
@@ -63,6 +65,18 @@ def _dci_endpoint(endpoint_id: str, device_id: str, device_name: str, interface_
                 "id": device_id,
                 "name": {"value": device_name},
                 "role": {"value": "border_leaf"},
+                "asn": {"node": {"asn": {"value": device_asn}}},
+                "pod": {
+                    "node": {
+                        "parent": {
+                            "node": {
+                                "__typename": "NetworkFabric",
+                                "name": {"value": "fabric-a"},
+                                "dci_pool": {"node": SimpleNamespace(id="pool-1")},
+                            }
+                        }
+                    }
+                },
             }
         },
     }
@@ -76,8 +90,6 @@ def _dci_link(link_id: str, name: str, local_interface: str, remote_interface: s
         "name": {"value": name},
         "role": {"value": "dci"},
         "include_in_underlay_protocol": {"value": True},
-        "endpoint_1_bgp_asn": {"value": 65101},
-        "endpoint_2_bgp_asn": {"value": 65201},
         "connected_endpoints": {
             "edges": [
                 {
@@ -86,6 +98,7 @@ def _dci_link(link_id: str, name: str, local_interface: str, remote_interface: s
                         "dc1-leaf1",
                         "ih-dc1-leaf1a",
                         local_interface,
+                        device_asn=65101,
                     )
                 },
                 {
@@ -94,6 +107,7 @@ def _dci_link(link_id: str, name: str, local_interface: str, remote_interface: s
                         "dc2-leaf1",
                         "ih-dc2-leaf1a",
                         remote_interface,
+                        device_asn=65201,
                     )
                 },
             ]
@@ -482,7 +496,6 @@ async def test_dci_links_are_sorted_by_link_and_endpoint_identity() -> None:
 
     result = await build_dci_l3_edge_p2p_links(
         client,
-        fabric={"dci_pool": {"node": SimpleNamespace(id="pool-1")}},
         dci_links=[
             _dci_link("dci-2", "DCI-2", "Ethernet6", "Ethernet6"),
             _dci_link("dci-1", "DCI-1", "Ethernet5", "Ethernet5"),

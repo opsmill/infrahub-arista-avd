@@ -67,7 +67,7 @@ Hierarchical base for `NetworkFabric` and `NetworkPod`. Attributes: `name` (uniq
 
 A cabled connection between interfaces. Inherits `Dcim.Connector`, so it carries `name` and `medium` (`mmf`, `smf`, `copper`) and relates to `connected_endpoints` → `DcimEndpoint`. A DCI connection is a normal `NetworkLink` with `role=dci`, not a separate schema node.
 
-- **DCI attributes**: `role` (`dci`), `include_in_underlay_protocol` (Boolean, default `true`), `endpoint_1_bgp_asn`, and `endpoint_2_bgp_asn`.
+- **DCI attributes**: `role` (`dci`) and `include_in_underlay_protocol` (Boolean, default `true`). BGP ASNs are taken from each endpoint device's own `asn`, not stored on the link.
 - **Relationships**: inherited `connected_endpoints`; no DCI-specific endpoint, pool, subnet, endpoint IP, speed, BFD, MTU, external-network, or EVPN Gateway fields are added.
 - **Addressing source**: `NetworkFabric.dci_pool`; the hostvars generator allocates one `/31` from this pool per valid DCI-role link.
 

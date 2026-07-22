@@ -580,8 +580,6 @@ class InterfaceLag(DcimInterface, InterfaceLayer2, InterfaceLayer3, InterfaceHas
 
 
 class NetworkLink(DcimConnector):
-    endpoint_1_bgp_asn: IntegerOptional
-    endpoint_2_bgp_asn: IntegerOptional
     include_in_underlay_protocol: Boolean
     medium: Dropdown
     name: String
@@ -1595,8 +1593,6 @@ class ProfileNetworkFabric(LineageSource, CoreProfile, CoreNode):
 
 
 class ProfileNetworkLink(LineageSource, CoreProfile, CoreNode):
-    endpoint_1_bgp_asn: IntegerOptional
-    endpoint_2_bgp_asn: IntegerOptional
     include_in_underlay_protocol: BooleanOptional
     medium: DropdownOptional
     profile_name: String

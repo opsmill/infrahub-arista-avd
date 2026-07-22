@@ -71,11 +71,9 @@ def test_network_link_defines_only_allowed_direct_dci_attributes() -> None:
     network_link = _node(_load_yaml("schemas/dcim_extensions.yml"), "Network", "Link")
     attrs = _attrs(network_link)
 
-    assert set(attrs) == {"role", "include_in_underlay_protocol", "endpoint_1_bgp_asn", "endpoint_2_bgp_asn"}
+    assert set(attrs) == {"role", "include_in_underlay_protocol"}
     assert attrs["include_in_underlay_protocol"]["kind"] == "Boolean"
     assert attrs["include_in_underlay_protocol"]["default_value"] is True
-    assert attrs["endpoint_1_bgp_asn"]["kind"] == "Number"
-    assert attrs["endpoint_2_bgp_asn"]["kind"] == "Number"
 
 
 def test_network_link_has_no_prohibited_direct_dci_fields() -> None:
@@ -88,6 +86,8 @@ def test_network_link_has_no_prohibited_direct_dci_fields() -> None:
         "endpoint_b",
         "endpoint_1",
         "endpoint_2",
+        "endpoint_1_bgp_asn",
+        "endpoint_2_bgp_asn",
         "subnet",
         "p2p_pool",
         "p2p_link_id",

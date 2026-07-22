@@ -55,6 +55,8 @@ class DciEndpoint:
     device_role: str | None
     interface_id: str
     interface_name: str
+    device_bgp_asn: int | None = None
+    fabric_pool: object | None = None
     speed: str | None = None
 
 
@@ -327,6 +329,21 @@ def _device_id(interface: object) -> str | None:
     return _field(device, "id") if device else None
 
 
+def _device_bgp_asn(interface: object) -> int | None:
+    """Return the endpoint device's own BGP ASN (via its RoutingAsn relationship)."""
+    device = _node(_field(interface, "device"))
+    asn = _value(_node(_field(device, "asn")), "asn") if device else None
+    return int(asn) if asn is not None else None
+
+
+def _endpoint_fabric_pool(interface: object) -> object | None:
+    """Return the DCI prefix pool of the fabric that owns the endpoint device."""
+    device = _node(_field(interface, "device"))
+    pod = _node(_field(device, "pod")) if device else None
+    fabric = _node(_field(pod, "parent")) if pod else None
+    return _node(_field(fabric, "dci_pool")) if fabric else None
+
+
 def _extract_interface_speed(interface: object) -> str | None:
     for field in ("speed", "link_speed", "interface_speed"):
         speed = _value(interface, field)
@@ -349,7 +366,7 @@ def _normalize_dci_endpoints(endpoints: list[DciEndpoint]) -> tuple[DciEndpoint,
     return ordered[0], ordered[1]
 
 
-def _extract_dci_network_link_intent(link: object, fabric: object) -> DciNetworkLinkIntent:
+def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
     link_id = str(_field(link, "id") or _value(link, "name") or _field(link, "display_label"))
     link_name = str(_value(link, "name") or _field(link, "display_label") or link_id)
     if _value(link, "role") != "dci":
@@ -377,6 +394,8 @@ def _extract_dci_network_link_intent(link: object, fabric: object) -> DciNetwork
                 device_role=_device_role(endpoint),
                 interface_id=str(_field(endpoint, "id")),
                 interface_name=str(interface_name),
+                device_bgp_asn=_device_bgp_asn(endpoint),
+                fabric_pool=_endpoint_fabric_pool(endpoint),
                 speed=_extract_interface_speed(endpoint),
             )
         )
@@ -392,15 +411,17 @@ def _extract_dci_network_link_intent(link: object, fabric: object) -> DciNetwork
         msg = f"DCI link {link_name}: endpoints must use different interfaces"
         raise ValueError(msg)
 
-    asn_1 = _value(link, "endpoint_1_bgp_asn")
-    asn_2 = _value(link, "endpoint_2_bgp_asn")
-    if asn_1 is None or asn_2 is None:
-        msg = f"DCI link {link_name}: both endpoint BGP ASN values are required"
+    if endpoint_1.device_bgp_asn is None or endpoint_2.device_bgp_asn is None:
+        msg = f"DCI link {link_name}: both endpoint devices must have a BGP ASN assigned"
         raise ValueError(msg)
 
-    dci_pool = _node(_field(fabric, "dci_pool"))
-    if dci_pool is None:
-        msg = f"DCI link {link_name}: parent fabric is missing dci_pool"
+    # A DCI /31 must come from a single pool so both border leafs (which generate
+    # independently, potentially in different fabrics) allocate the same prefix
+    # under the shared link identifier. Pick it deterministically from the
+    # sorted-first endpoint's fabric, falling back to the peer's.
+    pool = endpoint_1.fabric_pool or endpoint_2.fabric_pool
+    if pool is None:
+        msg = f"DCI link {link_name}: neither endpoint fabric defines a dci_pool"
         raise ValueError(msg)
 
     include_in_underlay_protocol = _value(link, "include_in_underlay_protocol")
@@ -412,8 +433,8 @@ def _extract_dci_network_link_intent(link: object, fabric: object) -> DciNetwork
         link_name=link_name,
         include_in_underlay_protocol=bool(include_in_underlay_protocol),
         endpoints=(endpoint_1, endpoint_2),
-        asns=(int(asn_1), int(asn_2)),
-        pool=dci_pool,
+        asns=(endpoint_1.device_bgp_asn, endpoint_2.device_bgp_asn),
+        pool=pool,
     )
 
 
@@ -450,7 +471,6 @@ async def allocate_dci_p2p_prefix_from_pool(
 async def build_dci_l3_edge_p2p_links(
     client: InfrahubClient,
     *,
-    fabric: object,
     dci_links: list[object],
     hostname: str,
 ) -> list[dict[str, Any]]:
@@ -458,7 +478,7 @@ async def build_dci_l3_edge_p2p_links(
     intents: list[DciNetworkLinkIntent] = []
     for link in dci_links:
         try:
-            intents.append(_extract_dci_network_link_intent(link, fabric))
+            intents.append(_extract_dci_network_link_intent(link))
         except ValueError as exc:
             logger.warning("Skipping invalid DCI Network Link: %s", exc)
 
@@ -1554,19 +1574,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             for edge in (raw_data.get("NetworkLink", {}).get("edges") or [])
             if isinstance(edge, dict) and edge.get("node")
         ]
-        if raw_dci_links and role in LEAF_FAMILY_ROLES:
-            raw_fabric = (
-                raw_data.get("DcimDevice", {})
-                .get("edges", [{}])[0]
-                .get("node", {})
-                .get("pod", {})
-                .get("node", {})
-                .get("parent", {})
-                .get("node", {})
-            )
+        if raw_dci_links and role == "border_leaf":
             dci_l3_edge_p2p_links = await build_dci_l3_edge_p2p_links(
                 self.client,
-                fabric=raw_fabric,
                 dci_links=raw_dci_links,
                 hostname=hostname,
             )

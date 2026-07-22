@@ -368,7 +368,6 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     uplink_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUplinkPool"
     vtep_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPool"
     loopback_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool"
-    dci_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPool"
     spanning_tree_mode: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreeMode"
     ]
@@ -524,38 +523,6 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeDefaultPrefixLength(
-    BaseModel
-):
-    value: Optional[Any]
-
-
-class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPool(
-    BaseModel
-):
-    node: Optional[
-        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNode"
-    ]
-
-
-class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNode(
-    BaseModel
-):
-    id: str
-    name: Optional[
-        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeName"
-    ]
-    default_prefix_length: Optional[
-        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeDefaultPrefixLength"
-    ]
-
-
-class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeName(
-    BaseModel
-):
-    value: Optional[str]
-
-
-class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNodeDefaultPrefixLength(
     BaseModel
 ):
     value: Optional[Any]
@@ -1543,12 +1510,6 @@ class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNode(BaseModel):
     include_in_underlay_protocol: Optional[
         "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeIncludeInUnderlayProtocol"
     ]
-    endpoint_1_bgp_asn: Optional[
-        "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeEndpoint1BgpAsn"
-    ]
-    endpoint_2_bgp_asn: Optional[
-        "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeEndpoint2BgpAsn"
-    ]
     connected_endpoints: (
         "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpoints"
     )
@@ -1566,14 +1527,6 @@ class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeIncludeInUnderlayProtocol(
     BaseModel
 ):
     value: Optional[bool]
-
-
-class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeEndpoint1BgpAsn(BaseModel):
-    value: Optional[Any]
-
-
-class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeEndpoint2BgpAsn(BaseModel):
-    value: Optional[Any]
 
 
 class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpoints(BaseModel):
@@ -1663,6 +1616,7 @@ class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNod
     role: Optional[
         "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceRole"
     ]
+    asn: "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsn"
     pod: "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod"
 
 
@@ -1676,6 +1630,28 @@ class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNod
     BaseModel
 ):
     value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsn(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsnNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsnNode(
+    BaseModel
+):
+    asn: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsnNodeAsn"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsnNodeAsn(
+    BaseModel
+):
+    value: Optional[Any]
 
 
 class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod(
@@ -1801,8 +1777,6 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVte
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode.model_rebuild()
-GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPool.model_rebuild()
-GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricDciPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePriorities.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdges.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricSpanningTreePrioritiesEdgesNode.model_rebuild()
@@ -1868,6 +1842,8 @@ GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInter
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice.model_rebuild()
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDevice.model_rebuild()
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsn.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDeviceAsnNode.model_rebuild()
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod.model_rebuild()
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNode.model_rebuild()
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParent.model_rebuild()

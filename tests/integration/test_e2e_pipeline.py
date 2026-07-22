@@ -417,7 +417,7 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         link = report["unique_matching_links"][0]
         assert link["nodes"] == setup["device_names"]
         assert link["interfaces"] == setup["interface_names"]
-        assert link["as"] == [65101, 65201]
+        assert link["as"] == setup["expected_as"]
         assert link["ip"] == ["10.253.253.0/31", "10.253.253.1/31"]
         assert link["include_in_underlay_protocol"] is True
         assert "profile" not in link
@@ -862,8 +862,6 @@ async def _create_dci_link_scenario(client: InfrahubClient, branch: str) -> dict
         name=DCI_LINK_NAME,
         medium="smf",
         role="dci",
-        endpoint_1_bgp_asn=65101,
-        endpoint_2_bgp_asn=65201,
         include_in_underlay_protocol=True,
     )
     await dci_link.save(allow_upsert=True)
@@ -887,6 +885,9 @@ async def _create_dci_link_scenario(client: InfrahubClient, branch: str) -> dict
         "device_ids": [left["device_id"], right["device_id"]],
         "device_names": [left["device_name"], right["device_name"]],
         "interface_names": [left["interface_name"], right["interface_name"]],
+        # Candidates are sorted by device name, matching the generator's endpoint
+        # ordering, so the AS list follows the same order.
+        "expected_as": [left["device_asn"], right["device_asn"]],
     }
 
 
@@ -898,6 +899,7 @@ async def _dci_leaf_candidates(client: InfrahubClient, branch: str) -> list[dict
           node {
             id
             name { value }
+            asn { node { asn { value } } }
             pod { node { parent { node { id name { value } } } } }
           }
         }
@@ -912,6 +914,10 @@ async def _dci_leaf_candidates(client: InfrahubClient, branch: str) -> list[dict
         fabric = device.get("pod", {}).get("node", {}).get("parent", {}).get("node")
         if not fabric:
             continue
+        asn_node = (device.get("asn") or {}).get("node")
+        device_asn = asn_node["asn"]["value"] if asn_node and asn_node.get("asn") else None
+        if device_asn is None:
+            continue
         if seen_fabric_id is None:
             seen_fabric_id = fabric["id"]
         if fabric["id"] != seen_fabric_id:
@@ -920,6 +926,7 @@ async def _dci_leaf_candidates(client: InfrahubClient, branch: str) -> list[dict
             {
                 "device_id": device["id"],
                 "device_name": device["name"]["value"],
+                "device_asn": int(device_asn),
                 "fabric_id": fabric["id"],
                 "fabric_name": fabric["name"]["value"],
                 "interface_id": None,

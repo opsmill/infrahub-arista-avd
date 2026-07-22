@@ -186,17 +186,6 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                       }
                     }
                   }
-                  dci_pool {
-                    node {
-                      id
-                      name {
-                        value
-                      }
-                      default_prefix_length {
-                        value
-                      }
-                    }
-                  }
                   spanning_tree_mode {
                     value
                   }
@@ -509,12 +498,6 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
         include_in_underlay_protocol {
           value
         }
-        endpoint_1_bgp_asn {
-          value
-        }
-        endpoint_2_bgp_asn {
-          value
-        }
         connected_endpoints {
           edges {
             node {
@@ -534,6 +517,13 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                     ... on DcimDevice {
                       role {
                         value
+                      }
+                      asn {
+                        node {
+                          asn {
+                            value
+                          }
+                        }
                       }
                       pod {
                         node {
