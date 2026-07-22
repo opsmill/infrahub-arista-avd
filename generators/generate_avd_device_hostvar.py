@@ -66,7 +66,7 @@ class DciNetworkLinkIntent:
     link_name: str
     include_in_underlay_protocol: bool
     endpoints: tuple[DciEndpoint, DciEndpoint]
-    asns: tuple[int, int]
+    asns: tuple[int | None, int | None]
     pool: object
 
 
@@ -411,10 +411,6 @@ def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
         msg = f"DCI link {link_name}: endpoints must use different interfaces"
         raise ValueError(msg)
 
-    if endpoint_1.device_bgp_asn is None or endpoint_2.device_bgp_asn is None:
-        msg = f"DCI link {link_name}: both endpoint devices must have a BGP ASN assigned"
-        raise ValueError(msg)
-
     # A DCI /31 must come from a single pool so both border leafs (which generate
     # independently, potentially in different fabrics) allocate the same prefix
     # under the shared link identifier. Pick it deterministically from the
@@ -436,6 +432,10 @@ def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
         asns=(endpoint_1.device_bgp_asn, endpoint_2.device_bgp_asn),
         pool=pool,
     )
+
+
+def _uses_ebgp_underlay(underlay_routing_protocol: str | None) -> bool:
+    return (underlay_routing_protocol or "").lower() == "ebgp"
 
 
 async def allocate_dci_p2p_prefix_from_pool(
@@ -473,8 +473,16 @@ async def build_dci_l3_edge_p2p_links(
     *,
     dci_links: list[object],
     hostname: str,
+    underlay_routing_protocol: str | None = "ebgp",
 ) -> list[dict[str, Any]]:
-    """Build deterministic PyAVD l3_edge.p2p_links entries from DCI links."""
+    """Build deterministic PyAVD l3_edge.p2p_links entries from DCI links.
+
+    BGP ASNs are only required (and emitted as ``as``) when the fabric underlay
+    routing protocol is eBGP. With a non-BGP underlay (e.g. OSPF) the p2p link is
+    still emitted for reachability, but without ``as`` and without requiring the
+    endpoint devices to carry an ASN.
+    """
+    ebgp_underlay = _uses_ebgp_underlay(underlay_routing_protocol)
     intents: list[DciNetworkLinkIntent] = []
     for link in dci_links:
         try:
@@ -507,6 +515,14 @@ async def build_dci_l3_edge_p2p_links(
         if hostname not in {endpoint.device_name for endpoint in intent.endpoints}:
             continue
 
+        if ebgp_underlay and (intent.asns[0] is None or intent.asns[1] is None):
+            logger.warning(
+                "Skipping invalid DCI Network Link: DCI link %s: both endpoint devices must have a BGP ASN "
+                "when the underlay routing protocol is eBGP",
+                intent.link_name,
+            )
+            continue
+
         try:
             prefix = await allocate_dci_p2p_prefix_from_pool(
                 client,
@@ -529,10 +545,11 @@ async def build_dci_l3_edge_p2p_links(
         p2p_link: dict[str, Any] = {
             "nodes": [intent.endpoints[0].device_name, intent.endpoints[1].device_name],
             "interfaces": [intent.endpoints[0].interface_name, intent.endpoints[1].interface_name],
-            "as": [intent.asns[0], intent.asns[1]],
             "ip": addresses,
             "include_in_underlay_protocol": intent.include_in_underlay_protocol,
         }
+        if ebgp_underlay:
+            p2p_link["as"] = [intent.asns[0], intent.asns[1]]
         speed = intent.endpoints[0].speed or intent.endpoints[1].speed
         if speed:
             p2p_link["speed"] = speed
@@ -1579,6 +1596,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 self.client,
                 dci_links=raw_dci_links,
                 hostname=hostname,
+                underlay_routing_protocol=underlay_routing_protocol,
             )
 
         hostvars = self._build_hostvars(

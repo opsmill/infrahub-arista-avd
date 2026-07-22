@@ -436,6 +436,73 @@ async def test_dci_pool_falls_back_to_peer_endpoint_when_first_fabric_has_none()
 
 
 @pytest.mark.anyio
+async def test_dci_ospf_underlay_omits_as_and_relaxes_asn_requirement() -> None:
+    """With a non-eBGP underlay, the DCI link is emitted without `as`.
+
+    Endpoint devices are not required to carry a BGP ASN when the underlay
+    routing protocol is OSPF; the link is still generated for reachability.
+    """
+    gen = _make_generator()
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=None,
+                ),
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=None,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+        underlay_routing_protocol="ospf",
+    )
+
+    assert len(p2p_links) == 1
+    assert "as" not in p2p_links[0]
+    assert p2p_links[0]["ip"] == ["172.16.0.0/31", "172.16.0.1/31"]
+    assert not validate_inputs(_base_hostvars([], dci_l3_edge_p2p_links=p2p_links)).validation_result.violations
+
+
+@pytest.mark.anyio
+async def test_dci_ebgp_underlay_requires_asn(caplog: pytest.LogCaptureFixture) -> None:
+    """With an eBGP underlay, a missing endpoint device ASN skips the link."""
+    gen = _make_generator()
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_1=_dci_endpoint(
+                    endpoint_id="dc1-eth5",
+                    device_id="dc1-leaf1",
+                    device_name="ih-dc1-leaf1a",
+                    interface_name="Ethernet5",
+                    device_asn=None,
+                ),
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+        underlay_routing_protocol="ebgp",
+    )
+
+    assert p2p_links == []
+    assert "must have a BGP ASN when the underlay routing protocol is eBGP" in caplog.text
+
+
+@pytest.mark.anyio
 async def test_dci_l3_edge_uses_default_underlay_when_unset() -> None:
     gen = _make_generator()
     gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
