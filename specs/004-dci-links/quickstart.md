@@ -242,9 +242,26 @@ Recorded during implementation:
   reported 16 passed.
 - Remote full integration validation passed in the same isolated worktree:
   `uv run pytest tests/integration` reported 29 passed.
+- Convergence validation added mixed valid/invalid DCI coverage proving invalid
+  DCI-role Network Links are logged and excluded while valid links from the same
+  fabric still emit `l3_edge.p2p_links`.
+- The DCI allocation helper remains local to the repository-loaded generator as
+  a documented and unit-tested exception because task workers may load package
+  modules from the worker image while loading generator modules from the synced
+  repository revision.
+- After convergence changes, local focused validation passed:
+  `uv run pytest tests/unit/test_avd.py tests/unit/test_dci_schema_contract.py tests/unit/test_generate_avd_device_hostvar.py tests/unit/test_hostvar_ordering.py`
+  reported 92 passed.
+- After convergence changes, local standard lint passed:
+  `uv run invoke lint`.
+- After convergence changes, remote integration validation passed in an isolated
+  patched worktree based on commit `3af430495472c155c0013b551878ee2c50e78972`:
+  `uv run pytest tests/integration` reported 29 passed.
 
 Pending live gate:
 
 - `$infrahub-test-generator-idempotence` was not run. The skill requires
   explicit approval to use and normally rebuild the shared live validation lab,
-  and it expects a committed revision for checkout on that lab.
+  and it expects a committed revision for checkout on that lab. The current
+  convergence changes are uncommitted, so a live idempotence run remains pending
+  until a committed revision is available and live-lab approval is granted.

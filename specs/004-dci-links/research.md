@@ -165,22 +165,28 @@ models and make operator behavior ambiguous.
 
 ## R9. Prefix allocation helper consolidation
 
-**Decision**: Consolidate DCI generation on a single shared
-`allocate_p2p_prefix_from_pool` implementation in
-`src/solution_arista_avd/addressing.py` unless implementation finds a concrete
-behavioral mismatch. If a second helper must remain, document the reason and add
-tests proving both helpers are intentionally distinct.
+**Decision**: Keep the DCI generator's local
+`allocate_dci_p2p_prefix_from_pool` helper as a tested repository-loaded
+generator exception. Infrahub imports generator modules from the synced
+repository, while package modules can come from the task-worker image, so the
+DCI allocation path must remain available in the generator module that Infrahub
+loads. The helper is intentionally aligned with the shared
+`allocate_p2p_prefix_from_pool` semantics: stable identifier, `/31` default,
+branch-aware allocation, and deterministic reuse.
 
 **Rationale**: Duplicate allocation helpers increase the risk of divergent
-identifier construction, prefix length handling, and idempotence behavior.
-Centralizing the /31 allocation path gives DCI generation the same deterministic
-semantics in unit, integration, and live idempotence validation.
+identifier construction, prefix length handling, and idempotence behavior, so
+the exception is documented and covered by unit tests. Importing the shared
+package helper directly from repository-loaded generator code would risk using a
+stale installed package on the worker image instead of the synced repository
+revision.
 
 **Alternatives considered**:
 - Leave both helpers undocumented: rejected because the spec explicitly calls out
   this ambiguity.
-- Inline allocation logic in the hostvars generator: rejected because allocation
-  behavior is reusable infrastructure logic.
+- Inline allocation logic without documentation/tests: rejected because
+  allocation behavior is reusable infrastructure logic and must remain visibly
+  aligned with the shared helper.
 
 ## R10. Validation workflow
 

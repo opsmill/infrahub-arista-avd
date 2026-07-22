@@ -455,8 +455,15 @@ async def build_dci_l3_edge_p2p_links(
     hostname: str,
 ) -> list[dict[str, Any]]:
     """Build deterministic PyAVD l3_edge.p2p_links entries from DCI links."""
+    intents: list[DciNetworkLinkIntent] = []
+    for link in dci_links:
+        try:
+            intents.append(_extract_dci_network_link_intent(link, fabric))
+        except ValueError as exc:
+            logger.warning("Skipping invalid DCI Network Link: %s", exc)
+
     intents = sorted(
-        (_extract_dci_network_link_intent(link, fabric) for link in dci_links),
+        intents,
         key=lambda intent: (
             intent.link_name,
             intent.endpoints[0].device_name,
@@ -471,23 +478,33 @@ async def build_dci_l3_edge_p2p_links(
     for intent in intents:
         endpoint_pair = tuple(sorted((endpoint.device_id, endpoint.interface_id) for endpoint in intent.endpoints))
         if endpoint_pair in seen_pairs:
-            msg = f"DCI link {intent.link_name}: duplicate endpoint-interface pair"
-            raise ValueError(msg)
+            logger.warning(
+                "Skipping invalid DCI Network Link: DCI link %s: duplicate endpoint-interface pair", intent.link_name
+            )
+            continue
         seen_pairs.add(endpoint_pair)
 
         if hostname not in {endpoint.device_name for endpoint in intent.endpoints}:
             continue
 
-        prefix = await allocate_dci_p2p_prefix_from_pool(
-            client,
-            intent.pool,
-            identifier=f"dci-link:{intent.link_id}",
-            prefix_length=31,
-        )
+        try:
+            prefix = await allocate_dci_p2p_prefix_from_pool(
+                client,
+                intent.pool,
+                identifier=f"dci-link:{intent.link_id}",
+                prefix_length=31,
+            )
+        except ValueError as exc:
+            logger.warning("Skipping invalid DCI Network Link: %s", exc)
+            continue
         addresses = [f"{address}/31" for address in prefix.hosts()]
         if len(addresses) != 2:
-            msg = f"DCI link {intent.link_name}: allocated prefix {prefix} did not produce two /31 host addresses"
-            raise ValueError(msg)
+            logger.warning(
+                "Skipping invalid DCI Network Link: DCI link %s: allocated prefix %s did not produce two /31 host addresses",
+                intent.link_name,
+                prefix,
+            )
+            continue
 
         p2p_link: dict[str, Any] = {
             "nodes": [intent.endpoints[0].device_name, intent.endpoints[1].device_name],

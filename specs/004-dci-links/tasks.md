@@ -296,3 +296,8 @@ Task: "T064 [P] [US4] Add integration coverage that creates a complete Network L
 - DCI generation must source candidates from `NetworkLink.role = dci`; a standalone `NetworkDciLink` kind is stale by definition.
 - Each story should be validated independently before moving to the next dependent story.
 - Required project validation remains `$infrahub-run-integration-tests` and `$infrahub-test-generator-idempotence` for this Infrahub generator change.
+
+## Phase 8: Convergence
+
+- [X] T086 Change DCI generation to collect and report invalid DCI-role Network Links while still emitting valid links from the same fabric, including mixed valid/invalid coverage in `tests/unit/test_generate_avd_device_hostvar.py`, per FR-041/SC-010/T060 (partial)
+- [X] T087 Consolidate DCI prefix allocation on the shared allocation helper or document and test the repository-loaded-generator exception for keeping the separate DCI allocation helper, per SC-012/T048/R9 (partial)
