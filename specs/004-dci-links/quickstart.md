@@ -258,10 +258,16 @@ Recorded during implementation:
   patched worktree based on commit `3af430495472c155c0013b551878ee2c50e78972`:
   `uv run pytest tests/integration` reported 29 passed.
 
-Pending live gate:
-
-- `$infrahub-test-generator-idempotence` was not run. The skill requires
-  explicit approval to use and normally rebuild the shared live validation lab,
-  and it expects a committed revision for checkout on that lab. The current
-  convergence changes are uncommitted, so a live idempotence run remains pending
-  until a committed revision is available and live-lab approval is granted.
+- Generator idempotence validation passed for committed branch
+  `feat/dci-links` at commit `6827f7416c6887536e0ee35bfb8ccf84551766d7`.
+  The shared live validation lab was rebuilt to a known state, repository sync
+  and worker-visible `/upstream` checkout were verified at that commit, and a
+  fresh branch `idempotence-avd-hostvar-dci-20260722-1106` was used.
+- The idempotence scenario created one Fabric-C DCI Network Link
+  (`e2e-dci-link`) between `leaf-infrahub-dc1-1-1` and
+  `leaf-infrahub-dc1-1-2`, generated `l3_edge.p2p_links` hostvars, then reran
+  `generate-avd-device-hostvar` for the same two devices. Normalized snapshots
+  of target device hostvars, hostvar file identities/checksums, the DCI
+  Network Link, `Ethernet999` connectors, and the DCI pool/prefix matched
+  exactly on the second run:
+  `d8fe861a006dd523ec13523461bbf08853534126f072345272ab99940e131bfa`.
