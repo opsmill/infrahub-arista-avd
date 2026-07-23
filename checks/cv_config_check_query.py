@@ -1,96 +1,100 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class CVConfigCheckQuery(BaseModel):
-    network_fabric: CVConfigCheckQueryNetworkFabric = Field(alias="NetworkFabric")
-    dcim_device: CVConfigCheckQueryDcimDevice = Field(alias="DcimDevice")
+    network_fabric: "CVConfigCheckQueryNetworkFabric" = Field(alias="NetworkFabric")
+    dcim_device: "CVConfigCheckQueryDcimDevice" = Field(alias="DcimDevice")
 
 
 class CVConfigCheckQueryNetworkFabric(BaseModel):
-    edges: list[CVConfigCheckQueryNetworkFabricEdges]
+    edges: list["CVConfigCheckQueryNetworkFabricEdges"]
 
 
 class CVConfigCheckQueryNetworkFabricEdges(BaseModel):
-    node: CVConfigCheckQueryNetworkFabricEdgesNode | None
+    node: Optional["CVConfigCheckQueryNetworkFabricEdgesNode"]
 
 
 class CVConfigCheckQueryNetworkFabricEdgesNode(BaseModel):
     id: str
-    name: CVConfigCheckQueryNetworkFabricEdgesNodeName | None
-    cloudvision_managed: CVConfigCheckQueryNetworkFabricEdgesNodeCloudvisionManaged | None
+    name: Optional["CVConfigCheckQueryNetworkFabricEdgesNodeName"]
+    cloudvision_managed: Optional[
+        "CVConfigCheckQueryNetworkFabricEdgesNodeCloudvisionManaged"
+    ]
 
 
 class CVConfigCheckQueryNetworkFabricEdgesNodeName(BaseModel):
-    value: str | None
+    value: Optional[str]
 
 
 class CVConfigCheckQueryNetworkFabricEdgesNodeCloudvisionManaged(BaseModel):
-    value: bool | None
+    value: Optional[bool]
 
 
 class CVConfigCheckQueryDcimDevice(BaseModel):
-    edges: list[CVConfigCheckQueryDcimDeviceEdges]
+    edges: list["CVConfigCheckQueryDcimDeviceEdges"]
 
 
 class CVConfigCheckQueryDcimDeviceEdges(BaseModel):
-    node: CVConfigCheckQueryDcimDeviceEdgesNode | None
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNode"]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNode(BaseModel):
     id: str
-    name: CVConfigCheckQueryDcimDeviceEdgesNodeName | None
-    serial: CVConfigCheckQueryDcimDeviceEdgesNodeSerial | None
-    pod: CVConfigCheckQueryDcimDeviceEdgesNodePod
-    avd_artifact: CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifact
+    name: Optional["CVConfigCheckQueryDcimDeviceEdgesNodeName"]
+    serial: Optional["CVConfigCheckQueryDcimDeviceEdgesNodeSerial"]
+    pod: "CVConfigCheckQueryDcimDeviceEdgesNodePod"
+    avd_artifact: "CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifact"
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodeName(BaseModel):
-    value: str | None
+    value: Optional[str]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodeSerial(BaseModel):
-    value: str | None
+    value: Optional[str]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodePod(BaseModel):
-    node: CVConfigCheckQueryDcimDeviceEdgesNodePodNode | None
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNodePodNode"]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodePodNode(BaseModel):
     id: str
-    parent: CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParent
+    parent: "CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParent"
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParent(BaseModel):
-    node: CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParentNode | None
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParentNode"]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodePodNodeParentNode(BaseModel):
     typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
         alias="__typename"
     )
-    id: str | None
+    id: Optional[str]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifact(BaseModel):
-    node: CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNode | None
+    node: Optional["CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNode"]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNode(BaseModel):
     id: str
     structured_config_file: (
-        CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile
+        "CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile"
     )
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFile(
     BaseModel
 ):
-    node: CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode | None
+    node: Optional[
+        "CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode"
+    ]
 
 
 class CVConfigCheckQueryDcimDeviceEdgesNodeAvdArtifactNodeStructuredConfigFileNode(

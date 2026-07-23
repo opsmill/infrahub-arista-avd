@@ -111,6 +111,30 @@ def get_workspace_description(
     return DEFAULT_WORKSPACE_DESCRIPTION
 
 
+def _cloudvision_server_url(server: str) -> str:
+    stripped = server.strip().rstrip("/")
+    if stripped.startswith(("http://", "https://")):
+        return stripped
+    return f"https://{stripped}"
+
+
+def get_workspace_url(cv_config: CloudVision, workspace_id: str) -> str:
+    """Return the user-openable CloudVision workspace URL for a workspace ID."""
+    server = cv_config.servers[0] if isinstance(cv_config.servers, list) else cv_config.servers
+    return f"{_cloudvision_server_url(server)}/cv/provisioning/workspaces?ws={workspace_id}"
+
+
+def get_change_control_url(cv_config: CloudVision, change_control_id: str | None) -> str | None:
+    """Return a CloudVision change-control URL when a deployment supplies a reliable template."""
+    _ = cv_config
+    if not change_control_id:
+        return None
+    template = _env_value("CLOUDVISION_CHANGE_CONTROL_URL_TEMPLATE")
+    if template:
+        return template.format(change_control_id=change_control_id)
+    return None
+
+
 def _string_or_none(value: object | None) -> str | None:
     if value is None:
         return None

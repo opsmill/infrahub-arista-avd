@@ -5,8 +5,9 @@ title: CloudVision Validation
 # CloudVision Validation
 
 The repository validates generated EOS configurations in CloudVision during
-Infrahub proposed-change validation. Post-merge workspace submission is out of
-scope for this workflow and should be implemented separately with Semaphore.
+Infrahub proposed-change validation. It also records the CloudVision workspace
+URL in the proposed change and exposes a post-merge handler for submitting the
+linked workspace after the Infrahub change is merged.
 
 ## Runtime Configuration
 
@@ -66,13 +67,25 @@ When the tracking schema is loaded, validation also creates or updates a
 
 - `workspace_id`: deterministic CloudVision workspace ID
 - `proposed_change_id`: proposed change that created the workspace
-- `status`: `pending`, `built`, `submitted`, or `abandoned`
+- `workspace_url`: exact CloudVision workspace URL shown to reviewers
+- `thread_id`: proposed-change overview thread used for workspace comments
+- `change_control_id` / `change_control_url`: CloudVision submission result
+- `last_submission_error` / `last_submission_attempt_at`: latest failed
+  post-merge submission attempt
+- `submitted_at`: successful submission timestamp
+- `status`: `pending`, `built`, `submitted`, `abandoned`, or `submit_failed`
 - `fabric`: fabric validated by the workspace
 
 The workspace ID is deterministic from proposed-change ID and fabric name, so a
 validation rerun updates the same CloudVision workspace instead of creating a
 new one. Separate proposed changes against the same fabric receive different
 workspace IDs.
+
+After a workspace is created or reused, validation creates or reuses one
+deterministic `CoreChangeThread` in the proposed-change Overview. The first
+comment contains the exact workspace URL. Rerunning validation for the same
+proposed change and workspace reuses the stored `thread_id` or deterministic
+thread label and does not duplicate the URL comment.
 
 The CloudVision workspace display name uses the proposed-change name and fabric
 name. Its description uses the proposed-change description, with a generic
@@ -83,6 +96,42 @@ branch name for `feat/` branches.
 
 If the `CloudvisionWorkspace` schema is unavailable during rollout, tracking is
 skipped without masking CloudVision validation success or failure.
+
+## Post-Merge Submission
+
+The post-merge submission entry point is
+`submit_linked_workspace_for_proposed_change()` in
+`checks/cv_workspace_lifecycle.py`. It resolves `CloudvisionWorkspace` objects
+by the merged proposed-change ID on the destination branch and submits only when
+exactly one linked workspace exists and is in a submit-ready state.
+Deployment-specific post-merge/API execution code should call
+`submit_linked_workspace_for_merged_event()` with the `ProposedChangeMergedEvent`
+payload; that adapter extracts the proposed-change ID and destination branch
+before invoking the shared submission handler.
+The repository does not load a transport-specific submission receiver
+registration for this workflow. Deployments that need automatic execution
+should call the direct handler from their Infrahub merge/API integration, while
+operators can use the manual retry task below to replay the same lifecycle path.
+
+On success, the handler appends a comment to the existing workspace thread with
+the CloudVision change-control ID and a URL when
+`CLOUDVISION_CHANGE_CONTROL_URL_TEMPLATE` is configured. The thread is marked
+resolved only after the success comment is saved. Already-submitted workspaces
+are treated as complete and are not submitted again.
+
+On failure, the handler stores `status=submit_failed`, records the latest
+failure reason, appends an unresolved failure comment when possible, and leaves
+the thread unresolved. If thread or comment writes fail, the handler logs the
+same proposed-change, workspace, fabric, and error context as the fallback.
+If no linked workspace exists or multiple workspaces are linked ambiguously, the
+handler creates a proposed-change submission outcome thread when possible and
+records the skip or ambiguity there.
+
+Manual retry uses the invoke task:
+
+```bash
+uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main
+```
 
 ## Operational Notes
 
@@ -95,7 +144,6 @@ CloudVision build or EOS validation failures should be handled as data fixes
 first. Add schema or generator code only when a required configuration family
 cannot be represented with the existing model.
 
-The check builds workspaces for review only. It does not submit workspaces after
-merge, abandon workspaces when a proposed change is deleted, or register
-post-merge deployment hooks. Those lifecycle actions belong in a separate
-operator-controlled workflow.
+The validation check builds workspaces for review only. CloudVision submission
+is handled by the post-merge lifecycle entry point or the manual retry task, not
+by the pre-merge validation check.

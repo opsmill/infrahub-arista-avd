@@ -1,4 +1,5 @@
 import os
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -281,6 +282,21 @@ def test(ctx: Context) -> None:
     Run tests using pytest.
     """
     ctx.run("pytest tests", pty=True)
+
+
+@task(
+    help={
+        "proposed_change_id": "Merged proposed change ID.",
+        "branch": "Destination branch containing workspace tracking.",
+    }
+)
+def submit_cv_workspace(ctx: Context, proposed_change_id: str, branch: str = "main") -> None:
+    """Manually retry CloudVision submission for a linked merged proposed change."""
+    command = (
+        f"python -m checks.cv_workspace_lifecycle {shlex.quote(proposed_change_id)} --branch {shlex.quote(branch)}"
+    )
+    with ctx.cd(MAIN_DIRECTORY_PATH):
+        ctx.run(command, pty=True)
 
 
 @task(help={"override": "Redownload the compose file even if it already exists."})

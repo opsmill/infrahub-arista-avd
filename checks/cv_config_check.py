@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
@@ -42,10 +43,47 @@ from .cv_helpers import (
     get_workspace_description,
     get_workspace_id,
     get_workspace_name,
+    get_workspace_url,
     rollback_workspace,
 )
+from .cv_workspace_lifecycle import ensure_workspace_thread_and_url_comment
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _normalize_optional_relationships(data: dict[str, Any]) -> dict[str, Any]:
+    """Fill omitted nullable relationship selections before generated model validation."""
+    normalized = deepcopy(data)
+    device_edges = normalized.get("DcimDevice", {}).get("edges", [])
+    if not isinstance(device_edges, list):
+        return normalized
+
+    for edge in device_edges:
+        if not isinstance(edge, dict):
+            continue
+        node = edge.get("node")
+        if not isinstance(node, dict):
+            continue
+
+        pod = node.get("pod")
+        if not isinstance(pod, dict):
+            pod = {"node": None}
+            node["pod"] = pod
+        pod_node = pod.get("node")
+        if isinstance(pod_node, dict) and not isinstance(pod_node.get("parent"), dict):
+            pod_node["parent"] = {"node": None}
+
+        avd_artifact = node.get("avd_artifact")
+        if not isinstance(avd_artifact, dict):
+            avd_artifact = {"node": None}
+            node["avd_artifact"] = avd_artifact
+        avd_artifact_node = avd_artifact.get("node")
+        if isinstance(avd_artifact_node, dict) and not isinstance(
+            avd_artifact_node.get("structured_config_file"), dict
+        ):
+            avd_artifact_node["structured_config_file"] = {"node": None}
+
+    return normalized
 
 
 class CVConfigValidationCheck(InfrahubCheck):
@@ -55,7 +93,7 @@ class CVConfigValidationCheck(InfrahubCheck):
     timeout = 600
 
     async def validate(self, data: dict[str, Any]) -> None:  # type: ignore[override]
-        parsed = CVConfigCheckQuery(**data)
+        parsed = CVConfigCheckQuery(**_normalize_optional_relationships(data))
 
         fabric_edges = parsed.network_fabric.edges
         if not fabric_edges or not fabric_edges[0].node:
@@ -229,7 +267,9 @@ class CVConfigValidationCheck(InfrahubCheck):
                 continue
 
             try:
-                sc_file = await self.client.get(AvdStructuredConfigFile, id=sc_file_id, branch=self.branch_name)
+                sc_file = cast(
+                    "Any", await self.client.get(AvdStructuredConfigFile, id=sc_file_id, branch=self.branch_name)
+                )
                 content = await sc_file.download_file()
                 structured_config = json.loads(content)
                 eos_config_str = pyavd.get_device_config(structured_config)
@@ -309,6 +349,8 @@ class CVConfigValidationCheck(InfrahubCheck):
             fabric_id,
             proposed_change_id,
             "built" if not result.failed and not inactive_devices else "abandoned",
+            workspace_url=get_workspace_url(cv_config, ws_id),
+            fabric_name=fabric_name,
         )
         self._report_results(result, cv_config, fabric_name, len(inventory_devices))
         if inactive_devices:
@@ -353,7 +395,15 @@ class CVConfigValidationCheck(InfrahubCheck):
         await cv_client.wait_for_workspace_state(workspace_id=workspace.id, state="pending")
 
     async def _track_workspace(
-        self, ws_id: str, ws_name: str, fabric_id: str, proposed_change_id: str, status: str
+        self,
+        ws_id: str,
+        ws_name: str,
+        fabric_id: str,
+        proposed_change_id: str,
+        status: str,
+        *,
+        workspace_url: str | None = None,
+        fabric_name: str | None = None,
     ) -> None:
         """Create or update the Cv.Workspace tracking node in Infrahub."""
         from infrahub_sdk.exceptions import NodeNotFoundError, SchemaNotFoundError
@@ -369,7 +419,10 @@ class CVConfigValidationCheck(InfrahubCheck):
                 ws_node.status.value = status
                 if hasattr(ws_node, "proposed_change_id"):
                     ws_node.proposed_change_id.value = proposed_change_id
+                if hasattr(ws_node, "workspace_url") and workspace_url:
+                    ws_node.workspace_url.value = workspace_url
                 await ws_node.save()
+                await self._ensure_workspace_thread(ws_node, proposed_change_id, ws_id, fabric_name, workspace_url)
             except NodeNotFoundError:
                 ws_node = cast(
                     "Any",
@@ -382,19 +435,48 @@ class CVConfigValidationCheck(InfrahubCheck):
                             "proposed_change_id": proposed_change_id,
                             "status": status,
                             "fabric": fabric_id,
+                            **({"workspace_url": workspace_url} if workspace_url else {}),
                         },
                     ),
                 )
                 await ws_node.save()
+                await self._ensure_workspace_thread(ws_node, proposed_change_id, ws_id, fabric_name, workspace_url)
         except SchemaNotFoundError:
             LOGGER.warning("CloudvisionWorkspace schema not loaded in Infrahub — skipping workspace tracking")
         except (AttributeError, ValueError, RuntimeError):
             LOGGER.exception("Failed to track workspace in Infrahub")
 
+    async def _ensure_workspace_thread(
+        self,
+        ws_node: Any,
+        proposed_change_id: str,
+        ws_id: str,
+        fabric_name: str | None,
+        workspace_url: str | None,
+    ) -> None:
+        """Create or reuse the proposed-change thread for a tracked workspace."""
+        if not workspace_url:
+            return
+        try:
+            stored_thread_id = getattr(getattr(ws_node, "thread_id", None), "value", None)
+            thread_id = await ensure_workspace_thread_and_url_comment(
+                self.client,
+                proposed_change_id=proposed_change_id,
+                workspace_id=ws_id,
+                fabric_name=fabric_name,
+                workspace_url=workspace_url,
+                branch=self.branch_name,
+                thread_id=stored_thread_id if isinstance(stored_thread_id, str) else None,
+            )
+            if hasattr(ws_node, "thread_id"):
+                ws_node.thread_id.value = thread_id
+                await ws_node.save()
+        except Exception:
+            LOGGER.exception("Failed to create CloudVision workspace thread/comment for workspace %s", ws_id)
+
     def _report_results(self, result: DeployToCvResult, cv_config: Any, fabric_name: str, inventory_count: int) -> None:
         """Report deployment results via check log methods."""
-        server = cv_config.servers[0] if isinstance(cv_config.servers, list) else cv_config.servers
-        ws_url = f"https://{server}/cv/provisioning/workspaces?ws={result.workspace.id}"
+        ws_url = get_workspace_url(cv_config, result.workspace.id)
 
         if result.failed:
             error_msgs = "; ".join(str(e) for e in result.errors)

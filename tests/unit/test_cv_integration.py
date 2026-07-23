@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import inspect
 import time
+from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import Any, Self, cast
 
 import pytest
 from infrahub_sdk.exceptions import NodeNotFoundError, SchemaNotFoundError
@@ -13,16 +14,22 @@ from checks.cv_config_check import CVConfigValidationCheck
 from checks.cv_config_check_query import CVConfigCheckQuery
 from checks.cv_helpers import (
     DEFAULT_WORKSPACE_DESCRIPTION,
+    get_change_control_url,
     get_cloudvision_config,
     get_proposed_change_context,
     get_proposed_change_id,
     get_workspace_description,
     get_workspace_id,
     get_workspace_name,
+    get_workspace_url,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from checks.cv_workspace_lifecycle import (
+    SubmissionResult,
+    ensure_workspace_thread_and_url_comment,
+    submit_linked_workspace_for_merged_event,
+    submit_linked_workspace_for_proposed_change,
+)
+from checks.cv_workspace_submission_query import CVWorkspaceSubmissionQuery
 
 
 def _fabric_node(cloudvision_managed: bool | None = True) -> dict[str, Any]:
@@ -109,6 +116,42 @@ def test_cv_devices_in_fabric_includes_devices_without_structured_configs() -> N
     devices = check._devices_in_fabric(parsed, "fabric-1")
 
     assert [device.id for device in devices] == ["leaf-1", "leaf-2", "leaf-no-config"]
+
+
+def test_cv_query_parsing_tolerates_absent_optional_relationship_keys() -> None:
+    data = _cv_query().model_dump(by_alias=True)
+    device_nodes = [edge["node"] for edge in data["DcimDevice"]["edges"]]
+    device_nodes[0].pop("pod")
+    device_nodes[1]["pod"]["node"].pop("parent")
+    device_nodes[2].pop("avd_artifact")
+    device_nodes[4]["avd_artifact"] = {"node": {"id": "artifact-without-structured-config"}}
+
+    parsed = CVConfigCheckQuery.model_validate(cv_config_check._normalize_optional_relationships(data))
+    check = CVConfigValidationCheck.__new__(CVConfigValidationCheck)
+
+    devices = check._devices_in_fabric(parsed, "fabric-1")
+
+    assert [check._device_name(device) for device in devices] == ["leaf-no-config"]
+    assert [check._structured_config_file_id(device) for device in devices] == [None]
+
+
+@pytest.mark.asyncio
+async def test_unmanaged_validation_tolerates_absent_optional_relationship_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CLOUDVISION_SERVERS", raising=False)
+    data = _cv_query(cloudvision_managed=False).model_dump(by_alias=True)
+    device_nodes = [edge["node"] for edge in data["DcimDevice"]["edges"]]
+    device_nodes[0].pop("pod")
+    device_nodes[1]["pod"]["node"].pop("parent")
+    device_nodes[2].pop("avd_artifact")
+    device_nodes[4]["avd_artifact"] = {"node": {"id": "artifact-without-structured-config"}}
+    check = CVConfigValidationCheck(branch="cv-check-test", client=cast("Any", SimpleNamespace()))
+
+    await check.validate(data)
+
+    assert check.errors == []
+    assert "disabled" in check.logs[0]["message"]
 
 
 def test_workspace_id_includes_proposed_change_identity() -> None:
@@ -267,6 +310,559 @@ def test_cloudvision_config_supports_username_password_and_invalid_proxy_port(
     assert config.password == password_value
     assert config.verify_certs is False
     assert config.proxy_port is None
+
+
+def test_cloudvision_workspace_and_change_control_url_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
+    monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
+    monkeypatch.setenv("CLOUDVISION_CHANGE_CONTROL_URL_TEMPLATE", "https://cv.example.com/cc/{change_control_id}")
+
+    config = get_cloudvision_config()
+
+    assert config is not None
+    assert get_workspace_url(config, "ws-1") == "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1"
+    assert get_change_control_url(config, "cc-1") == "https://cv.example.com/cc/cc-1"
+
+
+def test_repository_objects_do_not_register_placeholder_cloudvision_webhook() -> None:
+    repository_text = "\n".join(
+        Path(path).read_text(encoding="utf-8") for path in ["triggers.yml", "repository_checks.yml", ".infrahub.yml"]
+    )
+
+    assert "cloudvision-workspace-submission" not in repository_text
+    assert "cloudvision-workspace-submitter" not in repository_text
+    assert "replace-in-deployment" not in repository_text
+    assert "CoreStandardWebhook" not in repository_text
+
+
+def test_cloudvision_docs_do_not_require_placeholder_submission_receiver() -> None:
+    docs = Path("docs/docs/cloudvision.md").read_text(encoding="utf-8")
+
+    assert "cloudvision-workspace-submission" not in docs
+    assert "cloudvision-workspace-submitter" not in docs
+    assert "replace-in-deployment" not in docs
+    assert "placeholder" not in docs.lower()
+    assert "separate webhook receiver" not in docs.lower()
+
+
+def test_cloudvision_docs_describe_direct_submission_and_manual_retry() -> None:
+    docs = Path("docs/docs/cloudvision.md").read_text(encoding="utf-8")
+
+    assert "submit_linked_workspace_for_proposed_change()" in docs
+    assert "submit_linked_workspace_for_merged_event()" in docs
+    assert "post-merge/API execution" in docs
+    assert "uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main" in docs
+    assert "fallback" in docs
+    assert "unresolved failure comment" in docs
+
+
+def test_direct_submission_quickstart_lists_validation_and_retry_paths() -> None:
+    quickstart = Path("specs/004-cv-config-validation/quickstart.md").read_text(encoding="utf-8")
+
+    assert "uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main" in quickstart
+    assert "uv run pytest tests/unit/test_cv_integration.py" in quickstart
+    assert "uv run invoke lint" in quickstart
+    assert "$infrahub-run-integration-tests" in quickstart
+    assert "No repository-loaded object registers" in quickstart
+
+
+class _FakeWorkspaceNode:
+    def __init__(
+        self,
+        *,
+        obj_id: str = "workspace-node-1",
+        workspace_id: str = "ws-1",
+        status: str = "built",
+        thread_id: str | None = None,
+        workspace_url: str | None = "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1",
+    ) -> None:
+        self.id = obj_id
+        self.name = SimpleNamespace(value="Workspace")
+        self.workspace_id = SimpleNamespace(value=workspace_id)
+        self.proposed_change_id = SimpleNamespace(value="pc-1")
+        self.status = SimpleNamespace(value=status)
+        self.workspace_url = SimpleNamespace(value=workspace_url)
+        self.thread_id = SimpleNamespace(value=thread_id)
+        self.change_control_id = SimpleNamespace(value=None)
+        self.change_control_url = SimpleNamespace(value=None)
+        self.last_submission_error = SimpleNamespace(value=None)
+        self.last_submission_attempt_at = SimpleNamespace(value=None)
+        self.submitted_at = SimpleNamespace(value=None)
+        self.saved = 0
+
+    async def save(self) -> None:
+        self.saved += 1
+
+
+class _FakeLifecycleClient:
+    def __init__(
+        self,
+        workspaces: list[_FakeWorkspaceNode] | None = None,
+        *,
+        fail_comment_write: bool = False,
+        fail_thread_resolve: bool = False,
+    ) -> None:
+        self.workspaces = workspaces if workspaces is not None else [_FakeWorkspaceNode()]
+        self.threads: dict[str, dict[str, Any]] = {}
+        self.comments: list[dict[str, str]] = []
+        self.resolved: list[tuple[str, bool]] = []
+        self.fail_comment_write = fail_comment_write
+        self.fail_thread_resolve = fail_thread_resolve
+        self.workspace_submission_query = Path("checks/cv_workspace_submission.gql").read_text(encoding="utf-8")
+
+    async def get(self, **kwargs: Any) -> _FakeWorkspaceNode:
+        obj_id = kwargs.get("id")
+        workspace_id = kwargs.get("workspace_id__value")
+        for workspace in self.workspaces:
+            if obj_id == workspace.id or workspace_id == workspace.workspace_id.value:
+                return workspace
+        raise NodeNotFoundError({"workspace": ["not-found"]})
+
+    async def create(self, **kwargs: Any) -> _FakeWorkspaceNode:
+        data = kwargs["data"]
+        node = _FakeWorkspaceNode(
+            obj_id="workspace-node-created",
+            workspace_id=data["workspace_id"],
+            status=data["status"],
+        )
+        node.workspace_url.value = data.get("workspace_url")
+        self.workspaces.append(node)
+        return node
+
+    async def execute_graphql(self, **kwargs: Any) -> dict[str, Any]:
+        query = kwargs["query"]
+        variables = kwargs.get("variables", {})
+        if "CVWorkspaceSubmission" in query:
+            assert query == self.workspace_submission_query
+            return {
+                "CloudvisionWorkspace": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": workspace.id,
+                                "name": {"value": workspace.name.value},
+                                "workspace_id": {"value": workspace.workspace_id.value},
+                                "proposed_change_id": {"value": workspace.proposed_change_id.value},
+                                "status": {"value": workspace.status.value},
+                                "workspace_url": {"value": workspace.workspace_url.value},
+                                "thread_id": {"value": workspace.thread_id.value},
+                                "change_control_id": {"value": workspace.change_control_id.value},
+                                "change_control_url": {"value": workspace.change_control_url.value},
+                                "fabric": {"node": {"id": "fabric-1", "name": {"value": "Fabric-DC1"}}},
+                            }
+                        }
+                        for workspace in self.workspaces
+                    ]
+                }
+            }
+        if "GetCloudVisionWorkspaceThreadById" in query:
+            thread_id = variables["ids"][0]
+            thread = self.threads.get(thread_id)
+            return {"CoreChangeThread": {"edges": [{"node": thread}] if thread else []}}
+        if "GetCloudVisionWorkspaceThread" in query:
+            label = variables["label"]
+            thread = next((thread for thread in self.threads.values() if thread["label"]["value"] == label), None)
+            return {"CoreChangeThread": {"edges": [{"node": thread}] if thread else []}}
+        if "CreateCloudVisionWorkspaceThread" in query:
+            thread_id = f"thread-{len(self.threads) + 1}"
+            thread = {
+                "id": thread_id,
+                "label": {"value": variables["label"]},
+                "resolved": {"value": False},
+                "comments": {"edges": []},
+            }
+            self.threads[thread_id] = thread
+            return {"CoreChangeThreadCreate": {"ok": True, "object": thread}}
+        if "AddCloudVisionWorkspaceThreadComment" in query:
+            if self.fail_comment_write:
+                raise RuntimeError("comment write failed")
+            thread_id = variables["thread"]["id"]
+            text = variables["text"]
+            comment = {"id": f"comment-{len(self.comments) + 1}", "text": text, "thread_id": thread_id}
+            self.comments.append(comment)
+            self.threads[thread_id]["comments"]["edges"].append(
+                {"node": {"id": comment["id"], "text": {"value": text}}}
+            )
+            return {"CoreThreadCommentCreate": {"ok": True, "object": {"id": comment["id"], "text": {"value": text}}}}
+        if "ResolveCloudVisionWorkspaceThread" in query:
+            if self.fail_thread_resolve:
+                raise RuntimeError("resolve failed")
+            thread_id = variables["id"]
+            resolved = variables["resolved"]
+            self.threads[thread_id]["resolved"]["value"] = resolved
+            self.resolved.append((thread_id, resolved))
+            return {"CoreChangeThreadUpdate": {"ok": True, "object": self.threads[thread_id]}}
+        raise AssertionError(f"Unexpected GraphQL query: {query}")
+
+
+def test_workspace_submission_runtime_query_and_generated_model_stay_aligned() -> None:
+    query = Path("checks/cv_workspace_submission.gql").read_text(encoding="utf-8")
+    parsed = CVWorkspaceSubmissionQuery.model_validate(
+        {
+            "CloudvisionWorkspace": {
+                "edges": [
+                    {
+                        "node": {
+                            "id": "workspace-node-1",
+                            "name": {"value": "Workspace"},
+                            "workspace_id": {"value": "ws-1"},
+                            "proposed_change_id": {"value": "pc-1"},
+                            "status": {"value": "built"},
+                            "workspace_url": {"value": "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1"},
+                            "thread_id": {"value": "thread-1"},
+                            "change_control_id": {"value": "cc-1"},
+                            "change_control_url": {"value": "https://www.cv.example.com/cc/cc-1"},
+                            "fabric": {"node": {"id": "fabric-1", "name": {"value": "Fabric-DC1"}}},
+                        }
+                    }
+                ]
+            }
+        }
+    )
+
+    assert all(
+        field in query
+        for field in (
+            "workspace_id",
+            "proposed_change_id",
+            "status",
+            "workspace_url",
+            "thread_id",
+            "change_control_id",
+            "change_control_url",
+            "fabric",
+        )
+    )
+    node = parsed.cloudvision_workspace.edges[0].node
+    assert node is not None
+    assert node.workspace_id is not None
+    assert node.workspace_id.value == "ws-1"
+    assert node.fabric.node is not None
+    assert node.fabric.node.name is not None
+    assert node.fabric.node.name.value == "Fabric-DC1"
+    assert node.change_control_id is not None
+    assert node.change_control_id.value == "cc-1"
+
+
+@pytest.mark.asyncio
+async def test_workspace_thread_creation_adds_exact_url_comment_once() -> None:
+    client = _FakeLifecycleClient(workspaces=[])
+    workspace_url = "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1"
+
+    first_thread_id = await ensure_workspace_thread_and_url_comment(
+        client,
+        proposed_change_id="pc-1",
+        workspace_id="ws-1",
+        fabric_name="Fabric-DC1",
+        workspace_url=workspace_url,
+        branch="branch-1",
+    )
+    second_thread_id = await ensure_workspace_thread_and_url_comment(
+        client,
+        proposed_change_id="pc-1",
+        workspace_id="ws-1",
+        fabric_name="Fabric-DC1",
+        workspace_url=workspace_url,
+        branch="branch-1",
+        thread_id=first_thread_id,
+    )
+
+    assert first_thread_id == second_thread_id
+    assert list(client.threads) == ["thread-1"]
+    assert len(client.comments) == 1
+    assert workspace_url in client.comments[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_workspace_tracking_persists_workspace_url_and_thread_id() -> None:
+    node = _FakeWorkspaceNode()
+    client = _FakeLifecycleClient([node])
+    check = CVConfigValidationCheck(branch="cv-check-test", client=cast("Any", client))
+
+    await check._track_workspace(
+        "ws-1",
+        "Workspace",
+        "fabric-1",
+        "pc-1",
+        "built",
+        workspace_url="https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1",
+        fabric_name="Fabric-DC1",
+    )
+
+    assert node.workspace_url.value.endswith("ws=ws-1")
+    assert node.thread_id.value == "thread-1"
+    assert len(client.comments) == 1
+
+
+@pytest.mark.asyncio
+async def test_submit_linked_workspace_success_updates_workspace_comments_and_resolves(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
+    monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
+    monkeypatch.setenv("CLOUDVISION_CHANGE_CONTROL_URL_TEMPLATE", "https://www.cv.example.com/cc/{change_control_id}")
+    client = _FakeLifecycleClient([_FakeWorkspaceNode()])
+
+    class FakeCVClient:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get_workspace(self, workspace_id: str) -> SimpleNamespace:
+            return SimpleNamespace(state="built")
+
+        async def submit_workspace(self, workspace_id: str, force: bool = False) -> SimpleNamespace:
+            assert workspace_id == "ws-1"
+            assert force is False
+            return SimpleNamespace(request_params=SimpleNamespace(request_id="req-1"))
+
+        async def wait_for_workspace_response(self, **kwargs: Any) -> tuple[SimpleNamespace, SimpleNamespace]:
+            assert kwargs == {"workspace_id": "ws-1", "request_id": "req-1", "timeout": 600.0}
+            return SimpleNamespace(status="success"), SimpleNamespace(change_control_id="cc-1")
+
+    monkeypatch.setattr("checks.cv_workspace_lifecycle.CVClient", FakeCVClient)
+
+    result = await submit_linked_workspace_for_proposed_change(client, "pc-1", branch="main")
+
+    workspace = client.workspaces[0]
+    assert result == SubmissionResult(
+        status="submitted",
+        proposed_change_id="pc-1",
+        workspace_id="ws-1",
+        fabric_name="Fabric-DC1",
+        thread_id="thread-1",
+        change_control_id="cc-1",
+        message=(
+            "CloudVision workspace ws-1 submitted successfully. Change control: cc-1 https://www.cv.example.com/cc/cc-1"
+        ),
+    )
+    assert workspace.status.value == "submitted"
+    assert workspace.change_control_id.value == "cc-1"
+    assert workspace.change_control_url.value == "https://www.cv.example.com/cc/cc-1"
+    assert client.resolved[-1] == ("thread-1", True)
+
+
+@pytest.mark.asyncio
+async def test_submit_linked_workspace_failure_records_unresolved_comment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
+    monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
+    client = _FakeLifecycleClient([_FakeWorkspaceNode()])
+
+    class FakeCVClient:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get_workspace(self, workspace_id: str) -> SimpleNamespace:
+            return SimpleNamespace(state="built")
+
+        async def submit_workspace(self, workspace_id: str, force: bool = False) -> SimpleNamespace:
+            raise RuntimeError("rejected by CloudVision")
+
+    monkeypatch.setattr("checks.cv_workspace_lifecycle.CVClient", FakeCVClient)
+
+    result = await submit_linked_workspace_for_proposed_change(client, "pc-1", branch="main")
+
+    workspace = client.workspaces[0]
+    assert result.status == "failed"
+    assert result.workspace_id == "ws-1"
+    assert workspace.status.value == "submit_failed"
+    assert "rejected by CloudVision" in workspace.last_submission_error.value
+    assert client.resolved[-1] == ("thread-1", False)
+    assert any("Infrahub proposed change pc-1 was merged" in comment["text"] for comment in client.comments)
+
+
+@pytest.mark.asyncio
+async def test_submit_linked_workspace_already_submitted_does_not_submit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
+    monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
+    client = _FakeLifecycleClient([_FakeWorkspaceNode(status="submitted")])
+
+    class FakeCVClient:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def submit_workspace(self, workspace_id: str, force: bool = False) -> None:
+            pytest.fail("already-submitted workspace should not be submitted")
+
+    monkeypatch.setattr("checks.cv_workspace_lifecycle.CVClient", FakeCVClient)
+
+    result = await submit_linked_workspace_for_proposed_change(client, "pc-1", branch="main")
+
+    assert result.status == "already_submitted"
+    assert client.resolved[-1] == ("thread-1", True)
+
+
+@pytest.mark.asyncio
+async def test_submit_linked_workspace_missing_or_ambiguous_linkage_skips_or_fails() -> None:
+    skipped_client = _FakeLifecycleClient([])
+    skipped = await submit_linked_workspace_for_proposed_change(skipped_client, "pc-1", branch="main")
+    ambiguous_client = _FakeLifecycleClient(
+        [_FakeWorkspaceNode(workspace_id="ws-1"), _FakeWorkspaceNode(workspace_id="ws-2")]
+    )
+    failed = await submit_linked_workspace_for_proposed_change(
+        ambiguous_client,
+        "pc-1",
+        branch="main",
+    )
+
+    assert skipped.status == "skipped"
+    assert skipped.thread_id == "thread-1"
+    assert skipped_client.threads["thread-1"]["label"]["value"] == "CloudVision workspace submission"
+    assert "No linked CloudVision workspace found" in skipped_client.comments[0]["text"]
+    assert skipped_client.resolved[-1] == ("thread-1", True)
+    assert failed.status == "failed"
+    assert failed.thread_id == "thread-1"
+    assert "Multiple CloudVision workspaces" in failed.message
+    assert "Multiple CloudVision workspaces" in ambiguous_client.comments[0]["text"]
+    assert ambiguous_client.resolved[-1] == ("thread-1", False)
+
+
+@pytest.mark.asyncio
+async def test_submit_linked_workspace_event_adapter_passes_event_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    async def submit_for_pc(client: Any, proposed_change_id: str, *, branch: str = "main") -> SubmissionResult:
+        calls.append((proposed_change_id, branch))
+        return SubmissionResult(status="skipped", proposed_change_id=proposed_change_id, message="done")
+
+    monkeypatch.setattr("checks.cv_workspace_lifecycle.submit_linked_workspace_for_proposed_change", submit_for_pc)
+
+    result = await submit_linked_workspace_for_merged_event(
+        SimpleNamespace(),
+        {
+            "event": "ProposedChangeMergedEvent",
+            "branch": "main",
+            "payload": {"proposed_change_id": "pc-merged"},
+        },
+        branch="fallback",
+    )
+
+    assert result.status == "skipped"
+    assert calls == [("pc-merged", "main")]
+
+
+@pytest.mark.asyncio
+async def test_submit_linked_workspace_derives_missing_workspace_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
+    monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
+    client = _FakeLifecycleClient([_FakeWorkspaceNode(workspace_url=None)])
+
+    class FakeCVClient:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get_workspace(self, workspace_id: str) -> SimpleNamespace:
+            return SimpleNamespace(state="built")
+
+        async def submit_workspace(self, workspace_id: str, force: bool = False) -> SimpleNamespace:
+            return SimpleNamespace(request_params=SimpleNamespace(request_id="req-1"))
+
+        async def wait_for_workspace_response(self, **kwargs: Any) -> tuple[SimpleNamespace, SimpleNamespace]:
+            return SimpleNamespace(status="success"), SimpleNamespace(change_control_id="cc-1")
+
+    monkeypatch.setattr("checks.cv_workspace_lifecycle.CVClient", FakeCVClient)
+
+    result = await submit_linked_workspace_for_proposed_change(client, "pc-1", branch="main")
+
+    assert result.status == "submitted"
+    assert client.workspaces[0].workspace_url.value == "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1"
+    assert "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1" in client.comments[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_submit_linked_workspace_malformed_workspace_url_does_not_create_empty_url_comment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _FakeLifecycleClient([_FakeWorkspaceNode(status="submitted", workspace_url="not-a-url")])
+
+    result = await submit_linked_workspace_for_proposed_change(client, "pc-1", branch="main")
+
+    assert result.status == "already_submitted"
+    assert len(client.comments) == 1
+    assert "not-a-url" not in client.comments[0]["text"]
+    assert "already submitted" in client.comments[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_successful_submission_logs_fallback_when_thread_comment_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("CLOUDVISION_SERVERS", "www.cv.example.com")
+    monkeypatch.setenv("CLOUDVISION_TOKEN", "token")
+    client = _FakeLifecycleClient([_FakeWorkspaceNode()], fail_comment_write=True)
+
+    class FakeCVClient:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get_workspace(self, workspace_id: str) -> SimpleNamespace:
+            return SimpleNamespace(state="built")
+
+        async def submit_workspace(self, workspace_id: str, force: bool = False) -> SimpleNamespace:
+            return SimpleNamespace(request_params=SimpleNamespace(request_id="req-1"))
+
+        async def wait_for_workspace_response(self, **kwargs: Any) -> tuple[SimpleNamespace, SimpleNamespace]:
+            return SimpleNamespace(status="success"), SimpleNamespace(change_control_id="cc-1")
+
+    monkeypatch.setattr("checks.cv_workspace_lifecycle.CVClient", FakeCVClient)
+
+    with caplog.at_level("ERROR", logger="checks.cv_workspace_lifecycle"):
+        result = await submit_linked_workspace_for_proposed_change(client, "pc-1", branch="main")
+
+    assert result.status == "submitted"
+    assert client.workspaces[0].status.value == "submitted"
+    assert "fallback outcome: status=submitted proposed_change_id=pc-1 workspace_id=ws-1" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_already_submitted_logs_fallback_when_thread_resolve_fails(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _FakeLifecycleClient([_FakeWorkspaceNode(status="submitted")], fail_thread_resolve=True)
+
+    with caplog.at_level("ERROR", logger="checks.cv_workspace_lifecycle"):
+        result = await submit_linked_workspace_for_proposed_change(client, "pc-1", branch="main")
+
+    assert result.status == "already_submitted"
+    assert "fallback outcome: status=already_submitted proposed_change_id=pc-1 workspace_id=ws-1" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -595,7 +1191,14 @@ async def test_deploy_and_build_blocks_inactive_inventory_device_after_successfu
     async def finalize_workspace(*args: Any, **kwargs: Any) -> None:
         return None
 
-    async def track_workspace(ws_id: str, ws_name: str, fabric_id: str, proposed_change_id: str, status: str) -> None:
+    async def track_workspace(
+        ws_id: str,
+        ws_name: str,
+        fabric_id: str,
+        proposed_change_id: str,
+        status: str,
+        **kwargs: Any,
+    ) -> None:
         tracked_statuses.append(status)
 
     token_value = "cv-" + "token"

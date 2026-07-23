@@ -54,6 +54,8 @@ queries:
   # CloudVision proposed-change check query
   - name: cv_config_check
     file_path: "./checks/cv_config_check.gql"
+  - name: cv_workspace_submission
+    file_path: "./checks/cv_workspace_submission.gql"
 
 
 generator_definitions:

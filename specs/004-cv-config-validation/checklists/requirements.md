@@ -1,7 +1,7 @@
 # Specification Quality Checklist: CloudVision Configuration Validation
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-07-20
+**Created**: 2026-07-23
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,6 +31,7 @@
 
 ## Notes
 
-- Validation passed. The Infrahub check template includes artifact contract fields such as check type, target group, and registered files; these are kept as Spec Kit planning inputs, while behavior remains expressed as user-visible validation outcomes.
-- Revalidated after adding the CloudVision Managed fabric gate. The spec now requires unmanaged fabrics to skip CloudVision validation and requires managed fabrics to pass authentication, serial-number, and inventory eligibility before configuration validation.
-- No clarification questions are required before planning.
+- Validation passed after merging the duplicate CloudVision workspace submission specs into `004-cv-config-validation`.
+- The merged scope includes managed-fabric CloudVision validation, workspace tracking, proposed-change workspace URL threads, direct post-merge/API submission, submission outcome comments, manual retry, and removal of placeholder external webhook receiver registration.
+- The previous contradiction where `004` treated submission as future work is resolved: pre-merge validation builds but does not submit; direct post-merge/API processing submits only the existing linked workspace after merge.
+- No clarification questions are required before re-running planning, task generation, or cross-artifact analysis.
