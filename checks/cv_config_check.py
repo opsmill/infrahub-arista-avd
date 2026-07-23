@@ -488,18 +488,16 @@ class CVConfigValidationCheck(InfrahubCheck):
 
         self.log_info(message=f"CloudVision workspace built successfully for fabric {fabric_name}: {ws_url}")
 
-        deployed_count = len(result.deployed_configs)
         skipped_count = len(result.skipped_configs)
         self.log_info(
             message=(
-                f"Deployed {deployed_count} device configs, skipped {skipped_count}; "
-                f"confirmed {inventory_count} devices in CloudVision inventory"
+                f"Confirmed {inventory_count} devices in CloudVision inventory, skipped {skipped_count}"
             )
         )
 
         if result.deployed_configs:
             device_names = ", ".join(c.device.hostname for c in result.deployed_configs)
-            self.log_info(message=f"Devices with configs deployed: {device_names}")
+            self.log_info(message=f"Devices with validated configurations: {device_names}")
 
         if result.skipped_configs:
             skipped_names = ", ".join(c.device.hostname for c in result.skipped_configs)

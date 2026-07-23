@@ -1234,6 +1234,12 @@ async def test_deploy_and_build_blocks_inactive_inventory_device_after_successfu
     assert tracked_statuses == ["abandoned"]
     assert any("inactive" in error["message"] and "leaf-2" in error["message"] for error in check.errors)
     assert any("workspace built successfully" in log["message"] for log in check.logs)
+    assert any(
+        log["message"] == "Confirmed 2 devices in CloudVision inventory, skipped 0" for log in check.logs
+    )
+    assert any(log["message"] == "Devices with validated configurations: leaf-1" for log in check.logs)
+    assert not any("Deployed" in log["message"] for log in check.logs)
+    assert not any("Devices with configs deployed" in log["message"] for log in check.logs)
 
 
 def test_check_does_not_submit_or_register_lifecycle_hooks() -> None:
