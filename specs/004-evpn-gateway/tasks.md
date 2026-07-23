@@ -321,7 +321,7 @@ Task: "Add schema/query regression tests that `src/solution_arista_avd/protocols
 
 ## Phase 9: Convergence
 
-- [ ] T081 CRITICAL: Run required Infrahub integration validation with `$infrahub-run-integration-tests` and record tested branch and commit per Constitution IV (missing)
-- [ ] T082 CRITICAL: Run required generator idempotence validation with `$infrahub-test-generator-idempotence`, or record the approved non-live exception and alternative repeated-run evidence, per Constitution II (missing)
+- [X] T081 CRITICAL: Run required Infrahub integration validation with `$infrahub-run-integration-tests` and record tested branch and commit per Constitution IV
+- [X] T082 CRITICAL: Run required generator idempotence validation with `$infrahub-test-generator-idempotence`, or record the approved non-live exception and alternative repeated-run evidence, per Constitution II
 - [X] T083 Complete and record the missing branch-first quickstart repository load, positive/negative object scenarios, hostvar generation, and structured-config peer-resolution evidence per SC-013 (partial)
 - [X] T084 Update `spec.md`, `schemas/evpn/evpn_gateway.yml`, schema contract tests, and quickstart evidence so the accepted Infrahub HFID limitation is documented and reviewer navigation distinguishes `local_domain` through EVPN Domain relationship views while preserving Pod, remote domain, and group name in gateway group identity/display metadata
