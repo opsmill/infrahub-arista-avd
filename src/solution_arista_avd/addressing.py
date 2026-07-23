@@ -29,7 +29,7 @@ async def assign_ip_address_to_interface(
     await ip_address.save(allow_upsert=True)
     # SDK accepts protocol kinds at runtime; assigning a node to a relationship is the SDK pattern.
     interface = await client.get(DcimInterface, id=interface.id, include=["connector"])  # type: ignore[type-abstract]
-    interface.ip_address = ip_address  # type: ignore[assignment]
+    interface.ip_address = ip_address  # type: ignore[assignment, attr-defined]
     await interface.save(allow_upsert=True)
     logger.info(f"Assigned {ip_address.address.value} to {interface.display_label}")
 

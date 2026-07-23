@@ -191,6 +191,15 @@ nodes:
         optional: true
         identifier: "pod__loopback_pool"
         order_weight: 6000
+      - name: evpn_domain
+        label: EVPN Domain
+        peer: EvpnDomain
+        kind: Attribute
+        cardinality: one
+        optional: true
+        identifier: "evpn_domain__pods"
+        description: "Local EVPN domain for this pod"
+        order_weight: 1450
       - name: prefix_pool
         peer: CoreIPPrefixPool
         branch: aware

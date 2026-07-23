@@ -10,6 +10,211 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
         role {
           value
         }
+        evpn_gateway_group {
+          node {
+            __typename
+            id
+            display_label
+            name {
+              value
+            }
+            resiliency_model {
+              value
+            }
+            evpn_l2_enabled {
+              value
+            }
+            evpn_l3_enabled {
+              value
+            }
+            evpn_l3_inter_domain {
+              value
+            }
+            d_path_enabled {
+              value
+            }
+            all_active_multihoming_enabled {
+              value
+            }
+            ethernet_segment_identifier {
+              value
+            }
+            ethernet_segment_rt_import {
+              value
+            }
+            local_domain {
+              node {
+                __typename
+                id
+                display_label
+                domain_id {
+                  value
+                }
+                fabric {
+                  node {
+                    __typename
+                    id
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+            pod {
+              node {
+                __typename
+                id
+                name {
+                  value
+                }
+                evpn_domain {
+                  node {
+                    __typename
+                    id
+                    display_label
+                    domain_id {
+                      value
+                    }
+                    fabric {
+                      node {
+                        __typename
+                        id
+                        name {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            members {
+              edges {
+                node {
+                  __typename
+                  id
+                  name {
+                    value
+                  }
+                  role {
+                    value
+                  }
+                  pod {
+                    node {
+                      __typename
+                      id
+                      name {
+                        value
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            remote_domain {
+              node {
+                __typename
+                id
+                display_label
+                domain_id {
+                  value
+                }
+                fabric {
+                  node {
+                    __typename
+                    id
+                    name {
+                      value
+                    }
+                  }
+                }
+                remote_gateway_groups {
+                  edges {
+                    node {
+                      __typename
+                      id
+                      display_label
+                      name {
+                        value
+                      }
+                      local_domain {
+                        node {
+                          __typename
+                          id
+                          display_label
+                          domain_id {
+                            value
+                          }
+                          fabric {
+                            node {
+                              __typename
+                              id
+                              name {
+                                value
+                              }
+                            }
+                          }
+                        }
+                      }
+                      pod {
+                        node {
+                          __typename
+                          id
+                          name {
+                            value
+                          }
+                          evpn_domain {
+                            node {
+                              __typename
+                              id
+                              display_label
+                              domain_id {
+                                value
+                              }
+                              fabric {
+                                node {
+                                  __typename
+                                  id
+                                  name {
+                                    value
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      members {
+                        edges {
+                          node {
+                            __typename
+                            id
+                            name {
+                              value
+                            }
+                            role {
+                              value
+                            }
+                            pod {
+                              node {
+                                __typename
+                                id
+                                name {
+                                  value
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
         asn {
           node {
             asn {
@@ -342,9 +547,6 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                             }
                           }
                           ... on InterfacePhysical {
-                            name {
-                              value
-                            }
                             lag {
                               node {
                                 __typename
@@ -452,20 +654,6 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                         }
                                       }
                                     }
-                                  }
-                                }
-                              }
-                            }
-                            device {
-                              node {
-                                __typename
-                                id
-                                name {
-                                  value
-                                }
-                                ... on DcimDevice {
-                                  role {
-                                    value
                                   }
                                 }
                               }

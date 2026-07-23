@@ -143,11 +143,14 @@ query RackGenerator($rack_id: String!) {
 2. Extract IP addresses (loopback, management)
 3. Determine uplink topology by device role
 4. Extract connected endpoints (servers with VLANs)
-5. Build PyAVD-compatible hostvars structure
-6. Upload hostvars JSON to object store
-7. Create/update AvdArtifact with checksum
+5. Validate optional EVPN Gateway group intent for `border_leaf` devices
+6. Build PyAVD-compatible hostvars structure
+7. Upload hostvars JSON to object store
+8. Create/update AvdArtifact with checksum
 
 **Query**: `avd_device_hostvar.gql`
+
+For EVPN Multi-Domain Gateway hostvars, the query fetches `EvpnGatewayGroup.local_domain`, the selected `pod` and its `evpn_domain`, `remote_domain`, members, and peer candidate groups from `remote_domain.remote_gateway_groups`. The generator emits `l3leaf.nodes[].evpn_gateway` only for valid grouped `border_leaf` devices, rejects Pod/local-domain mismatches and same local/remote domain intent, validates the final payload with `pyavd.validate_inputs()`, and derives hostname-only remote peers from valid groups that share the selected remote domain.
 
 ### AvdDeviceStructuredConfigGenerator
 

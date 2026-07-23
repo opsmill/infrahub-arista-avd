@@ -54,7 +54,7 @@ The role governs several downstream behaviours in the hostvars generator and in 
 | `super_spine` | — (top of fabric) | No | No |
 | `spine` | `super_spine` | No | No |
 | `leaf` | `spine` | Yes | Yes (if peer set) |
-| `border_leaf` | `spine` | Yes | Yes (if peer set) |
+| `border_leaf` | `spine` | Yes, including DCI links and EVPN Gateway when the device is a member of an `EvpnGatewayGroup` | Yes (if peer set) |
 | `l2leaf` | `leaf` | No (skipped) | Yes (if peer set) |
 
 See [Hostvars Reference](./hostvars.md) for exactly which fields each role emits.
