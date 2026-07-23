@@ -368,6 +368,24 @@ def test_gateway_group_border_leaf_emits_evpn_gateway_payload() -> None:
     assert not validate_inputs(hostvars).validation_result.violations
 
 
+def test_gateway_group_generated_query_alias_booleans_are_preserved() -> None:
+    target, gateway_node = _gateway_group_topology()
+    for graphql_name, generated_name in (
+        ("evpn_l2_enabled", "evpn_l_2_enabled"),
+        ("evpn_l3_enabled", "evpn_l_3_enabled"),
+        ("evpn_l3_inter_domain", "evpn_l_3_inter_domain"),
+    ):
+        setattr(gateway_node, generated_name, getattr(gateway_node, graphql_name))
+        delattr(gateway_node, graphql_name)
+
+    payload = GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role="border_leaf")
+
+    assert payload is not None
+    assert payload["evpn_l2"]["enabled"] is True
+    assert payload["evpn_l3"]["enabled"] is True
+    assert payload["evpn_l3"]["inter_domain"] is True
+
+
 @pytest.mark.parametrize("role", ["leaf", "l2leaf", "spine", "super_spine"])
 def test_ungrouped_non_gateway_roles_omit_evpn_gateway_payload(role: str) -> None:
     target, _gateway_node = _gateway_group_topology(target_role=role)

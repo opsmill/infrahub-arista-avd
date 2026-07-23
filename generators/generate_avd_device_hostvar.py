@@ -90,6 +90,11 @@ class DciNetworkLinkIntent:
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
 PORT_CHANNEL_RE = re.compile(r"^Port-Channel(?P<channel_id>\d+)$")
 LEAF_FAMILY_ROLES = {"leaf", "border_leaf"}
+FIELD_ALIASES = {
+    "evpn_l2_enabled": "evpn_l_2_enabled",
+    "evpn_l3_enabled": "evpn_l_3_enabled",
+    "evpn_l3_inter_domain": "evpn_l_3_inter_domain",
+}
 
 
 def get_generator_avd_type(role: str) -> str:
@@ -254,7 +259,13 @@ def _edges(value: object) -> list[object]:
 def _field(value: object, name: str) -> object | None:
     if isinstance(value, dict):
         return value.get(name)
-    return getattr(value, name, None)
+    attr = getattr(value, name, None)
+    if attr is not None:
+        return attr
+    alias = FIELD_ALIASES.get(name)
+    if alias:
+        return getattr(value, alias, None)
+    return None
 
 
 def _value(value: object, name: str) -> Any:
