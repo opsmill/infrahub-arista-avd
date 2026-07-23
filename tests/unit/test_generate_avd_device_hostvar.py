@@ -1,6 +1,7 @@
 """Unit tests for the AVD hostvar generator's tenant/EVPN payload."""
 
 import logging
+from collections.abc import Callable
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -144,6 +145,7 @@ def _base_hostvars(
     custom_hostvars: dict | None = None,
     role: str = "leaf",
     dci_l3_edge_p2p_links: list[dict] | None = None,
+    evpn_gateway: dict | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -177,6 +179,7 @@ def _base_hostvars(
         tenants_data=tenants_data,
         connected_endpoints=connected_endpoints or [],
         dci_l3_edge_p2p_links=dci_l3_edge_p2p_links,
+        evpn_gateway=evpn_gateway,
         custom_hostvars=custom_hostvars or {},
     )
 
@@ -256,6 +259,191 @@ def test_border_leaf_mapping_is_available_to_repository_loaded_generator(monkeyp
     assert hostvars["type"] == "l3leaf"
     assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+def _rel_node(node: object | None) -> SimpleNamespace:
+    return SimpleNamespace(node=node)
+
+
+def _rel_edges(nodes: list[object]) -> SimpleNamespace:
+    return SimpleNamespace(edges=[SimpleNamespace(node=node) for node in nodes])
+
+
+def _gateway_device(device_id: str, name: str, role: str, pod: object) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=device_id,
+        name=_attr(name),
+        role=_attr(role),
+        pod=_rel_node(pod),
+    )
+
+
+def _fabric(fabric_id: str = "fabric-a") -> SimpleNamespace:
+    return SimpleNamespace(id=fabric_id, name=_attr(fabric_id))
+
+
+def _domain(domain_id: str, fabric: object, *, obj_id: str = "domain") -> SimpleNamespace:
+    return SimpleNamespace(
+        id=obj_id,
+        display_label=f"{fabric.name.value} / {domain_id}",
+        domain_id=_attr(domain_id),
+        fabric=_rel_node(fabric),
+        remote_gateway_groups=_rel_edges([]),
+    )
+
+
+def _pod(pod_id: str, name: str, evpn_domain: object | None) -> SimpleNamespace:
+    return SimpleNamespace(id=pod_id, name=_attr(name), evpn_domain=_rel_node(evpn_domain))
+
+
+def _gateway_group(
+    group_id: str,
+    name: str,
+    pod: object | None,
+    remote_domain: object | None,
+    members: list[object],
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=group_id,
+        display_label=name,
+        name=_attr(name),
+        resiliency_model=_attr("all_active_multihoming"),
+        evpn_l2_enabled=_attr(True),
+        evpn_l3_enabled=_attr(True),
+        evpn_l3_inter_domain=_attr(True),
+        d_path_enabled=_attr(True),
+        all_active_multihoming_enabled=_attr(True),
+        ethernet_segment_identifier=_attr("0000:0000:0000:0001:0001"),
+        ethernet_segment_rt_import=_attr("00:00:00:00:00:01"),
+        pod=_rel_node(pod),
+        remote_domain=_rel_node(remote_domain),
+        members=_rel_edges(members),
+    )
+
+
+def _gateway_group_topology(
+    *, target_role: str = "border_leaf", peer_names: tuple[str, ...] = ("leaf3", "leaf2")
+) -> tuple[SimpleNamespace, SimpleNamespace]:
+    fabric = _fabric()
+    local_domain = _domain("65100:1", fabric, obj_id="domain-a")
+    peer_domain = _domain("65200:1", fabric, obj_id="domain-b")
+    core_domain = _domain("65300:1", fabric, obj_id="domain-core")
+    local_pod = _pod("pod-a", "pod-a", local_domain)
+    peer_pod = _pod("pod-b", "pod-b", peer_domain)
+    target = _gateway_device("device-a", "leaf1", target_role, local_pod)
+    peer_members = [
+        _gateway_device(f"device-peer-{index}", peer_name, "border_leaf", peer_pod)
+        for index, peer_name in enumerate(peer_names)
+    ]
+    local_group = _gateway_group("gateway-group-a", "gateway-group-a", local_pod, core_domain, [target])
+    peer_group = _gateway_group("gateway-group-b", "gateway-group-b", peer_pod, core_domain, peer_members)
+    core_domain.remote_gateway_groups = _rel_edges([local_group, peer_group])
+    target.evpn_gateway_group = _rel_node(local_group)
+    return target, local_group
+
+
+def test_gateway_group_border_leaf_emits_evpn_gateway_payload() -> None:
+    target, _gateway_node = _gateway_group_topology()
+
+    payload = GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role="border_leaf")
+    hostvars = _base_hostvars([], role="border_leaf", evpn_gateway=payload)
+
+    gateway = hostvars["l3leaf"]["nodes"][0]["evpn_gateway"]
+    assert gateway == {
+        "remote_peers": [{"hostname": "leaf2"}, {"hostname": "leaf3"}],
+        "evpn_l2": {"enabled": True},
+        "evpn_l3": {"enabled": True, "inter_domain": True},
+        "d_path": {"enabled": True, "local_domain_id": "65100:1", "remote_domain_id": "65300:1"},
+        "all_active_multihoming": {
+            "enabled": True,
+            "evpn_ethernet_segment": {
+                "identifier": "0000:0000:0000:0001:0001",
+                "rt_import": "00:00:00:00:00:01",
+            },
+        },
+    }
+    assert "enable_d_path" not in gateway["all_active_multihoming"]
+    assert "evpn_domain_id_local" not in gateway["all_active_multihoming"]
+    assert "evpn_domain_id_remote" not in gateway["all_active_multihoming"]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+@pytest.mark.parametrize("role", ["leaf", "l2leaf", "spine", "super_spine"])
+def test_ungrouped_non_gateway_roles_omit_evpn_gateway_payload(role: str) -> None:
+    target, _gateway_node = _gateway_group_topology(target_role=role)
+    target.evpn_gateway_group = _rel_node(None)
+
+    assert GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role=role) is None
+
+
+@pytest.mark.parametrize("role", ["leaf", "l2leaf", "spine", "super_spine"])
+def test_grouped_non_gateway_roles_raise_actionable_error(role: str) -> None:
+    target, _gateway_node = _gateway_group_topology(target_role=role)
+
+    with pytest.raises(ValueError, match="target device role"):
+        GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role=role)
+
+
+def test_unlinked_border_leaf_omits_evpn_gateway_payload() -> None:
+    target, _gateway_node = _gateway_group_topology()
+    target.evpn_gateway_group = _rel_node(None)
+
+    assert GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role="border_leaf") is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "match"),
+    [
+        ("resiliency_model", _attr("mlag"), "resiliency_model"),
+        ("ethernet_segment_identifier", _attr(""), "ethernet_segment_identifier"),
+        ("ethernet_segment_rt_import", _attr(""), "ethernet_segment_rt_import"),
+    ],
+)
+def test_gateway_group_field_validation_errors_are_actionable(field: str, value: object, match: str) -> None:
+    target, gateway = _gateway_group_topology()
+    setattr(gateway, field, value)
+
+    with pytest.raises(ValueError, match=match):
+        GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role="border_leaf")
+
+
+@pytest.mark.parametrize(
+    ("mutator", "match"),
+    [
+        (lambda _target, gateway: setattr(gateway.pod.node, "evpn_domain", _rel_node(None)), "evpn_domain"),
+        (lambda _target, gateway: setattr(gateway, "remote_domain", _rel_node(None)), "remote_domain"),
+        (
+            lambda _target, gateway: setattr(gateway, "remote_domain", _rel_node(gateway.pod.node.evpn_domain.node)),
+            "must differ",
+        ),
+        (lambda _target, gateway: setattr(gateway, "members", _rel_edges([])), "at least one"),
+        (lambda _target, gateway: setattr(gateway.members.edges[0].node, "role", _attr("leaf")), "border_leaf"),
+        (
+            lambda _target, gateway: setattr(
+                gateway.members.edges[0].node, "pod", _rel_node(_pod("pod-x", "pod-x", None))
+            ),
+            "gateway group's pod",
+        ),
+    ],
+)
+def test_gateway_group_relationship_validation_errors_are_actionable(
+    mutator: Callable[[SimpleNamespace, SimpleNamespace], None], match: str
+) -> None:
+    target, gateway = _gateway_group_topology()
+    mutator(target, gateway)
+
+    with pytest.raises(ValueError, match=match):
+        GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role="border_leaf")
+
+
+def test_gateway_group_without_remote_peers_emits_empty_peer_list() -> None:
+    target, gateway = _gateway_group_topology(peer_names=())
+    gateway.remote_domain.node.remote_gateway_groups = _rel_edges([gateway])
+
+    payload = GenerateAVDDeviceHostvar._extract_evpn_gateway_payload(target, hostname="leaf1", role="border_leaf")
+
+    assert payload is not None
+    assert payload["remote_peers"] == []
 
 
 @pytest.mark.anyio

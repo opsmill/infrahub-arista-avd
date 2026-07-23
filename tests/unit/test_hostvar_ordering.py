@@ -9,6 +9,7 @@ import pytest
 
 from generators import generate_avd_device_inputs_query as q
 from generators.generate_avd_device_hostvar import (
+    GenerateAVDDeviceHostvar,
     build_dci_l3_edge_p2p_links,
     extract_connected_endpoints,
     extract_uplinks_from_dict,
@@ -161,6 +162,65 @@ def _make_uplink_edge(
             ),
         )
     )
+
+
+def test_evpn_gateway_payload_order_on_l3leaf_node() -> None:
+    hostvars = GenerateAVDDeviceHostvar._build_hostvars(
+        hostname="border-leaf1",
+        role="border_leaf",
+        bgp_asn=65101,
+        node_id=1,
+        loopback_ip="10.0.0.1",
+        mgmt_ip="192.0.2.1/24",
+        fabric_name="Fabric-A",
+        mgmt_gateway=None,
+        virtual_router_mac=None,
+        underlay_routing_protocol="ebgp",
+        overlay_routing_protocol="ebgp",
+        p2p_uplinks_mtu=9000,
+        spanning_tree_mode="mstp",
+        spanning_tree_priorities={},
+        loopback_ipv4_offset=None,
+        bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
+        management={},
+        pools={
+            "uplink_ipv4_pool": "10.1.0.0/24",
+            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
+            "loopback_ipv4_pool": "10.0.0.0/24",
+            "mlag_peer_ipv4_pool": None,
+            "mlag_peer_l3_ipv4_pool": None,
+        },
+        uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        rack_info={"name": "rack-a", "mlag": False, "leaf_names": ["border-leaf1"], "avd_tags": []},
+        mlag_info={"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
+        tenants_data=[],
+        connected_endpoints=[],
+        evpn_gateway={
+            "remote_peers": [{"hostname": "border-leaf2"}],
+            "evpn_l2": {"enabled": True},
+            "evpn_l3": {"enabled": True, "inter_domain": True},
+            "d_path": {"enabled": True, "local_domain_id": "65100:1", "remote_domain_id": "65200:1"},
+            "all_active_multihoming": {
+                "enabled": True,
+                "evpn_ethernet_segment": {
+                    "identifier": "0000:0000:0000:0001:0001",
+                    "rt_import": "00:00:00:00:00:01",
+                },
+            },
+        },
+    )
+
+    assert list(hostvars["l3leaf"]["nodes"][0]) == [
+        "name",
+        "id",
+        "bgp_as",
+        "loopback_ipv4_address",
+        "loopback_ipv4_pool",
+        "mgmt_ip",
+        "evpn_gateway",
+        "uplink_ipv4_pool",
+        "vtep_loopback_ipv4_pool",
+    ]
 
 
 def _make_server_edge(

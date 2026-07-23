@@ -346,3 +346,43 @@ class TestValidateInputsAPI:
         """Confirm the old .failed API no longer exists (regression guard)."""
         validated = validate_inputs({})
         assert not hasattr(validated, "failed")
+
+
+class TestEvpnGatewayRemotePeerPreflight:
+    def test_hostname_only_remote_peer_must_have_aggregated_hostvars(self):
+        hostvars = {
+            "leaf1": {
+                "type": "l3leaf",
+                "l3leaf": {
+                    "nodes": [
+                        {
+                            "name": "leaf1",
+                            "evpn_gateway": {
+                                "remote_peers": [
+                                    {"hostname": "leaf2"},
+                                    {"hostname": "leaf3", "ip_address": "192.0.2.3", "bgp_as": "65003"},
+                                ]
+                            },
+                        }
+                    ]
+                },
+            },
+            "leaf3": {"type": "l3leaf", "l3leaf": {"nodes": [{"name": "leaf3"}]}},
+        }
+
+        missing = AvdDeviceStructuredConfigGenerator._missing_evpn_gateway_remote_peers(hostvars)
+
+        assert missing == ["leaf1 -> leaf2"]
+
+    def test_hostname_only_remote_peer_passes_when_peer_hostvars_exist(self):
+        hostvars = {
+            "leaf1": {
+                "type": "l3leaf",
+                "l3leaf": {"nodes": [{"name": "leaf1", "evpn_gateway": {"remote_peers": [{"hostname": "leaf2"}]}}]},
+            },
+            "leaf2": {"type": "l3leaf", "l3leaf": {"nodes": [{"name": "leaf2"}]}},
+        }
+
+        missing = AvdDeviceStructuredConfigGenerator._missing_evpn_gateway_remote_peers(hostvars)
+
+        assert missing == []

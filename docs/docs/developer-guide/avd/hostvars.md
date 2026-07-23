@@ -105,6 +105,33 @@ Generated DCI entries are self-contained and do not use `l3_edge.p2p_links_profi
 
 `speed` is emitted only when endpoint/interface data provides a resolvable speed. When it cannot be resolved, the key is omitted and pyAVD uses its normal behavior.
 
+Border Leafs are also the only role eligible for modeled EVPN Multi-Domain Gateway hostvars.
+A target Border Leaf that is a member of an `EvpnGatewayGroup` emits `l3leaf.nodes[].evpn_gateway`:
+
+```json
+{
+  "remote_peers": [{"hostname": "remote-border-leaf"}],
+  "evpn_l2": {"enabled": true},
+  "evpn_l3": {"enabled": true, "inter_domain": true},
+  "d_path": {
+    "enabled": true,
+    "local_domain_id": "65100:1",
+    "remote_domain_id": "65200:1"
+  },
+  "all_active_multihoming": {
+    "enabled": true,
+    "evpn_ethernet_segment": {
+      "identifier": "0000:0000:0000:0001:0001",
+      "rt_import": "00:00:00:00:00:01"
+    }
+  }
+}
+```
+
+The generator derives the local D-PATH domain ID from `EvpnGatewayGroup.pod.evpn_domain`, the remote D-PATH domain ID from `EvpnGatewayGroup.remote_domain`, and `remote_peers[].hostname` from other valid Border Leaf members in gateway groups that share the same remote EVPN Domain. It does not emit deprecated pyAVD 6.3.0 keys under `all_active_multihoming` such as `enable_d_path`, `evpn_domain_id_local`, or `evpn_domain_id_remote`.
+
+Gateway group intent fails before writing the hostvar file when the target or any member is not a Border Leaf, the group Pod has no EVPN Domain, the remote domain is missing or conflicts with the local domain, a member is outside the group Pod, or required All-Active Ethernet Segment values are missing.
+
 ### `l2leaf`
 
 L2 leaves are BGP-less layer-2 extenders. The hostvars builder **skips**:

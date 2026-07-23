@@ -118,6 +118,55 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
         return result
 
+    @staticmethod
+    def _missing_evpn_gateway_remote_peers(hostvars: dict[str, dict[str, Any]]) -> list[str]:
+        """Return hostname-only EVPN Gateway peers missing from the aggregated AVD inputs."""
+        missing: list[str] = []
+        available_hostnames = set(hostvars)
+        for hostname, inputs in hostvars.items():
+            node_type = inputs.get("type")
+            if not isinstance(node_type, str):
+                continue
+            node_type_inputs = inputs.get(node_type)
+            if not isinstance(node_type_inputs, dict):
+                continue
+            nodes = node_type_inputs.get("nodes")
+            if not isinstance(nodes, list):
+                continue
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+                evpn_gateway = node.get("evpn_gateway")
+                if not isinstance(evpn_gateway, dict):
+                    continue
+                remote_peers = evpn_gateway.get("remote_peers") or []
+                for peer in remote_peers:
+                    if not isinstance(peer, dict) or peer.get("ip_address") or peer.get("bgp_as"):
+                        continue
+                    peer_hostname = peer.get("hostname")
+                    if isinstance(peer_hostname, str) and peer_hostname not in available_hostnames:
+                        missing.append(f"{hostname} -> {peer_hostname}")
+        return sorted(missing)
+
+    @staticmethod
+    def _collect_input_validation_errors(hostvars: dict[str, dict[str, Any]]) -> list[str]:
+        """Validate all pyAVD inputs and return formatted violation messages."""
+        validation_errors: list[str] = []
+        for hostname, inputs in hostvars.items():
+            validated = validate_inputs(inputs)
+            if not validated.validation_result.violations:
+                AvdDeviceStructuredConfigGenerator.logger.info(f"{hostname} validated successfully")
+                continue
+
+            for violation in validated.validation_result.violations:
+                msg = getattr(violation, "message", str(violation))
+                path = getattr(violation, "path", "")
+                validation_errors.append(f"{hostname}: {msg} (path: {path})")
+            AvdDeviceStructuredConfigGenerator.logger.warning(
+                f"Validation warnings for {hostname}: {len(validated.validation_result.violations)} issues"
+            )
+        return validation_errors
+
     async def generate(self, data: dict) -> None:
         """Generate AVD inputs and structured config for all devices."""
         data: GenerateAvdInputsQuery = GenerateAvdInputsQuery(**data)
@@ -141,21 +190,16 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
         # Fetch hostvars from object storage
         hostvars = await self._fetch_hostvars_from_storage(devices)
+        missing_remote_peers = self._missing_evpn_gateway_remote_peers(hostvars)
+        if missing_remote_peers:
+            self.logger.error(
+                "Hostname-only EVPN Gateway remote peer hostvars are missing; generate hostvars for these peers "
+                "before structured config generation: %s",
+                ", ".join(missing_remote_peers),
+            )
+            return
 
-        validation_errors: list[str] = []
-        for hostname, inputs in hostvars.items():
-            validated = validate_inputs(inputs)
-            if validated.validation_result.violations:
-                for violation in validated.validation_result.violations:
-                    msg = getattr(violation, "message", str(violation))
-                    path = getattr(violation, "path", "")
-                    validation_errors.append(f"{hostname}: {msg} (path: {path})")
-                self.logger.warning(
-                    f"Validation warnings for {hostname}: {len(validated.validation_result.violations)} issues"
-                )
-            else:
-                self.logger.info(f"{hostname} validated successfully")
-
+        validation_errors = self._collect_input_validation_errors(hostvars)
         if validation_errors:
             for err in validation_errors:
                 self.logger.error(f"Validation error: {err}")

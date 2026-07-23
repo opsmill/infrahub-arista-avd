@@ -34,6 +34,7 @@ Regenerate the typed protocol classes after any schema change (see [the command 
 | `vlan/vlan.yml` | `Ipam.VLAN`, `Ipam.L2Domain` |
 | `vrf/vrf.yml` | `Ipam.VRF`, `Ipam.RouteTarget` |
 | `evpn/evpn_services.yml` | `Evpn.Tenant`, `Evpn.Svi`, `Evpn.L2Vlan` |
+| `evpn/evpn_gateway.yml` | `Evpn.Domain`, `Evpn.GatewayGroup`, plus fabric/pod/device EVPN Gateway relationship extensions |
 | `lag/lag.yml` | `Interface.Lag`, `Generic.InterfaceBundle` |
 | `mlag/mlag.yml` | `Generic.MlagDomain`, `Mlag.Domain`, `Mlag.Interface` |
 | `routing/routing.yml` | `Routing.BGPPeerGroup`, `Routing.BGPNeighbor`, prefix lists, route maps, static routes |
@@ -77,7 +78,7 @@ A cabled connection between interfaces. Inherits `Dcim.Connector`, so it carries
 
 The concrete network device (switch). Inherits `Dcim.GenericDevice`, `Dcim.PhysicalDevice`, and `CoreArtifactTarget`.
 
-- **Attributes**: `name` (unique), `description`, `os_version`, `status` (`active`, `provisioning`, `maintenance`, `drained`). Fabric extensions (via `dcim_extensions.yml`): `role` (`super_spine`, `spine`, `leaf`, `l2leaf`), `index`, `bgp_asn`, `node_id`.
+- **Attributes**: `name` (unique), `description`, `os_version`, `status` (`active`, `provisioning`, `maintenance`, `drained`). Fabric extensions (via `dcim_extensions.yml`): `role` (`super_spine`, `spine`, `leaf`, `border_leaf`, `l2leaf`), `index`, `bgp_asn`, `node_id`.
 - **Relationships**: `interfaces` → `DcimInterface`, `device_type` → `DcimDeviceType`, `platform` → `DcimPlatform`, `primary_address` / `loopback_ip` / `mgmt_ip` → `IpamIPAddress`, `pod` → `NetworkPod`, `rack` → `LocationRack`, `avd_artifact` → `AvdArtifact`, `mlag_domain` → `MlagDomain`, plus routing relations (`bgp_peer_groups`, `bgp_neighbors`, `prefix_lists`, `route_maps`, `static_routes`).
 
 ### Interface kinds
@@ -152,6 +153,16 @@ An SVI. Attributes: `name`, `svi_id`, `ip_address_virtual`, `enabled`. Relations
 ### `EvpnL2Vlan` — `Evpn.L2Vlan`
 
 An L2-only VLAN attached to a tenant. Attributes: `name`, `vlan_id`, `vni_override`. Relationships: `tenant` → `EvpnTenant` (parent), `vlan` → `IpamVLAN`.
+
+### `EvpnDomain` — `Evpn.Domain`
+
+An EVPN domain owned by one `NetworkFabric`. Attributes: `name`, `domain_id`, and optional `description`. Relationships: `fabric` -> `NetworkFabric` (parent), `pods` -> `NetworkPod`, and `remote_gateway_groups` -> `EvpnGatewayGroup`. `domain_id` and `name` are unique per fabric. The hostvar generator uses `domain_id` as the Pod-derived local or group-selected remote EVPN Gateway D-PATH domain ID.
+
+### `EvpnGatewayGroup` — `Evpn.GatewayGroup`
+
+EVPN Multi-Domain Gateway intent shared by one or more Border Leaf devices in a single Pod. Attributes include `resiliency_model` (only `all_active_multihoming`), EVPN L2/L3 enablement flags, D-PATH enablement, All-Active Multihoming enablement, and Ethernet Segment identifier/RT import values. Relationships: `pod` -> `NetworkPod`, `remote_domain` -> `EvpnDomain`, and `members` -> `DcimDevice`. The group has no independently selectable local domain; its local domain is derived from `pod.evpn_domain`. Its identity uses the Pod and group name, while display includes the remote domain ID, without computed or denormalized helper attributes solely for local-domain display.
+
+`NetworkFabric.evpn_domains`, `NetworkPod.evpn_domain`, `NetworkPod.evpn_gateway_groups`, and `DcimDevice.evpn_gateway_group` are additive relationships from `evpn/evpn_gateway.yml`. Both `EvpnDomain` and `EvpnGatewayGroup` set `include_in_menu: false` because the custom EVPN Services menu exposes one Domains item for `EvpnDomain`; gateway groups are reached from EVPN Domain relationship views.
 
 ## Compute
 

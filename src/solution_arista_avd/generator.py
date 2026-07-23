@@ -203,11 +203,11 @@ class GeneratorMixin:
             include=["asn"],
             exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
         )
-        if device.asn.id:
+        if device.asn.id:  # type: ignore[attr-defined]
             return None
 
         routing_asn = await self.allocate_routing_asn(asn_pool, fabric_id)
-        device.asn = routing_asn.id  # type: ignore[assignment]
+        device.asn = routing_asn.id  # type: ignore[assignment, attr-defined]
         try:
             await device.save(allow_upsert=True)
         except Exception:
@@ -240,7 +240,7 @@ class GeneratorMixin:
             role__value="loopback",
         )
         loopback_interface.status.value = "active"
-        loopback_interface.ip_address = device.loopback_ip.id  # type: ignore[assignment]
+        loopback_interface.ip_address = device.loopback_ip.id  # type: ignore[assignment, attr-defined]
         await loopback_interface.save(allow_upsert=True)
 
 

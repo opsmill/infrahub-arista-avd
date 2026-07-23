@@ -229,6 +229,12 @@ spec:
             kind: EvpnL2Vlan
             icon: "mdi:tag-multiple"
 
+          - namespace: Evpn
+            name: Domains
+            label: Domains
+            kind: EvpnDomain
+            icon: "mdi:domain"
+
     # --------- Locations ---------
     - namespace: Location
       name: LocationMenu

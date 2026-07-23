@@ -48,6 +48,23 @@ class RackInfo(TypedDict):
     avd_tags: list[str]
 
 
+class EvpnGatewayPayload(TypedDict):
+    remote_peers: list[dict[str, str]]
+    evpn_l2: dict[str, bool]
+    evpn_l3: dict[str, bool]
+    d_path: dict[str, str | bool]
+    all_active_multihoming: dict[str, bool | dict[str, str]]
+
+
+@dataclass(frozen=True)
+class EvpnGatewayContext:
+    group_pod_id: str
+    local_domain: object
+    local_domain_id: str
+    remote_domain: object
+    remote_domain_id: str
+
+
 @dataclass(frozen=True)
 class DciEndpoint:
     device_id: str
@@ -322,6 +339,218 @@ def _device_name(interface: object) -> str | None:
 def _device_role(interface: object) -> str | None:
     device = _node(_field(interface, "device"))
     return _value(device, "role") if device else None
+
+
+def _object_id(value: object | None) -> str | None:
+    obj_id = _field(value, "id")
+    return str(obj_id) if obj_id else None
+
+
+def _display_name(value: object | None) -> str:
+    if value is None:
+        return "<missing>"
+    return str(_field(value, "display_label") or _value(value, "name") or _object_id(value) or "<unknown>")
+
+
+def _relationship_node(value: object | None, relationship_name: str) -> object | None:
+    return _node(_field(value, relationship_name))
+
+
+def _role_value(value: object | None) -> str | None:
+    return _value(value, "role")
+
+
+def _pod_id(value: object | None) -> str | None:
+    pod = _relationship_node(value, "pod")
+    return _object_id(pod)
+
+
+def _fabric_id(value: object | None) -> str | None:
+    fabric = _relationship_node(value, "fabric")
+    return _object_id(fabric)
+
+
+def _domain_id(value: object | None) -> str | None:
+    domain_id = _value(value, "domain_id")
+    return str(domain_id) if domain_id else None
+
+
+def _gateway_error(gateway: object | None, target_hostname: str, message: str) -> ValueError:
+    return ValueError(f"EVPN Gateway Group '{_display_name(gateway)}' for target device '{target_hostname}': {message}")
+
+
+def _require_gateway_field(gateway: object, target_hostname: str, field_name: str) -> str:
+    value = _value(gateway, field_name)
+    if value in (None, ""):
+        raise _gateway_error(gateway, target_hostname, f"required field '{field_name}' is missing")
+    return str(value)
+
+
+def _validate_gateway_member(
+    *,
+    gateway: object,
+    device: object | None,
+    target_hostname: str,
+    expected_pod_id: str,
+) -> None:
+    if device is None:
+        raise _gateway_error(gateway, target_hostname, "members relationship contains an empty device")
+
+    role = _role_value(device)
+    if role != "border_leaf":
+        raise _gateway_error(
+            gateway,
+            target_hostname,
+            f"members must contain only border_leaf devices; device '{_display_name(device)}' role is {role!r}",
+        )
+
+    if _pod_id(device) != expected_pod_id:
+        raise _gateway_error(
+            gateway,
+            target_hostname,
+            f"member device '{_display_name(device)}' must belong to the gateway group's pod",
+        )
+
+
+def _gateway_members(gateway: object | None) -> list[object]:
+    return [_node(edge) for edge in _edges(_field(gateway, "members")) if _node(edge) is not None]
+
+
+def _pod_local_domain(gateway: object | None) -> object | None:
+    pod = _relationship_node(gateway, "pod")
+    return _relationship_node(pod, "evpn_domain")
+
+
+def _validate_gateway_group_context(gateway: object, hostname: str) -> EvpnGatewayContext:
+    group_pod = _relationship_node(gateway, "pod")
+    if group_pod is None:
+        raise _gateway_error(gateway, hostname, "relationship 'pod' is missing")
+    group_pod_id = _object_id(group_pod)
+    if not group_pod_id:
+        raise _gateway_error(gateway, hostname, "relationship 'pod' is missing an id")
+
+    local_domain = _pod_local_domain(gateway)
+    if local_domain is None:
+        raise _gateway_error(gateway, hostname, "gateway group pod must have an evpn_domain")
+    local_domain_id = _domain_id(local_domain)
+    if not local_domain_id:
+        raise _gateway_error(gateway, hostname, "pod.evpn_domain.domain_id is missing")
+
+    remote_domain = _relationship_node(gateway, "remote_domain")
+    if remote_domain is None:
+        raise _gateway_error(gateway, hostname, "relationship 'remote_domain' is missing")
+    remote_domain_id = _domain_id(remote_domain)
+    if not remote_domain_id:
+        raise _gateway_error(gateway, hostname, "remote_domain.domain_id is missing")
+    if _object_id(remote_domain) == _object_id(local_domain):
+        raise _gateway_error(gateway, hostname, "remote_domain must differ from the pod's local evpn_domain")
+    if remote_domain_id == local_domain_id and _fabric_id(remote_domain) == _fabric_id(local_domain):
+        raise _gateway_error(gateway, hostname, "remote_domain domain_id must differ from the local domain_id")
+    if _fabric_id(remote_domain) and _fabric_id(local_domain) and _fabric_id(remote_domain) != _fabric_id(local_domain):
+        raise _gateway_error(
+            gateway, hostname, "remote_domain must belong to the same fabric as the pod's local domain"
+        )
+
+    return EvpnGatewayContext(
+        group_pod_id=group_pod_id,
+        local_domain=local_domain,
+        local_domain_id=local_domain_id,
+        remote_domain=remote_domain,
+        remote_domain_id=remote_domain_id,
+    )
+
+
+def _validate_gateway_group_members(
+    *,
+    gateway: object,
+    device: object,
+    hostname: str,
+    group_pod_id: str,
+) -> None:
+    members = _gateway_members(gateway)
+    if not members:
+        raise _gateway_error(gateway, hostname, "members must contain at least one border_leaf device")
+
+    target_id = _object_id(device)
+    member_ids: set[str] = set()
+    target_is_member = False
+    for member in members:
+        _validate_gateway_member(gateway=gateway, device=member, target_hostname=hostname, expected_pod_id=group_pod_id)
+        member_id = _object_id(member)
+        if member_id:
+            if member_id in member_ids:
+                raise _gateway_error(
+                    gateway, hostname, f"member device '{_display_name(member)}' appears more than once"
+                )
+            member_ids.add(member_id)
+        if member_id == target_id:
+            target_is_member = True
+    if not target_is_member:
+        raise _gateway_error(gateway, hostname, "target device must be a member of its evpn_gateway_group")
+
+
+def _validate_peer_group_local_domain(
+    *,
+    gateway: object,
+    peer_group: object,
+    hostname: str,
+    context: EvpnGatewayContext,
+) -> str:
+    peer_local_domain = _pod_local_domain(peer_group)
+    if peer_local_domain is None:
+        raise _gateway_error(gateway, hostname, f"peer group '{_display_name(peer_group)}' pod has no evpn_domain")
+    if _object_id(peer_local_domain) == _object_id(context.local_domain):
+        raise _gateway_error(
+            gateway, hostname, f"peer group '{_display_name(peer_group)}' uses the same local EVPN domain"
+        )
+    if _domain_id(peer_local_domain) == context.local_domain_id and _fabric_id(peer_local_domain) == _fabric_id(
+        context.local_domain
+    ):
+        raise _gateway_error(
+            gateway, hostname, f"peer group '{_display_name(peer_group)}' uses the same local EVPN domain_id"
+        )
+
+    peer_pod = _relationship_node(peer_group, "pod")
+    peer_pod_id = _object_id(peer_pod)
+    if not peer_pod_id:
+        raise _gateway_error(gateway, hostname, f"peer group '{_display_name(peer_group)}' has no pod")
+    return peer_pod_id
+
+
+def _derive_remote_peer_hostnames(
+    *,
+    gateway: object,
+    device: object,
+    hostname: str,
+    context: EvpnGatewayContext,
+) -> list[str]:
+    remote_peer_hostnames: set[str] = set()
+    target_id = _object_id(device)
+    for peer_group_edge in _edges(_field(context.remote_domain, "remote_gateway_groups")):
+        peer_group = _node(peer_group_edge)
+        if peer_group is None or _object_id(peer_group) == _object_id(gateway):
+            continue
+        peer_pod_id = _validate_peer_group_local_domain(
+            gateway=gateway,
+            peer_group=peer_group,
+            hostname=hostname,
+            context=context,
+        )
+        for peer_member in _gateway_members(peer_group):
+            _validate_gateway_member(
+                gateway=peer_group,
+                device=peer_member,
+                target_hostname=hostname,
+                expected_pod_id=peer_pod_id,
+            )
+            peer_hostname = _value(peer_member, "name")
+            if not peer_hostname:
+                raise _gateway_error(
+                    gateway, hostname, f"peer group '{_display_name(peer_group)}' member hostname is missing"
+                )
+            if _object_id(peer_member) != target_id:
+                remote_peer_hostnames.add(str(peer_hostname))
+    return sorted(remote_peer_hostnames)
 
 
 def _device_id(interface: object) -> str | None:
@@ -1279,6 +1508,56 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         return {"name": rack_name, "mlag": rack_mlag, "leaf_names": sorted(leaf_names), "avd_tags": []}
 
     @staticmethod
+    def _extract_evpn_gateway_payload(device: object, *, hostname: str, role: str) -> EvpnGatewayPayload | None:
+        """Build a pyAVD EVPN Gateway payload for an eligible Border Leaf target."""
+        gateway = _relationship_node(device, "evpn_gateway_group")
+        if gateway is None:
+            return None
+
+        if role != "border_leaf":
+            raise _gateway_error(
+                gateway, hostname, f"target device role must be 'border_leaf'; actual role is {role!r}"
+            )
+
+        if _value(gateway, "resiliency_model") != "all_active_multihoming":
+            raise _gateway_error(gateway, hostname, "resiliency_model must be 'all_active_multihoming'")
+
+        context = _validate_gateway_group_context(gateway, hostname)
+        _validate_gateway_group_members(
+            gateway=gateway,
+            device=device,
+            hostname=hostname,
+            group_pod_id=context.group_pod_id,
+        )
+        remote_peer_hostnames = _derive_remote_peer_hostnames(
+            gateway=gateway,
+            device=device,
+            hostname=hostname,
+            context=context,
+        )
+
+        return {
+            "remote_peers": [{"hostname": peer_hostname} for peer_hostname in remote_peer_hostnames],
+            "evpn_l2": {"enabled": bool(_value(gateway, "evpn_l2_enabled"))},
+            "evpn_l3": {
+                "enabled": bool(_value(gateway, "evpn_l3_enabled")),
+                "inter_domain": bool(_value(gateway, "evpn_l3_inter_domain")),
+            },
+            "d_path": {
+                "enabled": bool(_value(gateway, "d_path_enabled")),
+                "local_domain_id": context.local_domain_id,
+                "remote_domain_id": context.remote_domain_id,
+            },
+            "all_active_multihoming": {
+                "enabled": bool(_value(gateway, "all_active_multihoming_enabled")),
+                "evpn_ethernet_segment": {
+                    "identifier": _require_gateway_field(gateway, hostname, "ethernet_segment_identifier"),
+                    "rt_import": _require_gateway_field(gateway, hostname, "ethernet_segment_rt_import"),
+                },
+            },
+        }
+
+    @staticmethod
     def _build_hostvars(  # noqa: C901 — assembles the full AVD hostvars payload
         *,
         hostname: str,
@@ -1305,6 +1584,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         tenants_data: list[dict[str, Any]],
         connected_endpoints: list[ServerEndpoint],
         dci_l3_edge_p2p_links: list[dict[str, Any]] | None = None,
+        evpn_gateway: EvpnGatewayPayload | None = None,
         custom_hostvars: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
@@ -1325,6 +1605,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 node_config["loopback_ipv4_pool"] = pools["loopback_ipv4_pool"]
         if mgmt_ip:
             node_config["mgmt_ip"] = mgmt_ip
+        if evpn_gateway:
+            node_config["evpn_gateway"] = evpn_gateway
 
         if pools["uplink_ipv4_pool"]:
             node_config["uplink_ipv4_pool"] = pools["uplink_ipv4_pool"]
@@ -1599,6 +1881,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 underlay_routing_protocol=underlay_routing_protocol,
             )
 
+        evpn_gateway = self._extract_evpn_gateway_payload(device, hostname=hostname, role=role)
+
         hostvars = self._build_hostvars(
             hostname=hostname,
             role=role,
@@ -1624,6 +1908,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             tenants_data=tenants_data,
             connected_endpoints=connected_endpoints,
             dci_l3_edge_p2p_links=dci_l3_edge_p2p_links,
+            evpn_gateway=evpn_gateway,
             custom_hostvars=custom_hostvars,
         )
 
