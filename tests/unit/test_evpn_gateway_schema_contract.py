@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import operator
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ def _by_name(items: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 def _ordered_names(*field_groups: list[dict[str, Any]]) -> list[str]:
     fields = [field for group in field_groups for field in group]
-    return [field["name"] for field in sorted(fields, key=lambda field: field["order_weight"])]
+    return [field["name"] for field in sorted(fields, key=operator.itemgetter("order_weight"))]
 
 
 def test_evpn_gateway_schema_defines_required_nodes() -> None:
