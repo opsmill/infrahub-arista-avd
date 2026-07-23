@@ -212,7 +212,11 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         try:
             avd_facts = get_avd_facts(hostvars)
             self.logger.info(f"Generated facts for {len(avd_facts)} devices")
-        except (ValueError, KeyError, TypeError):
+        except Exception:
+            # pyAVD raises AristaAvdError subclasses (not a public type) for invalid
+            # inputs, e.g. one device with a bad MLAG/EVPN payload. Catch broadly so
+            # this fabric fails alone instead of propagating and aborting every other
+            # fabric's structured-config run.
             self.logger.exception("AVD facts generation failed")
             return
 

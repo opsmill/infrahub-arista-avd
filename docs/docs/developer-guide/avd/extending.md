@@ -11,6 +11,15 @@ sidebar_position: 6
 The touch-point lists below give you the exact files to edit for the three most common extensions.
 :::
 
+## Native schema vs. the escape hatch
+
+When closing a capability gap (for example, to support a new AVD example scenario), decide up front whether to model it **natively** in the schema or pass it through the **`avd_custom_hostvars` escape hatch**:
+
+- **Prefer a native schema change** when the capability is reused across more than one scenario, is a first-class topology/role/protocol concept operators select in the UI, or needs validation, pool allocation, or deterministic generation. Examples: device roles and their `ROLE_TO_AVD_TYPE` mapping, underlay protocol choices, EVPN inputs such as `evpn_vlan_aware_bundles` and EVPN Gateway Groups.
+- **Use the `avd_custom_hostvars` escape hatch** when the capability is specific to a single scenario, is a pass-through of PyAVD keys that need no allocation or cross-device derivation, or would be premature to model before real demand. Examples: campus dot1x/PoE/port-profiles/in-band management and MPLS/VPN-IPv4 for ISIS-LDP IPVPN.
+
+`avd_custom_hostvars` is a JSON attribute available at fabric, pod, and device scope. Its content deep-merges with the generator-produced hostvars, and **generator-produced values win** on conflict. Keep escape-hatch content in committed seed data (not manual UI edits) so a design stays reproducible and idempotent, and confirm every key is accepted by the pinned PyAVD version. Escape-hatch use is a deliberate, documented choice per capability — not a default fallback to avoid modeling.
+
 ## Add a new device role
 
 Scenario: you want to support a new Infrahub role (e.g. `border-leaf`) that maps to a PyAVD type.

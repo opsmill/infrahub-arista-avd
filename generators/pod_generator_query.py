@@ -92,6 +92,9 @@ class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabric(BaseModel):
     amount_of_super_spines: Optional[
         "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAmountOfSuperSpines"
     ]
+    underlay_routing_protocol: Optional[
+        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricUnderlayRoutingProtocol"
+    ]
     fabric_interface_sorting_method: Optional[
         "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricInterfaceSortingMethod"
     ]
@@ -113,6 +116,12 @@ class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricAmountOfSuperSp
     BaseModel
 ):
     value: Optional[Any]
+
+
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricUnderlayRoutingProtocol(
+    BaseModel
+):
+    value: Optional[str]
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricInterfaceSortingMethod(

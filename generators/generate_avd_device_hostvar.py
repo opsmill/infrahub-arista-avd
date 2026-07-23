@@ -14,6 +14,12 @@ from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 
+from solution_arista_avd.avd import (
+    MLAG_MAIN_TIER_ROLES,
+    NON_EMITTED_UNDERLAYS,
+    SPINE_UPLINK_LEAF_ROLES,
+    SPINE_UPLINK_UNDERLAYS,
+)
 from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
 from solution_arista_avd.generator import set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
@@ -849,6 +855,7 @@ def _lag_member_adapter(
     switch_lag_node: object | None,
     local_interface: object,
     mlag_active: bool,
+    skip_l2leaf_endpoints: bool = True,
 ) -> dict[str, Any] | None:
     members = _edges(_field(lag_node, "lag_members"))
     if not members:
@@ -871,7 +878,7 @@ def _lag_member_adapter(
                 continue
             if _typename(endpoint) != "InterfacePhysical":
                 continue
-            if _device_role(endpoint) == "l2leaf":
+            if skip_l2leaf_endpoints and _device_role(endpoint) == "l2leaf":
                 continue
             switch_name = _device_name(endpoint)
             switch_port = _value(endpoint, "name")
@@ -906,6 +913,7 @@ def _switch_lag_member_links(
     fallback_local_interface: object,
     fallback_endpoint: object,
     hostname: str,
+    skip_l2leaf_endpoints: bool = True,
 ) -> list[dict[str, Any]]:
     members = _edges(_field(server_lag_node, "lag_members")) if server_lag_node else []
     if not members:
@@ -932,7 +940,9 @@ def _switch_lag_member_links(
             endpoint = _node(endpoint_edge)
             if not endpoint or _field(endpoint, "id") == _field(member, "id"):
                 continue
-            if _typename(endpoint) != "InterfacePhysical" or _device_role(endpoint) == "l2leaf":
+            if _typename(endpoint) != "InterfacePhysical":
+                continue
+            if skip_l2leaf_endpoints and _device_role(endpoint) == "l2leaf":
                 continue
             switch_name = _device_name(endpoint)
             switch_port = _value(endpoint, "name")
@@ -1047,12 +1057,19 @@ def extract_connected_endpoints(  # noqa: C901
     hostname: str,
     *,
     mlag_active: bool = False,
+    skip_l2leaf_endpoints: bool = True,
 ) -> list[ServerEndpoint]:
     """Extract connected endpoints (servers) from device interfaces.
 
     Args:
         interfaces: List of interface edge dicts from GraphQL response
         hostname: Current device hostname (for switch_ports reference)
+        mlag_active: Whether the current device is in an active MLAG pair
+        skip_l2leaf_endpoints: Drop links whose remote device is an l2leaf. This is
+            correct for an L3 leaf building downlinks (AVD models the downstream
+            l2leaf via the l2leaf type, not connected_endpoints), but must be False
+            when the current device is itself an l2leaf main tier — there its
+            server legs land on sibling l2leaf switches of the same MLAG pair.
 
     Returns:
         List of server endpoint configs for pyAVD
@@ -1091,7 +1108,7 @@ def extract_connected_endpoints(  # noqa: C901
                 if remote_device:
                     # Skip L2 leaf devices — AVD handles them via l2leaf type, not connected_endpoints
                     remote_role = getattr(remote_device, "role", None)
-                    if remote_role and remote_role.value == "l2leaf":
+                    if skip_l2leaf_endpoints and remote_role and remote_role.value == "l2leaf":
                         continue
 
                     server_name = remote_device.name.value
@@ -1122,6 +1139,7 @@ def extract_connected_endpoints(  # noqa: C901
                             fallback_local_interface=interface,
                             fallback_endpoint=endpoint,
                             hostname=hostname,
+                            skip_l2leaf_endpoints=skip_l2leaf_endpoints,
                         )
                         _add_switch_lag_adapter(
                             servers[server_name],
@@ -1142,6 +1160,7 @@ def extract_connected_endpoints(  # noqa: C901
                             switch_lag_node=switch_lag_node,
                             local_interface=interface,
                             mlag_active=mlag_active,
+                            skip_l2leaf_endpoints=skip_l2leaf_endpoints,
                         )
                         if lag_adapter:
                             servers[server_name]["adapters"].append(lag_adapter)
@@ -1628,6 +1647,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         underlay_routing_protocol: str | None,
         overlay_routing_protocol: str | None,
         p2p_uplinks_mtu: int | None,
+        evpn_vlan_aware_bundles: bool | None = None,
+        mlag_capable: bool = False,
         spanning_tree_mode: str | None,
         spanning_tree_priorities: dict[str, int],
         loopback_ipv4_offset: int | None,
@@ -1651,8 +1672,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         node_config: dict[str, Any] = {"name": hostname}
         if node_id is not None:
             node_config["id"] = node_id
+        # Super-spines act as EVPN route servers in the multi-pod (5-stage Clos)
+        # design. This is fully determined by the role, so derive it here.
+        if role == "super_spine":
+            node_config["evpn_role"] = "server"
         is_leaf_family = role in LEAF_FAMILY_ROLES
-        is_mlag_leaf = bool(mlag_info.get("domain_id")) and is_leaf_family
+        # Renders MLAG constructs (node-group, mlag_domain_id, peer-link) for the
+        # L3LS leaf family AND the non-L3LS main tier (l2leaf/l2spine/l3spine) when
+        # the caller flags this device as MLAG-capable for its design.
+        renders_mlag = is_leaf_family or mlag_capable
+        is_mlag_leaf = bool(mlag_info.get("domain_id")) and renders_mlag
         if bgp_asn is not None and not is_mlag_leaf:
             node_config["bgp_as"] = str(bgp_asn)
         if loopback_ip:
@@ -1679,11 +1708,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
 
         # Extract MLAG peer interfaces for leaf devices (AVD needs mlag_interfaces)
-        if mlag_info["domain_id"] and is_leaf_family and "mlag_peer_interfaces" in mlag_info:
+        if mlag_info["domain_id"] and renders_mlag and "mlag_peer_interfaces" in mlag_info:
             node_config["mlag_interfaces"] = mlag_info["mlag_peer_interfaces"]
 
-        # Leaf devices with SVIs need virtual_router_mac at node level
-        if is_leaf_family and virtual_router_mac and tenants_data:
+        # Devices that render anycast SVIs (ip_address_virtual) need
+        # virtual_router_mac at node level. This covers L3 leaves as well as the
+        # l3spine campus core and MPLS PE routers — any device with tenant SVIs.
+        if virtual_router_mac and tenants_data:
             node_config["virtual_router_mac_address"] = virtual_router_mac
 
         # Build hostvars
@@ -1693,10 +1724,15 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars["mgmt_gateway"] = mgmt_gateway
         if virtual_router_mac:
             hostvars["virtual_router_mac_address"] = virtual_router_mac
-        if underlay_routing_protocol:
+        # Some underlay values are Infrahub design sentinels (standalone L2LS
+        # "none"), not real pyAVD underlay values; omit the key for those and
+        # let the node-type behavior apply.
+        if underlay_routing_protocol and underlay_routing_protocol not in NON_EMITTED_UNDERLAYS:
             hostvars["underlay_routing_protocol"] = underlay_routing_protocol
         if overlay_routing_protocol:
             hostvars["overlay_routing_protocol"] = overlay_routing_protocol
+        if evpn_vlan_aware_bundles:
+            hostvars["evpn_vlan_aware_bundles"] = True
         if p2p_uplinks_mtu is not None:
             hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
         if spanning_tree_mode:
@@ -1747,20 +1783,23 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         # multiple pairs yields several domains) and lists only its peer pair. A
         # non-MLAG rack groups every rack leaf together and disables MLAG at the
         # node-group level rather than in l3leaf.defaults.
-        if is_leaf_family:
+        if renders_mlag:
             avd_tags = sorted(dict.fromkeys(rack_info.get("avd_tags", [])))
             if mlag_info["domain_id"]:
                 mlag_bgp_asn = mlag_info.get("bgp_asn")
-                if mlag_bgp_asn is None:
-                    msg = f"MLAG domain {mlag_info['domain_id']} for leaf {hostname} has no BGP ASN"
-                    raise ValueError(msg)
                 pair_names = sorted(dict.fromkeys([*mlag_info.get("peer_names", []), hostname]))
                 node_group: dict[str, Any] = {
                     "group": mlag_info["domain_id"],
                     "nodes": [{"name": name} for name in pair_names],
                     "mlag_domain_id": mlag_info["domain_id"],
-                    "bgp_as": str(mlag_bgp_asn),
                 }
+                # L3 leaves run iBGP across the MLAG pair, so an ASN is mandatory.
+                # A pure-L2 MLAG tier (l2leaf/l2spine) runs no BGP and has none.
+                if mlag_bgp_asn is not None:
+                    node_group["bgp_as"] = str(mlag_bgp_asn)
+                elif is_leaf_family:
+                    msg = f"MLAG domain {mlag_info['domain_id']} for leaf {hostname} has no BGP ASN"
+                    raise ValueError(msg)
                 effective_vrmac = mlag_info["virtual_router_mac"] or virtual_router_mac
                 if effective_vrmac:
                     node_group["virtual_router_mac_address"] = effective_vrmac
@@ -1826,26 +1865,36 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         fabric_name = fabric.name.value
         mgmt_gateway = fabric.mgmt_gateway.value if fabric.mgmt_gateway else None
 
-        # Determine uplink role based on device role
+        # Determine uplink role based on device role. In standalone L2LS/campus
+        # fabrics the main leaf tier (l2leaf) uplinks to the spine tier
+        # (l2spine/l3spine) via interface role "spine"; the access-tier l2leaf
+        # under an L3LS fabric uplinks to the L3 leaf via interface role "leaf".
+        # l2spine/l3spine are top-of-fabric (no uplinks).
+        fabric_underlay = self._get_attr_value(fabric, "underlay_routing_protocol")
         uplink_role = None
         if role == "spine":
             uplink_role = "super_spine"
-        elif role in LEAF_FAMILY_ROLES:
+        elif role in LEAF_FAMILY_ROLES or role in SPINE_UPLINK_LEAF_ROLES:
             uplink_role = "spine"
         elif role == "l2leaf":
-            uplink_role = "leaf"
+            uplink_role = "spine" if fabric_underlay in SPINE_UPLINK_UNDERLAYS else "leaf"
 
         # Extract uplinks
         iface_edges = device.interfaces.edges or []
         uplinks = extract_uplinks_from_dict(iface_edges, uplink_role, device_id)
 
         is_l2leaf = role == "l2leaf"
+        # In non-L3LS designs (standalone L2LS "none", campus "ospf") the main tier
+        # (l2leaf/l2spine/l3spine) forms MLAG pairs and needs node-group / peer-link
+        # rendering. Gated on the underlay so the L3LS access-tier l2leaf is untouched.
+        mlag_capable = role in MLAG_MAIN_TIER_ROLES and fabric_underlay in SPINE_UPLINK_UNDERLAYS
 
         # Extract fabric L3LS settings (with backwards-compatible fallbacks)
         # L2 leafs don't participate in EVPN/BGP/VXLAN so skip most L3 settings
         virtual_router_mac = None if is_l2leaf else self._get_attr_value(fabric, "virtual_router_mac")
         underlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "underlay_routing_protocol")
         overlay_routing_protocol = None if is_l2leaf else self._get_attr_value(fabric, "overlay_routing_protocol")
+        evpn_vlan_aware_bundles = None if is_l2leaf else self._get_attr_value(fabric, "evpn_vlan_aware_bundles")
         p2p_uplinks_mtu = (
             None if is_l2leaf else self._get_first_attr_value(fabric, "p_2_p_uplinks_mtu", "p2p_uplinks_mtu")
         )
@@ -1882,7 +1931,10 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             self._extract_custom_hostvars(device),
         )
 
-        # Extract configurable IP pools (not applicable for L2 leafs)
+        # Extract configurable IP pools. L2 leafs run no L3 underlay/overlay, so
+        # the uplink/vtep/loopback/mlag-L3 pools stay unset. A main-tier l2leaf
+        # (mlag_capable) still forms an MLAG pair, so it needs the pod's MLAG
+        # peer-link pool — without it PyAVD cannot address the peer-link SVI.
         if is_l2leaf:
             pools: dict[str, str | None] = {
                 "uplink_ipv4_pool": None,
@@ -1891,13 +1943,18 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 "mlag_peer_ipv4_pool": None,
                 "mlag_peer_l3_ipv4_pool": None,
             }
+            if mlag_capable:
+                pools["mlag_peer_ipv4_pool"] = await self._extract_pool_prefix(
+                    getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool"
+                )
         else:
             pools = await self._extract_l3ls_pools(fabric, pod)
 
-        # Extract rack and MLAG domain info (only for L3 leaf devices)
+        # Extract rack and MLAG domain info. Applies to L3 leaf devices and to the
+        # non-L3LS main tier (mlag_capable l2leaf); the L3LS access-tier l2leaf is skipped.
         rack_info: RackInfo = {"name": None, "mlag": None, "leaf_names": []}
         mlag_info: dict[str, Any] = {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []}
-        if not is_l2leaf:
+        if not is_l2leaf or mlag_capable:
             rack_info = self._extract_rack_info(device)
             rack_info["avd_tags"] = await self._fetch_rack_avd_tags(device.rack.node.id if device.rack.node else None)
             mlag_info = self._extract_mlag_info(device)
@@ -1911,16 +1968,22 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 if mlag_peer_ifaces:
                     mlag_info["mlag_peer_interfaces"] = sorted(mlag_peer_ifaces)
 
-        # Extract connected endpoints (servers)
+        # Extract connected endpoints (servers). Only an L3 leaf/border_leaf drops
+        # l2leaf remotes (its downlinks to access switches); a main-tier l2leaf
+        # serves endpoints directly and its dual-homed legs land on sibling l2leaf
+        # switches of the same MLAG pair, which must be retained.
         connected_endpoints = extract_connected_endpoints(
             iface_edges,
             hostname,
             mlag_active=bool(mlag_info["domain_id"]),
+            skip_l2leaf_endpoints=role in LEAF_FAMILY_ROLES,
         )
 
-        # Fetch EVPN tenants (not applicable for L2 leafs)
+        # Fetch tenant/VLAN services. Skipped only for the L3LS access-tier
+        # l2leaf (pure access under an EVPN fabric); in a standalone L2LS/campus
+        # fabric the l2leaf is the main tier and carries the fabric's VLANs.
         tenants_data: list[dict[str, Any]] = []
-        if not is_l2leaf:
+        if not is_l2leaf or fabric_underlay in SPINE_UPLINK_UNDERLAYS:
             tenants_data = await self._build_tenants_hostvars(fabric.id)
 
         dci_l3_edge_p2p_links: list[dict[str, Any]] = []
@@ -1951,6 +2014,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             virtual_router_mac=virtual_router_mac,
             underlay_routing_protocol=underlay_routing_protocol,
             overlay_routing_protocol=overlay_routing_protocol,
+            evpn_vlan_aware_bundles=evpn_vlan_aware_bundles,
+            mlag_capable=mlag_capable,
             p2p_uplinks_mtu=p2p_uplinks_mtu,
             spanning_tree_mode=spanning_tree_mode,
             spanning_tree_priorities=spanning_tree_priorities,

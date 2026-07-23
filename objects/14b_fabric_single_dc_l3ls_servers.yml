@@ -1,0 +1,32 @@
+---
+# ============================================================================
+# Fabric-SDC-L3LS — connected endpoints (physical servers). Loaded after the
+# fabric/pod/rack (14) so the racks exist first. Each server declares only its
+# rack + object_template + servers-group membership; the generate-server-cabling
+# generator (targets the "servers" group) auto-cables the server to its rack's
+# leaf switches. member_of_groups is set atomically in the same object so the
+# generator trigger does not race group membership.
+#   - sdc-l3ls-server1: dual-homed (compute-server-dual) across the BORDER MLAG pair
+#   - sdc-l3ls-server2: single-homed (compute-server-single) on the ACCESS rack
+#   - sdc-l3ls-gpu1: single-homed GPU (gpu-server-single) on the ACCESS rack
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ComputePhysicalServer
+  data:
+    - name: "sdc-l3ls-server1"
+      status: "provisioning"
+      rack: "SDC_L3LS_BORDER"
+      object_template: "compute-server-dual"
+      member_of_groups: ["servers"]
+    - name: "sdc-l3ls-server2"
+      status: "provisioning"
+      rack: "SDC_L3LS_ACCESS"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]
+    - name: "sdc-l3ls-gpu1"
+      status: "provisioning"
+      rack: "SDC_L3LS_ACCESS"
+      object_template: "gpu-server-single"
+      member_of_groups: ["servers"]

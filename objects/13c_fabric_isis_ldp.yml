@@ -1,0 +1,164 @@
+---
+# ============================================================================
+# Fabric-ISIS-LDP — MPLS / IP-VPN example (AVD "isis-ldp-ipvpn").
+# underlay_routing_protocol: isis-ldp -> the pod/rack generators create P core
+# routers (spine position) and PE routers (leaf position); PE-P links are
+# ISIS-LDP p2p uplinks. VPN-IPv4 / per-customer VRFs are supplied via
+# avd_custom_hostvars.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.62.0.0/24
+      role: management
+    - prefix: 10.62.1.0/24
+      role: pod_loopback
+    - prefix: 10.62.2.0/24
+      role: loopback-vtep
+    - prefix: 10.62.3.0/24
+      role: pod_leaf_spine
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-ISIS-LDP-Uplink-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - 10.62.3.0/24
+    - name: Fabric-ISIS-LDP-VTEP-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - 10.62.2.0/24
+    - name: Fabric-ISIS-LDP-Loopback-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - 10.62.1.0/24
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-ISIS-LDP-Mgmt-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 24
+      ip_namespace: default
+      resources:
+        - 10.62.0.0/24
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: Fabric-ISIS-LDP-ASN-Pool
+      node: RoutingAsn
+      node_attribute: asn
+      start_range: 65800
+      end_range: 65899
+    - name: Fabric-ISIS-LDP-NodeID-Pool
+      node: DcimDevice
+      node_attribute: node_id
+      start_range: 1
+      end_range: 100
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: NetworkFabric
+  data:
+    - name: "Fabric-ISIS-LDP"
+      index: 62
+      amount_of_super_spines: 0
+      fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
+      mgmt_gateway: "10.62.0.1"
+      asn_pool: "Fabric-ISIS-LDP-ASN-Pool"
+      node_id_pool: "Fabric-ISIS-LDP-NodeID-Pool"
+      mgmt_pool: "Fabric-ISIS-LDP-Mgmt-Pool"
+      virtual_router_mac: "00:1c:73:00:00:62"
+      underlay_routing_protocol: "isis-ldp"
+      p2p_uplinks_mtu: 9214
+      uplink_pool: "Fabric-ISIS-LDP-Uplink-Pool"
+      vtep_pool: "Fabric-ISIS-LDP-VTEP-Pool"
+      loopback_pool: "Fabric-ISIS-LDP-Loopback-Pool"
+      spanning_tree_mode: "mstp"
+      # ----------------------------------------------------------------------
+      # Illustrative PE-CE routing for customer VRF C1_VRF1 via the
+      # avd_custom_hostvars escape hatch (no schema change). eBGP peers the PE
+      # with a customer-edge (CE) router inside the customer VRF and
+      # redistributes the VRF's connected routes into that session. It is
+      # injected as custom_structured_configuration so it deep-merges (by the
+      # `name` primary key) into each device's router_bgp: PE routers (role pe)
+      # already carry a BGP AS, so the VRF neighbor renders; P-core routers
+      # (role p) have no BGP AS, so eos_cli_config_gen emits no `router bgp`
+      # block for them and the payload is harmless there. Addresses are
+      # illustrative and consistent with the C1 (10.101.x) addressing scheme;
+      # 10.101.255.0/31 stands in for the PE-CE link (PE .0, CE .1).
+      # ----------------------------------------------------------------------
+      avd_custom_hostvars:
+        custom_structured_configuration_router_bgp:
+          vrfs:
+            - name: C1_VRF1
+              neighbors:
+                - ip_address: "10.101.255.1"
+                  remote_as: "65001"
+                  description: "PE-CE_CUSTOMER1"
+              redistribute:
+                connected:
+                  enabled: true
+              address_family_ipv4:
+                neighbors:
+                  - ip_address: "10.101.255.1"
+                    activate: true
+      dns_servers:
+        - dns-google
+      ntp_servers:
+        - time.google.com
+      local_users:
+        - admin-nopass
+      member_of_groups: ["fabrics"]
+      children:
+        kind: NetworkPod
+        data:
+          - name: "mpls-core"
+            index: 1
+            amount_of_spines: 2
+            spine_switch_template: "arista-7050cx3-32c-spine-switch"
+            loopback_ipv4_offset: 2
+            member_of_groups: ["pods"]
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: LocationHall
+  data:
+    - name: "Hall-ISIS-LDP"
+      index: 62
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: LocationRack
+  data:
+    - name: "MPLS_PE_RACK1"
+      index: 1
+      rack_type: compute
+      pod: mpls-core
+      parent: "Hall-ISIS-LDP"
+      amount_of_leafs: 2
+      mlag: false
+      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      member_of_groups: ["racks"]

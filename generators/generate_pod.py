@@ -7,6 +7,7 @@ from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_arista_avd import sorting as solution_arista_avd_sorting
+from solution_arista_avd.avd import SPINE_ROLE_BY_UNDERLAY
 from solution_arista_avd.cabling import build_pod_cabling_plan, connect_interface_maps
 from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
@@ -25,6 +26,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
     pod_name: str
     pod_spine_switch_template: str
     pod_role: str
+    # L3LS default; generate() switches to l2spine for standalone L2LS fabrics.
+    spine_role: str = "spine"
 
     fabric_interface_sorting_function: Callable
     spine_interface_sorting_function: Callable
@@ -97,6 +100,15 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric_interface_sorting_function = getattr(solution_arista_avd_sorting, fabric_interface_sorting_method)
         self.spine_interface_sorting_function = getattr(solution_arista_avd_sorting, spine_interface_sorting_method)
 
+        # Non-L3LS example fabrics use a different spine role, gated strictly on
+        # the fabric underlay so routed L3LS fabrics (ebgp) are unaffected:
+        #   underlay "none" -> l2spine (standalone L2LS)
+        #   underlay "ospf" -> l3spine (campus core, SVI routing)
+        # Read from the query data (no extra fetch).
+        fabric_node = data.network_pod.edges[0].node.parent.node
+        underlay = getattr(getattr(fabric_node, "underlay_routing_protocol", None), "value", None)
+        self.spine_role = SPINE_ROLE_BY_UNDERLAY.get(underlay, "spine")
+
         # Get AVD-related pool references from parent fabric
         self.asn_pool, self.node_id_pool, self.mgmt_pool = await self.resolve_avd_pools(
             data.network_pod.edges[0].node.parent.node
@@ -117,7 +129,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         for idx in range(1, self.amount_of_spines + 1):
             device = await self.create_avd_device(
                 name=f"spine-{self.pod_name}-{idx}",
-                role="spine",
+                role=self.spine_role,
                 object_template_id=self.pod_spine_switch_template,
                 pod_id=self.pod_id,
                 fabric_id=self.fabric_id,

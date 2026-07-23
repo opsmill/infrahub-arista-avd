@@ -147,6 +147,10 @@ def _base_hostvars(
     role: str = "leaf",
     dci_l3_edge_p2p_links: list[dict] | None = None,
     evpn_gateway: dict | None = None,
+    evpn_vlan_aware_bundles: bool | None = None,
+    underlay_routing_protocol: str = "ebgp",
+    mlag_capable: bool = False,
+    pools: dict | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -159,15 +163,18 @@ def _base_hostvars(
         fabric_name="Fabric-A",
         mgmt_gateway=None,
         virtual_router_mac="00:1c:73:00:00:99",
-        underlay_routing_protocol="ebgp",
+        underlay_routing_protocol=underlay_routing_protocol,
         overlay_routing_protocol="ebgp",
+        evpn_vlan_aware_bundles=evpn_vlan_aware_bundles,
+        mlag_capable=mlag_capable,
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
         spanning_tree_priorities={"leaf": 8192},
         loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
-        pools={
+        pools=pools
+        or {
             "uplink_ipv4_pool": "10.1.0.0/24",
             "vtep_loopback_ipv4_pool": "10.2.0.0/24",
             "loopback_ipv4_pool": "10.0.0.0/24",
@@ -235,6 +242,178 @@ def test_non_mlag_leaf_sets_avd_mlag_false_on_rack_node_group() -> None:
     assert not validate_inputs(hostvars).validation_result.violations
 
 
+def test_l2leaf_main_tier_renders_mlag_node_group() -> None:
+    """A standalone L2LS/campus l2leaf pair is the main tier and must render its
+    MLAG domain (node-group + mlag_domain_id + peer-link), with no bgp_as since a
+    pure-L2 MLAG tier runs no BGP. Regression for the MLAG-rendering gap."""
+    mlag_info = {
+        "domain_id": "L2LS_RACK1",
+        "bgp_asn": None,
+        "virtual_router_mac": None,
+        "peer_names": ["leaf1", "leaf2"],
+        "mlag_peer_interfaces": ["Ethernet47", "Ethernet48"],
+    }
+    hostvars = _base_hostvars(
+        [],
+        role="l2leaf",
+        underlay_routing_protocol="none",
+        mlag_capable=True,
+        mlag_info=mlag_info,
+        rack_info={"name": "L2LS_RACK1", "mlag": True, "leaf_names": [], "avd_tags": []},
+    )
+
+    node_group = hostvars["l2leaf"]["node_groups"][0]
+    assert node_group["group"] == "L2LS_RACK1"
+    assert node_group["mlag_domain_id"] == "L2LS_RACK1"
+    assert node_group["nodes"] == [{"name": "leaf1"}, {"name": "leaf2"}]
+    assert "bgp_as" not in node_group
+    assert hostvars["l2leaf"]["nodes"][0]["mlag_interfaces"] == ["Ethernet47", "Ethernet48"]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_l2spine_main_tier_renders_mlag_node_group() -> None:
+    """The L2LS spine tier (l2spine) also forms an MLAG pair and must render it."""
+    mlag_info = {
+        "domain_id": "L2LS_SPINE",
+        "bgp_asn": None,
+        "virtual_router_mac": None,
+        "peer_names": ["leaf1", "leaf2"],
+        "mlag_peer_interfaces": ["Ethernet1", "Ethernet2"],
+    }
+    hostvars = _base_hostvars(
+        [],
+        role="l2spine",
+        underlay_routing_protocol="none",
+        mlag_capable=True,
+        mlag_info=mlag_info,
+        rack_info={"name": "L2LS_SPINE", "mlag": True, "leaf_names": [], "avd_tags": []},
+    )
+
+    node_group = hostvars["l2spine"]["node_groups"][0]
+    assert node_group["mlag_domain_id"] == "L2LS_SPINE"
+    assert node_group["nodes"] == [{"name": "leaf1"}, {"name": "leaf2"}]
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_l2leaf_access_tier_under_l3ls_renders_no_mlag() -> None:
+    """Regression guard: the L3LS access-tier l2leaf (not mlag_capable) must keep
+    its pure-access behavior and render no MLAG node group."""
+    mlag_info = {
+        "domain_id": "ACCESS_RACK",
+        "bgp_asn": None,
+        "virtual_router_mac": None,
+        "peer_names": ["l2leaf1", "l2leaf2"],
+    }
+    hostvars = _base_hostvars(
+        [],
+        role="l2leaf",
+        underlay_routing_protocol="ebgp",
+        mlag_capable=False,
+        mlag_info=mlag_info,
+    )
+    assert "node_groups" not in hostvars.get("l2leaf", {})
+    assert "mlag_interfaces" not in hostvars["l2leaf"]["nodes"][0]
+
+
+def test_l2leaf_main_tier_emits_mlag_peer_pool_only() -> None:
+    """A main-tier l2leaf MLAG pair needs the pod's MLAG peer-link pool at node
+    level, but must not emit the L3 uplink/vtep/loopback/mlag-L3 pools (it runs no
+    L3 underlay). Regression for the 'mlag_interfaces not set' crash, whose root
+    cause included the peer pool being nulled for every l2leaf."""
+    mlag_info = {
+        "domain_id": "L2LS_RACK1",
+        "bgp_asn": None,
+        "virtual_router_mac": None,
+        "peer_names": ["leaf1", "leaf2"],
+        "mlag_peer_interfaces": ["Ethernet47", "Ethernet48"],
+    }
+    hostvars = _base_hostvars(
+        [],
+        role="l2leaf",
+        underlay_routing_protocol="none",
+        mlag_capable=True,
+        mlag_info=mlag_info,
+        rack_info={"name": "L2LS_RACK1", "mlag": True, "leaf_names": [], "avd_tags": []},
+        pools={
+            "uplink_ipv4_pool": None,
+            "vtep_loopback_ipv4_pool": None,
+            "loopback_ipv4_pool": None,
+            "mlag_peer_ipv4_pool": "10.60.4.0/24",
+            "mlag_peer_l3_ipv4_pool": None,
+        },
+    )
+
+    node = hostvars["l2leaf"]["nodes"][0]
+    assert node["mlag_peer_ipv4_pool"] == "10.60.4.0/24"
+    assert node["mlag_interfaces"] == ["Ethernet47", "Ethernet48"]
+    assert "uplink_ipv4_pool" not in node
+    assert "vtep_loopback_ipv4_pool" not in node
+    assert "mlag_peer_l3_ipv4_pool" not in node
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_switch_lag_member_links_retains_l2leaf_switch_endpoints() -> None:
+    """When the current device is itself a main-tier l2leaf, a dual-homed server's
+    port-channel legs land on sibling l2leaf switches and must be retained. The
+    default (L3-leaf) behaviour still drops l2leaf downlink endpoints.
+
+    Regression for the empty-adapter bug where a dual-homed L2LS/campus server
+    rendered a port_channel with no switches/switch_ports/endpoint_ports.
+    """
+    switch_lag = _lag(name="Port-Channel1", channel_id=1)
+
+    def _server_lag_member(member_name: str, switch_name: str, switch_port: str) -> SimpleNamespace:
+        switch_endpoint = SimpleNamespace(
+            id=f"{switch_name}:{switch_port}",
+            typename__="InterfacePhysical",
+            name=_attr(switch_port),
+            device=SimpleNamespace(node=SimpleNamespace(name=_attr(switch_name), role=_attr("l2leaf"))),
+            lag=SimpleNamespace(node=switch_lag),
+            tagged_vlan=SimpleNamespace(edges=[]),
+            untagged_vlan=SimpleNamespace(node=None),
+        )
+        connector = SimpleNamespace(
+            node=SimpleNamespace(connected_endpoints=SimpleNamespace(edges=[SimpleNamespace(node=switch_endpoint)]))
+        )
+        return SimpleNamespace(id=f"srv:{member_name}", name=_attr(member_name), connector=connector)
+
+    server_lag = SimpleNamespace(
+        lag_members=SimpleNamespace(
+            edges=[
+                SimpleNamespace(node=_server_lag_member("Ethernet1", "leaf-l2ls-pod1-1-1", "Ethernet1")),
+                SimpleNamespace(node=_server_lag_member("Ethernet2", "leaf-l2ls-pod1-1-2", "Ethernet1")),
+            ]
+        )
+    )
+    fallback_local = SimpleNamespace(
+        name=_attr("Ethernet1"), tagged_vlan=SimpleNamespace(edges=[]), untagged_vlan=SimpleNamespace(node=None)
+    )
+    fallback_endpoint = SimpleNamespace(name=_attr("Ethernet1"))
+
+    kept = hostvar_module._switch_lag_member_links(
+        server_lag_node=server_lag,
+        fallback_switch_lag_node=switch_lag,
+        fallback_local_interface=fallback_local,
+        fallback_endpoint=fallback_endpoint,
+        hostname="leaf-l2ls-pod1-1-1",
+        skip_l2leaf_endpoints=False,
+    )
+    assert sorted((link["switch"], link["switch_port"]) for link in kept) == [
+        ("leaf-l2ls-pod1-1-1", "Ethernet1"),
+        ("leaf-l2ls-pod1-1-2", "Ethernet1"),
+    ]
+
+    dropped = hostvar_module._switch_lag_member_links(
+        server_lag_node=server_lag,
+        fallback_switch_lag_node=switch_lag,
+        fallback_local_interface=fallback_local,
+        fallback_endpoint=fallback_endpoint,
+        hostname="leaf-l2ls-pod1-1-1",
+        skip_l2leaf_endpoints=True,
+    )
+    assert dropped == []
+
+
 def test_border_leaf_builds_l3leaf_hostvars() -> None:
     hostvars = _base_hostvars([], role="border_leaf")
 
@@ -242,6 +421,46 @@ def test_border_leaf_builds_l3leaf_hostvars() -> None:
     assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
     assert hostvars["l3leaf"]["node_groups"][0]["nodes"] == [{"name": "leaf1"}]
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_super_spine_renders_evpn_route_server() -> None:
+    """Super-spines act as EVPN route servers in the 5-stage Clos design."""
+    hostvars = _base_hostvars([], role="super_spine")
+
+    assert hostvars["type"] == "super-spine"
+    assert hostvars["super_spine"]["nodes"][0]["evpn_role"] == "server"
+
+
+def test_non_super_spine_has_no_evpn_route_server_role() -> None:
+    """Only super-spines derive evpn_role: server; leaves must not."""
+    hostvars = _base_hostvars([], role="leaf")
+
+    assert hostvars["l3leaf"]["nodes"][0].get("evpn_role") != "server"
+
+
+def test_hostvars_never_emit_design_type() -> None:
+    """pyAVD 6.3 has no design.type; the generator must never emit it (research R1)."""
+    for role in ("leaf", "border_leaf", "spine", "super_spine"):
+        hostvars = _base_hostvars([], role=role)
+        assert "design" not in hostvars
+
+
+def test_underlay_none_omits_underlay_routing_protocol() -> None:
+    """Standalone L2LS (underlay 'none') must not emit an underlay_routing_protocol."""
+    hostvars = _base_hostvars([], underlay_routing_protocol="none")
+    assert "underlay_routing_protocol" not in hostvars
+
+    ebgp = _base_hostvars([], underlay_routing_protocol="ebgp")
+    assert ebgp["underlay_routing_protocol"] == "ebgp"
+
+
+def test_evpn_vlan_aware_bundles_rendered_when_enabled() -> None:
+    """The 5-stage Clos design renders tenants as vlan-aware bundles when enabled."""
+    enabled = _base_hostvars([], evpn_vlan_aware_bundles=True)
+    assert enabled["evpn_vlan_aware_bundles"] is True
+
+    default = _base_hostvars([])
+    assert "evpn_vlan_aware_bundles" not in default
 
 
 def test_border_leaf_mapping_is_available_to_repository_loaded_generator(monkeypatch: pytest.MonkeyPatch) -> None:

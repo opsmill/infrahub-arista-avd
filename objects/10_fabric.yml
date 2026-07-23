@@ -17,6 +17,8 @@ spec:
       virtual_router_mac: "00:1c:73:00:00:99"
       underlay_routing_protocol: "ebgp"
       overlay_routing_protocol: "ebgp"
+      # 5-stage Clos: render tenant L2 services as vlan-aware bundles.
+      evpn_vlan_aware_bundles: true
       p2p_uplinks_mtu: 9214
       uplink_pool: "Fabric-A-Uplink-Pool"
       vtep_pool: "Fabric-A-VTEP-Pool"

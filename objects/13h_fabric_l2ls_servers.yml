@@ -1,0 +1,26 @@
+---
+# ============================================================================
+# Fabric-L2LS — connected endpoints (physical servers) for L2LS_RACK1.
+# Loaded after 13a so the fabric/pod/rack exist first. Each server declares
+# only its rack + object_template + servers-group membership; the
+# generate-server-cabling generator (targets the "servers" group) auto-cables
+# the server to the rack's leaf switches. member_of_groups is set atomically
+# in the same object so the generator trigger does not race group membership.
+#   - l2ls-server1: dual-homed (compute-server-dual) across the MLAG leaf pair
+#   - l2ls-server2: single-homed (compute-server-single)
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ComputePhysicalServer
+  data:
+    - name: "l2ls-server1"
+      status: "provisioning"
+      rack: "L2LS_RACK1"
+      object_template: "compute-server-dual"
+      member_of_groups: ["servers"]
+    - name: "l2ls-server2"
+      status: "provisioning"
+      rack: "L2LS_RACK1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]

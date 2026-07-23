@@ -44,7 +44,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         server_already_cabled = await self._is_server_cabled(server_interfaces)
 
         # Find leaf switches in the same rack
-        leaf_switches = await self.client.filters(kind=DcimDevice, rack__ids=[rack_id], role__value="leaf")
+        leaf_switches = await self.client.filters(kind=DcimDevice, rack__ids=[rack_id], role__values=["leaf", "l2leaf"])
         if not leaf_switches:
             self.logger.warning("No leaf switches found in rack %s for server %s", rack_name, server_hostname)
             return

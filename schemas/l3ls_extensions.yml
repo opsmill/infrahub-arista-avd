@@ -74,6 +74,14 @@ extensions:
               label: OSPF
               description: "OSPF for underlay routing"
               color: "#A9DFBF"
+            - name: none
+              label: None (L2 only)
+              description: "No underlay routing protocol (standalone L2LS fabric)"
+              color: "#F5B7B1"
+            - name: isis-ldp
+              label: ISIS-LDP
+              description: "ISIS IGP with LDP MPLS label distribution (ISIS-LDP IPVPN)"
+              color: "#FAD7A0"
           order_weight: 10100
         - name: overlay_routing_protocol
           label: Overlay Routing Protocol
@@ -90,6 +98,13 @@ extensions:
               description: "Internal BGP for overlay EVPN"
               color: "#D2B4DE"
           order_weight: 10200
+        - name: evpn_vlan_aware_bundles
+          label: EVPN VLAN-Aware Bundles
+          kind: Boolean
+          optional: true
+          default_value: false
+          description: "Render EVPN L2 services as VLAN-aware bundles (used by the multi-pod 5-stage Clos design)."
+          order_weight: 10250
         - name: p2p_uplinks_mtu
           label: P2P Uplinks MTU
           kind: Number
