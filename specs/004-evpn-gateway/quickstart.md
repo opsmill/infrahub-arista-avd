@@ -252,8 +252,37 @@ Validation performed on 2026-07-22:
   for `Fabric-C` found 12 devices with hostvars, validated all 12 inputs,
   generated facts for 12 devices, and completed with `0 updated, 12 unchanged,
   0 failed`.
-
-Not yet performed:
-
-- `$infrahub-run-integration-tests` has not yet satisfied the committed branch/commit gate because the implementation is not committed; the remote integration result above validates the copied dirty snapshot only.
-- `$infrahub-test-generator-idempotence` was not run because it requires explicit approval before rebuilding the shared live validation lab.
+- Added a regression test for generated GraphQL return-type aliases where
+  `evpn_l2_enabled`, `evpn_l3_enabled`, and `evpn_l3_inter_domain` are exposed
+  on the generated model as `evpn_l_2_enabled`, `evpn_l_3_enabled`, and
+  `evpn_l_3_inter_domain`; `uv run pytest
+  tests/unit/test_generate_avd_device_hostvar.py` passed with 87 tests.
+- Ran required committed-branch integration validation for
+  `feat/evpn-gateway` at commit
+  `3686b19ebf4d23896eb43a1fc7529baaae1d0216` in isolated remote worktree
+  `~/git/infrahub-worktrees/feat-evpn-gateway`. Command:
+  `uv run pytest tests/integration` with
+  `INFRAHUB_TESTING_DOCKER_IMAGE=opsmill/infrahub-solution-arista-avd`,
+  `INFRAHUB_TESTING_IMAGE_VER=1.10.1`,
+  `INFRAHUB_TESTING_TASKMGR_BACKGROUND_SVC_REPLICAS=1`, and
+  `GIT_CONFIG_GLOBAL=/dev/null`. Result: 29 passed, 31 warnings in 1057.83s
+  (0:17:37). This satisfies the required integration validation gate for the
+  committed feature revision.
+- Ran required generator idempotence validation for
+  `generate-avd-device-hostvar` against commit
+  `3686b19ebf4d23896eb43a1fc7529baaae1d0216` in the shared live validation lab.
+  The lab was rebuilt to a known state, the repository default branch was set to
+  `feat/evpn-gateway`, and the task worker-visible `/upstream` commit matched
+  the target commit. Validation branch:
+  `idempotence-hostvar-20260723-0919`. Scenario: generated Fabric-C topology,
+  created `DC1`, `DC2`, and `CORE` `EvpnDomain` objects, assigned local domains
+  to `infrahub-dc1` and `infrahub-dc2`, promoted
+  `leaf-infrahub-dc1-1-1` and `leaf-infrahub-dc2-1-1` to `border_leaf`, and
+  created `dc1-core` / `dc2-core` `EvpnGatewayGroup` objects sharing CORE.
+  Snapshot scope: normalized `AvdArtifact` / `AvdHostvarFile` relationship
+  identity plus parsed hostvar JSON for `leaf-infrahub-dc1-1-1`,
+  `leaf-infrahub-dc2-1-1`, and ungrouped control leaf
+  `leaf-infrahub-dc1-2-1`. Result: first corrected run updated the two grouped
+  border-leaf hostvars with `evpn_l2.enabled=true`,
+  `evpn_l3.enabled=true`, and `evpn_l3.inter_domain=true`; second run reported
+  all three hostvars unchanged and the normalized snapshots matched exactly.

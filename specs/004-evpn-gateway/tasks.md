@@ -173,8 +173,8 @@
 - [X] T061 [P] Run full unit coverage with `uv run pytest tests/unit` for `tests/unit/`
 - [X] T062 [P] Run repository lint with `uv run invoke lint` for `.`
 - [X] T063 Run branch-first schema, repository, menu, hostvar generation, and structured-config scenarios from `specs/004-evpn-gateway/quickstart.md`
-- [ ] T064 Run required Infrahub integration validation with `$infrahub-run-integration-tests` for changes in `schemas/`, `generators/`, `menus/`, `src/solution_arista_avd/`, and `tests/`
-- [ ] T065 Run required generator idempotence validation with `$infrahub-test-generator-idempotence` for `generators/generate_avd_device_hostvar.py` and `generators/avd_device_hostvar.gql`
+- [X] T064 Run required Infrahub integration validation with `$infrahub-run-integration-tests` for changes in `schemas/`, `generators/`, `menus/`, `src/solution_arista_avd/`, and `tests/`
+- [X] T065 Run required generator idempotence validation with `$infrahub-test-generator-idempotence` for `generators/generate_avd_device_hostvar.py` and `generators/avd_device_hostvar.gql`
 - [X] T066 [P] Run docs typecheck from `docs/` using `npm run typecheck` for `docs/docs/`
 - [X] T067 [P] Run docs build from `docs/` using `npm run build` for `docs/docs/`
 - [X] T068 Update implementation evidence and validation notes in `specs/004-evpn-gateway/quickstart.md`
@@ -290,6 +290,6 @@ Task: "Add a pyAVD smoke test for two generated gateway hostvar files with hostn
 
 ## Phase 9: Convergence
 
-- [ ] T069 CRITICAL: Run required Infrahub integration validation against an exact committed branch and commit, then record the tested branch/commit evidence per Constitution IV (partial)
-- [ ] T070 CRITICAL: Run required generator idempotence validation for `generate-avd-device-hostvar` changes, or document the approved alternative when live validation is not allowed, per Constitution II / IV (missing)
+- [X] T069 CRITICAL: Run required Infrahub integration validation against an exact committed branch and commit, then record the tested branch/commit evidence per Constitution IV (partial)
+- [X] T070 CRITICAL: Run required generator idempotence validation for `generate-avd-device-hostvar` changes, or document the approved alternative when live validation is not allowed, per Constitution II / IV (missing)
 - [X] T071 Execute the branch-first quickstart schema, repository, menu, hostvar-generation, and structured-config acceptance scenarios, creating concrete validation objects or targets as needed, per plan: Testing (partial)
