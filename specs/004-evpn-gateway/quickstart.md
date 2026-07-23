@@ -4,8 +4,8 @@
 
 - Dependencies installed with `uv sync --all-packages`.
 - A reachable Infrahub instance configured through `.env`.
-- The `border_leaf` role dependency from PR #74 / `feat/dci-links` is present before gateway-group implementation.
-- EVPN Domain, EVPN Gateway Group, menu, and hostvar generator changes have been implemented.
+- The `border_leaf` role dependency is present before gateway-group implementation.
+- EVPN Domain, EVPN Gateway Group, menu, generated protocol, hostvar query/model, and hostvar generator changes have been implemented.
 
 Verify the Border Leaf dependency locally:
 
@@ -47,10 +47,14 @@ Expected outcome:
 
 - Schema check reports no validation errors.
 - Schema load targets `evpn-gateway-validation`, not the default branch.
-- Existing Fabric, Pod, and Device objects remain valid because extensions are additive.
+- Existing Fabric, Pod, and Device objects remain valid because their extensions are optional.
 - `EvpnDomain` and `EvpnGatewayGroup` are present.
 - `EvpnGateway` is not present.
-- `EvpnGatewayGroup` has no independently selected `local_domain` relationship and no computed or denormalized helper attribute exists solely to display the Pod-derived local EVPN Domain.
+- `EvpnDomain.local_gateway_groups` is the Component side of `EvpnGatewayGroup.local_domain`.
+- `EvpnGatewayGroup.local_domain` is a required Parent relationship to `EvpnDomain`.
+- `EvpnGatewayGroup.pod` is a required Attribute relationship to `NetworkPod`.
+- `NetworkPod.evpn_gateway_groups` is an Attribute inverse, not a Component relationship.
+- `EvpnGatewayGroup` has no computed or denormalized helper attribute solely to display local-domain data.
 
 ## Generated Types
 
@@ -68,13 +72,13 @@ uv run infrahubctl graphql generate-return-types generators/avd_device_hostvar.g
 
 Expected outcome:
 
-- `src/solution_arista_avd/protocols.py` includes `EvpnDomain` and `EvpnGatewayGroup` protocols.
-- The generated hostvar query model includes the target device's `evpn_gateway_group` relationship and the remote-domain gateway-group traversal.
+- `src/solution_arista_avd/protocols.py` includes `EvpnDomain.local_gateway_groups` and `EvpnGatewayGroup.local_domain`.
+- The generated hostvar query model includes the target device's `evpn_gateway_group.local_domain`, `evpn_gateway_group.pod.evpn_domain`, `evpn_gateway_group.remote_domain`, and the remote-domain gateway-group traversal.
 - Generated files are not hand-edited.
 
 ## Repository and Menu Registration
 
-After adding the menu item, load repository configuration artifacts on the validation branch:
+After adding or confirming the menu item, load repository configuration artifacts on the validation branch:
 
 ```bash
 uv run infrahubctl object load repository.yml --branch evpn-gateway-validation
@@ -88,7 +92,7 @@ Expected outcome:
 - The EVPN Services menu contains no direct Gateways item linked to `EvpnGatewayGroup`.
 - No menu item points to `EvpnGateway`.
 - No duplicate automatic `EvpnDomain` or `EvpnGatewayGroup` sidebar entry appears.
-- Opening an EVPN Domain shows the related gateway groups through the domain relationships.
+- Opening an EVPN Domain shows local gateway group children and remote gateway group references through domain relationships.
 
 ## Acceptance Scenario: Domains Without Gateways
 
@@ -100,24 +104,26 @@ Expected outcome:
 - Pods may have no `evpn_domain`.
 - No Border Leaf receives EVPN Gateway hostvars just because it belongs to the Fabric or Pod.
 
-## Acceptance Scenario: Shared Remote CORE Domain
+## Acceptance Scenario: Domain-Owned Gateway Groups
 
 On the validation branch, model this data through the UI or object-loading workflow:
 
 - One Fabric.
-- Three `EvpnDomain` objects in the Fabric: two Pod-local domains and one remote exchange domain named CORE.
+- Three `EvpnDomain` objects in the Fabric: two local domains and one remote exchange domain named CORE.
 - Two Pods, each assigned to exactly one local `evpn_domain`.
-- Two `EvpnGatewayGroup` objects, one per Pod.
+- Two `EvpnGatewayGroup` objects, each created under its parent local `EvpnDomain` through `local_domain`.
+- Each gateway group selects the Pod whose `evpn_domain` equals the group's parent `local_domain`.
 - Both gateway groups point to the CORE domain as `remote_domain`.
-- Each group has one or more `DcimDevice` members with role `border_leaf`, and every member belongs to the group's Pod.
+- Each group has one or more `DcimDevice` members with role `border_leaf`, and every member belongs to the group's selected Pod.
 - Each group has shared all-active Ethernet Segment identifier and RT import values.
 
 Expected outcome:
 
-- Each group derives its local domain from its Pod.
-- No group has a directly selected local domain.
+- Each group local domain is its parent `EvpnDomain`.
+- The selected Pod is context only and does not own the group.
+- Each group validates that `pod.evpn_domain` matches `local_domain`.
 - Each member Border Leaf is considered an EVPN Gateway through group membership.
-- Full-mesh peer intent is derived from the two groups sharing CORE.
+- Full-mesh peer intent is derived from valid groups sharing CORE.
 - No route-server or route-reflector model is selectable or required.
 
 ## Hostvar Generation Scenario
@@ -133,9 +139,9 @@ Expected outcome:
 
 - The grouped Border Leaf hostvars include `l3leaf.nodes[0].evpn_gateway`.
 - The payload uses `remote_peers`, `evpn_l2`, `evpn_l3`, `d_path`, and `all_active_multihoming.evpn_ethernet_segment`.
-- `d_path.local_domain_id` is derived from `EvpnGatewayGroup.pod.evpn_domain.domain_id`.
+- `d_path.local_domain_id` is derived from `EvpnGatewayGroup.local_domain.domain_id`.
 - `d_path.remote_domain_id` is derived from `EvpnGatewayGroup.remote_domain.domain_id`.
-- `remote_peers[].hostname` is derived from other valid gateway-group member Border Leafs sharing the same remote domain.
+- `remote_peers[].hostname` is derived from valid gateway-group member Border Leafs sharing the same remote domain, excluding members of the target device's own `EvpnGatewayGroup`.
 - The payload does not include deprecated `all_active_multihoming.enable_d_path`, `evpn_domain_id_local`, or `evpn_domain_id_remote`.
 - The ungrouped device hostvars do not include `evpn_gateway`.
 - The generator validates the final hostvars with pyAVD before writing `AvdHostvarFile`.
@@ -161,8 +167,10 @@ Use object data to verify generator-side failures:
 
 - Add a regular `leaf` as an `EvpnGatewayGroup.members` device.
 - Add a `border_leaf` member from a different Pod.
-- Create a gateway group for a Pod with no `evpn_domain`.
-- Set the group `remote_domain` to the same domain as the Pod-derived local domain.
+- Create a gateway group whose selected Pod has no `evpn_domain`.
+- Create a gateway group under local Domain A while selecting a Pod assigned to Domain B.
+- Set the group `remote_domain` to the same object as the parent `local_domain`.
+- Set the group `remote_domain` to a domain with the same `domain_id` in the same Fabric.
 - Create a gateway group without members.
 - Model unsupported route-server or route-reflector behavior if any draft field exists.
 - Remove Ethernet Segment identifier or RT import values from an all-active group.
@@ -170,6 +178,7 @@ Use object data to verify generator-side failures:
 Expected outcome:
 
 - Hostvar generation either omits gateway fields for ineligible ungrouped devices or fails before writing hostvars when grouped gateway data is invalid.
+- Error messages include the target device, gateway group, failing field or relationship, expected value, and suggested model correction.
 
 ## Local Quality Gates
 
@@ -180,6 +189,7 @@ uv run pytest tests/unit/test_avd.py
 uv run pytest tests/unit/test_evpn_gateway_schema_contract.py
 uv run pytest tests/unit/test_evpn_gateway_menu_contract.py
 uv run pytest tests/unit/test_generate_avd_device_hostvar.py
+uv run pytest tests/unit/test_generate_avd_device_structured_config.py
 uv run pytest tests/unit/test_hostvar_ordering.py
 uv run invoke lint
 ```
@@ -215,74 +225,75 @@ Expected report:
 - The second run produces no owned-state diff.
 - The report includes branch, generator scenario, snapshot scope, and no-diff result.
 
+## Validation Evidence To Record
+
+Record updated evidence for the Domain-owned model after implementation:
+
+- AVD schema reference version used: `v6.3.0`.
+- Schema check/load branch and result.
+- Protocol regeneration command and result.
+- Hostvar query return-type regeneration command and result.
+- Menu load branch and result.
+- Positive object scenario showing `EvpnDomain.local_gateway_groups` and `EvpnGatewayGroup.local_domain`.
+- Negative object scenarios for Pod/local mismatch and same local/remote domain.
+- Focused unit-test commands and results.
+- `uv run invoke lint` result.
+- Required integration validation report from `$infrahub-run-integration-tests`.
+- Required generator idempotence report from `$infrahub-test-generator-idempotence` when live validation is permitted.
+
+Use this format for required validation evidence:
+
+```markdown
+- Integration validation: `$infrahub-run-integration-tests`
+  - Branch:
+  - Commit:
+  - Result:
+  - Date:
+
+- Generator idempotence validation: `$infrahub-test-generator-idempotence`
+  - Branch:
+  - Commit:
+  - Generator:
+  - Snapshot scope:
+  - Result:
+  - Date:
+```
+
+If live idempotence cannot run, document the approved exception:
+
+```markdown
+- Generator idempotence validation exception:
+  - Reason live validation was not allowed:
+  - Approver:
+  - Alternative repeated-run evidence:
+  - Result:
+```
+
+Any validation evidence captured before the 2026-07-23 clarification that derived local domain from `pod.evpn_domain` is superseded and must not be treated as final evidence for this updated model.
+
 ## Implementation Evidence
 
-Validation performed on 2026-07-22:
+Local and branch-first validation captured on 2026-07-23:
 
-- Confirmed AVD schema references against local AVD `v6.3.0`.
-- Regenerated `src/solution_arista_avd/protocols.py` from `schemas/`.
-- Regenerated `generators/generate_avd_device_inputs_query.py` from `generators/avd_device_hostvar.gql`.
-- Checked and loaded schema on Infrahub branch `evpn-gateway-validation`.
-- Loaded `menus/menu.yml` on `evpn-gateway-validation`; the `Evpn__Domains` menu node was created.
-- Loaded `repository.yml` on `evpn-gateway-validation`.
-- Exported `schema.graphql` from Infrahub with `INFRAHUB_BRANCH=evpn-gateway-validation`.
-- Ran `uv run pytest tests/unit`: 316 passed.
-- Ran `uv run invoke lint`: yamllint, ruff, ruff format check, and mypy passed.
-- Ran docs validation from `docs/`: `npm run typecheck` and `npm run build` passed.
-- Ran remote integration validation against a copied working-tree snapshot in
-  `~/git/infrahub-worktrees/feat-evpn-gateway-snapshot` based on commit
-  `fa9525d188cf28e33dccf374ac4f19eaecdad52c` with local modified and untracked
-  files overlaid. Command: `uv run pytest tests/integration` with
-  `INFRAHUB_TESTING_DOCKER_IMAGE=opsmill/infrahub-solution-arista-avd`,
-  `INFRAHUB_TESTING_IMAGE_VER=1.10.1`,
-  `INFRAHUB_TESTING_TASKMGR_BACKGROUND_SVC_REPLICAS=1`, and
-  `GIT_CONFIG_GLOBAL=/dev/null`. Result: 29 passed, 31 warnings in 1033.03s
-  (0:17:13).
-- Re-ran branch-first quickstart validation on `evpn-gateway-validation`:
-  schema check/load completed with zero validation errors; `repository.yml`,
-  `menus/menu.yml`, and `objects/` loaded successfully; the EVPN Services menu
-  created `Evpn__Domains`; `generate-fabric`, `generate-pod`, and
-  `generate-rack` produced the Fabric-C device topology; transient validation
-  data created three `EvpnDomain` objects (`DC1`, `DC2`, `CORE`), assigned
-  `infrahub-dc1` and `infrahub-dc2` local domains, promoted one border leaf per
-  domain to `border_leaf`, and created `dc1-core` / `dc2-core`
-  `EvpnGatewayGroup` objects sharing the CORE remote domain. Hostvar generation
-  updated `leaf-infrahub-dc1-1-1` and `leaf-infrahub-dc2-1-1`; the ungrouped
-  `leaf-infrahub-dc1-2-1` hostvars were unchanged; structured-config generation
-  for `Fabric-C` found 12 devices with hostvars, validated all 12 inputs,
-  generated facts for 12 devices, and completed with `0 updated, 12 unchanged,
-  0 failed`.
-- Added a regression test for generated GraphQL return-type aliases where
-  `evpn_l2_enabled`, `evpn_l3_enabled`, and `evpn_l3_inter_domain` are exposed
-  on the generated model as `evpn_l_2_enabled`, `evpn_l_3_enabled`, and
-  `evpn_l_3_inter_domain`; `uv run pytest
-  tests/unit/test_generate_avd_device_hostvar.py` passed with 87 tests.
-- Ran required committed-branch integration validation for
-  `feat/evpn-gateway` at commit
-  `3686b19ebf4d23896eb43a1fc7529baaae1d0216` in isolated remote worktree
-  `~/git/infrahub-worktrees/feat-evpn-gateway`. Command:
-  `uv run pytest tests/integration` with
-  `INFRAHUB_TESTING_DOCKER_IMAGE=opsmill/infrahub-solution-arista-avd`,
-  `INFRAHUB_TESTING_IMAGE_VER=1.10.1`,
-  `INFRAHUB_TESTING_TASKMGR_BACKGROUND_SVC_REPLICAS=1`, and
-  `GIT_CONFIG_GLOBAL=/dev/null`. Result: 29 passed, 31 warnings in 1057.83s
-  (0:17:37). This satisfies the required integration validation gate for the
-  committed feature revision.
-- Ran required generator idempotence validation for
-  `generate-avd-device-hostvar` against commit
-  `3686b19ebf4d23896eb43a1fc7529baaae1d0216` in the shared live validation lab.
-  The lab was rebuilt to a known state, the repository default branch was set to
-  `feat/evpn-gateway`, and the task worker-visible `/upstream` commit matched
-  the target commit. Validation branch:
-  `idempotence-hostvar-20260723-0919`. Scenario: generated Fabric-C topology,
-  created `DC1`, `DC2`, and `CORE` `EvpnDomain` objects, assigned local domains
-  to `infrahub-dc1` and `infrahub-dc2`, promoted
-  `leaf-infrahub-dc1-1-1` and `leaf-infrahub-dc2-1-1` to `border_leaf`, and
-  created `dc1-core` / `dc2-core` `EvpnGatewayGroup` objects sharing CORE.
-  Snapshot scope: normalized `AvdArtifact` / `AvdHostvarFile` relationship
-  identity plus parsed hostvar JSON for `leaf-infrahub-dc1-1-1`,
-  `leaf-infrahub-dc2-1-1`, and ungrouped control leaf
-  `leaf-infrahub-dc1-2-1`. Result: first corrected run updated the two grouped
-  border-leaf hostvars with `evpn_l2.enabled=true`,
-  `evpn_l3.enabled=true`, and `evpn_l3.inter_domain=true`; second run reported
-  all three hostvars unchanged and the normalized snapshots matched exactly.
+- AVD schema reference version used: `v6.3.0`.
+- Checklist validation: `requirements.md` passed with 16/16 items complete.
+- Schema validation branch: `evpn-gateway-validation` created successfully.
+- Schema check: `uv run infrahubctl schema check schemas/ --branch evpn-gateway-validation` passed.
+- Schema load: `uv run infrahubctl schema load schemas/ --branch evpn-gateway-validation` loaded 22 schemas successfully.
+- Protocol regeneration: `uv run infrahubctl protocols --schemas schemas --out src/solution_arista_avd/protocols.py` succeeded.
+- GraphQL schema export: `INFRAHUB_DEFAULT_BRANCH=evpn-gateway-validation uv run infrahubctl graphql export-schema --destination schema.graphql` succeeded.
+- Hostvar query return-type regeneration: `uv run infrahubctl graphql generate-return-types generators/avd_device_hostvar.gql --schema schema.graphql` succeeded.
+- Menu load: `uv run infrahubctl menu load menus/ --branch evpn-gateway-validation` succeeded and included `Evpn__Domains`.
+- Repository load: `uv run infrahubctl object load repository.yml --branch evpn-gateway-validation` succeeded.
+- Fabric-C live validation setup: `generate-fabric`, `generate-pod`, and `generate-rack` produced 12 Fabric-C devices on `evpn-gateway-validation`; border rack leaves were updated to `border_leaf` for gateway validation.
+- Positive object scenario: created Fabric-C EVPN Domains DC1 (`65100:1`), DC2 (`65100:2`), and CORE (`65200:100`); assigned `infrahub-dc1` to DC1 and `infrahub-dc2` to DC2; created domain-owned gateway groups `DC1-GW` and `DC2-GW` with CORE as the shared `remote_domain`.
+- Negative object scenarios: a temporary gateway group owned by DC1 while selecting `infrahub-dc2` failed hostvar generation with `selected pod evpn_domain must match gateway group local_domain`; a temporary gateway group with both `local_domain` and `remote_domain` set to DC1 failed hostvar generation with `remote_domain must differ from local_domain`. Temporary invalid groups were deleted after validation and temporary access-leaf role changes were reverted.
+- Hostvar generation: `generate-avd-device-hostvar` succeeded for all four gateway Border Leafs and an ungrouped access leaf. Stored hostvars for `leaf-infrahub-dc1-1-1` included `evpn_gateway` with `d_path.local_domain_id: "65100:1"`, `d_path.remote_domain_id: "65200:100"`, and remote peers `leaf-infrahub-dc2-1-1` and `leaf-infrahub-dc2-1-2`; stored hostvars for ungrouped `leaf-infrahub-dc1-2-1` had no `evpn_gateway` payload.
+- Structured-config generation: `uv run infrahubctl generator generate-avd-device-structured-config name=Fabric-C --branch evpn-gateway-validation` found 12 hostvar files, validated all 12 devices, generated AVD facts for 12 devices, and completed with `0 updated, 12 unchanged, 0 failed`.
+- Gateway group HFID note: Infrahub rejected local-domain peer attributes in `EvpnGatewayGroup.human_friendly_id` because `EvpnDomain` identifiers are unique per Fabric rather than globally unique; display, ordering, uniqueness, query, and generator validation still use `local_domain`.
+- Focused EVPN tests: `uv run pytest tests/unit/test_evpn_gateway_schema_contract.py tests/unit/test_evpn_gateway_menu_contract.py tests/unit/test_evpn_gateway_docs_contract.py tests/unit/test_generate_avd_device_hostvar.py tests/unit/test_hostvar_ordering.py tests/unit/test_generate_avd_device_structured_config.py` passed with 134 tests.
+- Full unit suite: `uv run pytest tests/unit` passed with 323 tests.
+- Lint suite: `uv run invoke lint` passed.
+- Docs typecheck: `npm run typecheck` from `docs/` passed.
+- Docs build: `npm run build` from `docs/` passed.
+- Remote integration validation and live generator idempotence remain pending until this work is available as a committed branch for the remote validation worktree and idempotence is explicitly approved.

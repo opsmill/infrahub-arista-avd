@@ -6,7 +6,7 @@ This contract defines how EVPN Gateway Group intent is exposed to pyAVD by the e
 
 ## GraphQL Contract
 
-Update `generators/avd_device_hostvar.gql` so the target `DcimDevice(name__value: $name)` query can resolve the target device's optional gateway group, the group's local domain through its Pod, the group's remote domain, and the peer candidate groups that share the remote domain.
+Update `generators/avd_device_hostvar.gql` so the target `DcimDevice(name__value: $name)` query can resolve the target device's optional gateway group, the group's parent `local_domain`, the group's selected `pod`, the Pod's `evpn_domain`, the selected `remote_domain`, and peer candidate groups that share the remote domain.
 
 The target device traversal must include at least:
 
@@ -24,6 +24,14 @@ evpn_gateway_group {
     all_active_multihoming_enabled { value }
     ethernet_segment_identifier { value }
     ethernet_segment_rt_import { value }
+    local_domain {
+      node {
+        id
+        display_label
+        domain_id { value }
+        fabric { node { id name { value } } }
+      }
+    }
     pod {
       node {
         id
@@ -60,6 +68,13 @@ evpn_gateway_group {
               id
               display_label
               name { value }
+              local_domain {
+                node {
+                  id
+                  domain_id { value }
+                  fabric { node { id name { value } } }
+                }
+              }
               pod {
                 node {
                   id
@@ -101,12 +116,15 @@ The generator emits EVPN Gateway hostvars only when all are true:
 - The target device role is `border_leaf`.
 - The target device is linked to exactly one `EvpnGatewayGroup`.
 - The target device is a member of that group.
-- The group Pod is present and has one local `evpn_domain`.
-- The group remote domain is present.
-- The local and remote domains differ.
+- The group has one parent `local_domain`.
+- The group has one selected `pod`.
+- The selected Pod has one `evpn_domain`.
+- The selected Pod's `evpn_domain` is the same object as the group's `local_domain`.
+- The group has one selected `remote_domain`.
+- The selected `remote_domain` differs from the group's `local_domain`.
 - The group has one or more member devices.
 - Every member device has role `border_leaf`.
-- Every member device belongs to the group's Pod.
+- Every member device belongs to the group's selected Pod.
 - The group uses `resiliency_model == "all_active_multihoming"`.
 
 For every other target role, including `leaf`, `l2leaf`, `spine`, and `super_spine`, the output must not contain an `evpn_gateway` key unless the device is incorrectly modeled as a gateway-group member, in which case generation must fail with an actionable error.
@@ -115,9 +133,9 @@ For every other target role, including `leaf`, `l2leaf`, `spine`, and `super_spi
 
 For an eligible target device, derive `remote_peers` from the target group's `remote_domain.remote_gateway_groups`:
 
-- Include member devices from gateway groups sharing the same remote domain.
+- Include member devices from valid gateway groups sharing the same remote domain.
+- Validate each candidate group's parent `local_domain`, selected Pod, Pod EVPN Domain, and member devices before using it.
 - Exclude the target device.
-- Exclude or reject candidates whose derived local domain is the same as the target group's derived local domain, because pyAVD EVPN multi-domain gateway peering is inter-domain.
 - Include only candidates with role `border_leaf`.
 - Sort peers by hostname.
 - Do not store peer hostnames, local domain IDs, or remote domain IDs as independent schema fields.
@@ -151,7 +169,7 @@ l3leaf:
           inter_domain: <EvpnGatewayGroup.evpn_l3_inter_domain>
         d_path:
           enabled: <EvpnGatewayGroup.d_path_enabled>
-          local_domain_id: <EvpnGatewayGroup.pod.evpn_domain.domain_id>
+          local_domain_id: <EvpnGatewayGroup.local_domain.domain_id>
           remote_domain_id: <EvpnGatewayGroup.remote_domain.domain_id>
         all_active_multihoming:
           enabled: <EvpnGatewayGroup.all_active_multihoming_enabled>
@@ -184,6 +202,9 @@ Unit tests must cover:
 - `border_leaf` maps to `l3leaf`.
 - A gateway-group member Border Leaf emits `l3leaf.nodes[0].evpn_gateway`.
 - Regular `leaf`, `l2leaf`, `spine`, `super_spine`, and ungrouped `border_leaf` devices do not emit `evpn_gateway`.
+- `d_path.local_domain_id` is derived from `EvpnGatewayGroup.local_domain.domain_id`.
+- Generator validation rejects a selected Pod whose `evpn_domain` does not match `EvpnGatewayGroup.local_domain`.
+- Generator validation rejects a `remote_domain` that equals `EvpnGatewayGroup.local_domain`.
 - Remote peer hostnames are derived from other gateway-group member Border Leafs sharing the remote domain.
 - Peer hostname ordering is deterministic.
 - Generated hostvars pass pyAVD 6.3.0 `validate_inputs()`.

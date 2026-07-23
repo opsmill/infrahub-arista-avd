@@ -128,9 +128,9 @@ A target Border Leaf that is a member of an `EvpnGatewayGroup` emits `l3leaf.nod
 }
 ```
 
-The generator derives the local D-PATH domain ID from `EvpnGatewayGroup.pod.evpn_domain`, the remote D-PATH domain ID from `EvpnGatewayGroup.remote_domain`, and `remote_peers[].hostname` from other valid Border Leaf members in gateway groups that share the same remote EVPN Domain. It does not emit deprecated pyAVD 6.3.0 keys under `all_active_multihoming` such as `enable_d_path`, `evpn_domain_id_local`, or `evpn_domain_id_remote`.
+The generator derives the local D-PATH domain ID from `EvpnGatewayGroup.local_domain`, validates that the selected `EvpnGatewayGroup.pod.evpn_domain` matches that parent domain, derives the remote D-PATH domain ID from `EvpnGatewayGroup.remote_domain`, and derives `remote_peers[].hostname` from other valid Border Leaf members in gateway groups that share the same remote EVPN Domain. It does not emit deprecated pyAVD 6.3.0 keys under `all_active_multihoming` such as `enable_d_path`, `evpn_domain_id_local`, or `evpn_domain_id_remote`.
 
-Gateway group intent fails before writing the hostvar file when the target or any member is not a Border Leaf, the group Pod has no EVPN Domain, the remote domain is missing or conflicts with the local domain, a member is outside the group Pod, or required All-Active Ethernet Segment values are missing.
+Gateway group intent fails before writing the hostvar file when the target or any member is not a Border Leaf, the group has no `local_domain`, the selected Pod has no matching EVPN Domain, the remote domain is missing or conflicts with the local domain, a member is outside the group Pod, or required All-Active Ethernet Segment values are missing. Hostname-only remote peers depend on the structured-config generator aggregating every gateway member's stored hostvars before `pyavd.get_avd_facts()` runs.
 
 ### `l2leaf`
 

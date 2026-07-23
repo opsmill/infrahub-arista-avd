@@ -32,6 +32,11 @@ def _by_name(items: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {item["name"]: item for item in items}
 
 
+def _ordered_names(*field_groups: list[dict[str, Any]]) -> list[str]:
+    fields = [field for group in field_groups for field in group]
+    return [field["name"] for field in sorted(fields, key=lambda field: field["order_weight"])]
+
+
 def test_evpn_gateway_schema_defines_required_nodes() -> None:
     schema = _schema()
     assert schema["version"] == "1.0"
@@ -63,7 +68,11 @@ def test_domain_contract() -> None:
     assert rels["fabric"]["identifier"] == "fabric__evpn_domains"
     assert rels["pods"]["peer"] == "NetworkPod"
     assert rels["pods"]["identifier"] == "evpn_domain__pods"
+    assert rels["local_gateway_groups"]["peer"] == "EvpnGatewayGroup"
+    assert rels["local_gateway_groups"]["kind"] == "Component"
+    assert rels["local_gateway_groups"]["identifier"] == "evpn_domain__local_gateway_groups"
     assert rels["remote_gateway_groups"]["peer"] == "EvpnGatewayGroup"
+    assert rels["remote_gateway_groups"]["kind"] == "Attribute"
     assert rels["remote_gateway_groups"]["identifier"] == "evpn_gateway_group__remote_domain"
     assert list(domain["uniqueness_constraints"]) == [
         ["fabric", "domain_id__value"],
@@ -96,15 +105,22 @@ def test_gateway_contract_and_all_active_only_choice() -> None:
 
     assert attrs["ethernet_segment_identifier"]["kind"] == "Text"
     assert attrs["ethernet_segment_rt_import"]["kind"] == "Text"
-    assert "local_domain" not in rels
+    assert rels["local_domain"]["peer"] == "EvpnDomain"
+    assert rels["local_domain"]["cardinality"] == "one"
+    assert rels["local_domain"]["kind"] == "Parent"
+    assert rels["local_domain"]["optional"] is False
+    assert rels["local_domain"]["identifier"] == "evpn_domain__local_gateway_groups"
     assert rels["pod"]["peer"] == "NetworkPod"
+    assert rels["pod"]["kind"] == "Attribute"
+    assert rels["pod"]["optional"] is False
     assert rels["pod"]["identifier"] == "pod__evpn_gateway_groups"
     assert rels["remote_domain"]["peer"] == "EvpnDomain"
     assert rels["remote_domain"]["identifier"] == "evpn_gateway_group__remote_domain"
     assert rels["members"]["peer"] == "DcimDevice"
     assert rels["members"]["identifier"] == "evpn_gateway_group__members"
     assert rels["members"]["optional"] is False
-    assert gateway["uniqueness_constraints"] == [["pod", "name__value"]]
+    assert gateway["uniqueness_constraints"] == [["local_domain", "pod", "name__value"]]
+    assert [rel["name"] for rel in rels.values() if rel["kind"] == "Parent"] == ["local_domain"]
 
 
 def test_inverse_relationship_extensions_are_additive() -> None:
@@ -125,6 +141,8 @@ def test_inverse_relationship_extensions_are_additive() -> None:
     assert pod_base_rels["evpn_domain"]["optional"] is True
     assert pod_base_rels["evpn_domain"]["identifier"] == "evpn_domain__pods"
     assert pod_rels["evpn_gateway_groups"]["peer"] == "EvpnGatewayGroup"
+    assert pod_rels["evpn_gateway_groups"]["kind"] == "Attribute"
+    assert pod_rels["evpn_gateway_groups"]["optional"] is True
     assert pod_rels["evpn_gateway_groups"]["identifier"] == "pod__evpn_gateway_groups"
 
     assert device_rels["evpn_gateway_group"]["peer"] == "EvpnGatewayGroup"
@@ -146,8 +164,55 @@ def test_display_metadata_is_human_friendly() -> None:
         "pod__name__value",
         "name__value",
     ]
+    assert "local_domain__domain_id__value" not in gateway["human_friendly_id"]
+    assert "local_domain__domain_id__value" in gateway["display_label"]
     assert "pod__name__value" in gateway["display_label"]
     assert "remote_domain__domain_id__value" in gateway["display_label"]
+
+
+def test_gateway_group_identity_uses_relationship_view_fallback_for_local_domain() -> None:
+    gateway = _node(_schema(), "GatewayGroup")
+
+    assert gateway["human_friendly_id"] == ["pod__name__value", "name__value"]
+    assert gateway["order_by"] == [
+        "local_domain__domain_id__value",
+        "pod__name__value",
+        "remote_domain__domain_id__value",
+        "name__value",
+    ]
+    assert "local_domain__domain_id__value" in gateway["display_label"]
+
+
+def test_evpn_gateway_schema_order_weights_are_predictable() -> None:
+    schema = _schema()
+    domain = _node(schema, "Domain")
+    gateway = _node(schema, "GatewayGroup")
+
+    assert _ordered_names(domain["relationships"], domain["attributes"]) == [
+        "fabric",
+        "name",
+        "domain_id",
+        "local_gateway_groups",
+        "remote_gateway_groups",
+        "pods",
+        "description",
+    ]
+    assert _ordered_names(gateway["relationships"], gateway["attributes"]) == [
+        "local_domain",
+        "name",
+        "pod",
+        "remote_domain",
+        "members",
+        "resiliency_model",
+        "evpn_l2_enabled",
+        "evpn_l3_enabled",
+        "evpn_l3_inter_domain",
+        "d_path_enabled",
+        "all_active_multihoming_enabled",
+        "ethernet_segment_identifier",
+        "ethernet_segment_rt_import",
+        "description",
+    ]
 
 
 def test_schema_does_not_add_display_only_local_domain_helpers() -> None:
@@ -167,3 +232,13 @@ def test_border_leaf_dependency_is_present_in_device_role_choices() -> None:
 
     choices = {choice["name"]: choice.get("label") for choice in role_attr["choices"]}
     assert choices["border_leaf"] == "Border Leaf"
+
+
+def test_generated_protocol_and_query_models_expose_local_domain() -> None:
+    protocols_text = Path("src/solution_arista_avd/protocols.py").read_text(encoding="utf-8")
+    query_text = Path("generators/generate_avd_device_inputs_query.py").read_text(encoding="utf-8")
+
+    assert "local_gateway_groups: RelationshipManager[EvpnGatewayGroup]" in protocols_text
+    assert "local_domain: RelationshipAttribute[EvpnDomain]" in protocols_text
+    assert "NodeLocalDomain" in query_text
+    assert "RemoteGatewayGroupsEdgesNodeLocalDomain" in query_text

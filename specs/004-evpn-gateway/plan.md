@@ -1,42 +1,42 @@
 # Implementation Plan: EVPN Gateway Domains
 
-**Branch**: `feat/evpn-gateway` | **Date**: 2026-07-22 | **Spec**: [spec.md](spec.md)
+**Branch**: `feat/evpn-gateway` | **Date**: 2026-07-23 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/004-evpn-gateway/spec.md`
 
 ## Summary
 
-Replace the earlier per-device `EvpnGateway` draft with a schema-first EVPN Domain and EVPN Gateway Group model. A `NetworkFabric` owns zero or more `EvpnDomain` objects, each `NetworkPod` belongs to zero or one local EVPN Domain, and an `EvpnGatewayGroup` defined for one Pod activates gateway behavior for its member `border_leaf` devices. The hostvar generator derives each member Border Leaf's local domain from the group's Pod, remote domain from the group, shared EVPN L2/L3, D-PATH, and all-active Ethernet Segment settings from the group, and a deterministic full-mesh remote peer list from all gateway groups sharing the same remote EVPN Domain. No dedicated `EvpnGateway` node and no dedicated Infrahub check are part of this design.
+Update the EVPN Gateway domain model so `EvpnDomain` owns local `EvpnGatewayGroup` children. `EvpnGatewayGroup.local_domain` becomes the required `Parent` relationship to `EvpnDomain`, `EvpnGatewayGroup.pod` becomes a required non-owning `Attribute` relationship to `NetworkPod`, and `EvpnGatewayGroup.remote_domain` remains a required `Attribute` relationship to another `EvpnDomain`. The hostvar generator must derive local D-PATH data from the group's parent local domain, validate that the selected Pod's `evpn_domain` matches that parent, reject same local/remote domain intent, and continue deriving deterministic EVPN Gateway remote peers from groups sharing the selected remote domain.
 
 ## Technical Context
 
 **Language/Version**: Infrahub schema YAML `version: "1.0"`; Python `>=3.11,<3.14`; pyAVD `v6.3.0` from the repository constraint `pyavd>=6.3.0,<6.4.0`.
 
-**Primary Dependencies**: Infrahub schema engine and repository loader, `infrahub-sdk>=1.19.0`, generated `src/solution_arista_avd/protocols.py`, generated GraphQL return models, existing `generate-avd-device-hostvar` generator, pyAVD `validate_inputs()`, and the `border_leaf` role from PR #74 / `feat/dci-links`.
+**Primary Dependencies**: Infrahub schema engine and repository loader, `infrahub-sdk>=1.19.0`, generated `src/solution_arista_avd/protocols.py`, generated GraphQL return models, existing `generate-avd-device-hostvar` generator, existing structured-config generator, pyAVD `validate_inputs()`, and the `border_leaf` role mapped to pyAVD `l3leaf`.
 
-**Storage**: Infrahub graph data model loaded from `schemas/`; generated hostvars continue to be stored as `AvdHostvarFile` under `AvdArtifact`; no external datastore changes.
+**Storage**: Infrahub graph data model loaded from `schemas/`; generated hostvars remain stored as `AvdHostvarFile` under `AvdArtifact`; no external datastore changes.
 
-**Testing**: Schema contract tests, menu contract tests, hostvar generator tests, hostvar ordering tests, pyAVD input validation tests, a fabric-level pyAVD smoke path that proves hostname-only EVPN Gateway remote peers resolve through aggregated hostvars, schema check/load on an explicit Infrahub branch, protocol regeneration, GraphQL return-type regeneration for `generators/avd_device_hostvar.gql`, `uv run invoke lint`, `$infrahub-run-integration-tests`, and `$infrahub-test-generator-idempotence` for the hostvar generator change when live validation is allowed.
+**Testing**: Schema contract tests, menu contract tests, hostvar generator tests, structured-config peer-resolution tests, hostvar ordering tests, pyAVD input validation tests, schema check/load on an explicit Infrahub branch, protocol regeneration, GraphQL return-type regeneration for `generators/avd_device_hostvar.gql`, `uv run invoke lint`, `$infrahub-run-integration-tests`, and `$infrahub-test-generator-idempotence` for the hostvar generator change when live validation is allowed.
 
 **Target Platform**: Infrahub repository running through branch-based schema validation and the existing AVD hostvar/structured-config pipeline.
 
-**Project Type**: Infrahub reference-design repository with schema-defined data model, Python generators, GraphQL queries, custom menus, and Docusaurus documentation.
+**Project Type**: Infrahub reference-design repository with schema-defined data model, Python generators, GraphQL queries, custom menus, object data, tests, and Docusaurus documentation.
 
-**Performance Goals**: Not throughput-bound. Full-mesh peer derivation must be deterministic, sorted by peer hostname, and derived from the target device's gateway group plus that group's remote-domain inverse relationships without broad per-device follow-up API calls.
+**Performance Goals**: Not throughput-bound. Peer derivation must be deterministic, sorted by peer hostname, and resolved from the gateway group's `remote_domain.remote_gateway_groups` traversal without broad per-device follow-up API calls.
 
-**Constraints**: Additive schema migration for existing Fabric, Pod, and Device data; remove/replace any earlier `EvpnGateway` node draft; reuse `border_leaf` exactly as defined by PR #74 and map it to pyAVD `l3leaf`; no route-server or route-reflector remote-domain model; no manually modeled peer objects; hostname-only remote peers require every gateway member hostvar to exist before structured-config generation; one remote EVPN Domain per gateway group; only `all_active_multihoming` is actionable in this phase; gateway group identity/display must not add computed or denormalized helper attributes solely to expose the Pod-derived local EVPN Domain; all relationship peers use full kinds; bidirectional relationships use matching identifiers; custom-menu nodes use `include_in_menu: false`.
+**Constraints**: `EvpnGatewayGroup` may have only one `Parent` relationship, and that parent must be `local_domain -> EvpnDomain`; `pod` must not own gateway groups; `NetworkPod.evpn_gateway_groups` must be a non-owning inverse relationship; `pod.evpn_domain` must match `local_domain`; `remote_domain` must differ from `local_domain`; all relationship peers use full kinds; bidirectional relationships use matching identifiers; uniqueness constraints use `__value` for attributes and bare relationship names for relationships; new custom-menu schema nodes use `include_in_menu: false`; no dedicated `EvpnGateway` node; no dedicated Infrahub check; no route-server or route-reflector model; no manually modeled peer objects; hostname-only remote peers require all gateway member hostvars to exist before structured-config generation; only `all_active_multihoming` is actionable in this phase.
 
-**Scale/Scope**: Two concrete EVPN nodes, three existing-node relationship extensions, one existing generator query/class extension, generated models/protocols, one EVPN Services Domains menu entry, focused tests, and related developer documentation. Dedicated Infrahub checks, service-portal workflows, object seed data, route-server/route-reflector behavior, a direct EVPN Gateway Groups menu entry, and non-all-active resiliency models are out of scope.
+**Scale/Scope**: Update the EVPN gateway schema, generated protocols, hostvar GraphQL query and generated model, hostvar generator validation, menu/domain relationship documentation, tests, quickstart, and validation evidence expectations. Existing object data, tests, and docs that still assume Pod-owned gateway groups must be corrected. Service-portal workflows, new generator definitions, dedicated checks, route-server/route-reflector behavior, a direct EVPN Gateway Groups menu entry, and non-all-active resiliency models are out of scope.
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- **Schema-Driven Architecture**: PASS. The plan defines `EvpnDomain`, `EvpnGatewayGroup`, and required extensions before generators, menus, or docs consume them.
-- **Idempotent Operations**: PASS. The feature extends the existing hostvar generator and stored-file update path. Generator changes require deterministic ordering and repeated-run validation; no new mutable generator target is introduced.
-- **Type Safety**: PASS. Schema changes require regenerated protocols, and GraphQL query changes require regenerated `*_query.py` models before production code consumes new fields.
+- **Schema-Driven Architecture**: PASS. The plan changes schema ownership first and requires protocols/query models to be regenerated before Python code consumes the changed relationships.
+- **Idempotent Operations**: PASS. The feature extends existing generator behavior and preserves deterministic hostvar output; repeated-run validation is required for the changed hostvar generator.
+- **Type Safety**: PASS. The plan requires regenerated `protocols.py` and regenerated GraphQL return models before production code uses `local_domain`.
 - **Test-Required Quality**: PASS. The plan includes schema, generator, pyAVD, unit, lint, integration, and generator idempotence validation.
-- **Convention-Based Structure**: PASS. Planned files follow existing `schemas/evpn/`, `generators/`, `menus/`, `tests/unit/`, and `docs/docs/` conventions.
+- **Convention-Based Structure**: PASS. Planned files follow existing `schemas/evpn/`, `generators/`, `menus/`, `tests/unit/`, `objects/`, and `docs/docs/` conventions.
 
 No constitution violations require complexity justification.
 
@@ -64,14 +64,14 @@ specs/004-evpn-gateway/
 ```text
 schemas/
 +-- evpn/
-|   +-- evpn_services.yml
-|   +-- evpn_gateway.yml          # replace stale EvpnGateway draft with EvpnGatewayGroup model
-+-- dcim_extensions.yml           # dependency source for border_leaf from feat/dci-links
+|   +-- evpn_gateway.yml
++-- dcim_extensions.yml
 
 generators/
 +-- avd_device_hostvar.gql
 +-- generate_avd_device_hostvar.py
 +-- generate_avd_device_inputs_query.py
++-- generate_avd_device_structured_config.py
 
 src/solution_arista_avd/
 +-- avd.py
@@ -80,12 +80,17 @@ src/solution_arista_avd/
 menus/
 +-- menu.yml
 
+objects/
++-- *.yml
+
 tests/
 +-- unit/
     +-- test_avd.py
     +-- test_evpn_gateway_schema_contract.py
     +-- test_evpn_gateway_menu_contract.py
+    +-- test_evpn_gateway_docs_contract.py
     +-- test_generate_avd_device_hostvar.py
+    +-- test_generate_avd_device_structured_config.py
     +-- test_hostvar_ordering.py
 
 docs/docs/
@@ -98,7 +103,7 @@ docs/docs/
         +-- role-mapping.md
 ```
 
-**Structure Decision**: Implement the model in `schemas/evpn/evpn_gateway.yml` to keep EVPN gateway-domain intent next to the existing EVPN service schemas, but replace the earlier `EvpnGateway` node with `EvpnGatewayGroup`. Extend the existing per-device hostvar generator instead of adding a new generator definition. Use schema constraints plus generator-side validation instead of adding an Infrahub check. Add one custom menu item for `EvpnDomain` under EVPN Services and keep `EvpnGatewayGroup` discoverable from EVPN Domain relationship views rather than from its own menu entry.
+**Structure Decision**: Keep the model in `schemas/evpn/evpn_gateway.yml`, but change ownership from Pod-first to Domain-first. Extend the existing per-device hostvar generator instead of adding a generator definition. Use schema constraints plus generator-side validation instead of a dedicated Infrahub check. Keep one custom EVPN Services Domains menu entry for `EvpnDomain`; `EvpnGatewayGroup` remains discoverable from EVPN Domain local/remote relationship views rather than from its own sidebar item.
 
 ## Complexity Tracking
 
@@ -121,7 +126,7 @@ Completed artifacts:
 
 ## Constitution Check Re-Evaluation
 
-- **Schema-Driven Architecture**: PASS. Design artifacts define schema nodes and extensions before generator consumers and menu exposure.
+- **Schema-Driven Architecture**: PASS. Design artifacts define the Domain-owned relationship model before generator consumers and menu exposure.
 - **Idempotent Operations**: PASS. Hostvar generation remains in the existing stored-artifact flow and must be validated with repeated-run/idempotence checks.
 - **Type Safety**: PASS. The contracts require protocol and GraphQL return-type regeneration before code changes are considered complete.
 - **Test-Required Quality**: PASS. Quickstart includes schema validation, generator-side validation, pyAVD/unit validation, lint, integration validation, and generator idempotence validation.

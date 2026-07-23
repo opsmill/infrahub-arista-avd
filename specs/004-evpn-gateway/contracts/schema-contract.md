@@ -6,7 +6,7 @@ This contract defines the Infrahub schema interface for EVPN Domain and EVPN Gat
 
 ## File Contract
 
-Add or replace the schema file under `schemas/evpn/`:
+Update the schema file under `schemas/evpn/`:
 
 ```text
 schemas/evpn/evpn_gateway.yml
@@ -24,13 +24,13 @@ Relationships added to existing nodes must use `extensions.nodes` with matching 
 
 ## Dependency Contract
 
-The implementation must reuse the `border_leaf` device role from PR #74 / branch `feat/dci-links`:
+The implementation must reuse the `border_leaf` device role:
 
 - `DcimDevice.role` includes `border_leaf` with label `Border Leaf`.
 - `ROLE_TO_AVD_TYPE["border_leaf"] == "l3leaf"`.
 - Hostvar code treats `border_leaf` as part of the L3 leaf family for uplinks, tenants, and gateway generation.
 
-If those changes are not present on `feat/evpn-gateway`, they must be merged/rebased or imported before gateway-group implementation proceeds. Do not model gateway behavior on regular `leaf` as a substitute.
+Do not model gateway behavior on regular `leaf` as a substitute.
 
 ## Kind Contract
 
@@ -39,7 +39,7 @@ The implementation must expose these concrete kinds:
 | Kind | Namespace | Include In Menu | Purpose |
 |------|-----------|-----------------|---------|
 | `EvpnDomain` | `Evpn` | `false` | EVPN Domain owned by one Fabric. |
-| `EvpnGatewayGroup` | `Evpn` | `false` | Shared EVPN Gateway configuration and member Border Leaf group for one Pod. |
+| `EvpnGatewayGroup` | `Evpn` | `false` | Shared EVPN Gateway configuration and member Border Leaf group owned by one local domain. |
 
 No new generic is required for this cycle. The schema must not define `EvpnGateway`.
 
@@ -51,14 +51,16 @@ No new generic is required for this cycle. The schema must not define `EvpnGatew
 | `EvpnDomain` | `fabric` | `NetworkFabric` | one | Yes | Parent | `fabric__evpn_domains` |
 | `NetworkPod` | `evpn_domain` | `EvpnDomain` | one | No | Attribute | `evpn_domain__pods` |
 | `EvpnDomain` | `pods` | `NetworkPod` | many | No | Attribute | `evpn_domain__pods` |
-| `NetworkPod` | `evpn_gateway_groups` | `EvpnGatewayGroup` | many | No | Component | `pod__evpn_gateway_groups` |
-| `EvpnGatewayGroup` | `pod` | `NetworkPod` | one | Yes | Parent | `pod__evpn_gateway_groups` |
+| `EvpnDomain` | `local_gateway_groups` | `EvpnGatewayGroup` | many | No | Component | `evpn_domain__local_gateway_groups` |
+| `EvpnGatewayGroup` | `local_domain` | `EvpnDomain` | one | Yes | Parent | `evpn_domain__local_gateway_groups` |
+| `NetworkPod` | `evpn_gateway_groups` | `EvpnGatewayGroup` | many | No | Attribute | `pod__evpn_gateway_groups` |
+| `EvpnGatewayGroup` | `pod` | `NetworkPod` | one | Yes | Attribute | `pod__evpn_gateway_groups` |
 | `EvpnGatewayGroup` | `remote_domain` | `EvpnDomain` | one | Yes | Attribute | `evpn_gateway_group__remote_domain` |
 | `EvpnDomain` | `remote_gateway_groups` | `EvpnGatewayGroup` | many | No | Attribute | `evpn_gateway_group__remote_domain` |
 | `EvpnGatewayGroup` | `members` | `DcimDevice` | many | Yes | Attribute | `evpn_gateway_group__members` |
 | `DcimDevice` | `evpn_gateway_group` | `EvpnGatewayGroup` | one | No | Attribute | `evpn_gateway_group__members` |
 
-`EvpnGatewayGroup` must not define a `local_domain` relationship. The local domain is derived from `EvpnGatewayGroup.pod.evpn_domain`.
+`EvpnGatewayGroup.local_domain` is the only `Parent` relationship on the group. `EvpnGatewayGroup.pod` must not be a `Parent` relationship, and `NetworkPod.evpn_gateway_groups` must not be a `Component` relationship.
 
 ## Attribute Contract
 
@@ -101,7 +103,7 @@ No `mlag`, `anycast_ip`, route-server, or route-reflector choice is allowed.
 
 - `EvpnDomain`: `[fabric, domain_id__value]`
 - `EvpnDomain`: `[fabric, name__value]`
-- `EvpnGatewayGroup`: `[pod, name__value]`
+- `EvpnGatewayGroup`: `[local_domain, pod, name__value]`
 
 Attribute references in uniqueness constraints must use `__value`; relationship references must be bare relationship names.
 
@@ -116,22 +118,24 @@ Both new nodes must define:
 - `display_label`
 - `order_by`
 
-`EvpnDomain` identity must include Fabric and domain ID. `EvpnGatewayGroup` identity and display must use schema-valid native fields such as Pod, remote EVPN Domain, and group name. It may include the Pod-derived local EVPN Domain only through a direct `pod.evpn_domain` relationship traversal if Infrahub accepts that path in `human_friendly_id` or `display_label`.
+`EvpnDomain` identity must include Fabric and domain ID. `EvpnGatewayGroup` display and ordering must use schema-valid native fields such as parent `local_domain`, selected `pod`, selected `remote_domain`, and group `name`. `EvpnGatewayGroup.human_friendly_id` uses `pod__name__value` and `name__value` because Infrahub rejects local-domain peer attributes that are only unique per Fabric.
 
-The implementation must not add computed or denormalized helper attributes solely to show the Pod-derived local EVPN Domain in `EvpnGatewayGroup` identity/display. Examples to avoid for this purpose include a Pod-level local-domain ID helper or a domain fabric-name helper used only to make display traversal work.
+The implementation must not add computed or denormalized helper attributes solely to show local EVPN Domain data in `EvpnGatewayGroup` identity/display.
 
 ## Migration Contract
 
-- Schema additions must be additive for existing Fabric, Pod, and Device data.
-- Relationships added to `NetworkFabric`, `NetworkPod`, and `DcimDevice` must be optional on existing objects.
-- Required attributes belong only to new `EvpnDomain` and `EvpnGatewayGroup` objects.
+- Schema additions to `NetworkFabric`, `NetworkPod`, and `DcimDevice` must remain optional for existing Fabric, Pod, and Device objects.
+- Required attributes belong only to `EvpnDomain` and `EvpnGatewayGroup` objects.
+- Changing an existing draft `EvpnGatewayGroup.pod` Parent relationship to `EvpnGatewayGroup.local_domain` Parent is a relationship ownership migration. Validate it on an explicit Infrahub branch.
+- Existing draft gateway groups can be migrated only when the selected Pod has an `evpn_domain` and that domain can become the group's parent `local_domain`.
+- Existing draft gateway groups whose selected Pod lacks an EVPN Domain, whose selected Pod does not match the intended local domain, or whose remote domain equals the local domain must be reported as invalid before gateway hostvars are accepted.
 - If an earlier draft introduced `EvpnGateway`, remove or replace it with `EvpnGatewayGroup` before implementation proceeds.
 - After schema changes, regenerate `src/solution_arista_avd/protocols.py`; do not hand-edit generated protocol code.
 
 ## Non-Goals
 
 - No `EvpnGateway` node.
-- No new device role beyond the PR #74 `border_leaf` dependency.
+- No new device role beyond `border_leaf`.
 - No MLAG, Anycast IP, route-server, or route-reflector gateway model.
 - No dedicated Infrahub check or proposed-change validation implementation.
 - No direct `CoreArtifactTarget` or new generator target on `EvpnDomain` or `EvpnGatewayGroup`.

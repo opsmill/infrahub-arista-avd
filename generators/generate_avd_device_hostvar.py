@@ -427,9 +427,37 @@ def _gateway_members(gateway: object | None) -> list[object]:
     return [_node(edge) for edge in _edges(_field(gateway, "members")) if _node(edge) is not None]
 
 
-def _pod_local_domain(gateway: object | None) -> object | None:
-    pod = _relationship_node(gateway, "pod")
-    return _relationship_node(pod, "evpn_domain")
+def _gateway_local_domain(gateway: object | None) -> object | None:
+    return _relationship_node(gateway, "local_domain")
+
+
+def _validate_gateway_pod_domain(
+    *,
+    gateway: object,
+    hostname: str,
+    group_pod: object,
+    local_domain: object,
+    local_domain_id: str,
+) -> None:
+    pod_domain = _relationship_node(group_pod, "evpn_domain")
+    if pod_domain is None:
+        raise _gateway_error(gateway, hostname, "selected pod must have an evpn_domain matching local_domain")
+    pod_domain_id = _domain_id(pod_domain)
+    if not pod_domain_id:
+        raise _gateway_error(gateway, hostname, "selected pod evpn_domain.domain_id is missing")
+    if _object_id(pod_domain) != _object_id(local_domain):
+        raise _gateway_error(
+            gateway,
+            hostname,
+            "selected pod evpn_domain must match gateway group local_domain; "
+            f"expected {_display_name(local_domain)}, got {_display_name(pod_domain)}",
+        )
+    if pod_domain_id != local_domain_id:
+        raise _gateway_error(
+            gateway,
+            hostname,
+            "selected pod evpn_domain.domain_id must match gateway group local_domain.domain_id",
+        )
 
 
 def _validate_gateway_group_context(gateway: object, hostname: str) -> EvpnGatewayContext:
@@ -440,12 +468,19 @@ def _validate_gateway_group_context(gateway: object, hostname: str) -> EvpnGatew
     if not group_pod_id:
         raise _gateway_error(gateway, hostname, "relationship 'pod' is missing an id")
 
-    local_domain = _pod_local_domain(gateway)
+    local_domain = _gateway_local_domain(gateway)
     if local_domain is None:
-        raise _gateway_error(gateway, hostname, "gateway group pod must have an evpn_domain")
+        raise _gateway_error(gateway, hostname, "relationship 'local_domain' is missing")
     local_domain_id = _domain_id(local_domain)
     if not local_domain_id:
-        raise _gateway_error(gateway, hostname, "pod.evpn_domain.domain_id is missing")
+        raise _gateway_error(gateway, hostname, "local_domain.domain_id is missing")
+    _validate_gateway_pod_domain(
+        gateway=gateway,
+        hostname=hostname,
+        group_pod=group_pod,
+        local_domain=local_domain,
+        local_domain_id=local_domain_id,
+    )
 
     remote_domain = _relationship_node(gateway, "remote_domain")
     if remote_domain is None:
@@ -454,13 +489,11 @@ def _validate_gateway_group_context(gateway: object, hostname: str) -> EvpnGatew
     if not remote_domain_id:
         raise _gateway_error(gateway, hostname, "remote_domain.domain_id is missing")
     if _object_id(remote_domain) == _object_id(local_domain):
-        raise _gateway_error(gateway, hostname, "remote_domain must differ from the pod's local evpn_domain")
+        raise _gateway_error(gateway, hostname, "remote_domain must differ from local_domain")
     if remote_domain_id == local_domain_id and _fabric_id(remote_domain) == _fabric_id(local_domain):
         raise _gateway_error(gateway, hostname, "remote_domain domain_id must differ from the local domain_id")
     if _fabric_id(remote_domain) and _fabric_id(local_domain) and _fabric_id(remote_domain) != _fabric_id(local_domain):
-        raise _gateway_error(
-            gateway, hostname, "remote_domain must belong to the same fabric as the pod's local domain"
-        )
+        raise _gateway_error(gateway, hostname, "remote_domain must belong to the same fabric as local_domain")
 
     return EvpnGatewayContext(
         group_pod_id=group_pod_id,
@@ -507,14 +540,19 @@ def _validate_peer_group_local_domain(
     hostname: str,
     context: EvpnGatewayContext,
 ) -> str:
-    peer_local_domain = _pod_local_domain(peer_group)
+    peer_local_domain = _gateway_local_domain(peer_group)
     if peer_local_domain is None:
-        raise _gateway_error(gateway, hostname, f"peer group '{_display_name(peer_group)}' pod has no evpn_domain")
+        raise _gateway_error(gateway, hostname, f"peer group '{_display_name(peer_group)}' has no local_domain")
+    peer_local_domain_id = _domain_id(peer_local_domain)
+    if not peer_local_domain_id:
+        raise _gateway_error(
+            gateway, hostname, f"peer group '{_display_name(peer_group)}' local_domain.domain_id is missing"
+        )
     if _object_id(peer_local_domain) == _object_id(context.local_domain):
         raise _gateway_error(
             gateway, hostname, f"peer group '{_display_name(peer_group)}' uses the same local EVPN domain"
         )
-    if _domain_id(peer_local_domain) == context.local_domain_id and _fabric_id(peer_local_domain) == _fabric_id(
+    if peer_local_domain_id == context.local_domain_id and _fabric_id(peer_local_domain) == _fabric_id(
         context.local_domain
     ):
         raise _gateway_error(
@@ -525,6 +563,13 @@ def _validate_peer_group_local_domain(
     peer_pod_id = _object_id(peer_pod)
     if not peer_pod_id:
         raise _gateway_error(gateway, hostname, f"peer group '{_display_name(peer_group)}' has no pod")
+    _validate_gateway_pod_domain(
+        gateway=gateway,
+        hostname=hostname,
+        group_pod=peer_pod,
+        local_domain=peer_local_domain,
+        local_domain_id=peer_local_domain_id,
+    )
     return peer_pod_id
 
 

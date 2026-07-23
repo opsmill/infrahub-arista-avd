@@ -42,6 +42,25 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             ethernet_segment_rt_import {
               value
             }
+            local_domain {
+              node {
+                __typename
+                id
+                display_label
+                domain_id {
+                  value
+                }
+                fabric {
+                  node {
+                    __typename
+                    id
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
+            }
             pod {
               node {
                 __typename
@@ -118,6 +137,25 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                       display_label
                       name {
                         value
+                      }
+                      local_domain {
+                        node {
+                          __typename
+                          id
+                          display_label
+                          domain_id {
+                            value
+                          }
+                          fabric {
+                            node {
+                              __typename
+                              id
+                              name {
+                                value
+                              }
+                            }
+                          }
+                        }
                       }
                       pod {
                         node {

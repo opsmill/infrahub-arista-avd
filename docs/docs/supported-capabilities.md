@@ -35,7 +35,7 @@ Some boundaries below are marked *confirm scope* and are being finalized with th
 |------------|:------:|-------|
 | Model VLANs and L2 domains | ✅ | Defined in the source of truth and rendered into config. |
 | Fabric-level EVPN settings | ✅ | Fabric EVPN overlay configuration. Exact EVPN depth is being confirmed. |
-| EVPN Multi-Domain Gateway on Border Leafs | 🟡 | Models Fabric-owned `EvpnDomain` objects and Pod-scoped `EvpnGatewayGroup` membership for `border_leaf` devices, then emits pyAVD EVPN Gateway hostvars for All-Active Multihoming only. MLAG, Anycast IP, route-server, and route-reflector gateway models are not included. |
+| EVPN Multi-Domain Gateway on Border Leafs | 🟡 | Models Fabric-owned `EvpnDomain` objects with domain-owned local `EvpnGatewayGroup` children for `border_leaf` devices, then emits pyAVD EVPN Gateway hostvars for All-Active Multihoming only. Pods remain selected context and must point at the group's local domain. MLAG, Anycast IP, route-server, and route-reflector gateway models are not included. |
 | EVPN L3 VRFs | 🟡 | Wired into the PyAVD hostvar generator and produce config. The maintainers flagged "we don't do VRF and route targets" — **confirm** whether the exclusion is VRF-lite, route-leaking, or explicit route targets. |
 | MLAG (domain + peer) | 🟡 | Modeled and wired into hostvars; **confirm** supported scope. |
 | Server LAG | 🟡 | Modeled and wired into hostvars; **confirm** supported scope. |

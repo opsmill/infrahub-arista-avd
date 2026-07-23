@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -299,6 +300,7 @@ def _pod(pod_id: str, name: str, evpn_domain: object | None) -> SimpleNamespace:
 def _gateway_group(
     group_id: str,
     name: str,
+    local_domain: object | None,
     pod: object | None,
     remote_domain: object | None,
     members: list[object],
@@ -315,6 +317,7 @@ def _gateway_group(
         all_active_multihoming_enabled=_attr(True),
         ethernet_segment_identifier=_attr("0000:0000:0000:0001:0001"),
         ethernet_segment_rt_import=_attr("00:00:00:00:00:01"),
+        local_domain=_rel_node(local_domain),
         pod=_rel_node(pod),
         remote_domain=_rel_node(remote_domain),
         members=_rel_edges(members),
@@ -335,8 +338,8 @@ def _gateway_group_topology(
         _gateway_device(f"device-peer-{index}", peer_name, "border_leaf", peer_pod)
         for index, peer_name in enumerate(peer_names)
     ]
-    local_group = _gateway_group("gateway-group-a", "gateway-group-a", local_pod, core_domain, [target])
-    peer_group = _gateway_group("gateway-group-b", "gateway-group-b", peer_pod, core_domain, peer_members)
+    local_group = _gateway_group("gateway-group-a", "gateway-group-a", local_domain, local_pod, core_domain, [target])
+    peer_group = _gateway_group("gateway-group-b", "gateway-group-b", peer_domain, peer_pod, core_domain, peer_members)
     core_domain.remote_gateway_groups = _rel_edges([local_group, peer_group])
     target.evpn_gateway_group = _rel_node(local_group)
     return target, local_group
@@ -386,6 +389,16 @@ def test_gateway_group_generated_query_alias_booleans_are_preserved() -> None:
     assert payload["evpn_l3"]["inter_domain"] is True
 
 
+def test_gateway_query_model_exposes_domain_owned_relationships() -> None:
+    query_text = Path("generators/avd_device_hostvar.gql").read_text(encoding="utf-8")
+    model_text = Path("generators/generate_avd_device_inputs_query.py").read_text(encoding="utf-8")
+
+    assert "local_domain" in query_text
+    assert "remote_gateway_groups" in query_text
+    assert "NodeLocalDomain" in model_text
+    assert "RemoteGatewayGroupsEdgesNodeLocalDomain" in model_text
+
+
 @pytest.mark.parametrize("role", ["leaf", "l2leaf", "spine", "super_spine"])
 def test_ungrouped_non_gateway_roles_omit_evpn_gateway_payload(role: str) -> None:
     target, _gateway_node = _gateway_group_topology(target_role=role)
@@ -428,10 +441,20 @@ def test_gateway_group_field_validation_errors_are_actionable(field: str, value:
 @pytest.mark.parametrize(
     ("mutator", "match"),
     [
+        (lambda _target, gateway: setattr(gateway, "local_domain", _rel_node(None)), "local_domain"),
+        (
+            lambda _target, gateway: setattr(
+                gateway,
+                "local_domain",
+                _rel_node(_domain("65100:99", _fabric(), obj_id="domain-unmatched")),
+            ),
+            "must match gateway group local_domain",
+        ),
         (lambda _target, gateway: setattr(gateway.pod.node, "evpn_domain", _rel_node(None)), "evpn_domain"),
+        (lambda _target, gateway: setattr(gateway, "pod", _rel_node(None)), "relationship 'pod'"),
         (lambda _target, gateway: setattr(gateway, "remote_domain", _rel_node(None)), "remote_domain"),
         (
-            lambda _target, gateway: setattr(gateway, "remote_domain", _rel_node(gateway.pod.node.evpn_domain.node)),
+            lambda _target, gateway: setattr(gateway, "remote_domain", _rel_node(gateway.local_domain.node)),
             "must differ",
         ),
         (lambda _target, gateway: setattr(gateway, "members", _rel_edges([])), "at least one"),

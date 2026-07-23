@@ -1,7 +1,7 @@
 # Specification Quality Checklist: EVPN Gateway Domains
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-07-22
+**Created**: 2026-07-23
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,9 +31,8 @@
 
 ## Notes
 
-- Validation iteration 1 passed after updating the active spec for the new EVPN Domain and EVPN Gateway Group model.
-- The spec now explicitly rejects a dedicated per-device `EvpnGateway` object. A Border Leaf becomes an EVPN Gateway only through EVPN Gateway Group membership.
-- The spec captures Fabric zero-or-more EVPN Domains, Pod zero-or-one EVPN Domain membership, local and remote EVPN Domains per gateway group, shared group configuration, full-mesh peering for gateways sharing a remote domain, and route server or route reflector exclusion.
-- Conditional visibility for all-active settings is captured as required where available, with a clear fallback when UI-level conditional visibility is not available.
-- Validation iteration 2 passed after tightening Pod membership: each EVPN Gateway Group is defined for exactly one Pod, all member devices must belong to that Pod, and the group's local EVPN Domain is derived from that Pod's EVPN Domain.
-- Validation iteration 3 passed after clarifying EVPN Services menu navigation: the menu exposes EVPN Domains through a Domains tab, does not expose EVPN Gateway Groups directly, and relies on Domain detail relationships for gateway group discovery.
+- Validation iteration 1 passed after updating the active 004 spec for the EVPN Domain-owned gateway group model.
+- The spec now states that `EvpnGatewayGroup.local_domain` is the required Parent relationship to `EvpnDomain`.
+- The spec now states that `EvpnGatewayGroup.pod` is a required Attribute relationship to `NetworkPod`, and the selected Pod must have the same `evpn_domain` as the group's parent `local_domain`.
+- The spec now states that `EvpnGatewayGroup.remote_domain` remains a required Attribute relationship to another `EvpnDomain` and must differ from `local_domain`.
+- The spec keeps the broader EVPN Gateway scope covering schema, generated protocols, hostvar query/model, generator validation, menu/domain relationship docs, tests, quickstart, and validation evidence.

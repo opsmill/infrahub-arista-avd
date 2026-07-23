@@ -192,6 +192,7 @@ class EvpnDomain(CoreNode):
     domain_id: String
     name: String
     fabric: RelationshipAttribute[NetworkFabric]
+    local_gateway_groups: RelationshipManager[EvpnGatewayGroup]
     pods: RelationshipManager[NetworkPod]
     remote_gateway_groups: RelationshipManager[EvpnGatewayGroup]
 
@@ -232,6 +233,7 @@ class EvpnGatewayGroup(CoreNode):
     evpn_l3_inter_domain: Boolean
     name: String
     resiliency_model: Dropdown
+    local_domain: RelationshipAttribute[EvpnDomain]
     members: RelationshipManager[DcimDevice]
     pod: RelationshipAttribute[NetworkPod]
     remote_domain: RelationshipAttribute[EvpnDomain]

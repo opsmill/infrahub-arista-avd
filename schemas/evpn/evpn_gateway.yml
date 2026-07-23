@@ -52,6 +52,15 @@ nodes:
         optional: true
         identifier: "evpn_domain__pods"
         description: "Pods that use this EVPN domain as their local domain"
+        order_weight: 1500
+      - name: local_gateway_groups
+        label: Local Gateway Groups
+        peer: EvpnGatewayGroup
+        cardinality: many
+        kind: Component
+        optional: true
+        identifier: "evpn_domain__local_gateway_groups"
+        description: "Gateway groups owned by this local EVPN domain"
         order_weight: 1300
       - name: remote_gateway_groups
         label: Remote Gateway Groups
@@ -73,12 +82,15 @@ nodes:
       - pod__name__value
       - name__value
     order_by:
+      - local_domain__domain_id__value
       - pod__name__value
       - remote_domain__domain_id__value
       - name__value
-    display_label: "{{ pod__name__value }} -> {{ remote_domain__domain_id__value }} / {{ name__value }}"
+    display_label: >-
+      {{ local_domain__domain_id__value }} / {{ pod__name__value }} ->
+      {{ remote_domain__domain_id__value }} / {{ name__value }}
     uniqueness_constraints:
-      - [pod, name__value]
+      - [local_domain, pod, name__value]
     attributes:
       - name: name
         kind: Text
@@ -89,7 +101,7 @@ nodes:
         kind: Dropdown
         default_value: all_active_multihoming
         description: "Supported EVPN Gateway resiliency model"
-        order_weight: 1200
+        order_weight: 1400
         choices:
           - name: all_active_multihoming
             label: All-Active Multihoming
@@ -98,55 +110,64 @@ nodes:
         kind: Boolean
         default_value: true
         description: "Maps to pyAVD evpn_gateway.evpn_l2.enabled"
-        order_weight: 1300
+        order_weight: 1500
       - name: evpn_l3_enabled
         label: EVPN L3 Enabled
         kind: Boolean
         default_value: true
         description: "Maps to pyAVD evpn_gateway.evpn_l3.enabled"
-        order_weight: 1400
+        order_weight: 1600
       - name: evpn_l3_inter_domain
         label: EVPN L3 Inter-Domain
         kind: Boolean
         default_value: true
         description: "Maps to pyAVD evpn_gateway.evpn_l3.inter_domain"
-        order_weight: 1500
+        order_weight: 1700
       - name: d_path_enabled
         label: D-PATH Enabled
         kind: Boolean
         default_value: true
         description: "Maps to pyAVD evpn_gateway.d_path.enabled"
-        order_weight: 1600
+        order_weight: 1800
       - name: all_active_multihoming_enabled
         label: All-Active Multihoming Enabled
         kind: Boolean
         default_value: true
         description: "Maps to pyAVD evpn_gateway.all_active_multihoming.enabled"
-        order_weight: 1700
+        order_weight: 1900
       - name: ethernet_segment_identifier
         label: Ethernet Segment Identifier
         kind: Text
         description: "EVPN Ethernet Segment Identifier in Type 1 format for all-active multihoming"
-        order_weight: 1800
+        order_weight: 2000
       - name: ethernet_segment_rt_import
         label: Ethernet Segment RT Import
         kind: Text
         description: "Low-order 6 bytes of the ES-Import route target for all-active multihoming"
-        order_weight: 1900
+        order_weight: 2100
       - name: description
         kind: Text
         optional: true
-        order_weight: 2000
+        order_weight: 3000
     relationships:
+      - name: local_domain
+        label: Local EVPN Domain
+        peer: EvpnDomain
+        cardinality: one
+        kind: Parent
+        optional: false
+        identifier: "evpn_domain__local_gateway_groups"
+        description: "Parent EVPN domain that owns this local gateway group"
+        order_weight: 900
       - name: pod
         label: Pod
         peer: NetworkPod
         cardinality: one
-        kind: Parent
+        kind: Attribute
         optional: false
         identifier: "pod__evpn_gateway_groups"
-        description: "Pod where this gateway group is defined"
-        order_weight: 900
+        description: "Selected Pod context for this gateway group; its EVPN domain must match local_domain"
+        order_weight: 1100
       - name: remote_domain
         label: Remote EVPN Domain
         peer: EvpnDomain
@@ -155,7 +176,7 @@ nodes:
         optional: false
         identifier: "evpn_gateway_group__remote_domain"
         description: "Remote EVPN domain used for inter-domain exchange"
-        order_weight: 910
+        order_weight: 1200
       - name: members
         label: Border Leaf Members
         peer: DcimDevice
@@ -164,7 +185,7 @@ nodes:
         optional: false
         identifier: "evpn_gateway_group__members"
         description: "Border Leaf devices that share this EVPN Gateway profile"
-        order_weight: 920
+        order_weight: 1300
 
 extensions:
   nodes:
@@ -186,10 +207,10 @@ extensions:
           label: EVPN Gateway Groups
           peer: EvpnGatewayGroup
           cardinality: many
-          kind: Component
+          kind: Attribute
           optional: true
           identifier: "pod__evpn_gateway_groups"
-          description: "EVPN Gateway groups defined for this pod"
+          description: "EVPN Gateway groups that select this pod as context"
           order_weight: 1460
 
     - kind: DcimDevice

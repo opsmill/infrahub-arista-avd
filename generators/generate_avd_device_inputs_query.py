@@ -82,6 +82,9 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNode(BaseMo
     ethernet_segment_rt_import: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeEthernetSegmentRtImport"
     ]
+    local_domain: (
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomain"
+    )
     pod: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodePod"
     members: (
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeMembers"
@@ -138,6 +141,54 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeEtherne
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeEthernetSegmentRtImport(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomain(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNode(
+    BaseModel
+):
+    id: str
+    display_label: Optional[str]
+    domain_id: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeDomainId"
+    ]
+    fabric: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabric"
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeDomainId(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabric(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabricNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabricNode(
+    BaseModel
+):
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabricNodeName"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabricNodeName(
     BaseModel
 ):
     value: Optional[str]
@@ -350,11 +401,60 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteD
     name: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeName"
     ]
+    local_domain: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomain"
     pod: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodePod"
     members: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeMembers"
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomain(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNode(
+    BaseModel
+):
+    id: str
+    display_label: Optional[str]
+    domain_id: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeDomainId"
+    ]
+    fabric: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabric"
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeDomainId(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabric(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabricNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabricNode(
+    BaseModel
+):
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabricNodeName"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabricNodeName(
     BaseModel
 ):
     value: Optional[str]
@@ -2195,6 +2295,10 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdges.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroup.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomain.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabric.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeLocalDomainNodeFabricNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodePod.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodePodNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodePodNodeEvpnDomain.model_rebuild()
@@ -2213,6 +2317,10 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainN
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroups.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdges.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomain.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabric.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodeLocalDomainNodeFabricNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodePod.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodePodNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeEvpnGatewayGroupNodeRemoteDomainNodeRemoteGatewayGroupsEdgesNodePodNodeEvpnDomain.model_rebuild()
