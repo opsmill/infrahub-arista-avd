@@ -82,6 +82,12 @@ logs/
 .tmp/
 .temp/
 
+# Node.js/docs dependencies
+node_modules/
+
+# Local environment variants
+.env*
+
 # Docker
 Dockerfile*
 docker-compose*.yml

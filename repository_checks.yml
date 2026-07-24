@@ -1,0 +1,144 @@
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreGraphQLQuery
+  data:
+    - name: cv_config_check
+      repository: test-repository
+      query: |
+        query CVConfigCheck($name: String!) {
+          NetworkFabric(name__value: $name) {
+            edges {
+              node {
+                id
+                name {
+                  value
+                }
+                cloudvision_managed {
+                  value
+                }
+              }
+            }
+          }
+          DcimDevice {
+            edges {
+              node {
+                id
+                name {
+                  value
+                }
+                serial {
+                  value
+                }
+                pod {
+                  node {
+                    id
+                    parent {
+                      node {
+                        __typename
+                        id
+                      }
+                    }
+                  }
+                }
+                avd_artifact {
+                  node {
+                    id
+                    structured_config_file {
+                      node {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    - name: cv_workspace_submission_webhook
+      repository: test-repository
+      query: |
+        query CVWorkspaceSubmissionQuery($proposed_change_id: String!) {
+          CloudvisionWorkspace(proposed_change_id__value: $proposed_change_id) {
+            edges {
+              node {
+                id
+                name {
+                  value
+                }
+                workspace_id {
+                  value
+                }
+                proposed_change_id {
+                  value
+                }
+                status {
+                  value
+                }
+                workspace_url {
+                  value
+                }
+                thread_id {
+                  value
+                }
+                change_control_id {
+                  value
+                }
+                change_control_url {
+                  value
+                }
+                fabric {
+                  node {
+                    id
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreCheckDefinition
+  data:
+    - name: cv-config-validation
+      repository: test-repository
+      file_path: "./checks/cv_config_check.py"
+      class_name: CVConfigValidationCheck
+      timeout: 600
+      targets: fabrics
+      query: cv_config_check
+      parameters:
+        name: name__value
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreTransformPython
+  data:
+    - name: cv-workspace-submission-webhook-payload
+      repository: test-repository
+      query: cv_workspace_submission_webhook
+      file_path: "./transforms/cv_workspace_submission_webhook.py"
+      class_name: CVWorkspaceSubmissionWebhookPayload
+      convert_query_response: false
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreCustomWebhook
+  data:
+    - name: cloudvision-workspace-submission
+      event_type: infrahub.proposed_change.submitted
+      active: true
+      branch_scope: other_branches
+      node_kind: CoreProposedChange
+      description: Placeholder CloudVision workspace submission handoff for cv-config-validation
+      url: https://placeholder.invalid/cloudvision-workspace-submission
+      validate_certificates: false
+      transformation: cv-workspace-submission-webhook-payload

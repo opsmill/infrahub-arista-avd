@@ -6,6 +6,7 @@ const sidebars: SidebarsConfig = {
     'quick-start',
     'provision-first-fabric',
     'viewing-artifacts',
+    'cloudvision',
     'troubleshooting',
     'supported-capabilities',
     {
