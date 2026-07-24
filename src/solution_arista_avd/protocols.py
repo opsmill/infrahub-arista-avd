@@ -187,6 +187,16 @@ class NetworkDnsServer(CoreNode):
     vrf: StringOptional
 
 
+class EvpnDomain(CoreNode):
+    description: StringOptional
+    domain_id: String
+    name: String
+    fabric: RelationshipAttribute[NetworkFabric]
+    local_gateway_groups: RelationshipManager[EvpnGatewayGroup]
+    pods: RelationshipManager[NetworkPod]
+    remote_gateway_groups: RelationshipManager[EvpnGatewayGroup]
+
+
 class MlagDomain(GenericMlagDomain):
     peers: RelationshipManager[DcimDevice]
 
@@ -211,6 +221,23 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     mgmt_pool: RelationshipAttribute[CoreIPAddressPool]
     node_id_pool: RelationshipAttribute[CoreNumberPool]
     super_spine_switch_template: RelationshipAttribute[CoreObjectTemplate]
+
+
+class EvpnGatewayGroup(CoreNode):
+    all_active_multihoming_enabled: Boolean
+    d_path_enabled: Boolean
+    description: StringOptional
+    ethernet_segment_identifier: String
+    ethernet_segment_rt_import: String
+    evpn_l2_enabled: Boolean
+    evpn_l3_enabled: Boolean
+    evpn_l3_inter_domain: Boolean
+    name: String
+    resiliency_model: Dropdown
+    local_domain: RelationshipAttribute[EvpnDomain]
+    members: RelationshipManager[DcimDevice]
+    pod: RelationshipAttribute[NetworkPod]
+    remote_domain: RelationshipAttribute[EvpnDomain]
 
 
 class LocationHall(LocationGeneric):
@@ -308,6 +335,7 @@ class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
     role: Dropdown
     spine_interface_sorting_method: Dropdown
     devices: RelationshipManager[DcimDevice]
+    evpn_domain: RelationshipAttribute[EvpnDomain]
     loopback_pool: RelationshipAttribute[CoreIPAddressPool]
     prefix_pool: RelationshipAttribute[CoreIPPrefixPool]
     racks: RelationshipManager[LocationRack]
