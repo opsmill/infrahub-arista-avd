@@ -1,0 +1,167 @@
+---
+# ============================================================================
+# Post-generation Fabric-C DCI, EVPN Gateway, and lab management overrides.
+# Load after Fabric-C fabric, pod, and rack generators have created devices and
+# interfaces.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamIPAddress
+  data:
+    - address: 10.0.6.11/24
+      ip_namespace: default
+    - address: 10.0.6.12/24
+      ip_namespace: default
+    - address: 10.0.6.13/24
+      ip_namespace: default
+    - address: 10.0.6.14/24
+      ip_namespace: default
+    - address: 10.0.6.15/24
+      ip_namespace: default
+    - address: 10.0.6.16/24
+      ip_namespace: default
+    - address: 10.0.6.21/24
+      ip_namespace: default
+    - address: 10.0.6.22/24
+      ip_namespace: default
+    - address: 10.0.6.23/24
+      ip_namespace: default
+    - address: 10.0.6.24/24
+      ip_namespace: default
+    - address: 10.0.6.25/24
+      ip_namespace: default
+    - address: 10.0.6.26/24
+      ip_namespace: default
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: DcimDevice
+  data:
+    - name: spine-infrahub-dc1-1
+      status: provisioning
+      mgmt_ip: ["10.0.6.11/24", default]
+    - name: spine-infrahub-dc1-2
+      status: provisioning
+      mgmt_ip: ["10.0.6.12/24", default]
+    - name: leaf-infrahub-dc1-1-1
+      status: provisioning
+      role: border_leaf
+      mgmt_ip: ["10.0.6.13/24", default]
+    - name: leaf-infrahub-dc1-1-2
+      status: provisioning
+      role: border_leaf
+      mgmt_ip: ["10.0.6.14/24", default]
+    - name: leaf-infrahub-dc1-2-1
+      status: provisioning
+      mgmt_ip: ["10.0.6.15/24", default]
+    - name: leaf-infrahub-dc1-2-2
+      status: provisioning
+      mgmt_ip: ["10.0.6.16/24", default]
+    - name: spine-infrahub-dc2-1
+      status: provisioning
+      mgmt_ip: ["10.0.6.21/24", default]
+    - name: spine-infrahub-dc2-2
+      status: provisioning
+      mgmt_ip: ["10.0.6.22/24", default]
+    - name: leaf-infrahub-dc2-1-1
+      status: provisioning
+      role: border_leaf
+      mgmt_ip: ["10.0.6.23/24", default]
+    - name: leaf-infrahub-dc2-1-2
+      status: provisioning
+      role: border_leaf
+      mgmt_ip: ["10.0.6.24/24", default]
+    - name: leaf-infrahub-dc2-2-1
+      status: provisioning
+      mgmt_ip: ["10.0.6.25/24", default]
+    - name: leaf-infrahub-dc2-2-2
+      status: provisioning
+      mgmt_ip: ["10.0.6.26/24", default]
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: NetworkLink
+  data:
+    - name: Fabric-C-DCI-1
+      medium: smf
+      role: dci
+      include_in_underlay_protocol: true
+      connected_endpoints:
+        kind: InterfacePhysical
+        data:
+          - name: Ethernet5
+            device: leaf-infrahub-dc1-1-1
+          - name: Ethernet5
+            device: leaf-infrahub-dc2-1-1
+    - name: Fabric-C-DCI-2
+      medium: smf
+      role: dci
+      include_in_underlay_protocol: true
+      connected_endpoints:
+        kind: InterfacePhysical
+        data:
+          - name: Ethernet6
+            device: leaf-infrahub-dc1-1-1
+          - name: Ethernet6
+            device: leaf-infrahub-dc2-1-2
+    - name: Fabric-C-DCI-3
+      medium: smf
+      role: dci
+      include_in_underlay_protocol: true
+      connected_endpoints:
+        kind: InterfacePhysical
+        data:
+          - name: Ethernet5
+            device: leaf-infrahub-dc1-1-2
+          - name: Ethernet5
+            device: leaf-infrahub-dc2-1-2
+    - name: Fabric-C-DCI-4
+      medium: smf
+      role: dci
+      include_in_underlay_protocol: true
+      connected_endpoints:
+        kind: InterfacePhysical
+        data:
+          - name: Ethernet6
+            device: leaf-infrahub-dc1-1-2
+          - name: Ethernet6
+            device: leaf-infrahub-dc2-1-1
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnGatewayGroup
+  data:
+    - name: Fabric-C-DC1-Gateway
+      local_domain: ["Fabric-C", "65100:1"]
+      pod: infrahub-dc1
+      remote_domain: ["Fabric-C", "65000:100"]
+      members:
+        - leaf-infrahub-dc1-1-1
+        - leaf-infrahub-dc1-1-2
+      resiliency_model: all_active_multihoming
+      evpn_l2_enabled: true
+      evpn_l3_enabled: true
+      evpn_l3_inter_domain: true
+      d_path_enabled: true
+      all_active_multihoming_enabled: true
+      ethernet_segment_identifier: "0000:0001:0001:0000:0001"
+      ethernet_segment_rt_import: "00:01:00:00:00:01"
+    - name: Fabric-C-DC2-Gateway
+      local_domain: ["Fabric-C", "65200:1"]
+      pod: infrahub-dc2
+      remote_domain: ["Fabric-C", "65000:100"]
+      members:
+        - leaf-infrahub-dc2-1-1
+        - leaf-infrahub-dc2-1-2
+      resiliency_model: all_active_multihoming
+      evpn_l2_enabled: true
+      evpn_l3_enabled: true
+      evpn_l3_inter_domain: true
+      d_path_enabled: true
+      all_active_multihoming_enabled: true
+      ethernet_segment_identifier: "0000:0002:0002:0000:0002"
+      ethernet_segment_rt_import: "00:02:00:00:00:02"

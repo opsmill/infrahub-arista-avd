@@ -22,12 +22,12 @@ kind: Object
 spec:
   kind: NetworkLocalUser
   data:
-    - name: admin-nopass
+    - name: admin
       privilege: 15
       role: network-admin
       password_type: type7
       password: "nopassword"
-    - name: mtache-nopass
+    - name: mtache
       privilege: 15
       role: network-admin
       password_type: type7

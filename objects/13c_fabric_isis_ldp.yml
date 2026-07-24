@@ -128,7 +128,7 @@ spec:
       ntp_servers:
         - time.google.com
       local_users:
-        - admin-nopass
+        - admin
       member_of_groups: ["fabrics"]
       children:
         kind: NetworkPod

@@ -16,6 +16,8 @@ spec:
       role: loopback-vtep
     - prefix: 10.250.3.0/24
       role: pod_leaf_spine
+    - prefix: 172.16.0.0/28
+      role: technical
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -43,6 +45,13 @@ spec:
       ip_namespace: default
       resources:
         - 10.250.1.0/24
+    - name: Fabric-C-DCI-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - 172.16.0.0/28
 ---
 apiVersion: infrahub.app/v1
 kind: Object
