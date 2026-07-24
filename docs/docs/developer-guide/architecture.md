@@ -74,7 +74,7 @@ FabricSupernetPool (e.g., 10.0.0.0/8)
 ├── CoreIPPrefixPool: Management Pool (e.g., 10.254.0.0/16)
 │   └── CoreIPAddressPool: OOB management
 ├── CoreNumberPool: ASN Pool (65000-65999)
-│   └── Per-device BGP ASN allocation
+│   └── Tier-aware eBGP ASN allocation: shared super-spine ASN per fabric, shared spine ASN per pod, leaf ASNs per device or MLAG domain
 └── CoreNumberPool: Node ID Pool (1-65535)
     └── Per-device unique identifier
 ```

@@ -23,6 +23,9 @@ class FabricGeneratorQueryNetworkFabricEdgesNode(BaseModel):
     amount_of_super_spines: Optional[
         "FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines"
     ]
+    underlay_routing_protocol: Optional[
+        "FabricGeneratorQueryNetworkFabricEdgesNodeUnderlayRoutingProtocol"
+    ]
     super_spine_switch_template: (
         "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate"
     )
@@ -38,6 +41,10 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeName(BaseModel):
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines(BaseModel):
     value: Optional[Any]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeUnderlayRoutingProtocol(BaseModel):
+    value: Optional[str]
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate(BaseModel):

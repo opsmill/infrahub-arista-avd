@@ -20,7 +20,7 @@ Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overv
 | `type` | string | Role-mapped from `DcimDevice.role.value` | See [Role Mapping](./role-mapping.md). |
 | `fabric_name` | string | `NetworkFabric.name.value` | |
 | `id` | int | `DcimDevice.node_id.value` | Fabric-unique device identifier. |
-| `bgp_as` | string | `DcimDevice.bgp_asn.value` | Stringified; PyAVD expects a string. |
+| `bgp_as` | string | `DcimDevice.asn.node.asn.value` | Stringified; PyAVD expects a string. |
 | `loopback_ipv4_address` | string | `DcimDevice.loopback_ip` | Optional; stripped of CIDR. |
 | `mgmt_ip` | string | `DcimDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |

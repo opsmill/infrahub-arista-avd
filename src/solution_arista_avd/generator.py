@@ -220,6 +220,76 @@ class GeneratorMixin:
             raise
         return routing_asn
 
+    async def _set_device_asn(self, device_id: str, routing_asn_id: str) -> None:
+        """Link DcimDevice.asn to a RoutingAsn without resaving the SDK object's relationships."""
+        await self.client.execute_graphql(
+            query="""
+            mutation SetDeviceAsn($id: String!, $asn_id: String!) {
+                DcimDeviceUpsert(data: { id: $id, asn: { id: $asn_id } }) {
+                    ok
+                    object { id }
+                }
+            }
+            """,
+            variables={"id": device_id, "asn_id": routing_asn_id},
+        )
+
+    async def ensure_shared_device_asn(
+        self, devices: list[DcimDevice], asn_pool: CoreNumberPool, fabric_id: str
+    ) -> RoutingAsn | None:
+        """Link all devices to one shared fabric-owned ``RoutingAsn``.
+
+        The first existing ASN found in the supplied device order is the
+        idempotency anchor. If none of the devices has an ASN yet, allocate one
+        from the fabric pool and link every device to it. Existing non-selected
+        ASN nodes are intentionally left in place; only the device links are
+        reconciled.
+        """
+        if not devices:
+            return None
+
+        device_ids = [device.id for device in devices]
+        fetched_devices = [
+            await self.client.get(  # type: ignore[type-abstract]
+                DcimDevice,
+                id=device_id,
+                include=["asn"],
+                exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
+            )
+            for device_id in device_ids
+        ]
+
+        shared_asn_id = next(
+            (
+                cast("str", fetched_device.asn.id)  # type: ignore[attr-defined]
+                for fetched_device in fetched_devices
+                if getattr(getattr(fetched_device, "asn", None), "id", None)
+            ),
+            None,
+        )
+
+        routing_asn: RoutingAsn | None = None
+        if shared_asn_id is None:
+            routing_asn = await self.allocate_routing_asn(asn_pool, fabric_id)
+            shared_asn_id = routing_asn.id
+
+        try:
+            for fetched_device in fetched_devices:
+                if getattr(getattr(fetched_device, "asn", None), "id", None) == shared_asn_id:
+                    continue
+                await self._set_device_asn(fetched_device.id, shared_asn_id)
+        except Exception:
+            if routing_asn is not None:
+                try:
+                    await routing_asn.delete()
+                except Exception:
+                    logger.exception(
+                        "Failed to clean up shared RoutingAsn %s after device ASN link error", routing_asn.id
+                    )
+            raise
+
+        return routing_asn
+
     async def _activate_loopback_interface(self, device_id: str) -> None:
         """Activate a device's loopback interface and bind its pool-allocated IP.
 

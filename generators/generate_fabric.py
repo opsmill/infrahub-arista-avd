@@ -6,6 +6,7 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumb
 from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import DcimDevice, NetworkPod
 
+from .asn import ensure_shared_device_asn
 from .fabric_generator_query import FabricGeneratorQuery
 
 
@@ -13,6 +14,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
     fabric_name: str
     fabric_id: str
     fabric_super_spine_switch_template: str | None
+    underlay_routing_protocol: str | None
 
     loopback_pool: CoreIPAddressPool
     asn_pool: CoreNumberPool | None
@@ -25,6 +27,8 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric_name = data.network_fabric.edges[0].node.name.value.lower()
         self.fabric_id = data.network_fabric.edges[0].node.id
         self.amount_of_super_spines = data.network_fabric.edges[0].node.amount_of_super_spines.value
+        underlay_attr = data.network_fabric.edges[0].node.underlay_routing_protocol
+        self.underlay_routing_protocol = underlay_attr.value if underlay_attr else None
         super_spine_template = data.network_fabric.edges[0].node.super_spine_switch_template.node
         self.fabric_super_spine_switch_template = super_spine_template.id if super_spine_template else None
         await set_fabric_avd_hostvars_ready(self.client, self.fabric_id, False)
@@ -51,6 +55,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
             raise ValueError(msg)
 
         fabric_pod = await self.client.get(kind=NetworkPod, parent__ids=[self.fabric_id], role__value="fabric")
+        device_asn_pool = None if self.underlay_routing_protocol == "ebgp" else self.asn_pool
 
         for idx in range(1, self.amount_of_super_spines + 1):
             device = await self.create_avd_device(
@@ -60,11 +65,20 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
                 pod_id=fabric_pod.id,
                 fabric_id=self.fabric_id,
                 loopback_pool=self.loopback_pool,
-                asn_pool=self.asn_pool,
+                asn_pool=device_asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,
             )
             self.super_spine_devices.append(device)
+
+        if self.underlay_routing_protocol == "ebgp" and self.asn_pool is not None:
+            await ensure_shared_device_asn(
+                client=self.client,
+                devices=self.super_spine_devices,
+                asn_pool=self.asn_pool,
+                fabric_id=self.fabric_id,
+                allocate_routing_asn=self.allocate_routing_asn,
+            )
 
     async def allocate_resource_pools(self) -> None:
         fabric_supernet_pool = await self.client.get(kind=CoreIPPrefixPool, name__value="FabricSupernetPool")

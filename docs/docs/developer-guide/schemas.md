@@ -24,7 +24,7 @@ Regenerate the typed protocol classes after any schema change (see [the command 
 | `base/location.yml` | `Location.Generic`, `Location.Hosting` base definitions |
 | `base/organization.yml` | `Organization.Generic`, `Organization.Manufacturer`, `Organization.Provider` |
 | `logical_design.yml` | `Network.Fabric`, `Network.Pod`, `Network.BuildingBlock` |
-| `dcim_extensions.yml` | `Network.Link`, including `role=dci` and DCI link fields, plus device extensions (`role`, `bgp_asn`, `node_id`, loopback/mgmt, pod/rack relations) and the interface `role`/`description`/`ip_address` extensions |
+| `dcim_extensions.yml` | `Network.Link`, including `role=dci` and DCI link fields, plus device extensions (`role`, BGP ASN relationship, `node_id`, loopback/mgmt, pod/rack relations) and the interface `role`/`description`/`ip_address` extensions |
 | `dci.yml` | `NetworkFabric.dci_pool` DCI addressing source |
 | `l3ls_extensions.yml` | L3LS fabric attributes (routing protocols, MTU, spanning-tree, EVPN overlay) and pod/rack/VRF/MLAG extensions |
 | `location_extensions.yml` | `Location.Hall`, `Location.Rack` (`rack_type`, leaf counts, `generation_complete`) |
@@ -78,8 +78,8 @@ A cabled connection between interfaces. Inherits `Dcim.Connector`, so it carries
 
 The concrete network device (switch). Inherits `Dcim.GenericDevice`, `Dcim.PhysicalDevice`, and `CoreArtifactTarget`.
 
-- **Attributes**: `name` (unique), `description`, `os_version`, `status` (`active`, `provisioning`, `maintenance`, `drained`). Fabric extensions (via `dcim_extensions.yml`): `role` (`super_spine`, `spine`, `leaf`, `border_leaf`, `l2leaf`), `index`, `bgp_asn`, `node_id`.
-- **Relationships**: `interfaces` → `DcimInterface`, `device_type` → `DcimDeviceType`, `platform` → `DcimPlatform`, `primary_address` / `loopback_ip` / `mgmt_ip` → `IpamIPAddress`, `pod` → `NetworkPod`, `rack` → `LocationRack`, `avd_artifact` → `AvdArtifact`, `mlag_domain` → `MlagDomain`, plus routing relations (`bgp_peer_groups`, `bgp_neighbors`, `prefix_lists`, `route_maps`, `static_routes`).
+- **Attributes**: `name` (unique), `description`, `os_version`, `status` (`active`, `provisioning`, `maintenance`, `drained`). Fabric extensions (via `dcim_extensions.yml`): `role` (`super_spine`, `spine`, `leaf`, `border_leaf`, `l2leaf`), `index`, `node_id`.
+- **Relationships**: `interfaces` → `DcimInterface`, `device_type` → `DcimDeviceType`, `platform` → `DcimPlatform`, `primary_address` / `loopback_ip` / `mgmt_ip` → `IpamIPAddress`, `pod` → `NetworkPod`, `rack` → `LocationRack`, `asn` → `RoutingAsn` (device BGP ASN), `avd_artifact` → `AvdArtifact`, `mlag_domain` → `MlagDomain`, plus routing relations (`bgp_peer_groups`, `bgp_neighbors`, `prefix_lists`, `route_maps`, `static_routes`).
 
 ### Interface kinds
 
@@ -209,7 +209,7 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 ## Source {#protocols}
 
 - [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas) — all schema definitions.
-- [`schemas/base/dcim.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/dcim.yml) — base `Dcim.GenericDevice` / `Dcim.PhysicalDevice` / `Dcim.Device`, interfaces, `DcimDeviceType`; project device extensions (`role`, `bgp_asn`, relations) and `Network.Link` live in [`schemas/dcim_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/dcim_extensions.yml).
+- [`schemas/base/dcim.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/dcim.yml) — base `Dcim.GenericDevice` / `Dcim.PhysicalDevice` / `Dcim.Device`, interfaces, `DcimDeviceType`; project device extensions (`role`, BGP ASN relationship, relations) and `Network.Link` live in [`schemas/dcim_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/dcim_extensions.yml).
 - [`schemas/logical_design.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/logical_design.yml) — `Network.Fabric`, `Network.Pod`.
 - [`schemas/base/location.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/location.yml) + [`schemas/location_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/location_extensions.yml) — `Location.Hall`, `Location.Rack`.
 - [`schemas/base/ipam.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/ipam.yml) + [`schemas/ipam_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/ipam_extensions.yml) — IPAM nodes (the `Prefix` `role`/`status` dropdowns live in the extension).

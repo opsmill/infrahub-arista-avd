@@ -24,6 +24,7 @@ from solution_arista_avd.protocols import (
     NetworkPod,
 )
 
+from .asn import set_device_asn
 from .rack_generator_query import RackGeneratorQuery
 
 if TYPE_CHECKING:
@@ -251,8 +252,8 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             await mlag_domain.save(allow_upsert=True)
 
             # Both leaves share the domain's single ASN node.
-            await self._set_device_asn(leaf_a.id, routing_asn_id)
-            await self._set_device_asn(leaf_b.id, routing_asn_id)
+            await set_device_asn(self.client, leaf_a.id, routing_asn_id)
+            await set_device_asn(self.client, leaf_b.id, routing_asn_id)
 
             # Standalone-L2LS / campus main-tier l2leaf switches use a model with
             # no dedicated mlag_peer interfaces, so carve the peer-link from the
@@ -446,20 +447,6 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             if hostvar_file:
                 await hostvar_file.delete()
                 self.logger.info("Invalidated hostvars for %s before targeted regeneration", hostname)
-
-    async def _set_device_asn(self, device_id: str, routing_asn_id: str) -> None:
-        """Link DcimDevice.asn to a RoutingAsn without resaving the SDK object's relationships."""
-        await self.client.execute_graphql(
-            query="""
-            mutation SetDeviceAsn($id: String!, $asn_id: String!) {
-                DcimDeviceUpsert(data: { id: $id, asn: { id: $asn_id } }) {
-                    ok
-                    object { id }
-                }
-            }
-            """,
-            variables={"id": device_id, "asn_id": routing_asn_id},
-        )
 
     async def _get_existing_mlag_domain(self, domain_id: str) -> object | None:
         """Return the current MLAG domain for a rack pair, if present."""

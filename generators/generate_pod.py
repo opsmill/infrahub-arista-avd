@@ -12,6 +12,7 @@ from solution_arista_avd.cabling import build_pod_cabling_plan, connect_interfac
 from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
 
+from .asn import ensure_shared_device_asn
 from .pod_generator_query import PodGeneratorQuery
 
 if TYPE_CHECKING:
@@ -34,6 +35,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
     fabric_id: str
     fabric_name: str
+    underlay_routing_protocol: str | None
 
     loopback_pool: CoreIPAddressPool
 
@@ -61,6 +63,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         )
         self.fabric_id: str = data.network_pod.edges[0].node.parent.node.id
         self.fabric_name: str = data.network_pod.edges[0].node.parent.node.name.value.lower()
+        underlay_attr = data.network_pod.edges[0].node.parent.node.underlay_routing_protocol
+        self.underlay_routing_protocol = underlay_attr.value if underlay_attr else None
         self.amount_of_spines: int = data.network_pod.edges[0].node.amount_of_spines.value
         self.fabric_amount_of_super_spines: int = data.network_pod.edges[
             0
@@ -105,9 +109,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         #   underlay "none" -> l2spine (standalone L2LS)
         #   underlay "ospf" -> l3spine (campus core, SVI routing)
         # Read from the query data (no extra fetch).
-        fabric_node = data.network_pod.edges[0].node.parent.node
-        underlay = getattr(getattr(fabric_node, "underlay_routing_protocol", None), "value", None)
-        self.spine_role = SPINE_ROLE_BY_UNDERLAY.get(underlay, "spine")
+        self.spine_role = SPINE_ROLE_BY_UNDERLAY.get(self.underlay_routing_protocol, "spine")
 
         # Get AVD-related pool references from parent fabric
         self.asn_pool, self.node_id_pool, self.mgmt_pool = await self.resolve_avd_pools(
@@ -126,6 +128,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
     async def create_spine_switches(self) -> None:
         """Create the spine switches"""
 
+        device_asn_pool = None if self.underlay_routing_protocol == "ebgp" else self.asn_pool
         for idx in range(1, self.amount_of_spines + 1):
             device = await self.create_avd_device(
                 name=f"spine-{self.pod_name}-{idx}",
@@ -134,11 +137,20 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 pod_id=self.pod_id,
                 fabric_id=self.fabric_id,
                 loopback_pool=self.loopback_pool,
-                asn_pool=self.asn_pool,
+                asn_pool=device_asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,
             )
             self.spine_switches.append(device)
+
+        if self.underlay_routing_protocol == "ebgp" and self.asn_pool is not None:
+            await ensure_shared_device_asn(
+                client=self.client,
+                devices=self.spine_switches,
+                asn_pool=self.asn_pool,
+                fabric_id=self.fabric_id,
+                allocate_routing_asn=self.allocate_routing_asn,
+            )
 
     async def allocate_resource_pools(self) -> None:
         """Allocate IP Space for the Pod"""

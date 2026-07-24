@@ -293,6 +293,28 @@ class TestE2EPipeline(TestInfrahubDockerClient):
                 f"MLAG domain {dom['domain_id']} does not share one ASN node with its peers: "
                 f"domain={dom_asn} peers={peer_asns}"
             )
+
+        ebgp_fabric_ids = {
+            fabric_id
+            for fabric_id, fabric in report["fabrics"].items()
+            if fabric["underlay_routing_protocol"] == "ebgp"
+        }
+        super_spines_by_fabric: dict[str, set[str]] = {}
+        spines_by_pod: dict[str, set[str]] = {}
+        for device in report["devices"]:
+            if not device["asn_node_id"] or device["fabric_id"] not in ebgp_fabric_ids:
+                continue
+            if device["role"] == "super_spine":
+                super_spines_by_fabric.setdefault(device["fabric_id"], set()).add(device["asn_node_id"])
+            if device["role"] == "spine":
+                spines_by_pod.setdefault(device["pod_id"], set()).add(device["asn_node_id"])
+
+        assert all(len(asn_ids) == 1 for asn_ids in super_spines_by_fabric.values()), (
+            f"eBGP super-spines do not share one ASN per fabric: {super_spines_by_fabric}"
+        )
+        assert all(len(asn_ids) == 1 for asn_ids in spines_by_pod.values()), (
+            f"eBGP spines do not share one ASN per pod: {spines_by_pod}"
+        )
         print(
             f"asn report: routing_asns={len(report['asns'])} l3_devices={len(l3)} mlag_domains={len(report['domains'])}",
             flush=True,
@@ -547,13 +569,16 @@ async def _asn_report(client: InfrahubClient, branch: str) -> dict:
 
     Returns:
         asns: [{id, value, fabric_id}] — the allocated ASN nodes.
-        devices: [{id, name, role, asn_node_id}] — each device's linked ASN node id (or None).
+        devices: [{id, name, role, pod_id, fabric_id, asn_node_id}] — each device's linked ASN node id (or None).
+        fabrics: {id: {underlay_routing_protocol}} — fabrics keyed by id.
         domains: [{domain_id, asn_node_id, peer_ids}] — MLAG domains and their peers.
     """
     query = """
     query AsnReport {
       RoutingAsn { edges { node { id asn { value } fabric { node { id } } } } }
-      DcimDevice { edges { node { id name { value } role { value } asn { node { id } } } } }
+      NetworkFabric { edges { node { id underlay_routing_protocol { value } } } }
+      NetworkPod { edges { node { id parent { node { __typename id } } } } }
+      DcimDevice { edges { node { id name { value } role { value } pod { node { id } } asn { node { id } } } } }
       MlagDomain { edges { node { domain_id { value } asn { node { id } } peers { edges { node { id } } } } } }
     }
     """
@@ -567,15 +592,30 @@ async def _asn_report(client: InfrahubClient, branch: str) -> dict:
             {"id": node["id"], "value": (node.get("asn") or {}).get("value"), "fabric_id": (fabric or {}).get("id")}
         )
 
+    fabrics = {
+        edge["node"]["id"]: {
+            "underlay_routing_protocol": ((edge["node"].get("underlay_routing_protocol") or {}).get("value"))
+        }
+        for edge in resp["NetworkFabric"]["edges"]
+    }
+    pod_fabric_ids = {}
+    for edge in resp["NetworkPod"]["edges"]:
+        node = edge["node"]
+        parent = (node.get("parent") or {}).get("node") or {}
+        pod_fabric_ids[node["id"]] = parent.get("id") if parent.get("__typename") == "NetworkFabric" else None
+
     devices = []
     for edge in resp["DcimDevice"]["edges"]:
         node = edge["node"]
         asn_node = (node.get("asn") or {}).get("node")
+        pod_id = ((node.get("pod") or {}).get("node") or {}).get("id")
         devices.append(
             {
                 "id": node["id"],
                 "name": node["name"]["value"],
                 "role": node["role"]["value"],
+                "pod_id": pod_id,
+                "fabric_id": pod_fabric_ids.get(pod_id),
                 "asn_node_id": (asn_node or {}).get("id"),
             }
         )
@@ -593,7 +633,7 @@ async def _asn_report(client: InfrahubClient, branch: str) -> dict:
             }
         )
 
-    return {"asns": asns, "devices": devices, "domains": domains}
+    return {"asns": asns, "devices": devices, "fabrics": fabrics, "domains": domains}
 
 
 async def _device_ip_report(client: InfrahubClient, branch: str) -> dict:
