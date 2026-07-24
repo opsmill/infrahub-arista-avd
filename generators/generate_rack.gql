@@ -79,6 +79,9 @@ query RackGeneratorQuery($name: String!) {
 							node {
 								__typename
 								... on NetworkFabric {
+									underlay_routing_protocol {
+										value
+									}
 									asn_pool {
 										node {
 											id

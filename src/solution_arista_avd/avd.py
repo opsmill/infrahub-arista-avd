@@ -54,6 +54,12 @@ NON_EMITTED_UNDERLAYS: frozenset[str] = frozenset({"none"})
 # just like the L3LS leaf family. Gated on SPINE_UPLINK_UNDERLAYS at the call site
 # so the L3LS access-tier l2leaf (pure access under EVPN) is unaffected.
 MLAG_MAIN_TIER_ROLES: frozenset[str] = frozenset({"l2leaf", "l2spine", "l3spine"})
+# Device roles that render anycast SVIs (ip_address_virtual) and therefore need a
+# node-level virtual_router_mac_address: L3 leaves, the campus l3spine SVI-routing
+# core, and the MPLS PE. Deliberately excludes the pure-L3 fabric transit roles
+# (spine, super_spine, p, rr) — which carry a fabric virtual_router_mac but no
+# SVIs — so routed L3LS spines keep their existing (mac-free) node config.
+SVI_RENDERING_ROLES: frozenset[str] = frozenset({"leaf", "border_leaf", "l3spine", "pe"})
 
 
 def get_avd_type(role: str) -> str:

@@ -186,6 +186,9 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkBuildingBlo
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric(BaseModel):
     typename__: Literal["NetworkFabric"] = Field(alias="__typename")
+    underlay_routing_protocol: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricUnderlayRoutingProtocol"
+    ]
     asn_pool: (
         "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool"
     )
@@ -193,6 +196,12 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric(Base
     mgmt_pool: (
         "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPool"
     )
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricUnderlayRoutingProtocol(
+    BaseModel
+):
+    value: Optional[str]
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool(

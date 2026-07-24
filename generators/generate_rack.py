@@ -21,7 +21,6 @@ from solution_arista_avd.protocols import (
     DcimDevice,
     DcimInterface,
     LocationRack,
-    NetworkFabric,
     NetworkPod,
 )
 
@@ -116,8 +115,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
         # Standalone L2LS fabrics (underlay "none") use l2leaf leaves. Gated on the
         # fabric underlay so L3LS fabrics (ebgp/ospf) keep the routed leaf role.
-        fabric_obj = await self.client.get(kind=NetworkFabric, id=self.fabric.id)
-        underlay = getattr(getattr(fabric_obj, "underlay_routing_protocol", None), "value", None)
+        # Read from the query data (no extra fetch), mirroring the pod generator.
+        fabric_node = data.location_rack.edges[0].node.pod.node.parent.node
+        underlay = getattr(getattr(fabric_node, "underlay_routing_protocol", None), "value", None)
         self.leaf_role = LEAF_ROLE_BY_UNDERLAY.get(underlay, "leaf")
         self.spine_role = SPINE_ROLE_BY_UNDERLAY.get(underlay, "spine")
 

@@ -463,6 +463,28 @@ def test_evpn_vlan_aware_bundles_rendered_when_enabled() -> None:
     assert "evpn_vlan_aware_bundles" not in default
 
 
+@pytest.mark.parametrize(("role", "node_type_key"), [("spine", "spine"), ("super_spine", "super_spine")])
+def test_l3ls_transit_roles_omit_node_virtual_router_mac_address(role: str, node_type_key: str) -> None:
+    """Routed L3LS spines/super-spines carry a fabric virtual_router_mac but render no
+    anycast SVIs, so they must NOT get a node-level virtual_router_mac_address — even
+    with tenant data present. Regression guard for the SVI-role gating (issue: the
+    node-level mac guard must stay off the pure-L3 transit tier)."""
+    hostvars = _base_hostvars([{"name": "TENANT_A"}], role=role)
+
+    node = hostvars[node_type_key]["nodes"][0]
+    assert "virtual_router_mac_address" not in node
+
+
+@pytest.mark.parametrize(("role", "node_type_key"), [("leaf", "l3leaf"), ("l3spine", "l3spine"), ("pe", "pe")])
+def test_svi_rendering_roles_keep_node_virtual_router_mac_address(role: str, node_type_key: str) -> None:
+    """Devices that render anycast SVIs (L3 leaf, campus l3spine core, MPLS PE) keep the
+    node-level virtual_router_mac_address when tenant SVIs are present."""
+    hostvars = _base_hostvars([{"name": "TENANT_A"}], role=role)
+
+    node = hostvars[node_type_key]["nodes"][0]
+    assert node["virtual_router_mac_address"] == "00:1c:73:00:00:99"
+
+
 def test_border_leaf_mapping_is_available_to_repository_loaded_generator(monkeypatch: pytest.MonkeyPatch) -> None:
     """Repository-loaded generators may run beside an older installed package."""
 

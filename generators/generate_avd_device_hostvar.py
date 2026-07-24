@@ -19,6 +19,7 @@ from solution_arista_avd.avd import (
     NON_EMITTED_UNDERLAYS,
     SPINE_UPLINK_LEAF_ROLES,
     SPINE_UPLINK_UNDERLAYS,
+    SVI_RENDERING_ROLES,
 )
 from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
 from solution_arista_avd.generator import set_fabric_avd_hostvars_ready
@@ -1711,10 +1712,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if mlag_info["domain_id"] and renders_mlag and "mlag_peer_interfaces" in mlag_info:
             node_config["mlag_interfaces"] = mlag_info["mlag_peer_interfaces"]
 
-        # Devices that render anycast SVIs (ip_address_virtual) need
-        # virtual_router_mac at node level. This covers L3 leaves as well as the
-        # l3spine campus core and MPLS PE routers — any device with tenant SVIs.
-        if virtual_router_mac and tenants_data:
+        # Only devices that render anycast SVIs (ip_address_virtual) need
+        # virtual_router_mac at node level: L3 leaves, the l3spine campus core, and
+        # MPLS PE routers. Gated on the role so fabric transit roles that carry a
+        # fabric virtual_router_mac but no SVIs (spine/super_spine/p/rr) keep their
+        # existing mac-free node config — routed L3LS spines are unaffected.
+        if role in SVI_RENDERING_ROLES and virtual_router_mac and tenants_data:
             node_config["virtual_router_mac_address"] = virtual_router_mac
 
         # Build hostvars
