@@ -876,7 +876,7 @@ async def submit_linked_workspace_for_custom_webhook(
     *,
     branch: str = "main",
 ) -> SubmissionResult:
-    """Adapter for the proposed-change submitted CustomWebhook payload."""
+    """Adapter for the proposed-change CustomWebhook payload."""
     check_name = _check_name_from_event(event)
     if check_name and check_name != "cv-config-validation":
         message = f"Ignoring CustomWebhook event for check {check_name}"

@@ -100,7 +100,7 @@ skipped without masking CloudVision validation success or failure.
 
 The repository loads exactly one placeholder `CoreCustomWebhook` named
 `cloudvision-workspace-submission`. It is associated with proposed-change
-submission for the `cv-config-validation` workflow, references the
+merge for the `cv-config-validation` workflow, references the
 `cv-workspace-submission-webhook-payload` `CoreTransformPython`, and uses this
 explicitly non-production URL:
 

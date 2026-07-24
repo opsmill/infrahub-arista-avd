@@ -370,6 +370,8 @@ def test_repository_objects_register_one_placeholder_cloudvision_webhook() -> No
 
     assert repository_text.count("kind: CoreCustomWebhook") == 1
     assert repository_text.count("cloudvision-workspace-submission") == 2
+    assert "event_type: infrahub.proposed_change.merged" in repository_text
+    assert "infrahub.proposed_change.submitted" not in repository_text
     assert "https://placeholder.invalid/cloudvision-workspace-submission" in repository_text
     assert "cv-workspace-submission-webhook-payload" in repository_text
     assert "cv_workspace_submission_webhook_payload" in repository_text
@@ -800,7 +802,7 @@ async def test_submit_linked_workspace_event_adapter_passes_event_identity(
     result = await submit_linked_workspace_for_custom_webhook(
         SimpleNamespace(),
         {
-            "event": "infrahub.proposed_change.submitted",
+            "event": "infrahub.proposed_change.merged",
             "branch": "main",
             "payload": {"proposed_change_id": "pc-submitted", "check_name": "cv-config-validation"},
         },

@@ -134,7 +134,7 @@ spec:
   kind: CoreCustomWebhook
   data:
     - name: cloudvision-workspace-submission
-      event_type: infrahub.proposed_change.submitted
+      event_type: infrahub.proposed_change.merged
       active: true
       branch_scope: other_branches
       description: Placeholder CloudVision workspace submission handoff for cv-config-validation

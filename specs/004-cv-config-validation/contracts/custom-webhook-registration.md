@@ -30,7 +30,7 @@ spec:
   kind: CoreCustomWebhook
   data:
     - name: cloudvision-workspace-submission
-      event_type: infrahub.proposed_change.submitted
+      event_type: infrahub.proposed_change.merged
       active: true
       branch_scope: other_branches
       description: Placeholder CloudVision workspace submission handoff for cv-config-validation
@@ -74,6 +74,6 @@ queries:
 - Repository load creates exactly one intended `CoreCustomWebhook` for CloudVision workspace submission.
 - The webhook references a `CoreTransformPython` payload transform.
 - The payload transform references the `cv_workspace_submission_webhook` query.
-- The webhook is active only for the intended proposed-change submission event. Do not set `node_kind` for `infrahub.proposed_change.submitted` events in Infrahub 1.10.
+- The webhook is active only for the intended proposed-change merge event. Do not set `node_kind` for `infrahub.proposed_change.merged` events in Infrahub 1.10.
 - The registration or docs associate the handoff with `cv-config-validation`.
 - No `CoreStandardWebhook` is used for this feature.
