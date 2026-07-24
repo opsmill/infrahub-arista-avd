@@ -211,6 +211,7 @@ class AvdEvpn(CoreNode):
 class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     amount_of_super_spines: Integer
     avd_hostvars_ready: Boolean
+    cloudvision_managed: Boolean
     fabric_interface_sorting_method: Dropdown
     mgmt_gateway: StringOptional
     mgmt_routes: ListAttributeOptional
@@ -475,6 +476,21 @@ class VirtualizationVirtualMachine(ComputeGenericUnit):
     role: DropdownOptional
     vcpu: IntegerOptional
     host: RelationshipAttribute[VirtualizationHostVirtualMachine]
+
+
+class CloudvisionWorkspace(CoreNode):
+    change_control_id: StringOptional
+    change_control_url: URLOptional
+    last_submission_attempt_at: DateTimeOptional
+    last_submission_error: StringOptional
+    name: String
+    proposed_change_id: StringOptional
+    status: Dropdown
+    submitted_at: DateTimeOptional
+    thread_id: StringOptional
+    workspace_id: String
+    workspace_url: URLOptional
+    fabric: RelationshipAttribute[NetworkFabric]
 
 
 

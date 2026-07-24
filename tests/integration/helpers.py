@@ -84,6 +84,9 @@ def _summarize(value: Any) -> str:
     if isinstance(value, (list, tuple, set)):
         return f"{type(value).__name__} of length {len(value)}"
     if isinstance(value, dict):
+        compact = repr(value)
+        if len(compact) <= 500:
+            return compact
         return f"dict with keys {sorted(value)[:10]}"
     text = repr(value)
     return text if len(text) <= 200 else f"{text[:200]}..."

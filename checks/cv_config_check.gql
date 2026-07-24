@@ -1,0 +1,49 @@
+query CVConfigCheckQuery($name: String!) {
+  NetworkFabric(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        cloudvision_managed {
+          value
+        }
+      }
+    }
+  }
+  DcimDevice {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        serial {
+          value
+        }
+        pod {
+          node {
+            id
+            parent {
+              node {
+                __typename
+                id
+              }
+            }
+          }
+        }
+        avd_artifact {
+          node {
+            id
+            structured_config_file {
+              node {
+                id
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

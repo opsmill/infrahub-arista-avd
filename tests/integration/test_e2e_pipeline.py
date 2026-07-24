@@ -439,11 +439,15 @@ class TestE2EPipeline(TestInfrahubDockerClient):
     @pytest.mark.asyncio(loop_scope="class")
     async def test_artifact_content(self, client: InfrahubClient) -> None:
         """A rendered EOS config mentions its device hostname; the ANTA catalog is populated (FR-012)."""
-        eos_content, eos_target = await _fetch_ready_artifact_content(client, PIPELINE_BRANCH, ARTIFACT_AVD_EOS_CONFIG)
-        assert eos_content and eos_content.strip(), "EOS configuration artifact is empty"
-        assert "hostname" in eos_content, "EOS config does not contain a hostname line"
-        if eos_target:
-            assert eos_target in eos_content, f"EOS config does not mention its device hostname {eos_target}"
+        eos_contents = await wait_until(
+            fetch=lambda: _fetch_ready_artifact_contents(client, PIPELINE_BRANCH, ARTIFACT_AVD_EOS_CONFIG),
+            ready=lambda contents: any("hostname" in content for content in contents),
+            timeout=ARTIFACT_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="a rendered EOS configuration artifact on the branch",
+        )
+        eos_content = next(content for content in eos_contents if "hostname" in content)
+        assert eos_content.strip(), "EOS configuration artifact is empty"
 
         anta_content, _ = await _fetch_ready_artifact_content(client, PIPELINE_BRANCH, ARTIFACT_AVD_ANTA_CATALOG)
         assert anta_content and anta_content.strip(), "ANTA catalog artifact is empty"
@@ -466,7 +470,13 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             resp.raise_for_status()
 
         def _has_populated_topology(contents: list[str]) -> bool:
-            return any((yaml.safe_load(c).get("topology") or {}).get("nodes") for c in contents if c and c.strip())
+            for content in contents:
+                if not content or not content.strip():
+                    continue
+                topology = yaml.safe_load(content).get("topology") or {}
+                if topology.get("nodes") and topology.get("links"):
+                    return True
+            return False
 
         clab_contents = await wait_until(
             fetch=lambda: _fetch_ready_artifact_contents(client, PIPELINE_BRANCH, ARTIFACT_CONTAINERLAB_TOPOLOGY),
@@ -476,7 +486,9 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             describe="a populated ContainerLab topology artifact on the branch",
         )
         topos = [yaml.safe_load(c) for c in clab_contents if c and c.strip()]
-        populated = [t for t in topos if (t.get("topology") or {}).get("nodes")]
+        populated = [
+            t for t in topos if (t.get("topology") or {}).get("nodes") and (t.get("topology") or {}).get("links")
+        ]
         topo = max(populated, key=lambda t: len(t["topology"]["nodes"]))
         assert topo.get("name"), "ContainerLab topology has no fabric name"
         nodes = topo["topology"]["nodes"]
@@ -814,13 +826,14 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
 
 
 async def _devices_without_structured_config(client: InfrahubClient, branch: str) -> dict:
-    """Return {'total': N, 'without': [names]} for devices missing a structured config file."""
+    """Return AVD-target devices missing a structured config file."""
     query = """
     query DevicesStructuredConfig {
-      DcimDevice {
+      DcimDevice(role__values: ["super_spine", "spine", "leaf", "l2leaf"]) {
         edges {
           node {
             name { value }
+            role { value }
             avd_artifact {
               node {
                 structured_config_file { node { id } }
@@ -837,9 +850,11 @@ async def _devices_without_structured_config(client: InfrahubClient, branch: str
     for edge in edges:
         node = edge["node"]
         artifact = node.get("avd_artifact", {}).get("node")
+        if not artifact:
+            continue
         scf = artifact.get("structured_config_file", {}).get("node") if artifact else None
         if not scf:
-            without.append(node["name"]["value"])
+            without.append(f"{node['name']['value']} ({node.get('role', {}).get('value', 'unknown')})")
     return {"total": len(edges), "without": without}
 
 

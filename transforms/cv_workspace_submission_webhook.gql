@@ -1,0 +1,41 @@
+query CVWorkspaceSubmissionWebhookQuery($proposed_change_id: String!) {
+  CloudvisionWorkspace(proposed_change_id__value: $proposed_change_id) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        workspace_id {
+          value
+        }
+        proposed_change_id {
+          value
+        }
+        status {
+          value
+        }
+        workspace_url {
+          value
+        }
+        thread_id {
+          value
+        }
+        change_control_id {
+          value
+        }
+        change_control_url {
+          value
+        }
+        fabric {
+          node {
+            id
+            name {
+              value
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+version: "1.0"
+
+nodes:
+  - name: Workspace
+    namespace: Cloudvision
+    label: CloudVision Workspace
+    description: "Tracks a CloudVision workspace linked to a fabric for proposed change validation"
+    icon: mdi:cloud-check-variant
+    include_in_menu: false
+    human_friendly_id:
+      - workspace_id__value
+    display_label: name__value
+    attributes:
+      - name: name
+        kind: Text
+        description: "Display name of the CloudVision workspace"
+      - name: workspace_id
+        kind: Text
+        unique: true
+        description: "CloudVision workspace UUID"
+      - name: proposed_change_id
+        kind: Text
+        optional: true
+        description: "Infrahub proposed change ID that created this workspace"
+      - name: workspace_url
+        kind: URL
+        optional: true
+        description: "CloudVision workspace URL displayed in the proposed change"
+      - name: thread_id
+        kind: Text
+        optional: true
+        description: "CoreChangeThread ID used for workspace lifecycle comments"
+      - name: change_control_id
+        kind: Text
+        optional: true
+        description: "CloudVision change control ID created during workspace submission"
+      - name: change_control_url
+        kind: URL
+        optional: true
+        description: "CloudVision change control URL when available"
+      - name: last_submission_error
+        kind: TextArea
+        optional: true
+        description: "Most recent CloudVision submission failure reason"
+      - name: last_submission_attempt_at
+        kind: DateTime
+        optional: true
+        description: "Timestamp of the most recent CloudVision submission attempt"
+      - name: submitted_at
+        kind: DateTime
+        optional: true
+        description: "Timestamp when CloudVision submission succeeded"
+      - name: status
+        kind: Dropdown
+        default_value: pending
+        choices:
+          - name: pending
+            label: Pending
+          - name: built
+            label: Built
+          - name: submitted
+            label: Submitted
+          - name: abandoned
+            label: Abandoned
+          - name: submit_failed
+            label: Submit Failed
+    relationships:
+      - name: fabric
+        peer: NetworkFabric
+        kind: Attribute
+        cardinality: one
+        identifier: "cv_workspace__fabric"
