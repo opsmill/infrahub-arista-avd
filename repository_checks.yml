@@ -137,7 +137,6 @@ spec:
       event_type: infrahub.proposed_change.submitted
       active: true
       branch_scope: other_branches
-      node_kind: CoreProposedChange
       description: Placeholder CloudVision workspace submission handoff for cv-config-validation
       url: https://placeholder.invalid/cloudvision-workspace-submission
       validate_certificates: false

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 import os
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -17,9 +19,15 @@ from pyavd._cv.api.arista.workspace.v1 import ResponseStatus, WorkspaceState
 from pyavd._cv.client import CVClient
 from pyavd._cv.client.exceptions import CVClientException, CVResourceNotFound, CVWorkspaceFailed
 
-from transforms.cv_workspace_submission_webhook_query import CVWorkspaceSubmissionWebhookQuery
-
 from .cv_helpers import get_change_control_url, get_cloudvision_config, get_workspace_url
+
+_REPO_ROOT = Path(__file__).parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+CVWorkspaceSubmissionWebhookQuery = importlib.import_module(
+    "transforms.cv_workspace_submission_webhook_query"
+).CVWorkspaceSubmissionWebhookQuery
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +36,7 @@ SubmissionStatus = Literal["submitted", "already_submitted", "skipped", "failed"
 SUBMIT_READY_STATUSES = {"built", "submit_failed"}
 SUBMITTED_STATES = {WorkspaceState.SUBMITTED.value, "submitted"}
 SUBMISSION_THREAD_LABEL = "CloudVision workspace submission"
-WORKSPACE_SUBMISSION_QUERY_PATH = Path(__file__).parents[1] / "transforms" / "cv_workspace_submission_webhook.gql"
+WORKSPACE_SUBMISSION_QUERY_PATH = _REPO_ROOT / "transforms" / "cv_workspace_submission_webhook.gql"
 
 
 @dataclass(frozen=True)

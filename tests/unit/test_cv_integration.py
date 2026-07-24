@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib
 import inspect
+import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,6 +33,42 @@ from checks.cv_workspace_lifecycle import (
 )
 from transforms.cv_workspace_submission_webhook import CVWorkspaceSubmissionWebhookPayload
 from transforms.cv_workspace_submission_webhook_query import CVWorkspaceSubmissionWebhookQuery
+
+
+def test_cv_workspace_lifecycle_imports_from_check_import_context(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = Path(__file__).parents[2]
+    checks_path = str(repo_root / "checks")
+    module_names = (
+        "checks.cv_workspace_lifecycle",
+        "transforms",
+        "transforms.cv_workspace_submission_webhook_query",
+    )
+    original_modules = {module_name: sys.modules.get(module_name) for module_name in module_names}
+    checks_package = sys.modules.get("checks")
+    original_lifecycle_attr = getattr(checks_package, "cv_workspace_lifecycle", None)
+
+    for module_name in module_names:
+        sys.modules.pop(module_name, None)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "path", [checks_path, *[path for path in sys.path if path not in ("", str(repo_root))]])
+
+    try:
+        importlib.import_module("checks.cv_workspace_lifecycle")
+    finally:
+        for module_name, module in original_modules.items():
+            if module is None:
+                sys.modules.pop(module_name, None)
+            else:
+                sys.modules[module_name] = module
+        if checks_package is not None:
+            if original_lifecycle_attr is None:
+                if hasattr(checks_package, "cv_workspace_lifecycle"):
+                    del checks_package.cv_workspace_lifecycle
+            else:
+                checks_package.cv_workspace_lifecycle = original_lifecycle_attr
 
 
 def _fabric_node(cloudvision_managed: bool | None = True) -> dict[str, Any]:
@@ -336,6 +374,8 @@ def test_repository_objects_register_one_placeholder_cloudvision_webhook() -> No
     assert "cv-workspace-submission-webhook-payload" in repository_text
     assert "cv_workspace_submission_webhook_payload" in repository_text
     assert "CVWorkspaceSubmissionWebhookPayload" in repository_text
+    webhook_block = repository_text.split("kind: CoreCustomWebhook", maxsplit=1)[1]
+    assert "node_kind:" not in webhook_block
     assert "CoreStandardWebhook" not in repository_text
 
 
