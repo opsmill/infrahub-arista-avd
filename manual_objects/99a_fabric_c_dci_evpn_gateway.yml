@@ -83,6 +83,36 @@ spec:
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
+  kind: InterfacePhysical
+  data:
+    - name: Ethernet5
+      device: leaf-infrahub-dc1-1-1
+      role: peering
+    - name: Ethernet6
+      device: leaf-infrahub-dc1-1-1
+      role: peering
+    - name: Ethernet5
+      device: leaf-infrahub-dc1-1-2
+      role: peering
+    - name: Ethernet6
+      device: leaf-infrahub-dc1-1-2
+      role: peering
+    - name: Ethernet5
+      device: leaf-infrahub-dc2-1-1
+      role: peering
+    - name: Ethernet6
+      device: leaf-infrahub-dc2-1-1
+      role: peering
+    - name: Ethernet5
+      device: leaf-infrahub-dc2-1-2
+      role: peering
+    - name: Ethernet6
+      device: leaf-infrahub-dc2-1-2
+      role: peering
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
   kind: NetworkLink
   data:
     - name: Fabric-C-DCI-1
