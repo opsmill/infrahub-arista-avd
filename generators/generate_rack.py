@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING, Any
 
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
+from netutils.interface import sort_interface_list
 
 from solution_arista_avd import sorting as solution_arista_avd_sorting
+from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY
 from solution_arista_avd.cabling import build_rack_cabling_plan, connect_interface_maps
 from solution_arista_avd.generator import (
     GeneratorMixin,
@@ -14,7 +16,13 @@ from solution_arista_avd.generator import (
     set_fabric_avd_hostvars_ready,
     trigger_hostvar_generation,
 )
-from solution_arista_avd.protocols import AvdArtifact, DcimDevice, DcimInterface, LocationRack, NetworkPod
+from solution_arista_avd.protocols import (
+    AvdArtifact,
+    DcimDevice,
+    DcimInterface,
+    LocationRack,
+    NetworkPod,
+)
 
 from .rack_generator_query import RackGeneratorQuery
 
@@ -22,6 +30,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 TASK_LOGGER = logging.getLogger("infrahub.tasks")
+
+# Number of access ports repurposed as the MLAG peer-link on a standalone-L2LS /
+# campus main-tier l2leaf. The L3LS leaf templates ship dedicated mlag_peer-role
+# interfaces; the arista-7050sx3-48yc8c model used by the l2leaf main tier does
+# not, so the peer-link ports are carved from its access ports instead.
+L2LEAF_MLAG_PEER_INTERFACE_COUNT = 2
 
 
 def is_mlag_enabled(value: object) -> bool:
@@ -49,6 +63,11 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     spine_switches: list[DcimDevice]
 
     leaf_switches: list[DcimDevice]
+
+    # Device roles for this fabric. Defaults are the L3LS roles; generate()
+    # switches them to l2spine/l2leaf for standalone L2LS fabrics (underlay "none").
+    leaf_role: str = "leaf"
+    spine_role: str = "spine"
 
     loopback_pool: CoreIPAddressPool
     prefix_pool: CoreIPPrefixPool
@@ -94,6 +113,14 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.fabric = self.pod.parent.peer
         await set_fabric_avd_hostvars_ready(self.client, self.fabric.id, False)
 
+        # Standalone L2LS fabrics (underlay "none") use l2leaf leaves. Gated on the
+        # fabric underlay so L3LS fabrics (ebgp/ospf) keep the routed leaf role.
+        # Read from the query data (no extra fetch), mirroring the pod generator.
+        fabric_node = data.location_rack.edges[0].node.pod.node.parent.node
+        underlay = getattr(getattr(fabric_node, "underlay_routing_protocol", None), "value", None)
+        self.leaf_role = LEAF_ROLE_BY_UNDERLAY.get(underlay, "leaf")
+        self.spine_role = SPINE_ROLE_BY_UNDERLAY.get(underlay, "spine")
+
         # Reset generation_complete flag to prevent stale flags during re-runs
         rack = await self.client.get(kind=LocationRack, id=self.rack_id)
         rack.generation_complete.value = False
@@ -105,7 +132,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.loopback_pool = await self.client.get(kind=CoreIPAddressPool, id=self.loopback_pool_id)
         self.prefix_pool = await self.client.get(kind=CoreIPPrefixPool, id=self.prefix_pool_id)
 
-        self.spine_switches = await self.client.filters(kind=DcimDevice, pod__ids=[self.pod_id], role__value="spine")
+        self.spine_switches = await self.client.filters(
+            kind=DcimDevice, pod__ids=[self.pod_id], role__value=self.spine_role
+        )
 
         if self.pod_amount_of_spines != len(self.spine_switches):
             msg = f"Cannot start rack generator on {self.rack_name}-{self.rack_id}: the pod doesn't seem to be fully generated"
@@ -166,7 +195,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         for index in range(1, self.rack_amount_of_leafs + 1):
             leaf_switch = await self.create_avd_device(
                 name=f"leaf-{self.pod_name}-{self.rack_index}-{index}",
-                role="leaf",
+                role=self.leaf_role,
                 object_template_id=self.rack_leaf_switch_template,
                 pod_id=self.pod_id,
                 fabric_id=self.fabric.id,
@@ -225,7 +254,54 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             await self._set_device_asn(leaf_a.id, routing_asn_id)
             await self._set_device_asn(leaf_b.id, routing_asn_id)
 
+            # Standalone-L2LS / campus main-tier l2leaf switches use a model with
+            # no dedicated mlag_peer interfaces, so carve the peer-link from the
+            # access ports. L3LS leaf/border_leaf templates already ship them.
+            if self.leaf_role == "l2leaf":
+                await self._assign_l2leaf_mlag_peer_interfaces(leaf_a)
+                await self._assign_l2leaf_mlag_peer_interfaces(leaf_b)
+
             self.logger.info(f"MLAG domain {domain_id} created successfully with shared ASN node {routing_asn_id}")
+
+    async def _assign_l2leaf_mlag_peer_interfaces(self, leaf: DcimDevice) -> None:
+        """Repurpose access ports as the MLAG peer-link on an l2leaf main-tier switch.
+
+        The L3LS leaf templates ship dedicated ``mlag_peer``-role interfaces, but the
+        standalone-L2LS / campus main-tier switch model (arista-7050sx3-48yc8c) does
+        not. Without ``mlag_peer`` interfaces PyAVD raises ``'mlag_interfaces' not set``
+        for the pair. Convert the highest-numbered access ports to role ``mlag_peer``
+        so the pair renders a peer-link, mirroring the L3LS leaf logic.
+
+        The peer-link set is selected deterministically from the whole access-port
+        pool (interfaces already in role ``server`` or ``mlag_peer``), so the choice
+        never shifts once a port has been converted — making a re-run a no-op. The
+        highest-numbered ports are used so the peer-link never collides with server
+        cabling (which allocates the lowest-numbered ports). Saves use
+        ``update_group_context=False`` so these template-owned interfaces are not
+        enrolled in the rack generator's tracking group and never risk being reset
+        or deleted by the tracking reconciliation on a subsequent run.
+        """
+        interfaces = await self.client.filters(kind=DcimInterface, device__ids=[leaf.id])
+        access_ports = {
+            iface.name.value: iface
+            for iface in interfaces
+            if getattr(iface, "role", None) and iface.role.value in {"server", "mlag_peer"}
+        }
+        if len(access_ports) < L2LEAF_MLAG_PEER_INTERFACE_COUNT:
+            msg = (
+                f"l2leaf {leaf.name.value}: only {len(access_ports)} access ports available to "
+                f"repurpose as an MLAG peer-link, need {L2LEAF_MLAG_PEER_INTERFACE_COUNT}"
+            )
+            raise ValueError(msg)
+
+        peer_link_names = sort_interface_list(list(access_ports))[-L2LEAF_MLAG_PEER_INTERFACE_COUNT:]
+        for name in peer_link_names:
+            iface = access_ports[name]
+            if iface.role.value == "mlag_peer":
+                continue
+            iface.role.value = "mlag_peer"
+            await iface.save(allow_upsert=True, update_group_context=False)
+            self.logger.info("Assigned MLAG peer-link role to %s on %s", name, leaf.name.value)
 
     async def delete_stale_mlag_domains(self) -> None:
         """Delete MLAG domains for this rack before hostvar generation runs.

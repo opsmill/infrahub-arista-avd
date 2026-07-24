@@ -13,6 +13,25 @@ This is a **reference design** that covers a defined set of AVD capabilities on 
 Some boundaries below are marked *confirm scope* and are being finalized with the maintainers. Where a row says "confirm", treat the exact edge as undecided rather than guaranteed.
 :::
 
+## AVD example scenario coverage
+
+Status of the official [AVD example designs](https://avd.arista.com/6.2/ansible_collections/arista/avd/examples/index.html) this reference design covers. Gaps are closed with **native schema** where a capability is reusable and first-class, and with the **`avd_custom_hostvars` escape hatch** where a full native model would be disproportionate (niche, single-scenario, pass-through).
+
+Each scenario has its own loadable fabric design; every device renders valid PyAVD EOS configuration (0 validation violations) on a fresh instance.
+
+| AVD example scenario | Status | Fabric | Design |
+|----------------------|:------:|--------|--------|
+| Single-DC L3LS | ✅ | `Fabric-C` | eBGP underlay, EVPN/VXLAN L3LS. |
+| Single-DC Multi-Pod L3LS (5-stage Clos) | ✅ | `Fabric-A` | 6 super-spines + 3 pods; super-spines as EVPN route servers; tenants as vlan-aware bundles (`evpn_vlan_aware_bundles`). |
+| Dual-DC L3LS | ✅ | `Fabric-C` | EVPN DC Gateway (next-hop-self) + DCI `l3_edge` p2p links, via `avd_custom_hostvars`. |
+| L2LS fabric (standalone) | ✅ | `Fabric-L2LS` | underlay `none` → `l2spine` + `l2leaf`, pure Layer-2, MLAG both tiers. |
+| Campus fabric | ✅ | `Fabric-Campus` | underlay `ospf` → `l3spine` core with anycast SVIs (`Evpn.Svi`) + `l2leaf` access; dot1x/PoE via escape hatch. |
+| ISIS-LDP IPVPN | ✅ | `Fabric-ISIS-LDP` | underlay `isis-ldp` → `p` core + `pe` edge; per-customer L3VPN VRFs (`Evpn.Tenant`/`Ipam.VRF`). |
+
+The non-L3LS designs are driven by the fabric `underlay_routing_protocol`, which the pod/rack generators map to the correct device roles (gated so eBGP L3LS fabrics are unaffected).
+
+Services are modeled **schema-first**: L2 VLANs (L2LS), anycast SVIs on the campus l3spine core, and per-customer L3VPN VRFs on the ISIS-LDP PE are all `Ipam.VLAN` / `Evpn.Tenant` / `Ipam.VRF` / `Evpn.Svi` **objects** rendered by the generator — the same service model as the L3LS fabrics. The `avd_custom_hostvars` escape hatch is reserved for capabilities the schema does not yet model — EVPN DC Gateway remote-peers and campus dot1x/PoE — a deliberate, documented niche exception (native modeling of those is future schema work). Native-vs-escape-hatch guidance is in the [developer guide](./developer-guide/avd/extending.md).
+
 ## Fabric generation
 
 | Capability | Status | Notes |

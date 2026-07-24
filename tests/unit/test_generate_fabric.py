@@ -37,6 +37,7 @@ def _pod_query_data(*, amount_of_super_spines: int) -> dict:
                                 "id": "fabric-1",
                                 "name": {"value": "INFRAHUB_AVD"},
                                 "amount_of_super_spines": {"value": amount_of_super_spines},
+                                "underlay_routing_protocol": {"value": "ebgp"},
                                 "fabric_interface_sorting_method": {"value": "create_sorted_device_interface_map"},
                                 "spine_interface_sorting_method": {"value": "create_sorted_device_interface_map"},
                                 "asn_pool": {"node": None},

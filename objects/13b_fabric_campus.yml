@@ -1,0 +1,236 @@
+---
+# ============================================================================
+# Fabric-Campus — three-tier campus example (AVD "campus-fabric").
+# underlay_routing_protocol: ospf -> the pod/rack generators create l3spine
+# core switches (SVI routing) and l2leaf access switches. Campus access
+# features (dot1x, PoE, port profiles) are supplied via avd_custom_hostvars.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.61.0.0/24
+      role: management
+    - prefix: 10.61.1.0/24
+      role: pod_loopback
+    - prefix: 10.61.2.0/24
+      role: loopback-vtep
+    - prefix: 10.61.3.0/24
+      role: pod_leaf_spine
+    - prefix: 10.61.4.0/24     # MLAG peer-link addressing (l2leaf access pair)
+      role: technical
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-Campus-Uplink-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - 10.61.3.0/24
+    - name: Fabric-Campus-VTEP-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - 10.61.2.0/24
+    - name: Fabric-Campus-Loopback-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - 10.61.1.0/24
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-Campus-Mgmt-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 24
+      ip_namespace: default
+      resources:
+        - 10.61.0.0/24
+    # MLAG peer-link pool for the l2leaf access-tier pair. /31 members, disjoint
+    # from the management/loopback/vtep/uplink subnets and the inband-mgmt subnet.
+    - name: Fabric-Campus-MLAG-Peer-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - 10.61.4.0/24
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: Fabric-Campus-ASN-Pool
+      node: RoutingAsn
+      node_attribute: asn
+      start_range: 65700
+      end_range: 65799
+    - name: Fabric-Campus-NodeID-Pool
+      node: DcimDevice
+      node_attribute: node_id
+      start_range: 1
+      end_range: 100
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: NetworkFabric
+  data:
+    - name: "Fabric-Campus"
+      index: 61
+      amount_of_super_spines: 0
+      fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
+      mgmt_gateway: "10.61.0.1"
+      asn_pool: "Fabric-Campus-ASN-Pool"
+      node_id_pool: "Fabric-Campus-NodeID-Pool"
+      mgmt_pool: "Fabric-Campus-Mgmt-Pool"
+      virtual_router_mac: "00:1c:73:00:00:61"
+      underlay_routing_protocol: "ospf"
+      p2p_uplinks_mtu: 9214
+      uplink_pool: "Fabric-Campus-Uplink-Pool"
+      vtep_pool: "Fabric-Campus-VTEP-Pool"
+      loopback_pool: "Fabric-Campus-Loopback-Pool"
+      spanning_tree_mode: "mstp"
+      # ----------------------------------------------------------------------
+      # Illustrative campus access features via the avd_custom_hostvars escape
+      # hatch (NOT backed by project schema). These keys are deep-merged into
+      # every device's AVD hostvars for this fabric before the PyAVD render, so
+      # they behave exactly like native eos_designs inputs. Every key below is a
+      # first-class eos_designs input, so the block is a complete, self-
+      # consistent 802.1X/NAC design that PyAVD renders without passthrough:
+      #   - dot1x_settings: global 802.1X enablement. dot1x_settings.enabled must
+      #     be true before any interface (network_ports/port_profiles) may carry
+      #     802.1X, otherwise eos_designs raises "802.1X is not enabled globally".
+      #   - aaa_settings.radius: RADIUS server(s) and server group backing the
+      #     802.1X authentication. dot1x_settings.authentication.radius_groups
+      #     references the group defined here. aaa_settings.local_users is added
+      #     separately by the hostvar generator (from the fabric local_users) and
+      #     deep-merges with this radius block.
+      #   - port_profiles / network_ports: model 802.1X (dot1x) and PoE on the
+      #     campus access ports.
+      #   - l2leaf.defaults.inband_mgmt_*: in-band management (SVI-based) on the
+      #     L2 access switches.
+      # ----------------------------------------------------------------------
+      avd_custom_hostvars:
+        # First-class eos_designs input: global 802.1X enablement. This is the
+        # switch-wide flag the network_ports/port_profiles 802.1X config requires
+        # to be set before it will render.
+        dot1x_settings:
+          enabled: true
+          bypass_lldp: true
+          dynamic_authorization:
+            enabled: true
+          mac_based_authentication:
+            delay: 300
+            hold_period: 300
+          authentication:
+            # RADIUS server group used for 802.1X auth; defined under
+            # aaa_settings.radius.servers[].groups below.
+            radius_groups:
+              - CAMPUS-RADIUS
+        # First-class eos_designs input: AAA / RADIUS backing for 802.1X. One
+        # illustrative RADIUS server in the default VRF, tagged into the
+        # CAMPUS-RADIUS group referenced by dot1x_settings above.
+        aaa_settings:
+          radius:
+            servers:
+              - host: 10.61.0.253
+                vrf: default
+                groups:
+                  - CAMPUS-RADIUS
+                cleartext_key: campus-radius-secret
+        # First-class eos_designs input: reusable campus access port profile
+        # carrying dot1x (NAC) and PoE settings. port_profiles are templates;
+        # they only emit config where referenced (see network_ports below).
+        port_profiles:
+          - profile: CAMPUS_ACCESS_DOT1X
+            mode: access
+            vlans: "110"
+            spanning_tree_portfast: edge
+            spanning_tree_bpduguard: enabled
+            dot1x:
+              port_control: auto
+              reauthentication: true
+              host_mode:
+                mode: multi-host
+              mac_based_authentication:
+                enabled: true
+            poe:
+              disabled: false
+              reboot:
+                action: maintain
+              shutdown:
+                action: power-off
+        # First-class eos_designs input: attach the access profile to a small
+        # illustrative range of access ports on the L2 access switches only.
+        # The switches regex is re.fullmatch-ed against generated hostnames.
+        # Access-tier devices are named leaf-campus-mdf-<rack>-<n> (the "leaf"
+        # prefix is the tier name, not the l2leaf role), so this matches the L2
+        # access switches only; the l3spine core is named spine-campus-mdf-<n>.
+        network_ports:
+          - switches:
+              - "leaf-campus-mdf-.*"
+            switch_ports:
+              - Ethernet3-10
+            profile: CAMPUS_ACCESS_DOT1X
+            description: campus-access-dot1x
+        # First-class eos_designs node keys: in-band management for the L2
+        # access switches. AVD builds the inband mgmt VLAN/SVI on the L3 uplink
+        # (l3spine) switches and allocates access-switch IPs from this subnet.
+        l2leaf:
+          defaults:
+            inband_mgmt_vlan: 4092
+            inband_mgmt_subnet: 10.61.10.0/24
+      dns_servers:
+        - dns-google
+      ntp_servers:
+        - time.google.com
+      local_users:
+        - admin-nopass
+      member_of_groups: ["fabrics"]
+      children:
+        kind: NetworkPod
+        data:
+          - name: "campus-mdf"
+            index: 1
+            amount_of_spines: 2
+            spine_switch_template: "arista-7050cx3-32c-spine-switch"
+            loopback_ipv4_offset: 2
+            mlag_peer_pool: "Fabric-Campus-MLAG-Peer-Pool"
+            member_of_groups: ["pods"]
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: LocationHall
+  data:
+    - name: "Hall-Campus"
+      index: 61
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: LocationRack
+  data:
+    - name: "CAMPUS_IDF1"
+      index: 1
+      rack_type: compute
+      pod: campus-mdf
+      parent: "Hall-Campus"
+      amount_of_leafs: 2
+      mlag: true
+      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      member_of_groups: ["racks"]

@@ -17,6 +17,19 @@ from solution_arista_avd.protocols import AvdArtifact, AvdStructuredConfigFile
 
 from .generate_avd_inputs_query import GenerateAvdInputsQuery
 
+try:  # pyAVD's error base is not part of its public API; import defensively.
+    from pyavd._errors import AristaAvdError  # noqa: PLC2701 - intentional private import, guarded above
+
+    _AVD_ERROR_BASES: tuple[type[BaseException], ...] = (AristaAvdError,)
+except ImportError:  # pragma: no cover - private module path may change across pyAVD versions
+    _AVD_ERROR_BASES = ()
+
+# Invalid per-fabric AVD inputs (e.g. a bad MLAG/EVPN payload on one device) surface
+# as AristaAvdError subclasses or as the standard value/lookup/type errors. Catching
+# this tuple isolates a broken fabric without also swallowing genuine programming
+# bugs (AttributeError, NameError, ...), which should still propagate.
+AVD_INPUT_ERRORS: tuple[type[BaseException], ...] = (*_AVD_ERROR_BASES, ValueError, KeyError, TypeError)
+
 
 class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
     """Builds AVD inputs and structured config for all devices in a fabric."""
@@ -212,7 +225,10 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         try:
             avd_facts = get_avd_facts(hostvars)
             self.logger.info(f"Generated facts for {len(avd_facts)} devices")
-        except (ValueError, KeyError, TypeError):
+        except AVD_INPUT_ERRORS:
+            # Invalid inputs for this fabric (e.g. one device with a bad MLAG/EVPN
+            # payload) fail this fabric alone instead of propagating and aborting
+            # every other fabric's structured-config run. Genuine bugs still raise.
             self.logger.exception("AVD facts generation failed")
             return
 

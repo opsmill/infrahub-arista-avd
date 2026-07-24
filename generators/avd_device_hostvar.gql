@@ -355,6 +355,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   overlay_routing_protocol {
                     value
                   }
+                  evpn_vlan_aware_bundles {
+                    value
+                  }
                   p2p_uplinks_mtu {
                     value
                   }

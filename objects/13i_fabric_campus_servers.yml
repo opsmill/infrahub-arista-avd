@@ -1,0 +1,26 @@
+---
+# ============================================================================
+# Fabric-Campus — connected endpoints (access-layer physical servers) for
+# CAMPUS_IDF1. Loaded after 13b so the fabric/pod/rack exist first. Each
+# server declares only its rack + object_template + servers-group membership;
+# the generate-server-cabling generator (targets the "servers" group)
+# auto-cables the server to the rack's access leaf switches. member_of_groups
+# is set atomically in the same object so the generator trigger does not race
+# group membership.
+#   - campus-endpoint1 / campus-endpoint2: single-homed (compute-server-single)
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ComputePhysicalServer
+  data:
+    - name: "campus-endpoint1"
+      status: "provisioning"
+      rack: "CAMPUS_IDF1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]
+    - name: "campus-endpoint2"
+      status: "provisioning"
+      rack: "CAMPUS_IDF1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]

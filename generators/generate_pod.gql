@@ -35,6 +35,9 @@ query PodGeneratorQuery($name: String!) {
               amount_of_super_spines {
                 value
               }
+              underlay_routing_protocol {
+                value
+              }
               fabric_interface_sorting_method {
                 value
               }

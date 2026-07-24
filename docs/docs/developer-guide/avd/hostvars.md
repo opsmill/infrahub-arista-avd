@@ -205,6 +205,20 @@ Example:
 
 In the final hostvars, `custom_structured_configuration_prefix` and `l3leaf.defaults.platform` survive if the generator does not set them. The generated `fabric_name` and generated `l3leaf.nodes` still win.
 
+The escape hatch is the delivery mechanism for capabilities the AVD example scenarios need but that are not modeled natively — for example campus dot1x/PoE/port-profiles/in-band management and MPLS/VPN-IPv4 for ISIS-LDP IPVPN. See [Extending the Pipeline → Native schema vs. the escape hatch](./extending.md#native-schema-vs-the-escape-hatch) for when to use it instead of a native schema change.
+
+## Native inputs for the AVD example scenarios
+
+The following native schema inputs anchor the AVD example scenarios. They are optional and default to backward-compatible values, so existing designs are unaffected:
+
+| Input | Node | Scenario |
+|-------|------|----------|
+| `evpn_vlan_aware_bundles` (Boolean) | `NetworkFabric` | Multi-Pod 5-stage Clos |
+| `underlay_routing_protocol` values `none`, `isis-ldp` | `NetworkFabric` | Standalone L2LS (`none`), ISIS-LDP IPVPN (`isis-ldp`) |
+| Roles `l2spine`, `l3spine`, `p`, `pe`, `rr` | `DcimDevice` | L2LS, campus, ISIS-LDP IPVPN — see [Role Mapping](./role-mapping.md) |
+
+Generator consumption of these inputs (route-server derivation, standalone L2LS and campus topology generation) is delivered alongside the per-scenario seed designs.
+
 ## Validation
 
 Once the dict is built, Phase 1 calls `pyavd.validate_inputs()` on the whole hostvars object. Validation failures are non-recoverable — the generator returns a failure for that device and does **not** write the `AvdHostvarFile`.

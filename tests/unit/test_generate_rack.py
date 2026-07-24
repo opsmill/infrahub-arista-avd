@@ -81,6 +81,74 @@ def _make_generator() -> RackGenerator:
     return gen
 
 
+def _iface(name: str, role: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=SimpleNamespace(value=name),
+        role=SimpleNamespace(value=role),
+        save=AsyncMock(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_assign_l2leaf_mlag_peer_interfaces_uses_highest_access_ports() -> None:
+    """The peer-link is carved from the highest-numbered access ports so it never
+    collides with server cabling, which fills the lowest-numbered ports first. Only
+    access ports (role server/mlag_peer) are eligible — uplinks are never touched."""
+    gen = _make_generator()
+    ifaces = [
+        _iface("Ethernet1", "server"),
+        _iface("Ethernet2", "server"),
+        _iface("Ethernet47", "server"),
+        _iface("Ethernet48", "server"),
+        _iface("Ethernet49/1", "spine"),  # uplink — never eligible
+    ]
+    gen.client.filters = AsyncMock(return_value=ifaces)
+
+    await gen._assign_l2leaf_mlag_peer_interfaces(_leaf("leaf-a", "leaf-pod-a-1-1"))
+
+    converted = {i.name.value for i in ifaces if i.role.value == "mlag_peer"}
+    assert converted == {"Ethernet47", "Ethernet48"}
+    assert ifaces[0].role.value == "server"  # low ports untouched (reserved for servers)
+    assert ifaces[4].role.value == "spine"  # uplink untouched
+    for i in ifaces:
+        if i.name.value in {"Ethernet47", "Ethernet48"}:
+            # Template-owned interfaces are saved outside the tracking group so a
+            # later reconciliation never resets or deletes them.
+            i.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+        else:
+            i.save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_assign_l2leaf_mlag_peer_interfaces_is_idempotent() -> None:
+    """A re-run is a no-op: ports already in role mlag_peer are re-selected (the pool
+    still includes them) but not re-saved, so the choice never shifts on re-run."""
+    gen = _make_generator()
+    ifaces = [
+        _iface("Ethernet1", "server"),
+        _iface("Ethernet2", "server"),
+        _iface("Ethernet47", "mlag_peer"),
+        _iface("Ethernet48", "mlag_peer"),
+    ]
+    gen.client.filters = AsyncMock(return_value=ifaces)
+
+    await gen._assign_l2leaf_mlag_peer_interfaces(_leaf("leaf-a", "leaf-pod-a-1-1"))
+
+    for i in ifaces:
+        i.save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_assign_l2leaf_mlag_peer_interfaces_raises_when_too_few_ports() -> None:
+    """Fewer access ports than the peer-link needs is a hard error, not a silent
+    partial peer-link that would leave PyAVD without mlag_interfaces."""
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[_iface("Ethernet1", "server")])
+
+    with pytest.raises(ValueError, match="MLAG peer-link"):
+        await gen._assign_l2leaf_mlag_peer_interfaces(_leaf("leaf-a", "leaf-pod-a-1-1"))
+
+
 @pytest.mark.parametrize("value", [False, "false", "False", "0", "no", "off"])
 def test_is_mlag_enabled_handles_false_values(value: object) -> None:
     assert is_mlag_enabled(value) is False

@@ -1,0 +1,46 @@
+---
+# ============================================================================
+# L3LS example fabrics — connected endpoints (physical servers) for the
+# existing Fabric-A and Fabric-B leaf racks. Loaded after the fabric/pod/rack
+# objects (11_rack.yml) so the racks exist first. Each server declares only its
+# rack + object_template + servers-group membership; the generate-server-cabling
+# generator (targets the "servers" group) auto-cables the server to its rack's
+# leaf switches. member_of_groups is set atomically in the same object so the
+# generator trigger does not race group membership.
+#   Fabric-A:
+#     - fabric-a-server1/2: dual-homed (compute-server-dual) on Rack-A2-1
+#       (compute rack, MLAG leaf pair)
+#     - fabric-a-gpu1: single-homed GPU (gpu-server-single) on Rack-A3-1
+#   Fabric-B:
+#     - fabric-b-server1/2: single-homed (compute-server-single) on Rack-B2-1
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ComputePhysicalServer
+  data:
+    - name: "fabric-a-server1"
+      status: "provisioning"
+      rack: "Rack-A2-1"
+      object_template: "compute-server-dual"
+      member_of_groups: ["servers"]
+    - name: "fabric-a-server2"
+      status: "provisioning"
+      rack: "Rack-A2-1"
+      object_template: "compute-server-dual"
+      member_of_groups: ["servers"]
+    - name: "fabric-a-gpu1"
+      status: "provisioning"
+      rack: "Rack-A3-1"
+      object_template: "gpu-server-single"
+      member_of_groups: ["servers"]
+    - name: "fabric-b-server1"
+      status: "provisioning"
+      rack: "Rack-B2-1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]
+    - name: "fabric-b-server2"
+      status: "provisioning"
+      rack: "Rack-B2-1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]

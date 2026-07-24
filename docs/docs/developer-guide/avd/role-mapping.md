@@ -15,13 +15,20 @@ Infrahub's `DcimDevice.role.value` is a string enum that the hostvars generator 
 
 ## Table
 
-| Infrahub role | PyAVD `type` |
-|---------------|--------------|
-| `super_spine` | `super-spine` |
-| `spine` | `spine` |
-| `leaf` | `l3leaf` |
-| `border_leaf` | `l3leaf` |
-| `l2leaf` | `l2leaf` |
+| Infrahub role | PyAVD `type` | Primary scenario |
+|---------------|--------------|------------------|
+| `super_spine` | `super-spine` | L3LS, 5-stage Clos |
+| `spine` | `spine` | L3LS |
+| `leaf` | `l3leaf` | L3LS |
+| `border_leaf` | `l3leaf` | Dual-DC (DCI) |
+| `l2leaf` | `l2leaf` | L3LS access, L2LS access, campus access |
+| `l2spine` | `l2spine` | Standalone L2LS fabric |
+| `l3spine` | `l3spine` | L2LS (L3 variant), campus core |
+| `p` | `p` | ISIS-LDP IPVPN (provider core) |
+| `pe` | `pe` | ISIS-LDP IPVPN (provider edge) |
+| `rr` | `rr` | ISIS-LDP IPVPN route reflector |
+
+All PyAVD `type` values above are valid entries in the pinned PyAVD default `node_type_keys`. Roles beyond `l3leaf`/`l2leaf` are the schema anchors for the AVD example scenarios; the scenario-specific rendering behaviour is delivered either natively or through the `avd_custom_hostvars` escape hatch — see [Extending the Pipeline](./extending.md).
 
 ## The mapping in code
 
@@ -33,6 +40,11 @@ ROLE_TO_AVD_TYPE: dict[str, str] = {
     "leaf": "l3leaf",
     "border_leaf": "l3leaf",
     "l2leaf": "l2leaf",
+    "l2spine": "l2spine",
+    "l3spine": "l3spine",
+    "p": "p",
+    "pe": "pe",
+    "rr": "rr",
 }
 
 
@@ -44,6 +56,22 @@ def get_avd_type(role: str) -> str:
 ```
 
 An unrecognised role raises `ValueError` at generation time — Phase 1 will fail for that device.
+
+## Underlay-driven role selection
+
+The four non-L3LS example designs do not set spine/leaf roles by hand. Instead the upstream generator derives them from the **fabric underlay**, so the same spine/leaf topology renders different device types per design:
+
+| Fabric underlay | Spine-tier role | Leaf-tier role | Example design |
+|-----------------|-----------------|----------------|----------------|
+| `none` | `l2spine` | `l2leaf` | Standalone L2LS |
+| `ospf` | `l3spine` | `l2leaf` | Campus |
+| `isis-ldp` | `p` | `pe` | MPLS ISIS-LDP IPVPN |
+
+These come from `SPINE_ROLE_BY_UNDERLAY` and `LEAF_ROLE_BY_UNDERLAY` in [`avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py). The selection is **gated to non-L3LS underlays only**: a routed L3LS fabric (underlay `ebgp`) is not in either map, so it falls back to the default `spine` / `leaf` roles.
+
+## MLAG in non-L3LS designs
+
+`MLAG_MAIN_TIER_ROLES` (`l2leaf`, `l2spine`, `l3spine`) is the main tier of the non-L3LS designs that forms MLAG pairs. When the fabric underlay is one of `SPINE_UPLINK_UNDERLAYS` (`none`, `ospf`, `isis-ldp`), devices in these roles render node-group / peer-link / MLAG-domain configuration — just like the L3LS leaf family. The gate leaves the L3LS access-tier `l2leaf` (pure access under EVPN) unaffected.
 
 ## Role implications
 

@@ -1,0 +1,81 @@
+---
+# ============================================================================
+# EVPN services for Fabric-SDC-L3LS — a small single-tenant, single-VRF design
+# with three L3 SVIs, mirroring the 12_evpn_services.yml shape (IpamL2Domain +
+# IpamVLAN + IpamVRF + EvpnTenant + EvpnSvi). Loads after the fabric (14) so the
+# tenant->fabric relationship resolves. SVI virtual IPs are tenant overlay
+# addresses and are independent of the fabric underlay pools in 14.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamL2Domain
+  data:
+    - name: Fabric-SDC-L3LS-L2Domain
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVLAN
+  data:
+    - name: SDC-DATA
+      vlan_id: 11
+      status: active
+      role: server
+      l2domain: Fabric-SDC-L3LS-L2Domain
+    - name: SDC-APP
+      vlan_id: 12
+      status: active
+      role: server
+      l2domain: Fabric-SDC-L3LS-L2Domain
+    - name: SDC-STORAGE
+      vlan_id: 21
+      status: active
+      role: server
+      l2domain: Fabric-SDC-L3LS-L2Domain
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVRF
+  data:
+    - name: SDC-VRF10
+      vrf_rd: "64:10"
+      namespace: default
+      vrf_vni: 10
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnTenant
+  data:
+    - name: SDC-L3LS-TENANT
+      mac_vrf_vni_base: 30000
+      fabrics:
+        - "Fabric-SDC-L3LS"
+      vrfs:
+        - SDC-VRF10
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnSvi
+  data:
+    - name: "SDC-Data-11"
+      svi_id: 11
+      ip_address_virtual: "10.64.11.1/24"
+      enabled: true
+      vrf: SDC-VRF10
+      vlan: SDC-DATA
+    - name: "SDC-App-12"
+      svi_id: 12
+      ip_address_virtual: "10.64.12.1/24"
+      enabled: true
+      vrf: SDC-VRF10
+      vlan: SDC-APP
+    - name: "SDC-Storage-21"
+      svi_id: 21
+      ip_address_virtual: "10.64.21.1/24"
+      enabled: true
+      vrf: SDC-VRF10
+      vlan: SDC-STORAGE

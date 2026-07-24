@@ -54,6 +54,21 @@ extensions:
               label: L2 Leaf
               description: "L2 Leaf Switch (access layer, no EVPN)"
               color: "#f0e6fa"
+            - name: l2spine
+              label: L2 Spine
+              description: "Standalone L2LS fabric spine (Layer 2)"
+            - name: l3spine
+              label: L3 Spine
+              description: "L2LS/campus spine with L3 SVI routing"
+            - name: p
+              label: Provider (P)
+              description: "MPLS provider core router (ISIS-LDP IPVPN)"
+            - name: pe
+              label: Provider Edge (PE)
+              description: "MPLS provider edge router (ISIS-LDP IPVPN)"
+            - name: rr
+              label: Route Reflector (RR)
+              description: "MPLS/WAN route reflector"
         - name: node_id
           label: Node ID
           kind: Number
