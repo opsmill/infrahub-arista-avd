@@ -5,5 +5,5 @@
   "here": true,
   "integration": "codex",
   "script": "py",
-  "speckit_version": "0.13.0"
+  "speckit_version": "0.14.1"
 }
