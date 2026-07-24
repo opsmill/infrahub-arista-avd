@@ -286,12 +286,12 @@ def test(ctx: Context) -> None:
 
 @task(
     help={
-        "proposed_change_id": "Merged proposed change ID.",
+        "proposed_change_id": "Submitted proposed change ID.",
         "branch": "Destination branch containing workspace tracking.",
     }
 )
 def submit_cv_workspace(ctx: Context, proposed_change_id: str, branch: str = "main") -> None:
-    """Manually retry CloudVision submission for a linked merged proposed change."""
+    """Manually retry CloudVision submission for a linked submitted proposed change."""
     command = (
         f"python -m checks.cv_workspace_lifecycle {shlex.quote(proposed_change_id)} --branch {shlex.quote(branch)}"
     )

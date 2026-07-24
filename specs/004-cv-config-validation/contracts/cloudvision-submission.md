@@ -2,8 +2,7 @@
 
 ## Purpose
 
-Submit an existing CloudVision workspace and capture the resulting change
-control without creating or rebuilding a workspace after Infrahub merge.
+Submit an existing CloudVision workspace from CustomWebhook processing and capture a safe user-visible outcome without creating, rebuilding, or force-submitting a workspace.
 
 ## CloudVision Configuration
 
@@ -20,38 +19,35 @@ Optional environment:
 - `CLOUDVISION_PROXY_USERNAME`
 - `CLOUDVISION_PROXY_PASSWORD`
 
-Missing required configuration is a submission failure and must produce a
-proposed-change failure comment when possible.
+Missing required configuration is a submission failure and must produce a proposed-change failure comment when possible.
 
 ## Submission Flow
 
-1. Open `CVClient` with the configured CloudVision connection.
-2. Fetch the existing workspace with `get_workspace(workspace_id)`.
-3. If the workspace is already submitted, return an already-complete outcome.
-4. Submit with `submit_workspace(workspace_id, force=False)`.
-5. Wait for the submission response with `wait_for_workspace_response()`.
-6. On success, read the change control ID from the returned workspace response
-   when CloudVision provides one.
-7. Update `CloudvisionWorkspace` and the proposed-change thread.
+1. Resolve exactly one linked `CloudvisionWorkspace` by proposed-change ID and branch.
+2. Confirm its status is submit-ready: `built` or `submit_failed`.
+3. Open `CVClient` with the configured CloudVision connection.
+4. Fetch the existing workspace with `get_workspace(workspace_id)`.
+5. If the workspace is already submitted, return an already-complete outcome.
+6. Submit the existing workspace with non-forced semantics.
+7. Wait for the workspace submission response.
+8. Update `CloudvisionWorkspace` and the proposed-change thread.
 
 ## Rules
 
-- Do not create a workspace after merge.
+- Do not create a workspace during CustomWebhook processing.
+- Do not rebuild the workspace during CustomWebhook processing.
 - Do not force-submit by default.
-- Do not rebuild the workspace as part of post-merge submission.
-- Do not treat missing change-control URL as failure when the ID is available.
-- Do treat CloudVision rejection, connection failure, authentication failure,
-  and timeout as failed submission outcomes.
+- Do not submit if the linked workspace is missing, ambiguous, already submitted, pending, abandoned, or validation-failed.
+- Do treat CloudVision rejection, connection failure, authentication failure, and timeout as failed submission outcomes.
+- Do not manage CloudVision change controls, approval scheduling, or Semaphore playbooks in this phase.
 
 ## Output Mapping
 
 Successful submission:
 
 - `CloudvisionWorkspace.status = submitted`
-- `CloudvisionWorkspace.change_control_id = <id when available>`
-- `CloudvisionWorkspace.change_control_url = <url when available>`
 - `CloudvisionWorkspace.submitted_at = <current timestamp>`
-- Thread success comment is appended.
+- Thread success comment is appended with workspace identity and URL when available.
 - Thread is resolved.
 
 Already submitted:
@@ -63,8 +59,8 @@ Already submitted:
 
 Failure:
 
-- `CloudvisionWorkspace.status = submit_failed`
+- `CloudvisionWorkspace.status = submit_failed` when a workspace record exists.
 - `CloudvisionWorkspace.last_submission_error = <reason>`
 - `CloudvisionWorkspace.last_submission_attempt_at = <current timestamp>`
-- Thread failure comment is appended.
+- Thread failure comment is appended when possible.
 - Thread remains unresolved.

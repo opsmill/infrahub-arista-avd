@@ -26,10 +26,11 @@ from checks.cv_helpers import (
 from checks.cv_workspace_lifecycle import (
     SubmissionResult,
     ensure_workspace_thread_and_url_comment,
-    submit_linked_workspace_for_merged_event,
+    submit_linked_workspace_for_custom_webhook,
     submit_linked_workspace_for_proposed_change,
 )
-from checks.cv_workspace_submission_query import CVWorkspaceSubmissionQuery
+from transforms.cv_workspace_submission_webhook import CVWorkspaceSubmissionWebhookPayload
+from transforms.cv_workspace_submission_webhook_query import CVWorkspaceSubmissionWebhookQuery
 
 
 def _fabric_node(cloudvision_managed: bool | None = True) -> dict[str, Any]:
@@ -324,46 +325,49 @@ def test_cloudvision_workspace_and_change_control_url_helpers(monkeypatch: pytes
     assert get_change_control_url(config, "cc-1") == "https://cv.example.com/cc/cc-1"
 
 
-def test_repository_objects_do_not_register_placeholder_cloudvision_webhook() -> None:
+def test_repository_objects_register_one_placeholder_cloudvision_webhook() -> None:
     repository_text = "\n".join(
         Path(path).read_text(encoding="utf-8") for path in ["triggers.yml", "repository_checks.yml", ".infrahub.yml"]
     )
 
-    assert "cloudvision-workspace-submission" not in repository_text
-    assert "cloudvision-workspace-submitter" not in repository_text
-    assert "replace-in-deployment" not in repository_text
+    assert repository_text.count("kind: CoreCustomWebhook") == 1
+    assert repository_text.count("cloudvision-workspace-submission") == 2
+    assert "https://placeholder.invalid/cloudvision-workspace-submission" in repository_text
+    assert "cv-workspace-submission-webhook-payload" in repository_text
+    assert "cv_workspace_submission_webhook_payload" in repository_text
+    assert "CVWorkspaceSubmissionWebhookPayload" in repository_text
     assert "CoreStandardWebhook" not in repository_text
 
 
-def test_cloudvision_docs_do_not_require_placeholder_submission_receiver() -> None:
+def test_cloudvision_docs_describe_placeholder_custom_webhook() -> None:
     docs = Path("docs/docs/cloudvision.md").read_text(encoding="utf-8")
 
-    assert "cloudvision-workspace-submission" not in docs
-    assert "cloudvision-workspace-submitter" not in docs
-    assert "replace-in-deployment" not in docs
-    assert "placeholder" not in docs.lower()
-    assert "separate webhook receiver" not in docs.lower()
+    assert "cloudvision-workspace-submission" in docs
+    assert "https://placeholder.invalid/cloudvision-workspace-submission" in docs
+    assert "placeholder" in docs.lower()
+    assert "no real external automation receiver is required" in docs.lower()
 
 
-def test_cloudvision_docs_describe_direct_submission_and_manual_retry() -> None:
+def test_cloudvision_docs_describe_custom_webhook_submission_and_manual_retry() -> None:
     docs = Path("docs/docs/cloudvision.md").read_text(encoding="utf-8")
 
     assert "submit_linked_workspace_for_proposed_change()" in docs
-    assert "submit_linked_workspace_for_merged_event()" in docs
-    assert "post-merge/API execution" in docs
+    assert "submit_linked_workspace_for_custom_webhook()" in docs
+    assert "CustomWebhook" in docs
     assert "uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main" in docs
     assert "fallback" in docs
     assert "unresolved failure comment" in docs
+    assert "CloudVision change-control management and Semaphore Ansible playbooks are out of scope" in docs
 
 
-def test_direct_submission_quickstart_lists_validation_and_retry_paths() -> None:
+def test_custom_webhook_quickstart_lists_validation_and_retry_paths() -> None:
     quickstart = Path("specs/004-cv-config-validation/quickstart.md").read_text(encoding="utf-8")
 
     assert "uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main" in quickstart
     assert "uv run pytest tests/unit/test_cv_integration.py" in quickstart
     assert "uv run invoke lint" in quickstart
     assert "$infrahub-run-integration-tests" in quickstart
-    assert "No repository-loaded object registers" in quickstart
+    assert "Exactly one intended CloudVision workspace submission `CoreCustomWebhook`" in quickstart
 
 
 class _FakeWorkspaceNode:
@@ -408,7 +412,9 @@ class _FakeLifecycleClient:
         self.resolved: list[tuple[str, bool]] = []
         self.fail_comment_write = fail_comment_write
         self.fail_thread_resolve = fail_thread_resolve
-        self.workspace_submission_query = Path("checks/cv_workspace_submission.gql").read_text(encoding="utf-8")
+        self.workspace_submission_query = Path("transforms/cv_workspace_submission_webhook.gql").read_text(
+            encoding="utf-8"
+        )
 
     async def get(self, **kwargs: Any) -> _FakeWorkspaceNode:
         obj_id = kwargs.get("id")
@@ -496,8 +502,8 @@ class _FakeLifecycleClient:
 
 
 def test_workspace_submission_runtime_query_and_generated_model_stay_aligned() -> None:
-    query = Path("checks/cv_workspace_submission.gql").read_text(encoding="utf-8")
-    parsed = CVWorkspaceSubmissionQuery.model_validate(
+    query = Path("transforms/cv_workspace_submission_webhook.gql").read_text(encoding="utf-8")
+    parsed = CVWorkspaceSubmissionWebhookQuery.model_validate(
         {
             "CloudvisionWorkspace": {
                 "edges": [
@@ -638,7 +644,8 @@ async def test_submit_linked_workspace_success_updates_workspace_comments_and_re
         thread_id="thread-1",
         change_control_id="cc-1",
         message=(
-            "CloudVision workspace ws-1 submitted successfully. Change control: cc-1 https://www.cv.example.com/cc/cc-1"
+            "CloudVision workspace ws-1 submitted successfully. "
+            "Workspace: https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1"
         ),
     )
     assert workspace.status.value == "submitted"
@@ -681,7 +688,7 @@ async def test_submit_linked_workspace_failure_records_unresolved_comment(
     assert workspace.status.value == "submit_failed"
     assert "rejected by CloudVision" in workspace.last_submission_error.value
     assert client.resolved[-1] == ("thread-1", False)
-    assert any("Infrahub proposed change pc-1 was merged" in comment["text"] for comment in client.comments)
+    assert any("Infrahub proposed change pc-1 was submitted" in comment["text"] for comment in client.comments)
 
 
 @pytest.mark.asyncio
@@ -750,18 +757,34 @@ async def test_submit_linked_workspace_event_adapter_passes_event_identity(
 
     monkeypatch.setattr("checks.cv_workspace_lifecycle.submit_linked_workspace_for_proposed_change", submit_for_pc)
 
-    result = await submit_linked_workspace_for_merged_event(
+    result = await submit_linked_workspace_for_custom_webhook(
         SimpleNamespace(),
         {
-            "event": "ProposedChangeMergedEvent",
+            "event": "infrahub.proposed_change.submitted",
             "branch": "main",
-            "payload": {"proposed_change_id": "pc-merged"},
+            "payload": {"proposed_change_id": "pc-submitted", "check_name": "cv-config-validation"},
         },
         branch="fallback",
     )
 
     assert result.status == "skipped"
-    assert calls == [("pc-merged", "main")]
+    assert calls == [("pc-submitted", "main")]
+
+
+@pytest.mark.asyncio
+async def test_custom_webhook_adapter_ignores_other_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def submit_for_pc(client: Any, proposed_change_id: str, *, branch: str = "main") -> SubmissionResult:
+        pytest.fail("unrelated check should not submit a CloudVision workspace")
+
+    monkeypatch.setattr("checks.cv_workspace_lifecycle.submit_linked_workspace_for_proposed_change", submit_for_pc)
+
+    result = await submit_linked_workspace_for_custom_webhook(
+        SimpleNamespace(),
+        {"payload": {"proposed_change_id": "pc-1", "check_name": "other-check"}},
+    )
+
+    assert result.status == "skipped"
+    assert "other-check" in result.message
 
 
 @pytest.mark.asyncio
@@ -798,6 +821,47 @@ async def test_submit_linked_workspace_derives_missing_workspace_url(
     assert result.status == "submitted"
     assert client.workspaces[0].workspace_url.value == "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1"
     assert "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1" in client.comments[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_custom_webhook_payload_transform_returns_submission_payload() -> None:
+    transform = CVWorkspaceSubmissionWebhookPayload.__new__(CVWorkspaceSubmissionWebhookPayload)
+    payload = await transform.transform(
+        {
+            "CloudvisionWorkspace": {
+                "edges": [
+                    {
+                        "node": {
+                            "id": "workspace-node-1",
+                            "name": {"value": "Workspace"},
+                            "workspace_id": {"value": "ws-1"},
+                            "proposed_change_id": {"value": "pc-1"},
+                            "status": {"value": "built"},
+                            "workspace_url": {"value": "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1"},
+                            "thread_id": {"value": "thread-1"},
+                            "change_control_id": {"value": None},
+                            "change_control_url": {"value": None},
+                            "fabric": {"node": {"id": "fabric-1", "name": {"value": "Fabric-DC1"}}},
+                        }
+                    }
+                ]
+            }
+        }
+    )
+
+    assert payload == {
+        "check_name": "cv-config-validation",
+        "proposed_change_id": "pc-1",
+        "workspaces": [
+            {
+                "workspace_id": "ws-1",
+                "proposed_change_id": "pc-1",
+                "status": "built",
+                "workspace_url": "https://www.cv.example.com/cv/provisioning/workspaces?ws=ws-1",
+                "fabric_name": "Fabric-DC1",
+            }
+        ],
+    }
 
 
 @pytest.mark.asyncio
@@ -1234,9 +1298,7 @@ async def test_deploy_and_build_blocks_inactive_inventory_device_after_successfu
     assert tracked_statuses == ["abandoned"]
     assert any("inactive" in error["message"] and "leaf-2" in error["message"] for error in check.errors)
     assert any("workspace built successfully" in log["message"] for log in check.logs)
-    assert any(
-        log["message"] == "Confirmed 2 devices in CloudVision inventory, skipped 0" for log in check.logs
-    )
+    assert any(log["message"] == "Confirmed 2 devices in CloudVision inventory, skipped 0" for log in check.logs)
     assert any(log["message"] == "Devices with validated configurations: leaf-1" for log in check.logs)
     assert not any("Deployed" in log["message"] for log in check.logs)
     assert not any("Devices with configs deployed" in log["message"] for log in check.logs)

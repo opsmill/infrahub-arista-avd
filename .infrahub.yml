@@ -54,8 +54,8 @@ queries:
   # CloudVision proposed-change check query
   - name: cv_config_check
     file_path: "./checks/cv_config_check.gql"
-  - name: cv_workspace_submission
-    file_path: "./checks/cv_workspace_submission.gql"
+  - name: cv_workspace_submission_webhook
+    file_path: "./transforms/cv_workspace_submission_webhook.gql"
 
 
 generator_definitions:
@@ -166,6 +166,10 @@ python_transforms:
   - name: containerlab_topology
     class_name: ContainerLabTopology
     file_path: "./transforms/containerlab_topology.py"
+  - name: cv_workspace_submission_webhook_payload
+    class_name: CVWorkspaceSubmissionWebhookPayload
+    file_path: "./transforms/cv_workspace_submission_webhook.py"
+    convert_query_response: false
 
 artifact_definitions:
   - name: "cabling_plan"

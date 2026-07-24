@@ -11,12 +11,12 @@
 
 ## Decision: Bind the query on the Python check class and register the query separately
 
-**Rationale**: Infrahub check definitions do not accept a `query` field in `.infrahub.yml`; the Python check class owns the query name and that name must match a top-level `queries` entry. The live `CoreCheckDefinition` seed object can carry its own query relationship because it is object data, not the repository config schema.
+**Rationale**: Infrahub check definitions in `.infrahub.yml` do not require a `query` field; the Python check class owns the query name and that name must match a top-level `queries` entry. Live `CoreCheckDefinition` seed objects can reference the query object because they are Infrahub object data, not repository config schema.
 
 **Alternatives considered**:
 
-- Put `query: cv_config_check` under `.infrahub.yml` `check_definitions`: rejected because the repository config model forbids that key.
-- Skip repository seed data and rely only on `.infrahub.yml`: rejected because this project also loads live check/query objects through `repository_checks.yml`.
+- Put `query: cv_config_check` under `.infrahub.yml` `check_definitions`: rejected because the repository config model does not use that key for check definitions.
+- Skip repository seed data and rely only on `.infrahub.yml`: rejected because this project also loads live check/query objects through repository YAML.
 
 ## Decision: Use generated typed GraphQL response models
 
@@ -24,7 +24,7 @@
 
 **Alternatives considered**:
 
-- Use untyped dictionaries in production code: rejected by the Type Safety principle and because missing relationships are more likely to become runtime errors.
+- Use untyped dictionaries in production code: rejected by the Type Safety principle and because missing relationships are likely to become runtime errors.
 - Hand-write query response classes: rejected because repository convention is to regenerate return types from `.gql` files.
 
 ## Decision: Gate validation with `NetworkFabric.cloudvision_managed`
@@ -92,19 +92,19 @@
 - Always fall back to `local`: rejected because live proposed-change validations would share an identity and workspace.
 - Fail when initializer metadata is missing: rejected because Infrahub can still expose enough proposed-change metadata through branch lookup.
 
-## Decision: Build before merge, submit only after merge through the direct lifecycle path
+## Decision: Build before merge and submit only through CustomWebhook processing
 
-**Rationale**: Pre-merge validation should build the CloudVision workspace for review and block invalid proposed changes before merge. Submission changes production state, so it must happen only after Infrahub merge and only for the exact existing workspace linked to the merged proposed change.
+**Rationale**: Pre-merge validation should build the CloudVision workspace for review and block invalid proposed changes before merge. Submission changes CloudVision state, so it must be initiated only by the CustomWebhook processing path associated with proposed-change submission and `cv-config-validation`.
 
 **Alternatives considered**:
 
 - Submit immediately from the validation check: rejected because it would deploy unmerged changes and break review semantics.
-- Create or rebuild a workspace after merge: rejected because post-merge processing must operate on the already-built linked workspace.
+- Create or rebuild a workspace during CustomWebhook processing: rejected because submission must operate on the already-built linked workspace.
 - Submit based only on branch name: rejected because retries and concurrent same-fabric proposed changes need the stable proposed-change ID.
 
 ## Decision: Treat workspace thread updates as part of the CloudVision lifecycle
 
-**Rationale**: The created CloudVision workspace URL, submission success, change-control reference, already-complete state, skip outcome, ambiguity outcome, and failure reason are all review or operator-facing lifecycle events. A deterministic `CoreChangeThread` with `CoreThreadComment` entries keeps those events visible in the proposed-change Overview and makes retries idempotent.
+**Rationale**: The created CloudVision workspace URL, submission success, already-complete state, skip outcome, ambiguity outcome, and failure reason are all review or operator-facing lifecycle events. A deterministic `CoreChangeThread` with `CoreThreadComment` entries keeps those events visible in the proposed-change Overview and makes retries idempotent.
 
 **Alternatives considered**:
 
@@ -114,60 +114,54 @@
 
 ## Decision: Extend `CloudvisionWorkspace` with optional lifecycle metadata
 
-**Rationale**: The tracking node already links a deterministic workspace ID to a proposed change and fabric. Optional fields such as `workspace_url`, `thread_id`, `change_control_id`, `change_control_url`, `last_submission_error`, `last_submission_attempt_at`, and `submitted_at` make thread updates and direct submission retry-safe without requiring a second tracking node.
+**Rationale**: The tracking node links a deterministic workspace ID to a proposed change and fabric. Optional fields such as `workspace_url`, `thread_id`, `last_submission_error`, `last_submission_attempt_at`, and `submitted_at` make thread updates and CustomWebhook retry behavior safe without requiring a second tracking node.
 
 **Alternatives considered**:
 
 - Store only comments and re-query comment text on retry: rejected because idempotence would depend on display wording.
 - Create a separate submission node: rejected for this scope because there is a single submission lifecycle per deterministic workspace.
 
-## Decision: Submit the existing CloudVision workspace through PyAVD `CVClient`
+## Decision: Register one placeholder `CoreCustomWebhook` with a Python payload transform
 
-**Rationale**: The pinned PyAVD dependency exposes CloudVision client helpers that can submit an existing workspace and wait for the workspace response, including change control IDs when CloudVision creates them. This avoids rebuilding or recreating the workspace after merge.
-
-**Alternatives considered**:
-
-- Use the validation build workflow with requested state `submitted`: rejected for the post-merge path because it can rebuild and starts from validation behavior.
-- Call CloudVision gRPC stubs directly everywhere: rejected because the current code already uses PyAVD's client abstraction for CloudVision operations.
-
-## Decision: Resolve workspaces by proposed-change ID on the destination branch
-
-**Rationale**: `CloudvisionWorkspace.proposed_change_id` is the stable correlation key between an Infrahub proposed change and its CloudVision workspace. Looking up the tracking object on the destination branch after merge lets the handler find the workspace created during validation without depending on branch-name heuristics or event-transport-specific payload shapes.
+**Rationale**: The active scope requires a repository-loadable CustomWebhook called on proposed-change submission with `cv-config-validation`. The local schema shows `CoreCustomWebhook` requires a `transformation` relationship to `CoreTransformPython`, so the registration must include a small Python payload transform that is registered under `python_transforms` and backed by the co-located `cv_workspace_submission_webhook` query. The URL must be clearly placeholder in this phase so the repository exposes the handoff point without implying that a real deployment automation endpoint, CloudVision change-control workflow, or Semaphore playbook exists.
 
 **Alternatives considered**:
 
-- Resolve by source branch only: rejected because branch names are not durable enough for retries and concurrent same-fabric proposed changes.
-- Create a workspace after merge when none is found: rejected because missing linked work must be skipped or reported, not invented after merge.
+- Omit webhook registration until a real receiver exists: rejected because the scope explicitly requires the CustomWebhook object for this phase.
+- Register a real external endpoint: rejected because external automation is out of scope.
+- Use `CoreStandardWebhook`: rejected because the spec calls for `CoreCustomWebhook` and check-specific association with `cv-config-validation`.
+- Register `CoreCustomWebhook` without a transformation: rejected because the local Infrahub schema requires a `CoreTransformPython` relationship.
+
+## Decision: Process CustomWebhook events through a shared typed submission handler
+
+**Rationale**: CustomWebhook processing, manual retry, and tests should all call one handler that resolves linked `CloudvisionWorkspace` objects by proposed-change ID and branch. Keeping the business logic in one handler prevents different retry and webhook paths from diverging.
+
+**Alternatives considered**:
+
+- Implement separate logic in the webhook adapter and manual retry task: rejected because it increases duplicate submission risk.
+- Depend on the placeholder URL to perform real work in this phase: rejected because the placeholder URL is a loadable handoff marker, not a deployed automation endpoint.
 
 ## Decision: Submit exactly one existing submit-ready workspace
 
-**Rationale**: The direct path must submit only when the destination branch has exactly one linked `CloudvisionWorkspace` and its status indicates it is submit-ready. Zero linked workspaces produce a visible skip outcome. Multiple linked workspaces produce an ambiguity failure and no CloudVision submission. Already-submitted workspaces are treated as complete and must not issue another CloudVision submit request.
+**Rationale**: The CustomWebhook path must submit only when the destination branch has exactly one linked `CloudvisionWorkspace` and its status indicates it is submit-ready. Zero linked workspaces produce a visible skip outcome. Multiple linked workspaces produce an ambiguity failure and no CloudVision submission. Already-submitted workspaces are treated as complete and must not issue another CloudVision submit request.
 
 **Alternatives considered**:
 
-- Submit every linked workspace: rejected because this can deploy ambiguous or unintended work after merge.
-- Force-submit a workspace regardless of status: rejected because status captures whether validation created a built workspace ready for deployment.
+- Submit every linked workspace: rejected because this can deploy ambiguous or unintended work.
+- Force-submit a workspace regardless of status: rejected because status captures whether validation created a built workspace ready for submission.
 
-## Decision: Remove placeholder external webhook registration
+## Decision: Keep CloudVision change-control management and Semaphore playbooks out of scope
 
-**Rationale**: The feature explicitly rejects a fake receiver URL, placeholder shared key, and implied external service dependency. Repository-loaded objects must not include `CoreStandardWebhook` data for CloudVision workspace submission unless a real deployment-specific receiver is implemented outside this feature. The repository should expose callable lifecycle code, an event adapter, and a manual retry path without shipping a placeholder transport binding.
-
-**Alternatives considered**:
-
-- Keep `cloudvision-workspace-submission` with a placeholder URL: rejected because it creates an operational requirement for a nonexistent receiver.
-- Replace it with another placeholder trigger object: rejected because the requirement is to remove fake registration, not rename it.
-
-## Decision: Validate placeholder absence as first-class behavior
-
-**Rationale**: The main regression risk is reintroducing a fake webhook or continuing to document it. Unit/static validation should assert that repository objects and CloudVision documentation no longer mention the placeholder receiver name, URL, or shared key. Integration validation remains mandatory for the Infrahub repository changes and must record the tested branch and commit or an approved exception.
+**Rationale**: The CustomWebhook is only the handoff point and linked workspace submission mechanism for this phase. The repository must not require CloudVision change-control approval scheduling, change-control lifecycle management, or Semaphore Ansible playbook execution to validate or submit the workspace.
 
 **Alternatives considered**:
 
-- Treat webhook removal as manual review only: rejected because no-placeholder behavior is measurable and should be automated where practical.
+- Add change-control orchestration now: rejected by explicit scope.
+- Start a Semaphore deployment playbook after workspace submission: rejected by explicit scope and left for a later feature.
 
-## Decision: Validation evidence must include unit, schema, lint/type, placeholder absence, and integration checks
+## Decision: Validation evidence must include unit, schema, lint/type, CustomWebhook registration, placeholder URL, and integration checks
 
-**Rationale**: The merged feature touches Infrahub schema, repository config, check code, lifecycle code, query models, object seed data, task loading behavior, integration tests, and documentation. The constitution requires unit tests, schema validation, lint/type checks, and the project integration validation skill for Infrahub code changes.
+**Rationale**: The feature touches Infrahub schema, repository config, check code, lifecycle code, query models, object seed data, task loading behavior, integration tests, and documentation. The constitution requires unit tests, schema validation, lint/type checks, and the project integration validation skill for Infrahub code changes.
 
 **Alternatives considered**:
 

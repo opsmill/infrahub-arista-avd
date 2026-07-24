@@ -2,8 +2,7 @@
 
 ## Purpose
 
-Create and update the proposed-change Overview conversation for the CloudVision
-workspace lifecycle.
+Create and update the proposed-change Overview conversation for the CloudVision workspace lifecycle.
 
 ## Thread Identity
 
@@ -11,8 +10,8 @@ workspace lifecycle.
 - Relationship to proposed change: `change`
 - Deterministic label: `CloudVision workspace <workspace_id>`
 - Resolution state:
-  - `resolved=false` when created, pending, or failed
-  - `resolved=true` only after a successful submission comment is saved
+  - `resolved=false` when created, pending, failed, or ambiguous
+  - `resolved=true` only after a successful, already-complete, or safe skip comment is saved
 
 Lookup order:
 
@@ -40,21 +39,35 @@ Rules:
 Required after CloudVision submission succeeds:
 
 ```text
-CloudVision workspace <workspace_id> submitted successfully. Change control: <change_control_id> <change_control_url_if_available>
+CloudVision workspace <workspace_id> submitted successfully. Workspace: <workspace_url_if_available>
 ```
 
 Rules:
 
-- Must include `change_control_id` when CloudVision returns one.
-- Must include `change_control_url` when a reliable URL can be derived.
+- Must include workspace identity.
+- Must include a user-openable workspace URL when available.
 - The thread is marked resolved only after this comment is saved.
+- Must not claim that CloudVision change-control approvals, scheduling, or Semaphore deployment completed.
+
+### Already Complete
+
+Required when the workspace is already submitted:
+
+```text
+CloudVision workspace <workspace_id> was already submitted. No duplicate submission was issued.
+```
+
+Rules:
+
+- Must not issue another CloudVision submission.
+- The thread may be resolved after the comment is saved.
 
 ### Submission Failure
 
-Required when post-merge submission fails:
+Required when CustomWebhook processing fails after proposed-change submission:
 
 ```text
-Infrahub proposed change <proposed_change_id> was merged, but CloudVision workspace <workspace_id> was not submitted for fabric <fabric_name>: <reason>
+Proposed change <proposed_change_id> was submitted, but CloudVision workspace <workspace_id> was not submitted for fabric <fabric_name>: <reason>
 ```
 
 Rules:
@@ -63,6 +76,20 @@ Rules:
 - Must include workspace ID when known.
 - Must include fabric identity when available.
 - Must keep the thread unresolved.
+
+### Skip Or Ambiguity
+
+Required when no linked workspace or multiple linked workspaces are found:
+
+```text
+No CloudVision workspace was submitted for proposed change <proposed_change_id>: <reason>
+```
+
+Rules:
+
+- No linked workspace is informational and may resolve the outcome thread.
+- Multiple linked workspaces is an ambiguity failure and must remain unresolved.
+- The comment must state that no CloudVision submission was attempted.
 
 ## Mutation Shape
 
@@ -128,7 +155,5 @@ mutation ResolveCloudVisionWorkspaceThread($id: String!) {
 ## Error Handling
 
 - If thread lookup fails, create a new deterministic thread and continue.
-- If comment creation fails, log the full outcome with proposed-change ID,
-  workspace ID, and failure reason.
-- If success comment succeeds but resolve fails, log the resolve failure and
-  keep `CloudvisionWorkspace.status` aligned with CloudVision submission state.
+- If comment creation fails, log the full outcome with proposed-change ID, workspace ID, fabric, and failure reason.
+- If success comment succeeds but resolve fails, log the resolve failure and keep `CloudvisionWorkspace.status` aligned with CloudVision submission state.

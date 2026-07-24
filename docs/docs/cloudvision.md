@@ -6,8 +6,8 @@ title: CloudVision Validation
 
 The repository validates generated EOS configurations in CloudVision during
 Infrahub proposed-change validation. It also records the CloudVision workspace
-URL in the proposed change and exposes a post-merge handler for submitting the
-linked workspace after the Infrahub change is merged.
+URL in the proposed change and registers a placeholder CustomWebhook handoff for
+submitting the linked workspace when the proposed change is submitted.
 
 ## Runtime Configuration
 
@@ -69,9 +69,8 @@ When the tracking schema is loaded, validation also creates or updates a
 - `proposed_change_id`: proposed change that created the workspace
 - `workspace_url`: exact CloudVision workspace URL shown to reviewers
 - `thread_id`: proposed-change overview thread used for workspace comments
-- `change_control_id` / `change_control_url`: CloudVision submission result
 - `last_submission_error` / `last_submission_attempt_at`: latest failed
-  post-merge submission attempt
+  CustomWebhook submission attempt
 - `submitted_at`: successful submission timestamp
 - `status`: `pending`, `built`, `submitted`, `abandoned`, or `submit_failed`
 - `fabric`: fabric validated by the workspace
@@ -97,27 +96,38 @@ branch name for `feat/` branches.
 If the `CloudvisionWorkspace` schema is unavailable during rollout, tracking is
 skipped without masking CloudVision validation success or failure.
 
-## Post-Merge Submission
+## CustomWebhook Submission
 
-The post-merge submission entry point is
+The repository loads exactly one placeholder `CoreCustomWebhook` named
+`cloudvision-workspace-submission`. It is associated with proposed-change
+submission for the `cv-config-validation` workflow, references the
+`cv-workspace-submission-webhook-payload` `CoreTransformPython`, and uses this
+explicitly non-production URL:
+
+```text
+https://placeholder.invalid/cloudvision-workspace-submission
+```
+
+The placeholder is a repository-loadable handoff marker for this phase. No real external automation receiver is required, and the placeholder URL is not a production deployment endpoint.
+
+The CustomWebhook processing entry point is
+`submit_linked_workspace_for_custom_webhook()` in
+`checks/cv_workspace_lifecycle.py`. It extracts the proposed-change ID and
+branch from the submitted proposed-change event, ignores events that explicitly
+identify a check other than `cv-config-validation`, and calls the shared
+submission handler.
+
+The shared submission handler is
 `submit_linked_workspace_for_proposed_change()` in
 `checks/cv_workspace_lifecycle.py`. It resolves `CloudvisionWorkspace` objects
-by the merged proposed-change ID on the destination branch and submits only when
+by the submitted proposed-change ID on the selected branch and submits only when
 exactly one linked workspace exists and is in a submit-ready state.
-Deployment-specific post-merge/API execution code should call
-`submit_linked_workspace_for_merged_event()` with the `ProposedChangeMergedEvent`
-payload; that adapter extracts the proposed-change ID and destination branch
-before invoking the shared submission handler.
-The repository does not load a transport-specific submission receiver
-registration for this workflow. Deployments that need automatic execution
-should call the direct handler from their Infrahub merge/API integration, while
-operators can use the manual retry task below to replay the same lifecycle path.
 
 On success, the handler appends a comment to the existing workspace thread with
-the CloudVision change-control ID and a URL when
-`CLOUDVISION_CHANGE_CONTROL_URL_TEMPLATE` is configured. The thread is marked
-resolved only after the success comment is saved. Already-submitted workspaces
-are treated as complete and are not submitted again.
+the CloudVision workspace identity and URL when available. The thread is marked
+resolved only after the success or already-complete comment is saved.
+Already-submitted workspaces are treated as complete and are not submitted
+again.
 
 On failure, the handler stores `status=submit_failed`, records the latest
 failure reason, appends an unresolved failure comment when possible, and leaves
@@ -145,5 +155,7 @@ first. Add schema or generator code only when a required configuration family
 cannot be represented with the existing model.
 
 The validation check builds workspaces for review only. CloudVision submission
-is handled by the post-merge lifecycle entry point or the manual retry task, not
+is handled by CustomWebhook processing or the manual retry task, not
 by the pre-merge validation check.
+
+CloudVision change-control management and Semaphore Ansible playbooks are out of scope for this phase. The CustomWebhook is only the handoff point for future deployment automation after linked workspace submission.

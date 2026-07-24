@@ -31,7 +31,8 @@
 
 ## Notes
 
-- Validation passed after merging the duplicate CloudVision workspace submission specs into `004-cv-config-validation`.
-- The merged scope includes managed-fabric CloudVision validation, workspace tracking, proposed-change workspace URL threads, direct post-merge/API submission, submission outcome comments, manual retry, and removal of placeholder external webhook receiver registration.
-- The previous contradiction where `004` treated submission as future work is resolved: pre-merge validation builds but does not submit; direct post-merge/API processing submits only the existing linked workspace after merge.
+- Validation passed after updating `004-cv-config-validation` to use a CustomWebhook for CloudVision workspace submission.
+- The updated scope includes managed-fabric CloudVision validation, workspace tracking, proposed-change workspace URL threads, CustomWebhook submission on proposed-change submission with `cv-config-validation`, submission outcome comments, manual retry, and one placeholder CustomWebhook URL.
+- The validation check builds but does not submit workspaces itself; CustomWebhook processing submits only the existing linked workspace.
+- CloudVision change-control management and Semaphore Ansible playbooks are explicitly out of scope for this phase.
 - No clarification questions are required before re-running planning, task generation, or cross-artifact analysis.

@@ -2,8 +2,7 @@
 
 ## Purpose
 
-Record direct CloudVision submission outcomes in proposed-change threads when
-possible and in operational logs when thread writes fail.
+Record CustomWebhook CloudVision submission outcomes in proposed-change threads when possible and in operational logs when thread writes fail.
 
 ## Success
 
@@ -11,24 +10,22 @@ Condition:
 
 - Exactly one linked `CloudvisionWorkspace` exists.
 - It is submit-ready.
-- CloudVision submission succeeds.
+- CloudVision workspace submission succeeds.
 
 Required outcome:
 
 - `CloudvisionWorkspace.status = submitted`
 - `submitted_at` is updated.
-- `change_control_id` is stored when CloudVision returns one.
-- `change_control_url` is stored when derivable.
 - A success comment is written to the workspace thread.
 - The thread is resolved only after the success comment is saved.
 - `SubmissionResult.status = submitted`
+- No CloudVision change-control or Semaphore orchestration is started.
 
 ## Already Submitted
 
 Condition:
 
-- Infrahub tracking status is `submitted`, or CloudVision reports the workspace
-  is already submitted.
+- Infrahub tracking status is `submitted`, or CloudVision reports the workspace is already submitted.
 
 Required outcome:
 
@@ -42,8 +39,7 @@ Required outcome:
 
 Condition:
 
-- Destination-branch lookup by proposed-change ID returns zero
-  `CloudvisionWorkspace` records.
+- Branch lookup by proposed-change ID returns zero `CloudvisionWorkspace` records.
 
 Required outcome:
 
@@ -55,8 +51,7 @@ Required outcome:
 
 Condition:
 
-- Destination-branch lookup by proposed-change ID returns more than one
-  `CloudvisionWorkspace` record.
+- Branch lookup by proposed-change ID returns more than one `CloudvisionWorkspace` record.
 
 Required outcome:
 
@@ -69,17 +64,13 @@ Required outcome:
 
 Condition:
 
-- Credentials, connectivity, CloudVision rejection, timeout, missing request ID,
-  missing workspace ID, or non-submit-ready status prevents successful
-  submission.
+- Credentials, connectivity, CloudVision rejection, timeout, missing workspace ID, or non-submit-ready status prevents successful submission.
 
 Required outcome:
 
 - `CloudvisionWorkspace.status = submit_failed` when a workspace record exists.
-- `last_submission_error` and `last_submission_attempt_at` are updated when
-  possible.
-- Failure comment states that Infrahub merge completed but CloudVision
-  submission did not.
+- `last_submission_error` and `last_submission_attempt_at` are updated when possible.
+- Failure comment states that proposed-change submission completed but CloudVision workspace submission did not.
 - Thread remains unresolved.
 - `SubmissionResult.status = failed`
 
@@ -91,5 +82,5 @@ If thread or comment writes fail, the handler must log:
 - proposed-change ID,
 - workspace ID when known,
 - fabric name when known,
-- change-control ID when known,
-- human-readable reason.
+- human-readable reason,
+- whether a CloudVision submit request was issued.

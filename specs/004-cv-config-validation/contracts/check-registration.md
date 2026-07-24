@@ -2,7 +2,7 @@
 
 ## Repository Query Registration
 
-`.infrahub.yml` must register the query under top-level `queries`:
+`.infrahub.yml` must register the validation query under top-level `queries`:
 
 ```yaml
 queries:
@@ -38,3 +38,4 @@ The repository check definition must not contain a `query` field. The Python che
 - `parameters.name` maps to `name__value`.
 - `.infrahub.yml` check definition does not include `query`.
 - The Python class query name matches the registered query name exactly.
+- The CustomWebhook submission path does not change check failure semantics: only `log_error()` in the check blocks merge.

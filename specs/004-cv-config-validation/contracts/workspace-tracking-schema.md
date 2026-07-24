@@ -2,8 +2,7 @@
 
 ## Purpose
 
-Persist enough Infrahub metadata to correlate proposed changes, CloudVision
-workspaces, user-visible threads, and post-merge submission outcomes.
+Persist enough Infrahub metadata to correlate proposed changes, CloudVision workspaces, user-visible threads, and CustomWebhook submission outcomes.
 
 ## Schema Kind
 
@@ -23,23 +22,18 @@ Required existing fields:
 | `status` | `Dropdown` | Tracks lifecycle state |
 | `fabric` | relationship to `NetworkFabric` | Required fabric correlation |
 
-Optional existing field:
+Optional fields:
 
 | Field | Kind | Rules |
 | ----- | ---- | ----- |
-| `proposed_change_id` | `Text` | Primary correlation key for post-merge submission |
-
-Planned optional fields:
-
-| Field | Kind | Rules |
-| ----- | ---- | ----- |
+| `proposed_change_id` | `Text` | Primary correlation key for CustomWebhook submission |
 | `workspace_url` | `URL` | Exact URL shown in the first thread comment |
 | `thread_id` | `Text` | CoreChangeThread ID for idempotent updates |
-| `change_control_id` | `Text` | CloudVision change control ID from submission |
-| `change_control_url` | `URL` | Stored only when reliably derivable |
 | `last_submission_error` | `TextArea` | Human-readable last failure |
 | `last_submission_attempt_at` | `DateTime` | Last submission attempt timestamp |
 | `submitted_at` | `DateTime` | Successful submission timestamp |
+
+Existing `change_control_id` or `change_control_url` fields, if retained from earlier work, are optional implementation details and are not required by this phase. They must not imply change-control management, approval scheduling, or Semaphore execution.
 
 ## Status Choices
 
@@ -53,19 +47,11 @@ Required choices:
 
 ## Validation Rules
 
-- Optional fields must be added as `optional: true` so existing tracking objects
-  remain valid.
+- Optional fields must be added as `optional: true` so existing tracking objects remain valid.
 - `workspace_id` remains the primary unique identity.
-- `proposed_change_id` plus `fabric` plus `workspace_id` must be sufficient to
-  distinguish concurrent proposed changes against the same fabric.
+- `proposed_change_id` plus `fabric` plus `workspace_id` must be sufficient to distinguish concurrent proposed changes against the same fabric.
 - `thread_id` must be updated after the thread is created or reused.
-- `status=submitted` means the post-merge handler must not resubmit the
-  workspace.
+- `status=submitted` means the CustomWebhook handler must not resubmit the workspace.
 - `status=submit_failed` means retries may attempt the same workspace again.
-
-## Migration Notes
-
-- After schema updates, run schema check and regenerate protocols.
+- Schema changes require schema check and protocol regeneration.
 - Do not hand-edit `src/solution_arista_avd/protocols.py`.
-- Existing objects without the new optional fields are valid and should be
-  backfilled opportunistically during the next validation or post-merge run.

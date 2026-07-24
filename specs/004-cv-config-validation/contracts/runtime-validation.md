@@ -11,7 +11,7 @@ The check receives:
 
 ## Required Environment
 
-One of these credential sets is required:
+One of these credential sets is required only when CloudVision is contacted:
 
 - `CLOUDVISION_SERVERS` and `CLOUDVISION_TOKEN`
 - `CLOUDVISION_SERVERS`, `CLOUDVISION_USERNAME`, and `CLOUDVISION_PASSWORD`
@@ -60,3 +60,4 @@ Blank optional values are treated as unset.
 - CloudVision credential, authentication, and connection setup is validated before target-device eligibility decisions only for fabrics where `cloudvision_managed` is true.
 - Missing CloudVision inventory membership is blocking for every serial-numbered device in a managed fabric.
 - Inactive CloudVision device state is blocking for every targeted CloudVision device in a managed fabric and must not be downgraded to a warning when workspace build succeeds.
+- The validation check never submits the CloudVision workspace; submission belongs to CustomWebhook processing.

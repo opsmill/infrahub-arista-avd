@@ -1,4 +1,4 @@
-query CVWorkspaceSubmissionQuery($proposed_change_id: String!) {
+query CVWorkspaceSubmissionWebhookQuery($proposed_change_id: String!) {
   CloudvisionWorkspace(proposed_change_id__value: $proposed_change_id) {
     edges {
       node {

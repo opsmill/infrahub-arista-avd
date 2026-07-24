@@ -490,9 +490,7 @@ class CVConfigValidationCheck(InfrahubCheck):
 
         skipped_count = len(result.skipped_configs)
         self.log_info(
-            message=(
-                f"Confirmed {inventory_count} devices in CloudVision inventory, skipped {skipped_count}"
-            )
+            message=(f"Confirmed {inventory_count} devices in CloudVision inventory, skipped {skipped_count}")
         )
 
         if result.deployed_configs:

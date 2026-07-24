@@ -1,4 +1,4 @@
-"""CloudVision proposed-change thread and post-merge workspace lifecycle."""
+"""CloudVision proposed-change thread and CustomWebhook workspace lifecycle."""
 
 from __future__ import annotations
 
@@ -17,8 +17,9 @@ from pyavd._cv.api.arista.workspace.v1 import ResponseStatus, WorkspaceState
 from pyavd._cv.client import CVClient
 from pyavd._cv.client.exceptions import CVClientException, CVResourceNotFound, CVWorkspaceFailed
 
+from transforms.cv_workspace_submission_webhook_query import CVWorkspaceSubmissionWebhookQuery
+
 from .cv_helpers import get_change_control_url, get_cloudvision_config, get_workspace_url
-from .cv_workspace_submission_query import CVWorkspaceSubmissionQuery
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,12 +28,12 @@ SubmissionStatus = Literal["submitted", "already_submitted", "skipped", "failed"
 SUBMIT_READY_STATUSES = {"built", "submit_failed"}
 SUBMITTED_STATES = {WorkspaceState.SUBMITTED.value, "submitted"}
 SUBMISSION_THREAD_LABEL = "CloudVision workspace submission"
-WORKSPACE_SUBMISSION_QUERY_PATH = Path(__file__).with_name("cv_workspace_submission.gql")
+WORKSPACE_SUBMISSION_QUERY_PATH = Path(__file__).parents[1] / "transforms" / "cv_workspace_submission_webhook.gql"
 
 
 @dataclass(frozen=True)
 class SubmissionResult:
-    """Typed result returned by the CloudVision post-merge submission path."""
+    """Typed result returned by the CloudVision CustomWebhook submission path."""
 
     status: SubmissionStatus
     proposed_change_id: str
@@ -376,7 +377,7 @@ async def _record_change_outcome(
     return thread_id
 
 
-def _workspace_from_query(data: CVWorkspaceSubmissionQuery) -> list[WorkspaceRecord]:
+def _workspace_from_query(data: CVWorkspaceSubmissionWebhookQuery) -> list[WorkspaceRecord]:
     records: list[WorkspaceRecord] = []
     for edge in data.cloudvision_workspace.edges:
         node = edge.node
@@ -410,7 +411,7 @@ async def _get_linked_workspaces(client: Any, proposed_change_id: str, branch: s
     result = await _execute_graphql(
         client, _workspace_submission_query(), {"proposed_change_id": proposed_change_id}, branch
     )
-    return _workspace_from_query(CVWorkspaceSubmissionQuery(**result))
+    return _workspace_from_query(CVWorkspaceSubmissionWebhookQuery(**result))
 
 
 def _set_optional_attr(node: Any, name: str, value: str | None) -> None:
@@ -473,24 +474,17 @@ def _change_control_id(workspace: Any) -> str | None:
     return None
 
 
-def _success_comment(workspace_id: str, change_control_id: str | None, change_control_url: str | None) -> str:
-    if change_control_id and change_control_url:
-        return (
-            f"CloudVision workspace {workspace_id} submitted successfully. "
-            f"Change control: {change_control_id} {change_control_url}"
-        )
-    if change_control_id:
-        return f"CloudVision workspace {workspace_id} submitted successfully. Change control: {change_control_id}"
-    return (
-        f"CloudVision workspace {workspace_id} submitted successfully. CloudVision did not return change-control data."
-    )
+def _success_comment(workspace_id: str, workspace_url: str | None) -> str:
+    if workspace_url:
+        return f"CloudVision workspace {workspace_id} submitted successfully. Workspace: {workspace_url}"
+    return f"CloudVision workspace {workspace_id} submitted successfully."
 
 
 def _failure_comment(proposed_change_id: str, workspace_id: str | None, fabric_name: str | None, reason: str) -> str:
     workspace = workspace_id or "unknown"
     fabric = fabric_name or "unknown"
     return (
-        f"Infrahub proposed change {proposed_change_id} was merged, but CloudVision workspace {workspace} "
+        f"Infrahub proposed change {proposed_change_id} was submitted, but CloudVision workspace {workspace} "
         f"was not submitted for fabric {fabric}: {reason}"
     )
 
@@ -727,7 +721,7 @@ async def _submit_workspace(
         submitted_at=submitted_at,
         workspace_url=thread_workspace_url,
     )
-    text = _success_comment(record.workspace_id, change_control_id, change_control_url)
+    text = _success_comment(record.workspace_id, thread_workspace_url)
     thread_id = record.thread_id
     result = SubmissionResult(
         status="submitted",
@@ -847,12 +841,46 @@ async def submit_linked_workspace_for_merged_event(
     *,
     branch: str = "main",
 ) -> SubmissionResult:
-    """Adapter for ProposedChangeMergedEvent webhook/event-runner payloads."""
+    """Backward-compatible adapter for legacy merged proposed-change events."""
     proposed_change_id = _proposed_change_id_from_event(event)
     if not proposed_change_id:
         message = "Unable to resolve proposed change ID from merged proposed-change event"
         LOGGER.error(message)
         return SubmissionResult(status="failed", proposed_change_id="", message=message)
+    return await submit_linked_workspace_for_proposed_change(
+        client,
+        proposed_change_id,
+        branch=_branch_from_event(event, branch),
+    )
+
+
+def _check_name_from_event(event: Mapping[str, Any]) -> str | None:
+    value = _event_value(event, "check_name") or _event_value(event, "check")
+    if isinstance(value, Mapping):
+        name = value.get("name") or value.get("display_label")
+        return str(name) if name else None
+    return str(value) if value else None
+
+
+async def submit_linked_workspace_for_custom_webhook(
+    client: Any,
+    event: Mapping[str, Any],
+    *,
+    branch: str = "main",
+) -> SubmissionResult:
+    """Adapter for the proposed-change submitted CustomWebhook payload."""
+    check_name = _check_name_from_event(event)
+    if check_name and check_name != "cv-config-validation":
+        message = f"Ignoring CustomWebhook event for check {check_name}"
+        LOGGER.info(message)
+        return SubmissionResult(status="skipped", proposed_change_id="", message=message)
+
+    proposed_change_id = _proposed_change_id_from_event(event)
+    if not proposed_change_id:
+        message = "Unable to resolve proposed change ID from CustomWebhook event"
+        LOGGER.error(message)
+        return SubmissionResult(status="failed", proposed_change_id="", message=message)
+
     return await submit_linked_workspace_for_proposed_change(
         client,
         proposed_change_id,
@@ -866,7 +894,7 @@ async def submit_linked_workspace_for_proposed_change(
     *,
     branch: str = "main",
 ) -> SubmissionResult:
-    """Submit the exact CloudVision workspace linked to a merged proposed change."""
+    """Submit the exact CloudVision workspace linked to a submitted proposed change."""
     try:
         records = await _get_linked_workspaces(client, proposed_change_id, branch)
     except (SchemaNotFoundError, NodeNotFoundError) as exc:
@@ -933,11 +961,11 @@ async def _run_manual_submission(proposed_change_id: str, branch: str) -> Submis
 
 
 def main() -> None:
-    """CLI entry point for manual post-merge submission retries."""
+    """CLI entry point for manual CustomWebhook submission retries."""
     import argparse
     import asyncio
 
-    parser = argparse.ArgumentParser(description="Submit a linked CloudVision workspace for a merged proposed change.")
+    parser = argparse.ArgumentParser(description="Submit a linked CloudVision workspace for a proposed change.")
     parser.add_argument("proposed_change_id")
     parser.add_argument("--branch", default="main")
     args = parser.parse_args()
