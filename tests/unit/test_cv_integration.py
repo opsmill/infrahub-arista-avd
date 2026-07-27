@@ -402,14 +402,13 @@ def test_cloudvision_docs_describe_custom_webhook_submission_and_manual_retry() 
     assert "CloudVision change-control management and Semaphore Ansible playbooks are out of scope" in docs
 
 
-def test_custom_webhook_quickstart_lists_validation_and_retry_paths() -> None:
-    quickstart = Path("specs/004-cv-config-validation/quickstart.md").read_text(encoding="utf-8")
+def test_cloudvision_docs_list_validation_and_retry_paths() -> None:
+    docs = Path("docs/docs/cloudvision.md").read_text(encoding="utf-8")
 
-    assert "uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main" in quickstart
-    assert "uv run pytest tests/unit/test_cv_integration.py" in quickstart
-    assert "uv run invoke lint" in quickstart
-    assert "$infrahub-run-integration-tests" in quickstart
-    assert "Exactly one intended CloudVision workspace submission `CoreCustomWebhook`" in quickstart
+    assert "uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main" in docs
+    assert "exactly one placeholder `CoreCustomWebhook`" in docs
+    assert "failure reason, appends an unresolved failure comment" in docs
+    assert "fallback" in docs
 
 
 class _FakeWorkspaceNode:
