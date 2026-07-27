@@ -49,6 +49,7 @@ from .helpers import (
     ARTIFACT_CONTAINERLAB_TOPOLOGY,
     ARTIFACT_TIMEOUT,
     GENERATOR_FABRIC,
+    GENERATOR_RACK,
     GENERATOR_TIMEOUT,
     GROUP_TIMEOUT,
     POLL_INTERVAL,
@@ -438,6 +439,35 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             f"duplicate interface-side IP assignments: {report['duplicate_interface_ips']}"
         )
         print(f"ipam duplicate report: total={report['total']} assigned={report['assigned']}", flush=True)
+
+    # --- Component 11b: rack generator rerun regression -------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_rack_generators_rerun_without_error_or_drift(self, client: InfrahubClient) -> None:
+        """Explicit rack reruns, including DC1_BORDER, do not fail or mutate generated state."""
+        racks = await client.all(kind="LocationRack", branch=PIPELINE_BRANCH)
+        rack_targets = sorted((rack.name.value, rack.id) for rack in racks)
+        assert any(name == "DC1_BORDER" for name, _ in rack_targets), "DC1_BORDER rack not found"
+
+        snapshots = []
+        for pass_number in (1, 2):
+            await _run_generator_for_nodes(
+                client, PIPELINE_BRANCH, GENERATOR_RACK, [rack_id for _, rack_id in rack_targets]
+            )
+            snapshot = await wait_until(
+                fetch=lambda: _rack_rerun_snapshot(client, PIPELINE_BRANCH),
+                ready=itemgetter("ready"),
+                timeout=GENERATOR_TIMEOUT,
+                interval=POLL_INTERVAL,
+                describe=f"rack generator rerun pass {pass_number} settled without Error",
+            )
+            snapshots.append(snapshot["state"])
+            print(
+                f"rack rerun pass {pass_number}: racks={len(rack_targets)} "
+                f"rack_instances={len(snapshot['state']['rack_generator_instances'])}",
+                flush=True,
+            )
+
+        assert snapshots[1] == snapshots[0], "rack rerun changed generated-state snapshot"
 
     # --- Component 11b: DCI link hostvars ----------------------------------
     @pytest.mark.asyncio(loop_scope="class")
@@ -966,6 +996,208 @@ async def _devices_without_structured_config(client: InfrahubClient, branch: str
         if not scf:
             without.append(f"{node['name']['value']} ({node.get('role', {}).get('value', 'unknown')})")
     return {"total": len(edges), "without": without}
+
+
+async def _rack_rerun_snapshot(client: InfrahubClient, branch: str) -> dict:
+    """Return a normalized snapshot of rack-generated state after a rerun."""
+    query = """
+    query RackRerunSnapshot {
+      CoreGeneratorInstance {
+        edges {
+          node {
+            name { value }
+            status { value }
+            object { node { id display_label } }
+            definition {
+              node {
+                id
+                display_label
+                ... on CoreGeneratorDefinition {
+                  name { value }
+                }
+              }
+            }
+          }
+        }
+      }
+      LocationRack {
+        edges { node { id name { value } generation_complete { value } } }
+      }
+      IpamIPAddress {
+        edges {
+          node {
+            id
+            address { value }
+            ip_namespace { node { name { value } } }
+            interface { node { id display_label } }
+          }
+        }
+      }
+      InterfacePhysical {
+        edges {
+          node {
+            id
+            name { value }
+            device { node { name { value } } }
+            ip_addresses { edges { node { id address { value } } } }
+          }
+        }
+      }
+      AvdStructuredConfigFile {
+        edges {
+          node {
+            id
+            file_name { value }
+            checksum { value }
+            file_size { value }
+            storage_id { value }
+            artifact { node { name { value } } }
+          }
+        }
+      }
+    }
+    """
+    resp = await client.execute_graphql(query=query, branch_name=branch)
+    generator_instances = _normalize_generator_instances(resp["CoreGeneratorInstance"]["edges"])
+    rack_generator_instances = [
+        instance for instance in generator_instances if instance["definition_name"] == GENERATOR_RACK
+    ]
+    rack_errors = [instance for instance in rack_generator_instances if instance["status"] == "Error"]
+    active = [
+        instance
+        for instance in generator_instances
+        if instance["status"].lower() in {"pending", "running", "scheduled", "in_progress", "queued"}
+    ]
+
+    racks = sorted(
+        (
+            edge["node"]["name"]["value"],
+            bool(edge["node"]["generation_complete"]["value"]),
+        )
+        for edge in resp["LocationRack"]["edges"]
+    )
+    structured_config_files = _normalize_structured_config_files(resp["AvdStructuredConfigFile"]["edges"])
+    structured_config_ethernet_ip_refs = await _structured_config_ethernet_ip_refs(
+        client,
+        resp["AvdStructuredConfigFile"]["edges"],
+    )
+    state = {
+        "generator_instances": generator_instances,
+        "rack_generator_instances": rack_generator_instances,
+        "ipam_addresses": _normalize_ipam_addresses(resp["IpamIPAddress"]["edges"]),
+        "physical_interface_ip_assignments": _normalize_physical_interface_ip_assignments(
+            resp["InterfacePhysical"]["edges"]
+        ),
+        "structured_config_files": structured_config_files,
+        "structured_config_ethernet_ip_refs": structured_config_ethernet_ip_refs,
+    }
+    return {
+        "ready": (
+            bool(rack_generator_instances)
+            and not rack_errors
+            and not active
+            and all(complete for _, complete in racks)
+            and bool(structured_config_files)
+        ),
+        "rack_errors": rack_errors,
+        "active_generator_instances": active,
+        "state": state,
+    }
+
+
+def _normalize_generator_instances(edges: list[dict]) -> list[dict]:
+    instances = []
+    for edge in edges:
+        node = edge["node"]
+        definition = (node.get("definition") or {}).get("node") or {}
+        definition_name = ((definition.get("name") or {}).get("value")) or definition.get("display_label")
+        target = (node.get("object") or {}).get("node") or {}
+        instances.append(
+            {
+                "name": (node.get("name") or {}).get("value") or "",
+                "status": (node.get("status") or {}).get("value") or "",
+                "definition_name": definition_name or "",
+                "target": target.get("display_label") or target.get("id") or "",
+            }
+        )
+    return sorted(instances, key=itemgetter("definition_name", "target", "name"))
+
+
+def _normalize_ipam_addresses(edges: list[dict]) -> list[dict]:
+    addresses = []
+    for edge in edges:
+        node = edge["node"]
+        interface = (node.get("interface") or {}).get("node") or {}
+        namespace = ((node.get("ip_namespace") or {}).get("node") or {}).get("name", {}).get("value") or "default"
+        addresses.append(
+            {
+                "address": (node.get("address") or {}).get("value"),
+                "namespace": namespace,
+                "interface": interface.get("display_label") or interface.get("id") or "",
+            }
+        )
+    return sorted(addresses, key=itemgetter("namespace", "address", "interface"))
+
+
+def _normalize_physical_interface_ip_assignments(edges: list[dict]) -> list[dict]:
+    assignments = []
+    for edge in edges:
+        node = edge["node"]
+        device_name = ((node.get("device") or {}).get("node") or {}).get("name", {}).get("value") or ""
+        interface_name = (node.get("name") or {}).get("value") or ""
+        ip_addresses = sorted(
+            (ip_edge["node"].get("address") or {}).get("value")
+            for ip_edge in (node.get("ip_addresses") or {}).get("edges", [])
+            if ip_edge.get("node")
+        )
+        if ip_addresses:
+            assignments.append(
+                {
+                    "device": device_name,
+                    "interface": interface_name,
+                    "ip_addresses": ip_addresses,
+                }
+            )
+    return sorted(assignments, key=itemgetter("device", "interface"))
+
+
+def _normalize_structured_config_files(edges: list[dict]) -> list[dict]:
+    files = []
+    for edge in edges:
+        node = edge["node"]
+        artifact = (node.get("artifact") or {}).get("node") or {}
+        files.append(
+            {
+                "artifact": (artifact.get("name") or {}).get("value") or "",
+                "file_name": (node.get("file_name") or {}).get("value") or "",
+                "checksum": (node.get("checksum") or {}).get("value") or "",
+                "file_size": (node.get("file_size") or {}).get("value") or 0,
+            }
+        )
+    return sorted(files, key=itemgetter("artifact", "file_name"))
+
+
+async def _structured_config_ethernet_ip_refs(client: InfrahubClient, edges: list[dict]) -> list[dict]:
+    refs = []
+    for edge in edges:
+        node = edge["node"]
+        storage_id = (node.get("storage_id") or {}).get("value")
+        if not storage_id:
+            continue
+        content = await client.object_store.get(identifier=storage_id)
+        structured_config = json.loads(content)
+        artifact = (node.get("artifact") or {}).get("node") or {}
+        for interface in structured_config.get("ethernet_interfaces", []):
+            if not interface.get("ip_address"):
+                continue
+            refs.append(
+                {
+                    "artifact": (artifact.get("name") or {}).get("value") or "",
+                    "interface": interface.get("name") or "",
+                    "ip_address": interface.get("ip_address") or "",
+                }
+            )
+    return sorted(refs, key=itemgetter("artifact", "interface", "ip_address"))
 
 
 async def _create_dci_link_scenario(client: InfrahubClient, branch: str) -> dict:

@@ -4,8 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from infrahub_sdk.exceptions import ServerNotResponsiveError
 
-from solution_arista_avd.generator import GeneratorMixin
+from solution_arista_avd.generator import GeneratorMixin, trigger_hostvar_generation
 
 
 def _make_generator() -> GeneratorMixin:
@@ -279,3 +280,71 @@ async def test_ensure_shared_device_asn_noops_when_all_devices_already_share_asn
     assert result is None
     gen.allocate_routing_asn.assert_not_awaited()
     gen.client.execute_graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_trigger_generator_raises_when_definition_is_missing() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[])
+    client.execute_graphql = AsyncMock()
+
+    with pytest.raises(ValueError, match="CoreGeneratorDefinition 'generate-avd-device-hostvar'"):
+        await trigger_hostvar_generation(client, node_ids=["device-1"])
+
+    client.execute_graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_trigger_generator_passes_timeout_to_graphql() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    client.execute_graphql = AsyncMock()
+
+    await trigger_hostvar_generation(client, node_ids=["device-1"], timeout=300)
+
+    assert client.execute_graphql.await_args.kwargs["timeout"] == 300
+    assert client.execute_graphql.await_args.kwargs["variables"] == {
+        "id": "generator-1",
+        "nodes": ["device-1"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_trigger_generator_tolerates_server_timeout_when_enabled() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    client.execute_graphql = AsyncMock(side_effect=ServerNotResponsiveError(url="http://infrahub", timeout=300))
+
+    await trigger_hostvar_generation(
+        client,
+        node_ids=["device-1"],
+        timeout=300,
+        tolerate_timeout=True,
+    )
+
+    client.execute_graphql.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_trigger_generator_does_not_tolerate_server_timeout_by_default() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    client.execute_graphql = AsyncMock(side_effect=ServerNotResponsiveError(url="http://infrahub", timeout=300))
+
+    with pytest.raises(ServerNotResponsiveError):
+        await trigger_hostvar_generation(client, node_ids=["device-1"], timeout=300)
+
+
+@pytest.mark.asyncio
+async def test_trigger_generator_tolerant_mode_propagates_non_timeout_errors() -> None:
+    client = MagicMock()
+    client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    client.execute_graphql = AsyncMock(side_effect=RuntimeError("graphql failed"))
+
+    with pytest.raises(RuntimeError, match="graphql failed"):
+        await trigger_hostvar_generation(
+            client,
+            node_ids=["device-1"],
+            timeout=300,
+            tolerate_timeout=True,
+        )

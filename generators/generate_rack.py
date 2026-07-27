@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from inspect import signature
 from typing import TYPE_CHECKING, Any
 
+from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 from netutils.interface import sort_interface_list
@@ -83,13 +85,21 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
 
     async def generate(self, data: dict) -> None:
         data: RackGeneratorQuery = RackGeneratorQuery(**data)
+        rack_node = data.location_rack.edges[0].node
+        if rack_node is None:
+            msg = "Rack generator query returned no rack node"
+            raise ValueError(msg)
 
-        self.rack_id: str = data.location_rack.edges[0].node.id
-        self.rack_index: int = data.location_rack.edges[0].node.index.value
-        self.rack_name: str = data.location_rack.edges[0].node.name.value
-        self.rack_leaf_switch_template: str = data.location_rack.edges[0].node.leaf_switch_template.node.id
-        self.rack_amount_of_leafs: int = data.location_rack.edges[0].node.amount_of_leafs.value
-        rack_mlag_attr = data.location_rack.edges[0].node.mlag
+        self.rack_id = rack_node.id
+        self.rack_index = self._attr_value(rack_node.index, default=0)
+        self.rack_name = self._attr_value(rack_node.name, default=self.rack_id)
+        self.rack_leaf_switch_template = self._relationship_node_id(rack_node.leaf_switch_template)
+        self.rack_amount_of_leafs = self._attr_value(rack_node.amount_of_leafs, default=0)
+        if self.rack_amount_of_leafs > 0 and not self.rack_leaf_switch_template:
+            msg = f"Rack {self.rack_name}: amount_of_leafs is {self.rack_amount_of_leafs} but leaf_switch_template is missing"
+            raise ValueError(msg)
+
+        rack_mlag_attr = rack_node.mlag
         self.rack_mlag: bool = is_mlag_enabled(None if rack_mlag_attr is None else rack_mlag_attr.value)
         self.rack_mlag_enabled: bool = self.rack_mlag and self.rack_amount_of_leafs >= 2
         self.logger.info(f"Rack {self.rack_name}: mlag_enabled={self.rack_mlag}")
@@ -97,58 +107,75 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.l2leaf_switches: list[DcimDevice] = []
 
         # L2 leaf fields (optional)
-        rack_node = data.location_rack.edges[0].node
         l2leaf_count_attr = getattr(rack_node, "amount_of_l_2_leafs", None)
         self.rack_amount_of_l2leafs: int = (
             l2leaf_count_attr.value if l2leaf_count_attr and l2leaf_count_attr.value else 0
         )
         l2leaf_template_attr = getattr(rack_node, "l_2_leaf_switch_template", None)
-        self.rack_l2leaf_switch_template: str | None = (
-            l2leaf_template_attr.node.id if l2leaf_template_attr and l2leaf_template_attr.node else None
-        )
+        self.rack_l2leaf_switch_template = self._relationship_node_id(l2leaf_template_attr)
+        if self.rack_amount_of_l2leafs > 0 and not self.rack_l2leaf_switch_template:
+            msg = (
+                f"Rack {self.rack_name}: amount_of_l2leafs is {self.rack_amount_of_l2leafs} "
+                "but l2leaf_switch_template is missing"
+            )
+            raise ValueError(msg)
 
-        self.pod_id: str = data.location_rack.edges[0].node.pod.node.id
-        self.pod_index: int = data.location_rack.edges[0].node.pod.node.index.value
-        self.pod_name: str = data.location_rack.edges[0].node.pod.node.name.value.lower()
-        self.pod_amount_of_spines: int = data.location_rack.edges[0].node.pod.node.amount_of_spines.value
-        self.pod: NetworkPod = await self.client.get(kind=NetworkPod, id=self.pod_id)
+        pod_node = self._relationship_node(rack_node.pod)
+        if pod_node is None:
+            await self.defer_rack_generation("rack has no pod")
+            return
+
+        fabric_node = self._relationship_node(pod_node.parent)
+        if fabric_node is None or getattr(fabric_node, "typename__", None) != "NetworkFabric":
+            await self.defer_rack_generation("pod has no parent fabric")
+            return
+
+        self.loopback_pool_id = self._relationship_node_id(pod_node.loopback_pool)
+        if not self.loopback_pool_id:
+            await self.defer_rack_generation("pod has no loopback_pool")
+            return
+
+        self.prefix_pool_id = self._relationship_node_id(pod_node.prefix_pool)
+        if not self.prefix_pool_id:
+            await self.defer_rack_generation("pod has no prefix_pool")
+            return
+
+        self.pod_id = pod_node.id
+        self.pod_index = self._attr_value(pod_node.index, default=0)
+        self.pod_name = str(self._attr_value(pod_node.name, default=self.pod_id)).lower()
+        self.pod_amount_of_spines = self._attr_value(pod_node.amount_of_spines, default=0)
+        self.pod = await self.client.get(kind=NetworkPod, id=self.pod_id)
         await self.pod.parent.fetch()
         self.fabric = self.pod.parent.peer
-        await set_fabric_avd_hostvars_ready(self.client, self.fabric.id, False)
 
         # Standalone L2LS fabrics (underlay "none") use l2leaf leaves. Gated on the
         # fabric underlay so L3LS fabrics (ebgp/ospf) keep the routed leaf role.
         # Read from the query data (no extra fetch), mirroring the pod generator.
-        fabric_node = data.location_rack.edges[0].node.pod.node.parent.node
         underlay = getattr(getattr(fabric_node, "underlay_routing_protocol", None), "value", None)
         self.leaf_role = LEAF_ROLE_BY_UNDERLAY.get(underlay, "leaf")
         self.spine_role = SPINE_ROLE_BY_UNDERLAY.get(underlay, "spine")
-
-        # Reset generation_complete flag to prevent stale flags during re-runs
-        rack = await self.client.get(kind=LocationRack, id=self.rack_id)
-        rack.generation_complete.value = False
-        await rack.save(allow_upsert=True)
-
-        self.loopback_pool_id: str = data.location_rack.edges[0].node.pod.node.loopback_pool.node.id
-        self.prefix_pool_id: str = data.location_rack.edges[0].node.pod.node.prefix_pool.node.id
-
-        self.loopback_pool = await self.client.get(kind=CoreIPAddressPool, id=self.loopback_pool_id)
-        self.prefix_pool = await self.client.get(kind=CoreIPPrefixPool, id=self.prefix_pool_id)
 
         self.spine_switches = await self.client.filters(
             kind=DcimDevice, pod__ids=[self.pod_id], role__value=self.spine_role
         )
 
         if self.pod_amount_of_spines != len(self.spine_switches):
-            msg = f"Cannot start rack generator on {self.rack_name}-{self.rack_id}: the pod doesn't seem to be fully generated"
-            raise RuntimeError(msg)
+            await self.defer_rack_generation(
+                f"pod is not fully generated: expected {self.pod_amount_of_spines} "
+                f"{self.spine_role} devices, found {len(self.spine_switches)}"
+            )
+            return
 
-        leaf_interface_sorting_method: str = data.location_rack.edges[
-            0
-        ].node.pod.node.leaf_interface_sorting_method.value
-        spine_interface_sorting_method: str = data.location_rack.edges[
-            0
-        ].node.pod.node.spine_interface_sorting_method.value
+        await set_fabric_avd_hostvars_ready(self.client, self.fabric.id, False)
+
+        # Reset generation_complete flag to prevent stale flags during re-runs
+        await self.set_rack_generation_complete(False)
+
+        self.loopback_pool = await self.client.get(kind=CoreIPAddressPool, id=self.loopback_pool_id)
+        self.prefix_pool = await self.client.get(kind=CoreIPPrefixPool, id=self.prefix_pool_id)
+
+        leaf_interface_sorting_method: str = pod_node.leaf_interface_sorting_method.value
+        spine_interface_sorting_method: str = pod_node.spine_interface_sorting_method.value
 
         self.leaf_interface_sorting_function = getattr(solution_arista_avd_sorting, leaf_interface_sorting_method)
         self.spine_interface_sorting_function = getattr(solution_arista_avd_sorting, spine_interface_sorting_method)
@@ -159,11 +186,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.mgmt_pool = None
         self.vtep_loopback_pool = None
 
-        pod_node = data.location_rack.edges[0].node.pod.node
-        if pod_node.parent and pod_node.parent.node:
-            self.asn_pool, self.node_id_pool, self.mgmt_pool, self.vtep_loopback_pool = await self.resolve_avd_pools(
-                pod_node.parent.node
-            )
+        self.asn_pool, self.node_id_pool, self.mgmt_pool, self.vtep_loopback_pool = await self.resolve_avd_pools(
+            fabric_node
+        )
 
         await self.create_leaf_switches()
 
@@ -180,9 +205,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         await self.connect_l2leafs_to_leafs()
 
         # Mark this rack as generation complete
-        rack = await self.client.get(kind=LocationRack, id=self.rack_id)
-        rack.generation_complete.value = True
-        await rack.save(allow_upsert=True)
+        await self.set_rack_generation_complete(True)
         self.logger.info(f"Rack {self.rack_name} generation complete")
 
         # Check if all racks in the fabric are done; if so, trigger hostvar generation
@@ -192,7 +215,89 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             self.logger.info(
                 "All racks generated — triggering hostvar generation for %s devices", len(hostvar_target_ids)
             )
-            await trigger_hostvar_generation(self.client, node_ids=hostvar_target_ids)
+            await self.trigger_hostvar_generation_after_rack_completion(hostvar_target_ids)
+
+    async def trigger_hostvar_generation_after_rack_completion(self, node_ids: list[str]) -> None:
+        """Trigger hostvars with timeout tolerance, compatible with older installed helper packages."""
+        if "timeout" in signature(trigger_hostvar_generation).parameters:
+            await trigger_hostvar_generation(
+                self.client,
+                node_ids=node_ids,
+                timeout=300,
+                tolerate_timeout=True,
+            )
+            return
+
+        await self._trigger_hostvar_generation_compat(node_ids=node_ids, timeout=300, tolerate_timeout=True)
+
+    async def _trigger_hostvar_generation_compat(
+        self,
+        *,
+        node_ids: list[str] | None,
+        timeout: int | None,  # noqa: ASYNC109 - forwards the SDK GraphQL timeout option
+        tolerate_timeout: bool,
+    ) -> None:
+        if node_ids is None:
+            self.logger.warning("Skipping generate-avd-device-hostvar trigger: target node IDs are required")
+            return
+        if not node_ids:
+            self.logger.warning("Skipping generate-avd-device-hostvar trigger: no target node IDs found")
+            return
+
+        generator_defs = await self.client.filters(
+            kind="CoreGeneratorDefinition", name__value="generate-avd-device-hostvar"
+        )
+        if not generator_defs:
+            msg = "Could not find CoreGeneratorDefinition 'generate-avd-device-hostvar'"
+            raise ValueError(msg)
+
+        execute_kwargs: dict[str, Any] = {
+            "query": """
+            mutation RunGenerator($id: String!, $nodes: [String!]!) {
+                CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
+                    ok
+                }
+            }
+            """,
+            "variables": {"id": generator_defs[0].id, "nodes": node_ids},
+        }
+        if timeout is not None:
+            execute_kwargs["timeout"] = timeout
+
+        try:
+            await self.client.execute_graphql(**execute_kwargs)
+        except ServerNotResponsiveError:
+            if not tolerate_timeout:
+                raise
+            self.logger.warning(
+                "Timed out while triggering generate-avd-device-hostvar; downstream generator state is ambiguous "
+                "and will be observed later"
+            )
+
+    async def defer_rack_generation(self, reason: str) -> None:
+        """Mark the rack incomplete and return without enrolling deferral in tracking."""
+        self.logger.info("Deferring rack %s generation: %s", self.rack_name, reason)
+        if getattr(self, "rack_id", None):
+            await self.set_rack_generation_complete(False, update_group_context=False)
+
+    async def set_rack_generation_complete(self, complete: bool, *, update_group_context: bool = True) -> None:
+        rack = await self.client.get(kind=LocationRack, id=self.rack_id)
+        rack.generation_complete.value = complete
+        if update_group_context:
+            await rack.save(allow_upsert=True)
+            return
+        await rack.save(allow_upsert=True, update_group_context=False)
+
+    @staticmethod
+    def _relationship_node(relationship: object) -> object | None:
+        if relationship is None:
+            return None
+        return getattr(relationship, "node", None)
+
+    @staticmethod
+    def _attr_value(attribute: object, *, default: Any) -> Any:
+        value = getattr(attribute, "value", None)
+        return default if value is None else value
 
     async def create_leaf_switches(self) -> None:
         # MLAG leafs share an ASN allocated onto the MLAG domain, so they must not

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from infrahub_sdk.exceptions import ServerNotResponsiveError
 
 from generators.generate_rack import RackGenerator, is_mlag_enabled
 from solution_arista_avd.generator import trigger_hostvar_generation
@@ -36,6 +37,83 @@ def _domain(domain_id: str, *, domain_uuid: str | None = None, asn_node_id: str 
 
 def _named_device(device_id: str, name: str) -> SimpleNamespace:
     return SimpleNamespace(id=device_id, name=SimpleNamespace(value=name))
+
+
+def _rack_query_data(
+    *,
+    pod_node: dict | object | None = "default",
+    leaf_template_id: str | None = "leaf-template",
+    leaf_count: int = 2,
+    l2leaf_template_id: str | None = None,
+    l2leaf_count: int = 0,
+    loopback_pool_id: str | None = "loopback-pool",
+    prefix_pool_id: str | None = "prefix-pool",
+) -> dict:
+    if pod_node == "default":
+        pod_node = {
+            "id": "pod-1",
+            "name": {"value": "Pod-A"},
+            "index": {"value": 1},
+            "prefix_pool": {"node": {"id": prefix_pool_id} if prefix_pool_id else None},
+            "loopback_pool": {"node": {"id": loopback_pool_id} if loopback_pool_id else None},
+            "amount_of_spines": {"value": 2},
+            "leaf_interface_sorting_method": {"value": "sort_interfaces"},
+            "spine_interface_sorting_method": {"value": "sort_interfaces"},
+            "parent": {
+                "node": {
+                    "__typename": "NetworkFabric",
+                    "name": {"value": "Fabric-A"},
+                    "underlay_routing_protocol": {"value": "ebgp"},
+                    "asn_pool": {"node": None},
+                    "node_id_pool": {"node": None},
+                    "mgmt_pool": {"node": None},
+                    "vtep_pool": {"node": None},
+                }
+            },
+        }
+
+    return {
+        "LocationRack": {
+            "edges": [
+                {
+                    "node": {
+                        "id": "rack-1",
+                        "name": {"value": "DC1_BORDER"},
+                        "checksum": {"value": "checksum"},
+                        "index": {"value": 1},
+                        "rack_type": {"value": "leaf"},
+                        "amount_of_leafs": {"value": leaf_count},
+                        "mlag": {"value": True},
+                        "leaf_switch_template": {
+                            "node": (
+                                {"__typename": "TemplateDcimDevice", "id": leaf_template_id}
+                                if leaf_template_id
+                                else None
+                            )
+                        },
+                        "amount_of_l2leafs": {"value": l2leaf_count},
+                        "l2leaf_switch_template": {
+                            "node": (
+                                {"__typename": "TemplateDcimDevice", "id": l2leaf_template_id}
+                                if l2leaf_template_id
+                                else None
+                            )
+                        },
+                        "parent": {"node": {"__typename": "LocationRack", "id": "parent-1", "name": {"value": "P"}}},
+                        "pod": {"node": pod_node},
+                    }
+                }
+            ]
+        }
+    }
+
+
+def _rack_node() -> SimpleNamespace:
+    return SimpleNamespace(generation_complete=SimpleNamespace(value=True), save=AsyncMock())
+
+
+def _pod_node() -> SimpleNamespace:
+    return SimpleNamespace(parent=SimpleNamespace(fetch=AsyncMock(), peer=SimpleNamespace(id="fabric-1")))
 
 
 def _filters_side_effect(
@@ -88,6 +166,115 @@ def _iface(name: str, role: str) -> SimpleNamespace:
         role=SimpleNamespace(value=role),
         save=AsyncMock(),
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("data", "reason"),
+    [
+        (_rack_query_data(pod_node=None), "rack has no pod"),
+        (_rack_query_data(loopback_pool_id=None), "pod has no loopback_pool"),
+        (_rack_query_data(prefix_pool_id=None), "pod has no prefix_pool"),
+    ],
+)
+async def test_generate_defers_when_required_relationships_are_missing(data: dict, reason: str) -> None:
+    gen = _make_generator()
+    rack = _rack_node()
+    gen.client.get.return_value = rack
+    gen.create_leaf_switches = AsyncMock()  # type: ignore[method-assign]
+
+    await gen.generate(data)
+
+    assert rack.generation_complete.value is False
+    rack.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+    gen.create_leaf_switches.assert_not_awaited()
+    gen.client.execute_graphql.assert_not_awaited()
+    gen.logger.info.assert_any_call("Deferring rack %s generation: %s", "DC1_BORDER", reason)
+
+
+@pytest.mark.asyncio
+async def test_generate_defers_when_pod_parent_fabric_is_missing() -> None:
+    data = _rack_query_data()
+    data["LocationRack"]["edges"][0]["node"]["pod"]["node"]["parent"] = {"node": None}
+    gen = _make_generator()
+    rack = _rack_node()
+    gen.client.get.return_value = rack
+    gen.create_leaf_switches = AsyncMock()  # type: ignore[method-assign]
+
+    await gen.generate(data)
+
+    assert rack.generation_complete.value is False
+    rack.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+    gen.create_leaf_switches.assert_not_awaited()
+    gen.client.execute_graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_generate_defers_when_spines_are_missing() -> None:
+    gen = _make_generator()
+    rack = _rack_node()
+    gen.client.get.side_effect = [_pod_node(), rack]
+    gen.client.filters = AsyncMock(return_value=[])
+    gen.create_leaf_switches = AsyncMock()  # type: ignore[method-assign]
+
+    await gen.generate(_rack_query_data())
+
+    assert rack.generation_complete.value is False
+    rack.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+    gen.create_leaf_switches.assert_not_awaited()
+    gen.client.execute_graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_generate_requires_leaf_template_when_leaf_count_is_positive() -> None:
+    gen = _make_generator()
+
+    with pytest.raises(ValueError, match=r"DC1_BORDER.*leaf_switch_template is missing"):
+        await gen.generate(_rack_query_data(leaf_template_id=None, leaf_count=2))
+
+    gen.client.get.assert_not_awaited()
+    gen.client.execute_graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_generate_requires_l2leaf_template_when_l2leaf_count_is_positive() -> None:
+    gen = _make_generator()
+
+    with pytest.raises(ValueError, match=r"DC1_BORDER.*l2leaf_switch_template is missing"):
+        await gen.generate(_rack_query_data(l2leaf_template_id=None, l2leaf_count=1))
+
+    gen.client.get.assert_not_awaited()
+    gen.client.execute_graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_trigger_hostvar_generation_compat_passes_timeout() -> None:
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    gen.client.execute_graphql = AsyncMock()
+
+    await gen._trigger_hostvar_generation_compat(node_ids=["leaf-a"], timeout=300, tolerate_timeout=True)
+
+    assert gen.client.execute_graphql.await_args.kwargs["timeout"] == 300
+    assert gen.client.execute_graphql.await_args.kwargs["variables"] == {
+        "id": "generator-1",
+        "nodes": ["leaf-a"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_trigger_hostvar_generation_compat_tolerates_only_server_timeout() -> None:
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[SimpleNamespace(id="generator-1")])
+    gen.client.execute_graphql = AsyncMock(side_effect=ServerNotResponsiveError(url="http://infrahub", timeout=300))
+
+    await gen._trigger_hostvar_generation_compat(node_ids=["leaf-a"], timeout=300, tolerate_timeout=True)
+
+    gen.client.execute_graphql.assert_awaited_once()
+
+    gen.client.execute_graphql = AsyncMock(side_effect=RuntimeError("graphql failed"))
+    with pytest.raises(RuntimeError, match="graphql failed"):
+        await gen._trigger_hostvar_generation_compat(node_ids=["leaf-a"], timeout=300, tolerate_timeout=True)
 
 
 @pytest.mark.asyncio

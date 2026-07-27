@@ -4,6 +4,7 @@ import hashlib
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from .protocols import DcimDevice, DcimInterface, InterfaceVirtual, RoutingAsn
@@ -484,7 +485,14 @@ async def check_all_racks_generated(client: InfrahubClient, fabric_id: str) -> b
     return True
 
 
-async def _trigger_generator(client: InfrahubClient, name: str, node_ids: list[str] | None = None) -> None:
+async def _trigger_generator(
+    client: InfrahubClient,
+    name: str,
+    node_ids: list[str] | None = None,
+    *,
+    timeout: int | None = None,  # noqa: ASYNC109 - forwards the SDK GraphQL timeout option
+    tolerate_timeout: bool = False,
+) -> None:
     """Trigger a generator by name via CoreGeneratorDefinition mutation."""
     if node_ids is None:
         logger.warning("Skipping %s trigger: target node IDs are required", name)
@@ -495,27 +503,51 @@ async def _trigger_generator(client: InfrahubClient, name: str, node_ids: list[s
 
     generator_defs = await client.filters(kind="CoreGeneratorDefinition", name__value=name)
     if not generator_defs:
-        logger.error("Could not find CoreGeneratorDefinition '%s'", name)
-        return
+        msg = f"Could not find CoreGeneratorDefinition '{name}'"
+        raise ValueError(msg)
 
     generator_def = generator_defs[0]
     logger.info("Triggering %s via CoreGeneratorDefinitionRun for %s", name, generator_def.id)
 
-    await client.execute_graphql(
-        query="""
-        mutation RunGenerator($id: String!, $nodes: [String!]!) {
-            CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
-                ok
+    execute_kwargs: dict[str, Any] = {
+        "query": """
+            mutation RunGenerator($id: String!, $nodes: [String!]!) {
+                CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) {
+                    ok
+                }
             }
-        }
-        """,
-        variables={"id": generator_def.id, "nodes": node_ids},
-    )
+            """,
+        "variables": {"id": generator_def.id, "nodes": node_ids},
+    }
+    if timeout is not None:
+        execute_kwargs["timeout"] = timeout
+
+    try:
+        await client.execute_graphql(**execute_kwargs)
+    except ServerNotResponsiveError:
+        if not tolerate_timeout:
+            raise
+        logger.warning(
+            "Timed out while triggering %s; downstream generator state is ambiguous and will be observed later",
+            name,
+        )
 
 
-async def trigger_hostvar_generation(client: InfrahubClient, node_ids: list[str] | None = None) -> None:
+async def trigger_hostvar_generation(
+    client: InfrahubClient,
+    node_ids: list[str] | None = None,
+    *,
+    timeout: int | None = None,  # noqa: ASYNC109 - forwards the SDK GraphQL timeout option
+    tolerate_timeout: bool = False,
+) -> None:
     """Trigger the hostvar generator via CoreGeneratorDefinition mutation."""
-    await _trigger_generator(client, "generate-avd-device-hostvar", node_ids=node_ids)
+    await _trigger_generator(
+        client,
+        "generate-avd-device-hostvar",
+        node_ids=node_ids,
+        timeout=timeout,
+        tolerate_timeout=tolerate_timeout,
+    )
 
 
 async def trigger_structured_config_generation(client: InfrahubClient) -> None:
