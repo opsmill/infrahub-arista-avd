@@ -116,7 +116,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 continue
 
             try:
-                artifact = await self.client.get(AvdArtifact, name__value=hostname)
+                artifact = await self.client.get(AvdArtifact, name__value=hostname, include=["hostvar_file"])
                 if not artifact.hostvar_file.id:
                     self.logger.warning(f"No hostvar file for {hostname}, skipping")
                     continue
@@ -250,7 +250,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 new_content = json.dumps(structured_config_dict, indent=2).encode()
                 new_checksum = hashlib.sha256(new_content).hexdigest()
 
-                avd_artifact = await self.client.get(AvdArtifact, name__value=hostname)
+                avd_artifact = await self.client.get(AvdArtifact, name__value=hostname, include=["structured_config_file"])
 
                 # Get existing structured config file if it exists
                 existing_file = None

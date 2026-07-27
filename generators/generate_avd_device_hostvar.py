@@ -2259,7 +2259,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         await avd_artifact.save(allow_upsert=True)
 
         # Re-fetch to get the relationship IDs populated
-        avd_artifact = await self.client.get(AvdArtifact, name__value=artifact_name)
+        avd_artifact = await self.client.get(AvdArtifact, name__value=artifact_name, include=["hostvar_file"])
 
         # Get existing hostvar file if it exists
         existing_file = None
