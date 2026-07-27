@@ -79,6 +79,9 @@ query RackGeneratorQuery($name: String!) {
 							node {
 								__typename
 								... on NetworkFabric {
+									name {
+										value
+									}
 									underlay_routing_protocol {
 										value
 									}
@@ -103,6 +106,7 @@ query RackGeneratorQuery($name: String!) {
 											resources {
 												edges {
 													node {
+														__typename
 														id
 													}
 												}

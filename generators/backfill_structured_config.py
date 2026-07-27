@@ -63,6 +63,11 @@ UNMODELED_SECTIONS = [
 DEFAULT_IP_NAMESPACE = "default"
 
 
+def _namespace_ref(namespace: str) -> dict[str, list[str]]:
+    """Return an Infrahub relationship reference for a BuiltinIPNamespace."""
+    return {"hfid": [namespace]}
+
+
 class BackfillStructuredConfigGenerator(InfrahubGenerator):
     """Backfills structured config data into the Infrahub data model."""
 
@@ -194,7 +199,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             IpamPrefix,
             prefix=prefix_str,
             role="backfill",
-            ip_namespace=namespace,
+            ip_namespace=_namespace_ref(namespace),
         )
         self._set_source(prefix, avd_source)
         await prefix.save(allow_upsert=True)
@@ -204,7 +209,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             IpamIPAddress,
             address=address_str,
             ip_prefix=prefix,
-            ip_namespace=namespace,
+            ip_namespace=_namespace_ref(namespace),
         )
         self._set_source(ip_address, avd_source)
         await ip_address.save(allow_upsert=True)

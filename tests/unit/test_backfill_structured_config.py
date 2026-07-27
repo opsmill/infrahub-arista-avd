@@ -368,7 +368,7 @@ class TestBackfillIp:
             IpamPrefix,
             prefix="10.0.0.0/31",
             role="backfill",
-            ip_namespace="default",
+            ip_namespace={"hfid": ["default"]},
         )
         mock_prefix.save.assert_awaited_once_with(allow_upsert=True)
 
@@ -377,7 +377,7 @@ class TestBackfillIp:
             IpamIPAddress,
             address="10.0.0.1/31",
             ip_prefix=mock_prefix,
-            ip_namespace="default",
+            ip_namespace={"hfid": ["default"]},
         )
         mock_ip.save.assert_awaited_once_with(allow_upsert=True)
 
@@ -413,7 +413,7 @@ class TestBackfillIp:
             IpamPrefix,
             prefix="10.255.0.1/32",
             role="backfill",
-            ip_namespace="default",
+            ip_namespace={"hfid": ["default"]},
         )
 
     async def test_backfill_raises_for_duplicate_existing_ips(self) -> None:
