@@ -346,6 +346,63 @@ async def test_create_avd_device_includes_preserved_required_attributes_without_
 
 
 @pytest.mark.asyncio
+async def test_create_avd_device_backfills_missing_template_physical_interfaces() -> None:
+    gen = _make_generator()
+    existing_device = _device_with_relationships()
+    saved_device = _device()
+    created_interface = SimpleNamespace(save=AsyncMock())
+    template_interface_existing = SimpleNamespace(
+        name=SimpleNamespace(value="Ethernet1"),
+        status=SimpleNamespace(value="active"),
+        role=SimpleNamespace(value="server"),
+        mtu=SimpleNamespace(value=1500),
+        description=SimpleNamespace(value=""),
+        l2_mode=SimpleNamespace(value=""),
+        dot1q_id=SimpleNamespace(value=""),
+        mac_address=SimpleNamespace(value=""),
+        index=SimpleNamespace(value=None),
+    )
+    template_interface_missing = SimpleNamespace(
+        name=SimpleNamespace(value="Ethernet2"),
+        status=SimpleNamespace(value="active"),
+        role=SimpleNamespace(value="spine"),
+        mtu=SimpleNamespace(value=9200),
+        description=SimpleNamespace(value="uplink"),
+        l2_mode=SimpleNamespace(value=""),
+        dot1q_id=SimpleNamespace(value=""),
+        mac_address=SimpleNamespace(value=""),
+        index=SimpleNamespace(value=None),
+    )
+    existing_interface = SimpleNamespace(name=SimpleNamespace(value="Ethernet1"))
+    gen.client.filters.side_effect = [
+        [SimpleNamespace(id="device-1")],
+        [template_interface_existing, template_interface_missing],
+        [existing_interface],
+    ]
+    gen.client.get.return_value = existing_device
+    gen.client.create.side_effect = [saved_device, created_interface]
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+    )
+
+    assert gen.client.create.await_args_list[1].args[0].__name__ == "InterfacePhysical"
+    assert gen.client.create.await_args_list[1].kwargs == {
+        "name": "Ethernet2",
+        "device": {"id": "device-1"},
+        "status": "active",
+        "role": "spine",
+        "mtu": 9200,
+        "description": "uplink",
+    }
+    created_interface.save.assert_awaited_once_with(allow_upsert=True)
+
+
+@pytest.mark.asyncio
 async def test_create_avd_device_adds_avd_group_without_removing_existing_groups() -> None:
     gen = _make_generator()
     existing_device = _device_with_relationships(group_ids=["ops-group"])

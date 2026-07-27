@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
-from .protocols import DcimDevice, DcimInterface, InterfaceVirtual, RoutingAsn
+from .protocols import DcimDevice, DcimInterface, InterfacePhysical, InterfaceVirtual, RoutingAsn
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -262,6 +262,7 @@ class GeneratorMixin:
 
         device = await self.client.create(DcimDevice, **device_kwargs)  # type: ignore[type-abstract]
         await device.save(allow_upsert=True)
+        await self._reconcile_physical_interfaces_from_template(device.id, object_template_id)
 
         created_asn: RoutingAsn | None = None
         try:
@@ -465,6 +466,49 @@ class GeneratorMixin:
             if fields:
                 log.info("Device %s: %s fields %s", name, decision, ", ".join(sorted(fields)))
 
+    async def _reconcile_physical_interfaces_from_template(self, device_id: str, object_template_id: str) -> None:
+        """Create missing physical interfaces for devices whose template was applied by upsert.
+
+        Infrahub expands template interfaces when a device is created from a template, but a
+        pre-seeded device may receive its object_template later through generator upsert. In
+        that case, copy only missing physical interfaces and leave existing manual interfaces
+        untouched.
+        """
+        template_interfaces = await self.client.filters(
+            kind="TemplateInterfacePhysical",
+            device__ids=[object_template_id],
+        )
+        if not template_interfaces:
+            return
+
+        existing_interfaces = await self.client.filters(
+            DcimInterface,  # type: ignore[type-abstract]
+            device__ids=[device_id],
+        )
+        existing_names = {
+            name
+            for interface in existing_interfaces
+            if (name := self._attribute_value(getattr(interface, "name", None)))
+        }
+
+        for template_interface in template_interfaces:
+            name = self._attribute_value(getattr(template_interface, "name", None))
+            if not name or name in existing_names:
+                continue
+
+            interface_kwargs: dict[str, Any] = {
+                "name": name,
+                "device": {"id": device_id},
+            }
+            for field_name in ("status", "role", "mtu", "description", "l2_mode", "dot1q_id", "mac_address", "index"):
+                value = self._attribute_value(getattr(template_interface, field_name, None))
+                if value not in (None, ""):
+                    interface_kwargs[field_name] = value
+
+            interface = await self.client.create(InterfacePhysical, **interface_kwargs)  # type: ignore[type-abstract]
+            await interface.save(allow_upsert=True)
+            existing_names.add(name)
+
     @staticmethod
     def _has_non_empty_value(attribute: object) -> bool:
         if attribute is None:
@@ -473,6 +517,12 @@ class GeneratorMixin:
         if value is None:
             return False
         return not (isinstance(value, str) and not value)
+
+    @staticmethod
+    def _attribute_value(attribute: object) -> object:
+        if attribute is None:
+            return None
+        return getattr(attribute, "value", attribute)
 
     @staticmethod
     def _relationship_peer_refs(relationship: object) -> list[dict[str, str]]:
