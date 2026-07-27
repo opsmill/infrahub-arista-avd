@@ -369,9 +369,13 @@ class TestPyavdLoopbackPools:
         }
         avd_facts = get_avd_facts(hostvars)
 
-        structured_config = get_device_structured_config(hostname="leaf1", inputs=hostvars["leaf1"], avd_facts=avd_facts)
+        structured_config = get_device_structured_config(
+            hostname="leaf1", inputs=hostvars["leaf1"], avd_facts=avd_facts
+        )
         prefix_lists = structured_config._as_dict()["prefix_lists"]
-        loopbacks = next(prefix_list for prefix_list in prefix_lists if prefix_list["name"] == "PL-LOOPBACKS-EVPN-OVERLAY")
+        loopbacks = next(
+            prefix_list for prefix_list in prefix_lists if prefix_list["name"] == "PL-LOOPBACKS-EVPN-OVERLAY"
+        )
         prefixes = [sequence["action"].removeprefix("permit ") for sequence in loopbacks["sequence_numbers"]]
 
         assert "10.0.0.0/24 eq 32" in prefixes

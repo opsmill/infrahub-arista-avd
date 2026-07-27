@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,12 +35,12 @@ def resolve_specify_init_dir() -> Path:
         candidate = Path.cwd() / candidate
     try:
         init_root = candidate.resolve(strict=True)
-    except OSError:
+    except OSError as err:
         print(
             f"ERROR: SPECIFY_INIT_DIR does not point to an existing directory: {raw}",
             file=sys.stderr,
         )
-        raise SystemExit(1)
+        raise SystemExit(1) from err
     if not init_root.is_dir():
         print(
             f"ERROR: SPECIFY_INIT_DIR does not point to an existing directory: {raw}",
@@ -48,8 +49,7 @@ def resolve_specify_init_dir() -> Path:
         raise SystemExit(1)
     if not (init_root / ".specify").is_dir():
         print(
-            "ERROR: SPECIFY_INIT_DIR is not a Spec Kit project "
-            f"(no .specify/ directory): {init_root}",
+            f"ERROR: SPECIFY_INIT_DIR is not a Spec Kit project (no .specify/ directory): {init_root}",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -113,9 +113,7 @@ def persist_feature_json(repo_root: Path, feature_dir_value: str) -> None:
 
     specify_dir = repo_root / ".specify"
     specify_dir.mkdir(parents=True, exist_ok=True)
-    (specify_dir / "feature.json").write_bytes(
-        _json_dump({"feature_directory": value}).encode("utf-8")
-    )
+    (specify_dir / "feature.json").write_bytes(_json_dump({"feature_directory": value}).encode("utf-8"))
 
 
 @dataclass(frozen=True)
@@ -132,9 +130,7 @@ class FeaturePaths:
     contracts_dir: Path
 
 
-def get_feature_paths(
-    *, no_persist: bool = False, script_file: Path | None = None
-) -> FeaturePaths:
+def get_feature_paths(*, no_persist: bool = False, script_file: Path | None = None) -> FeaturePaths:
     repo_root = get_repo_root(script_file)
     current_branch = get_current_branch()
 
@@ -188,27 +184,19 @@ def _sorted_preset_ids(presets_dir: Path) -> list[str]:
         # Mirrors bash: any failure while reading or sorting the registry
         # (invalid JSON, non-dict shapes, unorderable priority values) falls
         # back to the directory scan below.
-        try:
+        with suppress(OSError, UnicodeError, json.JSONDecodeError, TypeError):
             data = json.loads(registry.read_text(encoding="utf-8"))
             presets = data.get("presets", {})
             return [
                 pid
                 for pid, meta in sorted(
                     presets.items(),
-                    key=lambda kv: kv[1].get("priority", 10)
-                    if isinstance(kv[1], dict)
-                    else 10,
+                    key=lambda kv: kv[1].get("priority", 10) if isinstance(kv[1], dict) else 10,
                 )
                 if isinstance(meta, dict) and meta.get("enabled", True) is not False
             ]
-        except Exception:
-            pass
     try:
-        return sorted(
-            p.name
-            for p in presets_dir.iterdir()
-            if p.is_dir() and not p.name.startswith(".")
-        )
+        return sorted(p.name for p in presets_dir.iterdir() if p.is_dir() and not p.name.startswith("."))
     except OSError:
         return []
 

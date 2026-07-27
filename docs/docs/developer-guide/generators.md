@@ -186,6 +186,26 @@ Run generators in this order for a new fabric:
 5. AVD Structured Cfg  (on Fabric)
 ```
 
+For an existing fabric, `generate-fabric` is also the reconciliation entry point.
+Checksum changes still drive the existing trigger rules: a changed pod checksum
+fires `generate-pod`, and a changed rack checksum fires `generate-rack`. When a
+pod or rack checksum is already current, the upstream generator explicitly
+continues the cascade with `CoreGeneratorDefinitionRun` targeted to the unchanged
+node IDs. This keeps repeated fabric runs from faking checksum churn while still
+reaching pod, rack, hostvar, and structured-config generation.
+
+The fabric generator skips direct continuation for the fabric-role pod because
+that pod is owned by `FabricGenerator` for super-spine creation. Pod generation
+uses the same pattern for racks: changed racks rely on checksum-trigger saves;
+unchanged racks are scheduled directly.
+
+Device reconciliation is fill-only by default. `GeneratorMixin.create_avd_device()`
+fetches any existing device by name before building the upsert payload, then
+populates missing generator-owned values such as status, role, object template,
+pod, rack, index, AVD group membership, node ID, management IP, loopback IP,
+VTEP loopback IP, and ASN. Existing non-empty operator values, including
+`serial` and `mgmt_ip`, are preserved during standard generation.
+
 ## Running Generators
 
 ### Via Infrahub UI

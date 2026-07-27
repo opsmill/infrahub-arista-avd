@@ -1,0 +1,105 @@
+# Quickstart: Validate Generator Cascade Preservation
+
+## Prerequisites
+
+- Install project dependencies: `uv sync --all-packages`.
+- Load or connect to an Infrahub environment according to local project guidance.
+- Use a non-main branch for generator cascade validation, because trigger rules are branch-scoped.
+- Ensure `.env` is sourced before local `infrahubctl` commands when using local CLI access:
+
+```bash
+set -a; source .env; set +a
+```
+
+## Local Unit Validation
+
+Run focused unit tests after implementation:
+
+```bash
+uv run pytest tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generate_rack.py
+```
+
+Expected outcomes:
+
+- Fabric generator schedules unchanged non-fabric pod targets directly.
+- Pod generator schedules unchanged rack targets directly.
+- Changed targets still rely on checksum-trigger updates and are not directly scheduled a second time.
+- Existing device `serial` and non-empty `mgmt_ip` are preserved.
+- Missing generator-owned device values are populated.
+- Repeated reconciliation does not duplicate devices, groups, ASNs, loopback interfaces, or artifacts.
+
+## Full Local Quality Gates
+
+Run the standard local checks before integration validation:
+
+```bash
+uv run pytest tests/unit
+uv run invoke lint
+```
+
+If any GraphQL query is changed, regenerate its return model before running tests. If any schema is changed, run schema validation and regenerate protocols first.
+
+## Reproduced Pre-Seeded Fabric Scenario
+
+Create or use a branch containing an existing fabric with:
+
+- Existing pods and racks.
+- At least one device already named as the generator would create it.
+- Pre-populated non-empty `serial`.
+- Pre-populated non-empty `mgmt_ip`.
+- Missing one or more generated fields such as node ID, loopback, VTEP IP, ASN, AVD group membership, hostvars, or structured config.
+
+Run only `generate-fabric` for the target fabric on that branch.
+
+Expected outcomes:
+
+- Pod, rack, hostvar, and structured-config stages all complete from the single fabric kickoff.
+- The pre-existing `serial` value is unchanged.
+- The pre-existing `mgmt_ip` relationship is unchanged.
+- Missing generated fields are now present.
+- All expected devices have hostvars and structured configs.
+- A second run produces no duplicate objects or relationships.
+
+## Integration Validation
+
+For generator code changes, use the required project integration skill:
+
+```text
+$infrahub-run-integration-tests
+```
+
+The validation report must include the tested branch and commit.
+
+## Generator Idempotence Validation
+
+For generator cascade or generator-owned data changes, use the required idempotence skill when live validation is permitted:
+
+```text
+$infrahub-test-generator-idempotence
+```
+
+The report must cover a repeated `generate-fabric` run against the pre-seeded-device scenario and confirm no drift on the second run.
+
+## Override Mode
+
+No override-mode validation is required for this slice because the current external generator-run contract does not expose runtime options. If a future task adds an explicit override contract, add separate tests proving only generator-owned fields are overwritten.
+
+## Validation Evidence
+
+- Focused unit validation passed on 2026-07-27:
+  `uv run pytest tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generate_rack.py tests/unit/test_generator_cascade_contract.py`
+  (`68 passed`).
+- Targeted changed-file lint passed on 2026-07-27:
+  `uv run ruff check src/solution_arista_avd/generator.py generators/generate_fabric.py generators/generate_pod.py tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generator_cascade_contract.py`.
+- Targeted type check passed on 2026-07-27:
+  `uv run mypy --show-error-codes src/solution_arista_avd/generator.py`.
+- Full unit validation passed on 2026-07-27:
+  `uv run pytest tests/unit` (`470 passed`).
+- Full lint validation passed on 2026-07-27:
+  `uv run invoke lint`.
+- Remote integration validation with `$infrahub-run-integration-tests` is pending
+  a committed/fetchable branch revision so the remote integration worktree can
+  test the exact commit.
+- Live generator idempotence validation with `$infrahub-test-generator-idempotence`
+  is pending explicit user approval because the skill uses the shared live lab
+  and normally rebuilds it before testing.

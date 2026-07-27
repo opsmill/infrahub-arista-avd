@@ -162,6 +162,68 @@ class TestFabricGenerator:
         unchanged_pod.save.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_update_checksum_schedules_unchanged_non_fabric_pods(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        gen = _make_generator()
+        gen.fabric_id = "fabric-1"
+        gen.calculate_checksum = MagicMock(return_value="new-checksum")  # type: ignore[method-assign]
+        unchanged_pod = MagicMock()
+        unchanged_pod.id = "pod-1"
+        unchanged_pod.name.value = "pod-1"
+        unchanged_pod.role.value = "cpu"
+        unchanged_pod.checksum.value = "new-checksum"
+        unchanged_pod.save = AsyncMock()
+        gen.client.filters = AsyncMock(return_value=[unchanged_pod])
+        trigger_pod_generation = AsyncMock()
+        monkeypatch.setattr(generate_fabric_module, "trigger_pod_generation", trigger_pod_generation)
+
+        await gen.update_checksum()
+
+        unchanged_pod.save.assert_not_awaited()
+        trigger_pod_generation.assert_awaited_once_with(gen.client, node_ids=["pod-1"])
+
+    @pytest.mark.asyncio
+    async def test_update_checksum_changed_pods_rely_on_checksum_trigger(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        gen = _make_generator()
+        gen.fabric_id = "fabric-1"
+        gen.calculate_checksum = MagicMock(return_value="new-checksum")  # type: ignore[method-assign]
+        changed_pod = MagicMock()
+        changed_pod.id = "pod-1"
+        changed_pod.name.value = "pod-1"
+        changed_pod.role.value = "cpu"
+        changed_pod.checksum.value = "old-checksum"
+        changed_pod.save = AsyncMock()
+        gen.client.filters = AsyncMock(return_value=[changed_pod])
+        trigger_pod_generation = AsyncMock()
+        monkeypatch.setattr(generate_fabric_module, "trigger_pod_generation", trigger_pod_generation)
+
+        await gen.update_checksum()
+
+        changed_pod.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+        trigger_pod_generation.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_update_checksum_skips_fabric_role_pods_for_direct_continuation(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        gen = _make_generator()
+        gen.fabric_id = "fabric-1"
+        gen.calculate_checksum = MagicMock(return_value="new-checksum")  # type: ignore[method-assign]
+        fabric_pod = MagicMock()
+        fabric_pod.id = "pod-fabric"
+        fabric_pod.name.value = "fabric-pod"
+        fabric_pod.role.value = "fabric"
+        fabric_pod.checksum.value = "new-checksum"
+        fabric_pod.save = AsyncMock()
+        gen.client.filters = AsyncMock(return_value=[fabric_pod])
+        trigger_pod_generation = AsyncMock()
+        monkeypatch.setattr(generate_fabric_module, "trigger_pod_generation", trigger_pod_generation)
+
+        await gen.update_checksum()
+
+        fabric_pod.save.assert_not_awaited()
+        trigger_pod_generation.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_ebgp_super_spines_use_shared_asn_allocation(self, monkeypatch: pytest.MonkeyPatch) -> None:
         gen = _make_generator()
         gen.amount_of_super_spines = 2
@@ -233,7 +295,7 @@ class TestPodGenerator:
         gen.create_spine_switches.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_update_checksum_does_not_track_preseeded_racks(self) -> None:
+    async def test_update_checksum_does_not_track_preseeded_racks(self, monkeypatch: pytest.MonkeyPatch) -> None:
         gen = PodGenerator.__new__(PodGenerator)
         gen.client = MagicMock()
         gen.logger = MagicMock()
@@ -245,10 +307,13 @@ class TestPodGenerator:
         changed_rack.checksum.value = "old-checksum"
         changed_rack.save = AsyncMock()
         unchanged_rack = MagicMock()
+        unchanged_rack.id = "rack-2"
         unchanged_rack.name.value = "rack-2"
         unchanged_rack.checksum.value = "new-checksum"
         unchanged_rack.save = AsyncMock()
         gen.client.filters = AsyncMock(return_value=[changed_rack, unchanged_rack])
+        trigger_rack_generation = AsyncMock()
+        monkeypatch.setattr(generate_pod_module, "trigger_rack_generation", trigger_rack_generation)
 
         await gen.update_checksum()
 

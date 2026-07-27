@@ -23,6 +23,40 @@ def _device(device_id: str = "device-1", *, asn_id: str | None = None) -> Simple
     return SimpleNamespace(id=device_id, save=AsyncMock(), delete=AsyncMock(), asn=SimpleNamespace(id=asn_id))
 
 
+def _device_with_relationships(
+    device_id: str = "device-1",
+    *,
+    serial: str | None = None,
+    mgmt_ip_id: str | None = None,
+    group_ids: list[str] | None = None,
+    asn_id: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=device_id,
+        name=SimpleNamespace(value="leaf-a"),
+        serial=SimpleNamespace(value=serial),
+        status=SimpleNamespace(value=None),
+        role=SimpleNamespace(value=None),
+        index=SimpleNamespace(value=None),
+        object_template=SimpleNamespace(id=None, node=None),
+        pod=SimpleNamespace(id=None, node=None),
+        rack=SimpleNamespace(id=None, node=None),
+        mgmt_ip=SimpleNamespace(id=mgmt_ip_id, node=SimpleNamespace(id=mgmt_ip_id) if mgmt_ip_id else None),
+        node_id=SimpleNamespace(id=None, node=None),
+        loopback_ip=SimpleNamespace(id=None, node=None),
+        vtep_loopback_ip=SimpleNamespace(id=None, node=None),
+        asn=SimpleNamespace(id=asn_id, node=SimpleNamespace(id=asn_id) if asn_id else None),
+        member_of_groups=SimpleNamespace(
+            peers=[
+                SimpleNamespace(peer=SimpleNamespace(id=group_id, name=SimpleNamespace(value=group_id)))
+                for group_id in group_ids or []
+            ]
+        ),
+        save=AsyncMock(),
+        delete=AsyncMock(),
+    )
+
+
 def _interface(kind: str = "InterfacePhysical") -> SimpleNamespace:
     return SimpleNamespace(
         delete=AsyncMock(),
@@ -32,6 +66,20 @@ def _interface(kind: str = "InterfacePhysical") -> SimpleNamespace:
 
 def _resource(resource_id: str) -> SimpleNamespace:
     return SimpleNamespace(node=SimpleNamespace(id=resource_id))
+
+
+def test_relationship_node_id_detects_missing_and_populated_relationships() -> None:
+    assert GeneratorMixin._relationship_node_id(None) is None
+    assert GeneratorMixin._relationship_node_id(SimpleNamespace(id=None, node=None)) is None
+    assert GeneratorMixin._relationship_node_id(SimpleNamespace(id="rel-1", node=None)) == "rel-1"
+    assert GeneratorMixin._relationship_node_id(SimpleNamespace(node=SimpleNamespace(id="node-1"))) == "node-1"
+
+
+def test_non_empty_value_detects_missing_and_populated_attributes() -> None:
+    assert GeneratorMixin._has_non_empty_value(None) is False
+    assert GeneratorMixin._has_non_empty_value(SimpleNamespace(value=None)) is False
+    assert GeneratorMixin._has_non_empty_value(SimpleNamespace(value="")) is False
+    assert GeneratorMixin._has_non_empty_value(SimpleNamespace(value="SERIAL1")) is True
 
 
 @pytest.mark.asyncio
@@ -132,6 +180,126 @@ async def test_create_avd_device_allocates_vtep_loopback_for_leaf_roles_only() -
     spine_kwargs = gen.client.create.await_args_list[1].kwargs
     assert leaf_kwargs["vtep_loopback_ip"] == "vtep-pool"
     assert "vtep_loopback_ip" not in spine_kwargs
+
+
+@pytest.mark.asyncio
+async def test_create_avd_device_preserves_existing_non_empty_serial() -> None:
+    gen = _make_generator()
+    existing_device = _device_with_relationships(serial="SERIAL1")
+    saved_device = _device()
+    gen.client.filters.return_value = [SimpleNamespace(id="device-1")]
+    gen.client.get.return_value = existing_device
+    gen.client.create.return_value = saved_device
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+    )
+
+    assert "serial" not in gen.client.create.await_args.kwargs
+    gen.client.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_avd_device_preserves_existing_non_empty_mgmt_ip() -> None:
+    gen = _make_generator()
+    existing_device = _device_with_relationships(mgmt_ip_id="mgmt-existing")
+    saved_device = _device()
+    gen.client.filters.return_value = [SimpleNamespace(id="device-1")]
+    gen.client.get.return_value = existing_device
+    gen.client.create.return_value = saved_device
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+        mgmt_pool="mgmt-pool",  # type: ignore[arg-type]
+    )
+
+    assert "mgmt_ip" not in gen.client.create.await_args.kwargs
+
+
+@pytest.mark.asyncio
+async def test_create_avd_device_populates_missing_generated_relationships() -> None:
+    gen = _make_generator()
+    existing_device = _device_with_relationships()
+    saved_device = _device()
+    gen.client.filters.return_value = [SimpleNamespace(id="device-1")]
+    gen.client.get.return_value = existing_device
+    gen.client.create.return_value = saved_device
+    gen._ensure_device_asn = AsyncMock()  # type: ignore[method-assign]
+    gen._reconcile_generated_loopback_interfaces = AsyncMock()  # type: ignore[method-assign]
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+        loopback_pool="loopback-pool",  # type: ignore[arg-type]
+        vtep_loopback_pool="vtep-pool",  # type: ignore[arg-type]
+        asn_pool="asn-pool",  # type: ignore[arg-type]
+        node_id_pool="node-id-pool",  # type: ignore[arg-type]
+        mgmt_pool="mgmt-pool",  # type: ignore[arg-type]
+    )
+
+    kwargs = gen.client.create.await_args.kwargs
+    assert kwargs["mgmt_ip"] == "mgmt-pool"
+    assert kwargs["node_id"] == "node-id-pool"
+    assert kwargs["loopback_ip"] == "loopback-pool"
+    assert kwargs["vtep_loopback_ip"] == "vtep-pool"
+    gen._ensure_device_asn.assert_awaited_once_with("device-1", "asn-pool", "fabric-1")
+    gen._reconcile_generated_loopback_interfaces.assert_awaited_once_with("device-1", "leaf")
+
+
+@pytest.mark.asyncio
+async def test_create_avd_device_adds_avd_group_without_removing_existing_groups() -> None:
+    gen = _make_generator()
+    existing_device = _device_with_relationships(group_ids=["ops-group"])
+    saved_device = _device()
+    gen.client.filters.return_value = [SimpleNamespace(id="device-1")]
+    gen.client.get.return_value = existing_device
+    gen.client.create.return_value = saved_device
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+    )
+
+    assert gen.client.create.await_args.kwargs["member_of_groups"] == [{"id": "ops-group"}, "avd_devices"]
+
+
+@pytest.mark.asyncio
+async def test_create_avd_device_logs_preserved_populated_and_skipped_field_decisions() -> None:
+    gen = _make_generator()
+    existing_device = _device_with_relationships(serial="SERIAL1", mgmt_ip_id="mgmt-existing")
+    saved_device = _device()
+    gen.client.filters.return_value = [SimpleNamespace(id="device-1")]
+    gen.client.get.return_value = existing_device
+    gen.client.create.return_value = saved_device
+    gen.logger = MagicMock()
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+        mgmt_pool="mgmt-pool",  # type: ignore[arg-type]
+    )
+
+    logged_args = [call.args for call in gen.logger.info.call_args_list]
+    assert any("preserved" in args for args in logged_args)
+    assert any("populated" in args for args in logged_args)
+    assert any("skipped" in args for args in logged_args)
 
 
 @pytest.mark.asyncio

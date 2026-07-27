@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
@@ -43,6 +43,18 @@ async def set_fabric_avd_hostvars_ready(client: InfrahubClient, fabric_id: str, 
 
 class GeneratorMixin:
     client: InfrahubClient
+
+    _DEVICE_RECONCILE_INCLUDE: ClassVar[list[str]] = [
+        "asn",
+        "loopback_ip",
+        "member_of_groups",
+        "mgmt_ip",
+        "node_id",
+        "object_template",
+        "pod",
+        "rack",
+        "vtep_loopback_ip",
+    ]
 
     def calculate_checksum(self) -> str:
         """Calculates a checksum of the generator based on the related ids during the session"""
@@ -204,29 +216,24 @@ class GeneratorMixin:
 
         Returns the created device.
         """
-        device_kwargs: dict[str, Any] = {
-            "name": name,
-            "status": DEVICE_STATUS_PROVISIONING,
-            "object_template": {"id": object_template_id},
-            "role": role,
-            "pod": {"id": pod_id},
-            "member_of_groups": [AVD_DEVICES_GROUP],
-        }
-        if rack_id is not None:
-            device_kwargs["rack"] = {"id": rack_id}
-        if index is not None:
-            device_kwargs["index"] = index
-        if loopback_pool is not None:
-            device_kwargs["loopback_ip"] = loopback_pool
-        if vtep_loopback_pool is not None and role in VTEP_LOOPBACK_ROLES:
-            device_kwargs["vtep_loopback_ip"] = vtep_loopback_pool
-        if node_id_pool is not None:
-            device_kwargs["node_id"] = node_id_pool
-        if mgmt_pool is not None:
-            device_kwargs["mgmt_ip"] = mgmt_pool
-
         existing_devices = await self.client.filters(DcimDevice, name__value=name)
         device_existed = bool(existing_devices)
+        existing_device = await self._fetch_existing_avd_device(existing_devices[0].id) if device_existed else None
+
+        device_kwargs, decisions = self._build_avd_device_payload(
+            name=name,
+            role=role,
+            object_template_id=object_template_id,
+            pod_id=pod_id,
+            rack_id=rack_id,
+            index=index,
+            loopback_pool=loopback_pool,
+            vtep_loopback_pool=vtep_loopback_pool,
+            node_id_pool=node_id_pool,
+            mgmt_pool=mgmt_pool,
+            existing_device=existing_device,
+        )
+        self._log_device_field_decisions(name, decisions)
 
         device = await self.client.create(DcimDevice, **device_kwargs)  # type: ignore[type-abstract]
         await device.save(allow_upsert=True)
@@ -256,6 +263,203 @@ class GeneratorMixin:
             raise
 
         return device
+
+    async def _fetch_existing_avd_device(self, device_id: str) -> DcimDevice:
+        return await self.client.get(  # type: ignore[type-abstract]
+            DcimDevice,
+            id=device_id,
+            include=self._DEVICE_RECONCILE_INCLUDE,
+        )
+
+    def _build_avd_device_payload(
+        self,
+        *,
+        name: str,
+        role: str,
+        object_template_id: str,
+        pod_id: str,
+        rack_id: str | None,
+        index: int | None,
+        loopback_pool: CoreIPAddressPool | None,
+        vtep_loopback_pool: CoreIPAddressPool | None,
+        node_id_pool: CoreNumberPool | None,
+        mgmt_pool: CoreIPAddressPool | None,
+        existing_device: DcimDevice | None,
+    ) -> tuple[dict[str, Any], dict[str, list[str]]]:
+        decisions: dict[str, list[str]] = {"populated": [], "preserved": [], "skipped": []}
+        payload: dict[str, Any] = {"name": name}
+
+        if existing_device is not None and self._has_non_empty_value(getattr(existing_device, "serial", None)):
+            decisions["preserved"].append("serial")
+
+        self._add_attribute_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="status",
+            value=DEVICE_STATUS_PROVISIONING,
+        )
+        self._add_attribute_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="role",
+            value=role,
+        )
+        self._add_attribute_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="index",
+            value=index,
+        )
+        self._add_relationship_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="object_template",
+            value={"id": object_template_id},
+        )
+        self._add_relationship_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="pod",
+            value={"id": pod_id},
+        )
+        self._add_relationship_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="rack",
+            value={"id": rack_id} if rack_id is not None else None,
+        )
+        self._add_relationship_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="loopback_ip",
+            value=loopback_pool,
+        )
+        self._add_relationship_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="vtep_loopback_ip",
+            value=vtep_loopback_pool if role in VTEP_LOOPBACK_ROLES else None,
+        )
+        self._add_relationship_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="node_id",
+            value=node_id_pool,
+        )
+        self._add_relationship_if_missing(
+            payload,
+            decisions,
+            existing_device=existing_device,
+            field_name="mgmt_ip",
+            value=mgmt_pool,
+        )
+        self._add_avd_group_membership(payload, decisions, existing_device)
+
+        return payload, decisions
+
+    def _add_attribute_if_missing(
+        self,
+        payload: dict[str, Any],
+        decisions: dict[str, list[str]],
+        *,
+        existing_device: DcimDevice | None,
+        field_name: str,
+        value: object,
+    ) -> None:
+        if existing_device is not None and self._has_non_empty_value(getattr(existing_device, field_name, None)):
+            decisions["preserved"].append(field_name)
+            return
+        if value is None:
+            decisions["skipped"].append(field_name)
+            return
+        payload[field_name] = value
+        decisions["populated"].append(field_name)
+
+    def _add_relationship_if_missing(
+        self,
+        payload: dict[str, Any],
+        decisions: dict[str, list[str]],
+        *,
+        existing_device: DcimDevice | None,
+        field_name: str,
+        value: object,
+    ) -> None:
+        if existing_device is not None and self._relationship_node_id(getattr(existing_device, field_name, None)):
+            decisions["preserved"].append(field_name)
+            return
+        if value is None:
+            decisions["skipped"].append(field_name)
+            return
+        payload[field_name] = value
+        decisions["populated"].append(field_name)
+
+    def _add_avd_group_membership(
+        self,
+        payload: dict[str, Any],
+        decisions: dict[str, list[str]],
+        existing_device: DcimDevice | None,
+    ) -> None:
+        if existing_device is None:
+            payload["member_of_groups"] = [AVD_DEVICES_GROUP]
+            decisions["populated"].append("member_of_groups")
+            return
+
+        existing_groups = self._relationship_peer_refs(getattr(existing_device, "member_of_groups", None))
+        has_avd_group = any(
+            group_ref.get("id") == AVD_DEVICES_GROUP or group_ref.get("name") == AVD_DEVICES_GROUP
+            for group_ref in existing_groups
+        )
+        if has_avd_group:
+            decisions["preserved"].append("member_of_groups")
+            return
+
+        payload["member_of_groups"] = [
+            {"id": group_ref["id"]} if "id" in group_ref else group_ref["name"] for group_ref in existing_groups
+        ]
+        payload["member_of_groups"].append(AVD_DEVICES_GROUP)
+        decisions["populated"].append("member_of_groups")
+
+    def _log_device_field_decisions(self, name: str, decisions: dict[str, list[str]]) -> None:
+        log = getattr(self, "logger", logger)
+        for decision, fields in decisions.items():
+            if fields:
+                log.info("Device %s: %s fields %s", name, decision, ", ".join(sorted(fields)))
+
+    @staticmethod
+    def _has_non_empty_value(attribute: object) -> bool:
+        if attribute is None:
+            return False
+        value = getattr(attribute, "value", attribute)
+        if value is None:
+            return False
+        return not (isinstance(value, str) and not value)
+
+    @staticmethod
+    def _relationship_peer_refs(relationship: object) -> list[dict[str, str]]:
+        peers = getattr(relationship, "peers", None)
+        if not peers:
+            return []
+
+        refs: list[dict[str, str]] = []
+        for peer_ref in peers:
+            peer = getattr(peer_ref, "peer", None) or getattr(peer_ref, "node", None) or peer_ref
+            peer_id = getattr(peer, "id", None)
+            if isinstance(peer_id, str) and peer_id:
+                refs.append({"id": peer_id})
+                continue
+            peer_name = getattr(getattr(peer, "name", None), "value", None)
+            if isinstance(peer_name, str) and peer_name:
+                refs.append({"name": peer_name})
+        return refs
 
     async def allocate_routing_asn(self, asn_pool: CoreNumberPool, fabric_id: str) -> RoutingAsn:
         """Allocate a BGP ASN from ``asn_pool`` as a first-class ``Routing.Asn`` node.
@@ -574,6 +778,16 @@ async def trigger_hostvar_generation(
         timeout=timeout,
         tolerate_timeout=tolerate_timeout,
     )
+
+
+async def trigger_pod_generation(client: InfrahubClient, node_ids: list[str] | None = None) -> None:
+    """Trigger the pod generator for explicit pod targets."""
+    await _trigger_generator(client, "generate-pod", node_ids=node_ids)
+
+
+async def trigger_rack_generation(client: InfrahubClient, node_ids: list[str] | None = None) -> None:
+    """Trigger the rack generator for explicit rack targets."""
+    await _trigger_generator(client, "generate-rack", node_ids=node_ids)
 
 
 async def trigger_structured_config_generation(client: InfrahubClient) -> None:
