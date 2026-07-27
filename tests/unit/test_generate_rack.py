@@ -205,12 +205,67 @@ async def test_mlag_enabled_leafs_do_not_allocate_device_asns() -> None:
     leaf1 = _leaf("leaf-1", "leaf-pod-a-1-1")
     leaf2 = _leaf("leaf-2", "leaf-pod-a-1-2")
     gen.create_avd_device = AsyncMock(side_effect=[leaf1, leaf2])  # type: ignore[method-assign]
+    gen._share_mlag_vtep_loopback_ip = AsyncMock()  # type: ignore[method-assign]
     gen.leaf_switches = []
 
     await gen.create_leaf_switches()
 
     assert [call.kwargs["asn_pool"] for call in gen.create_avd_device.await_args_list] == [None, None]
     assert gen.leaf_switches == [leaf1, leaf2]
+    gen._share_mlag_vtep_loopback_ip.assert_awaited_once_with(leaf1, leaf2)
+
+
+@pytest.mark.asyncio
+async def test_mlag_leaf_pairs_allocate_one_vtep_loopback_per_pair() -> None:
+    gen = _make_generator()
+    gen.rack_mlag_enabled = True
+    gen.rack_amount_of_leafs = 4
+    leafs = [_leaf(f"leaf-{idx}", f"leaf-pod-a-1-{idx}") for idx in range(1, 5)]
+    gen.create_avd_device = AsyncMock(side_effect=leafs)  # type: ignore[method-assign]
+    gen._share_mlag_vtep_loopback_ip = AsyncMock()  # type: ignore[method-assign]
+    gen.leaf_switches = []
+
+    await gen.create_leaf_switches()
+
+    assert [call.kwargs["loopback_pool"] for call in gen.create_avd_device.await_args_list] == [
+        gen.loopback_pool,
+        gen.loopback_pool,
+        gen.loopback_pool,
+        gen.loopback_pool,
+    ]
+    assert [call.kwargs["vtep_loopback_pool"] for call in gen.create_avd_device.await_args_list] == [
+        gen.vtep_loopback_pool,
+        None,
+        gen.vtep_loopback_pool,
+        None,
+    ]
+    assert gen._share_mlag_vtep_loopback_ip.await_args_list[0].args == (leafs[0], leafs[1])
+    assert gen._share_mlag_vtep_loopback_ip.await_args_list[1].args == (leafs[2], leafs[3])
+
+
+@pytest.mark.asyncio
+async def test_share_mlag_vtep_loopback_links_secondary_to_primary_ip() -> None:
+    gen = _make_generator()
+    primary = _leaf("leaf-1", "leaf-pod-a-1-1")
+    secondary = _leaf("leaf-2", "leaf-pod-a-1-2")
+    gen._device_vtep_loopback_ip_id = AsyncMock(return_value="ip-shared")  # type: ignore[method-assign]
+    gen._set_device_vtep_loopback_ip = AsyncMock()  # type: ignore[method-assign]
+    gen._reconcile_generated_loopback_interfaces = AsyncMock()  # type: ignore[method-assign]
+
+    await gen._share_mlag_vtep_loopback_ip(primary, secondary)
+
+    gen._device_vtep_loopback_ip_id.assert_awaited_once_with("leaf-1")
+    gen._set_device_vtep_loopback_ip.assert_awaited_once_with("leaf-2", "ip-shared")
+    gen._reconcile_generated_loopback_interfaces.assert_awaited_once_with("leaf-2", "leaf")
+
+
+@pytest.mark.asyncio
+async def test_share_mlag_vtep_loopback_requires_primary_ip() -> None:
+    gen = _make_generator()
+    gen._device_vtep_loopback_ip_id = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="primary leaf has no VTEP loopback IP"):
+        await gen._share_mlag_vtep_loopback_ip(_leaf("leaf-1", "leaf-a"), _leaf("leaf-2", "leaf-b"))
 
 
 @pytest.mark.asyncio

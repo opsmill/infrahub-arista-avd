@@ -177,6 +177,20 @@ async def test_ensure_vtep_loopback_address_pool_uses_prefix_pool_resources() ->
 
 
 @pytest.mark.asyncio
+async def test_set_device_vtep_loopback_ip_uses_targeted_mutation() -> None:
+    gen = _make_generator()
+
+    await gen._set_device_vtep_loopback_ip("device-1", "ip-1")
+
+    gen.client.execute_graphql.assert_awaited_once()
+    assert "vtep_loopback_ip" in gen.client.execute_graphql.await_args.kwargs["query"]
+    assert gen.client.execute_graphql.await_args.kwargs["variables"] == {
+        "id": "device-1",
+        "ip_address_id": "ip-1",
+    }
+
+
+@pytest.mark.asyncio
 async def test_ensure_device_asn_deletes_new_asn_when_device_link_save_fails() -> None:
     gen = _make_generator()
     device = _device()

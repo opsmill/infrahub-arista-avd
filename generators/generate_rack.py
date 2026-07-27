@@ -11,6 +11,7 @@ from solution_arista_avd import sorting as solution_arista_avd_sorting
 from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY
 from solution_arista_avd.cabling import build_rack_cabling_plan, connect_interface_maps
 from solution_arista_avd.generator import (
+    VTEP_LOOPBACK_ROLES,
     GeneratorMixin,
     check_all_racks_generated,
     set_fabric_avd_hostvars_ready,
@@ -197,7 +198,14 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         # MLAG leafs share an ASN allocated onto the MLAG domain, so they must not
         # draw a per-device ASN from the fabric pool. Non-MLAG leafs allocate directly.
         asn_pool = None if self.rack_mlag_enabled else self.asn_pool
+        share_mlag_vtep_loopback = (
+            self.rack_mlag_enabled and self.leaf_role in VTEP_LOOPBACK_ROLES and self.vtep_loopback_pool is not None
+        )
         for index in range(1, self.rack_amount_of_leafs + 1):
+            vtep_loopback_pool = self.vtep_loopback_pool
+            if share_mlag_vtep_loopback and index % 2 == 0:
+                vtep_loopback_pool = None
+
             leaf_switch = await self.create_avd_device(
                 name=f"leaf-{self.pod_name}-{self.rack_index}-{index}",
                 role=self.leaf_role,
@@ -207,12 +215,27 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 rack_id=self.rack_id,
                 index=index,
                 loopback_pool=self.loopback_pool,
-                vtep_loopback_pool=self.vtep_loopback_pool,
+                vtep_loopback_pool=vtep_loopback_pool,
                 asn_pool=asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,
             )
             self.leaf_switches.append(leaf_switch)
+            if share_mlag_vtep_loopback and index % 2 == 0:
+                await self._share_mlag_vtep_loopback_ip(self.leaf_switches[-2], leaf_switch)
+
+    async def _share_mlag_vtep_loopback_ip(self, primary_leaf: DcimDevice, secondary_leaf: DcimDevice) -> None:
+        """Point both leaves in an MLAG pair at the primary leaf's VTEP loopback IP."""
+        vtep_loopback_ip_id = await self._device_vtep_loopback_ip_id(primary_leaf.id)
+        if vtep_loopback_ip_id is None:
+            msg = (
+                f"MLAG pair {primary_leaf.name.value} + {secondary_leaf.name.value}: "
+                "primary leaf has no VTEP loopback IP to share"
+            )
+            raise ValueError(msg)
+
+        await self._set_device_vtep_loopback_ip(secondary_leaf.id, vtep_loopback_ip_id)
+        await self._reconcile_generated_loopback_interfaces(secondary_leaf.id, self.leaf_role)
 
     async def create_mlag_pairs(self) -> None:
         """Create MLAG domains pairing consecutive leaf switches.

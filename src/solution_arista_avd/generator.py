@@ -308,6 +308,30 @@ class GeneratorMixin:
             variables={"id": device_id, "asn_id": routing_asn_id},
         )
 
+    async def _device_vtep_loopback_ip_id(self, device_id: str) -> str | None:
+        """Return the linked VTEP loopback IP node id for a device."""
+        device = await self.client.get(
+            DcimDevice,  # type: ignore[type-abstract]
+            id=device_id,
+            include=["vtep_loopback_ip"],
+            exclude=["rack", "pod", "role", "name", "object_template", "member_of_groups"],
+        )
+        return self._relationship_node_id(getattr(device, "vtep_loopback_ip", None))
+
+    async def _set_device_vtep_loopback_ip(self, device_id: str, ip_address_id: str) -> None:
+        """Link DcimDevice.vtep_loopback_ip to an existing IpamIPAddress by id."""
+        await self.client.execute_graphql(
+            query="""
+            mutation SetDeviceVtepLoopbackIp($id: String!, $ip_address_id: String!) {
+                DcimDeviceUpsert(data: { id: $id, vtep_loopback_ip: { id: $ip_address_id } }) {
+                    ok
+                    object { id }
+                }
+            }
+            """,
+            variables={"id": device_id, "ip_address_id": ip_address_id},
+        )
+
     async def ensure_shared_device_asn(
         self, devices: list[DcimDevice], asn_pool: CoreNumberPool, fabric_id: str
     ) -> RoutingAsn | None:

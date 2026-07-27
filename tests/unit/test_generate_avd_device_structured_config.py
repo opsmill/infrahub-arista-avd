@@ -4,7 +4,7 @@ import json
 from unittest.mock import AsyncMock
 
 import pytest
-from pyavd import get_avd_facts, validate_inputs
+from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 
 from generators.generate_avd_device_structured_config import (
     AvdDeviceStructuredConfigGenerator,
@@ -38,7 +38,7 @@ from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeName,
 )
-from tests.unit.test_generate_avd_device_hostvar import _underlay_hostvars
+from tests.unit.test_generate_avd_device_hostvar import _mlag_peer_hostvars, _underlay_hostvars
 
 # --- Helpers to build query data ---
 
@@ -376,6 +376,31 @@ class TestPyavdRuntimeHostvars:
         assert avd_facts["spine1"].loopback_ipv4_pool == "10.0.0.1/32"
         assert avd_facts["leaf1"].loopback_ipv4_pool == "10.0.0.3/32"
         assert "loopback_ipv4_pool" not in hostvars["leaf1"]["l3leaf"]["nodes"][0]
+
+    def test_mlag_leafs_keep_unique_router_ids_and_shared_vtep_ip(self):
+        hostvars = {
+            "leaf1": _mlag_peer_hostvars(hostname="leaf1", node_id=1, device_asn=65099),
+            "leaf2": _mlag_peer_hostvars(hostname="leaf2", node_id=2, device_asn=65098),
+        }
+
+        runtime_hostvars = AvdDeviceStructuredConfigGenerator._build_pyavd_runtime_hostvars(hostvars)
+        avd_facts = get_avd_facts(runtime_hostvars)
+
+        assert avd_facts["leaf1"].router_id == "10.0.0.1"
+        assert avd_facts["leaf2"].router_id == "10.0.0.2"
+        assert avd_facts["leaf1"].vtep_ip == avd_facts["leaf2"].vtep_ip == "10.2.0.3"
+
+        loopback_addresses: dict[str, dict[str, str]] = {}
+        for hostname, inputs in runtime_hostvars.items():
+            structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
+            loopback_addresses[hostname] = {
+                iface["name"]: iface["ip_address"] for iface in structured_config._as_dict()["loopback_interfaces"]
+            }
+
+        assert loopback_addresses["leaf1"]["Loopback0"] == "10.0.0.1/32"
+        assert loopback_addresses["leaf2"]["Loopback0"] == "10.0.0.2/32"
+        assert loopback_addresses["leaf1"]["Loopback1"] == "10.2.0.3/32"
+        assert loopback_addresses["leaf2"]["Loopback1"] == "10.2.0.3/32"
 
 
 class TestEvpnGatewayRemotePeerPreflight:
