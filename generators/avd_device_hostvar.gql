@@ -237,6 +237,7 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             }
             ip_prefix {
               node {
+                __typename
                 prefix {
                   value
                 }
@@ -253,6 +254,7 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             }
             ip_prefix {
               node {
+                __typename
                 prefix {
                   value
                 }
