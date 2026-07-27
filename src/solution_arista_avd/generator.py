@@ -45,6 +45,7 @@ class GeneratorMixin:
 
     _DEVICE_RECONCILE_INCLUDE: ClassVar[list[str]] = [
         "asn",
+        "index",
         "loopback_ip",
         "member_of_groups",
         "mgmt_ip",
@@ -52,6 +53,9 @@ class GeneratorMixin:
         "object_template",
         "pod",
         "rack",
+        "role",
+        "serial",
+        "status",
         "vtep_loopback_ip",
     ]
 
@@ -271,6 +275,7 @@ class GeneratorMixin:
             existing_device=existing_device,
             field_name="status",
             value=DEVICE_STATUS_PROVISIONING,
+            include_preserved=True,
         )
         self._add_attribute_if_missing(
             payload,
@@ -278,6 +283,7 @@ class GeneratorMixin:
             existing_device=existing_device,
             field_name="role",
             value=role,
+            include_preserved=True,
         )
         self._add_attribute_if_missing(
             payload,
@@ -321,7 +327,7 @@ class GeneratorMixin:
             field_name="vtep_loopback_ip",
             value=vtep_loopback_pool if role in VTEP_LOOPBACK_ROLES else None,
         )
-        self._add_relationship_if_missing(
+        self._add_attribute_if_missing(
             payload,
             decisions,
             existing_device=existing_device,
@@ -347,8 +353,12 @@ class GeneratorMixin:
         existing_device: DcimDevice | None,
         field_name: str,
         value: object,
+        include_preserved: bool = False,
     ) -> None:
-        if existing_device is not None and self._has_non_empty_value(getattr(existing_device, field_name, None)):
+        existing_attribute = getattr(existing_device, field_name, None) if existing_device is not None else None
+        if existing_device is not None and self._has_non_empty_value(existing_attribute):
+            if include_preserved:
+                payload[field_name] = getattr(existing_attribute, "value", existing_attribute)
             decisions["preserved"].append(field_name)
             return
         if value is None:

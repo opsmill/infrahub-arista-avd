@@ -26,6 +26,9 @@ def _device_with_relationships(
     device_id: str = "device-1",
     *,
     serial: str | None = None,
+    status: str | None = None,
+    role: str | None = None,
+    node_id: int | None = None,
     mgmt_ip_id: str | None = None,
     group_ids: list[str] | None = None,
     asn_id: str | None = None,
@@ -34,14 +37,14 @@ def _device_with_relationships(
         id=device_id,
         name=SimpleNamespace(value="leaf-a"),
         serial=SimpleNamespace(value=serial),
-        status=SimpleNamespace(value=None),
-        role=SimpleNamespace(value=None),
+        status=SimpleNamespace(value=status),
+        role=SimpleNamespace(value=role),
         index=SimpleNamespace(value=None),
         object_template=SimpleNamespace(id=None, node=None),
         pod=SimpleNamespace(id=None, node=None),
         rack=SimpleNamespace(id=None, node=None),
         mgmt_ip=SimpleNamespace(id=mgmt_ip_id, node=SimpleNamespace(id=mgmt_ip_id) if mgmt_ip_id else None),
-        node_id=SimpleNamespace(id=None, node=None),
+        node_id=SimpleNamespace(value=node_id),
         loopback_ip=SimpleNamespace(id=None, node=None),
         vtep_loopback_ip=SimpleNamespace(id=None, node=None),
         asn=SimpleNamespace(id=asn_id, node=SimpleNamespace(id=asn_id) if asn_id else None),
@@ -254,6 +257,30 @@ async def test_create_avd_device_populates_missing_generated_relationships() -> 
     assert kwargs["vtep_loopback_ip"] == "vtep-pool"
     gen._ensure_device_asn.assert_awaited_once_with("device-1", "asn-pool", "fabric-1")
     gen._reconcile_generated_loopback_interfaces.assert_awaited_once_with("device-1", "leaf")
+
+
+@pytest.mark.asyncio
+async def test_create_avd_device_includes_preserved_required_attributes_without_reallocating_node_id() -> None:
+    gen = _make_generator()
+    existing_device = _device_with_relationships(status="active", role="spine", node_id=7)
+    saved_device = _device()
+    gen.client.filters.return_value = [SimpleNamespace(id="device-1")]
+    gen.client.get.return_value = existing_device
+    gen.client.create.return_value = saved_device
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+        node_id_pool="node-id-pool",  # type: ignore[arg-type]
+    )
+
+    kwargs = gen.client.create.await_args.kwargs
+    assert kwargs["status"] == "active"
+    assert kwargs["role"] == "spine"
+    assert "node_id" not in kwargs
 
 
 @pytest.mark.asyncio
