@@ -89,6 +89,17 @@ def _make_saveable_mock() -> MagicMock:
     return mock
 
 
+class _UninitializedRelatedNode:
+    initialized = False
+
+    def __init__(self) -> None:
+        self.fetch = AsyncMock()
+
+    @property
+    def peer(self) -> object:
+        raise ValueError("Node must have at least one identifier (ID or HFID) to query it.")
+
+
 def _build_artifact_query_data(
     hostname: str = "leaf-1",
     interfaces: list | None = None,
@@ -467,6 +478,23 @@ class TestBackfillIp:
         await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1")
 
         gen.client.create.assert_not_called()
+        assert mock_interface.ip_address == existing_ip
+        mock_interface.save.assert_awaited_once_with(allow_upsert=True)
+
+    async def test_backfill_assigns_existing_ip_with_uninitialized_interface_relationship(self) -> None:
+        gen = _make_generator()
+        existing_ip = MagicMock()
+        interface_rel = _UninitializedRelatedNode()
+        existing_ip.interface = interface_rel
+        mock_interface = _make_saveable_mock()
+        gen.client.filters = AsyncMock(return_value=[existing_ip])
+        gen.client.get = AsyncMock(return_value=mock_interface)
+        iface = _make_interface(iface_id="iface-1", name="Ethernet1", ip_node=None)
+
+        await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1")
+
+        gen.client.create.assert_not_called()
+        interface_rel.fetch.assert_not_called()
         assert mock_interface.ip_address == existing_ip
         mock_interface.save.assert_awaited_once_with(allow_upsert=True)
 

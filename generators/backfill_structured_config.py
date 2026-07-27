@@ -128,21 +128,42 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         if interface_rel is None:
             return None
 
-        interface = getattr(interface_rel, "peer", None) or getattr(interface_rel, "node", None)
+        interface = self._get_loaded_relationship_peer(interface_rel)
         if interface is not None:
             return interface
 
+        if getattr(interface_rel, "initialized", True) is False:
+            return None
+
         fetch = getattr(interface_rel, "fetch", None)
-        if fetch:
+        if fetch and getattr(interface_rel, "id", None) and getattr(interface_rel, "typename", None):
             await fetch()
-            interface = getattr(interface_rel, "peer", None) or getattr(interface_rel, "node", None)
+            interface = self._get_loaded_relationship_peer(interface_rel)
             if interface is not None:
                 return interface
 
         peers = getattr(interface_rel, "peers", None) or []
         if peers:
-            return getattr(peers[0], "peer", None) or getattr(peers[0], "node", None)
+            return self._get_loaded_relationship_peer(peers[0])
         return None
+
+    @staticmethod
+    def _get_loaded_relationship_peer(relationship: Any) -> Any | None:
+        node = getattr(relationship, "node", None)
+        if node is not None:
+            return node
+
+        if getattr(relationship, "initialized", True) is False:
+            return None
+
+        try:
+            return getattr(relationship, "peer", None)
+        except ValueError as exc:
+            if "Node must have at least one identifier" in str(exc):
+                return None
+            raise
+        except NodeNotFoundError:
+            return None
 
     async def _backfill_ip(
         self,
