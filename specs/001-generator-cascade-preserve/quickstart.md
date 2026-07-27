@@ -101,5 +101,18 @@ No override-mode validation is required for this slice because the current exter
   a committed/fetchable branch revision so the remote integration worktree can
   test the exact commit.
 - Live generator idempotence validation with `$infrahub-test-generator-idempotence`
-  is pending explicit user approval because the skill uses the shared live lab
-  and normally rebuilds it before testing.
+  passed on 2026-07-27 for branch `emdash/pre-seed-devices-b7sa2` at commit
+  `2485c0829be374036b41d334d5fe3fb0131852a2`. The shared live validation lab
+  was rebuilt to a known state, then a fresh validation branch
+  `idempotence-generate-fabric-20260727-1920` was created. Scenario:
+  run `generate-fabric name=Fabric-C`, wait for the cascade, set
+  `spine-infrahub-dc1-1.serial` to `PRESEEDED-SERIAL-2485C08`, then run
+  `generate-fabric name=Fabric-C` twice. Snapshot scope:
+  `NetworkPod`, `LocationRack`, `DcimDevice`, `InterfacePhysical`,
+  `InterfaceLag`, `InterfaceVirtual`, `NetworkLink`, `IpamIPAddress`,
+  `RoutingAsn`, `MlagDomain`, `AvdArtifact`, `AvdHostvarFile`, and
+  `AvdStructuredConfigFile`. Both measured snapshots had SHA256
+  `72d02e11c564f05693576d144c34b12ae8f0eaa2680c07d5e27771afc97c6eed` and
+  compared identical. Final counts included 12 devices, 12 hostvar files,
+  12 structured config files, 64 IP addresses, and the pre-seeded serial was
+  preserved.
