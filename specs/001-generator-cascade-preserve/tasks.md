@@ -212,3 +212,14 @@ Task: "T026 [US3] Verify no override input is added to service_catalog/pages/4_F
 
 - [ ] T035 CRITICAL complete remote integration validation with `$infrahub-run-integration-tests` and record tested branch/commit evidence in `specs/001-generator-cascade-preserve/quickstart.md` per Constitution IV / T032 (missing)
 - [X] T036 CRITICAL complete live generator idempotence validation with `$infrahub-test-generator-idempotence` when permitted, or record an approved repeated-run validation exception in `specs/001-generator-cascade-preserve/quickstart.md`, per Constitution II / T033 (missing)
+
+## Phase 8: Convergence
+
+- [ ] T037 CRITICAL complete remote integration validation with `$infrahub-run-integration-tests` and record tested branch/commit evidence in `specs/001-generator-cascade-preserve/quickstart.md` per Constitution IV / T032 (missing)
+
+## Phase 9: Convergence
+
+- [ ] T038 CRITICAL complete remote integration validation with `$infrahub-run-integration-tests` and record tested branch/commit evidence in `specs/001-generator-cascade-preserve/quickstart.md` per Constitution IV / T032 (missing)
+- [X] T039 Update `connect_interface_maps()` to preserve existing non-empty connector relationships, populate only missing connectors and generated-owned interface state, reuse deterministic `NetworkLink` nodes, and log skipped connector conflicts per FR-026 / plan: connectivity reconciliation (contradicts)
+- [X] T040 Update point-to-point IP assignment to preserve existing non-empty interface IP relationships, populate only missing IPs with stable allocation identifiers, and log skipped IP conflicts per FR-026 / SC-008 (contradicts)
+- [X] T041 Add unit coverage for cabling and addressing fill-only reconciliation, including missing connector/IP population and conflicting connector/IP preservation with skipped-conflict logs, per Constitution IV / plan: Test-Required Quality (missing)

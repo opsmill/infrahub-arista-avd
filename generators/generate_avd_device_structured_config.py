@@ -250,7 +250,9 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                 new_content = json.dumps(structured_config_dict, indent=2).encode()
                 new_checksum = hashlib.sha256(new_content).hexdigest()
 
-                avd_artifact = await self.client.get(AvdArtifact, name__value=hostname, include=["structured_config_file"])
+                avd_artifact = await self.client.get(
+                    AvdArtifact, name__value=hostname, include=["structured_config_file"]
+                )
 
                 # Get existing structured config file if it exists
                 existing_file = None

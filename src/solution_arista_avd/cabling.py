@@ -94,17 +94,52 @@ async def connect_interface_maps(
         network_link = await client.create(kind="NetworkLink", name=name, medium="copper")
         await network_link.save(allow_upsert=True)
 
-        # Set connector on both interfaces using InterfacePhysical (concrete type
-        # that exposes the connector relationship from DcimEndpoint)
-        # SDK accepts protocol kinds at runtime; assigning a node to a relationship is the SDK pattern.
-        src = await client.get(InterfacePhysical, id=src_interface.id, include=["connector"])  # type: ignore[type-abstract]
-        src.connector = network_link  # type: ignore[assignment]
-        src.status.value = "active"
-        await src.save(allow_upsert=True)
+        src_populated = await _connect_interface_if_missing(client, logger, src_interface, network_link)
+        dst_populated = await _connect_interface_if_missing(client, logger, dst_interface, network_link)
 
-        dst = await client.get(InterfacePhysical, id=dst_interface.id, include=["connector"])  # type: ignore[type-abstract]
-        dst.connector = network_link  # type: ignore[assignment]
-        dst.status.value = "active"
-        await dst.save(allow_upsert=True)
+        if src_populated or dst_populated:
+            logger.info("Populated missing generated connector(s) for %s", name)
+        else:
+            logger.info("Preserved existing connector state for %s", name)
 
-        logger.info(f"Connected {name}")
+
+async def _connect_interface_if_missing(
+    client: InfrahubClient, logger: logging.Logger, interface: DcimInterface, network_link: object
+) -> bool:
+    # Set connector using InterfacePhysical, the concrete type that exposes the
+    # connector relationship from DcimEndpoint.
+    iface = await client.get(InterfacePhysical, id=interface.id, include=["connector"])  # type: ignore[type-abstract]
+    connector_id = _relationship_node_id(getattr(iface, "connector", None))
+    network_link_id = getattr(network_link, "id", None)
+
+    if connector_id:
+        if network_link_id and connector_id == network_link_id:
+            logger.info("Preserved generated connector on %s", iface.display_label)
+        else:
+            logger.warning(
+                "Skipped connector reconciliation for %s: existing connector %s conflicts with generated link %s",
+                iface.display_label,
+                connector_id,
+                getattr(network_link, "name", network_link_id),
+            )
+        return False
+
+    # SDK accepts protocol kinds at runtime; assigning a node to a relationship is the SDK pattern.
+    iface.connector = network_link  # type: ignore[assignment]
+    iface.status.value = "active"
+    await iface.save(allow_upsert=True)
+    logger.info("Populated missing connector on %s", iface.display_label)
+    return True
+
+
+def _relationship_node_id(relationship: object | None) -> str | None:
+    if relationship is None:
+        return None
+    relationship_id = getattr(relationship, "id", None)
+    if isinstance(relationship_id, str) and relationship_id:
+        return relationship_id
+    node = getattr(relationship, "node", None) or getattr(relationship, "peer", None)
+    node_id = getattr(node, "id", None)
+    if isinstance(node_id, str) and node_id:
+        return node_id
+    return None

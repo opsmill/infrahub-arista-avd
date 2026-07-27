@@ -7,6 +7,12 @@
 **Status**: Draft
 **Input**: User description: "Running generate-fabric on an already deployed Fabric, or on a Fabric that contains DcimDevice objects with already populated attributes such as serial or mgmt_ip, currently prevents the generator cascade from continuing through generate-pod, generate-rack, and hostvars generation. The cascade must still occur so fabric, pod, rack, device, and pyAVD hostvars data is fully populated. Existing populated fields must not be overwritten by default. If possible, provide an explicit override option."
 
+## Clarifications
+
+### Session 2026-07-27
+
+- Q: How should standard generate-fabric handle existing conflicting connection, interface, or IP values while populating missing uplinks and related attributes? → A: Preserve existing non-empty conflicting values; populate only missing values and expose skipped conflicts.
+
 ## Schema Files
 
 No new schema files are expected as the default outcome for this feature. The required business behavior is that existing fabric, pod, rack, device, and hostvars records can coexist with operator-provided device attributes and still be reconciled by the generator cascade.
@@ -29,6 +35,7 @@ As a fabric operator, I want to run generate-fabric on an already deployed fabri
 
 1. **Given** an already deployed fabric with existing racks and partially populated devices, **When** the operator runs generate-fabric for that fabric, **Then** the pod, rack, and hostvars generation steps all complete for the target fabric.
 2. **Given** a fabric where rack generation reports updated checksums, **When** generate-fabric completes, **Then** no expected device remains in a partial state solely because it had a pre-existing attribute value.
+3. **Given** a target fabric contains pre-existing devices with missing generated uplinks, connection relationships, interfaces, or IP attributes, **When** generate-fabric completes, **Then** all missing generated-owned connectivity data is populated when the required source intent exists.
 
 ---
 
@@ -44,6 +51,7 @@ As a fabric operator, I want pre-seeded device values such as serial and mgmt_ip
 
 1. **Given** a device has serial and mgmt_ip populated before generation, **When** generate-fabric runs without override, **Then** those values are unchanged after the cascade completes.
 2. **Given** a device has some required generated attributes missing, **When** generate-fabric runs without override, **Then** the missing generated attributes are populated while already-present attributes are preserved.
+3. **Given** a device has non-empty connection, interface, or IP values that conflict with generated topology intent, **When** generate-fabric runs without override, **Then** those conflicting values are unchanged and are visible as skipped conflicts in the completed run outcome.
 
 ---
 
@@ -71,6 +79,8 @@ As a fabric operator, I want standard generation to have no hidden override mode
 - Re-running the cascade after a successful reconciliation should not create duplicate objects or relationships.
 - A stale generated-owned value exists, but the current external contract has no explicit override mode.
 - The target fabric contains devices whose existing relationships to pods, racks, interfaces, or hostvars artifacts are incomplete.
+- The target fabric contains devices with missing uplinks, missing connection relationships, or missing interface and IP attributes required by the generated topology.
+- Existing non-empty connection, interface, or IP values conflict with generated topology intent during a standard generate-fabric run.
 
 ## Requirements *(mandatory)*
 
@@ -96,6 +106,9 @@ As a fabric operator, I want standard generation to have no hidden override mode
 - **FR-021**: The cascade MUST reconcile all expected relationships among the target fabric, pods, racks, devices, and generated hostvars artifacts.
 - **FR-022**: Repeated runs MUST NOT create duplicate devices, racks, artifacts, or relationships.
 - **FR-023**: A downstream stage that detects no direct changes for its own objects MUST still allow later required cascade stages to run when those later stages have missing data to populate.
+- **FR-024**: The cascade MUST populate all missing generated uplinks, connection relationships, device interfaces, interface attributes, and IP address attributes required by the target fabric topology when the required source intent exists.
+- **FR-025**: If an expected uplink, connection, interface, or IP relationship already exists but is incomplete, the cascade MUST populate its missing generated-owned attributes without replacing non-empty existing values.
+- **FR-026**: Existing non-empty connection, interface, or IP values that conflict with generated topology intent MUST be preserved during a standard generate-fabric run and reported as skipped conflicts in the completed run outcome.
 
 #### Preservation and Override Behavior
 
@@ -118,6 +131,7 @@ As a fabric operator, I want standard generation to have no hidden override mode
 - **DcimDevice**: A device that may already contain operator-provided values such as serial or mgmt_ip and must receive missing generated values without losing existing ones.
 - **Hostvars Artifact**: The generated pyAVD hostvars data required for a complete device configuration workflow.
 - **Generation Run**: A user-triggered or automated execution of generate-fabric and its dependent cascade stages for a target fabric.
+- **Uplink Connection**: A generated physical or logical connectivity record between fabric devices, including required device interfaces and IP address attributes derived from fabric topology intent.
 
 ## Success Criteria *(mandatory)*
 
@@ -129,6 +143,8 @@ As a fabric operator, I want standard generation to have no hidden override mode
 - **SC-004**: Re-running generation on an already reconciled fabric produces no duplicate objects or duplicate relationships.
 - **SC-005**: Contract validation confirms that no external override input, hidden runtime switch, environment variable, or branch-name convention can enable overwrite behavior in this slice.
 - **SC-006**: Operators can verify from the completed run outcome whether the cascade preserved, populated, or skipped values for the target fabric.
+- **SC-007**: In a pre-seeded-device scenario with missing generated uplinks, connections, interfaces, and IP attributes, 100% of missing generated-owned connectivity data is populated after one generate-fabric run when the required source intent exists.
+- **SC-008**: In a standard generate-fabric run with conflicting non-empty connection, interface, or IP values, 100% of those conflicting values remain unchanged and are visible as skipped conflicts in the completed run outcome.
 
 ## Assumptions
 
@@ -142,5 +158,7 @@ As a fabric operator, I want standard generation to have no hidden override mode
 
 - **Always preserve when non-empty**: `serial`, existing `mgmt_ip`, and unrelated operator-managed relationships.
 - **Populate when missing**: role, object template, pod, rack, index, AVD group membership, node ID, management IP, loopback IP, VTEP IP, and ASN.
+- **Connectivity populate when missing**: generated uplinks, connection relationships, device interfaces, interface attributes, peer interface references, point-to-point IP addresses, and related IP attributes.
+- **Connectivity conflicts**: existing non-empty connection, interface, or IP values must be preserved during standard generate-fabric runs and reported as skipped conflicts.
 - **Additive relationships**: `avd_devices` group membership must be added without removing unrelated groups.
 - **Future override scope**: only fields derived by the generator cascade from fabric intent may be considered for overwrite in a future explicit override contract.

@@ -6,7 +6,7 @@
 
 ## Summary
 
-Make `generate-fabric` a reconciliation entry point for existing fabrics, not only a checksum bump for newly generated topology. The implementation should keep the existing trigger-based cascade for changed pod/rack targets, explicitly continue the cascade for unchanged downstream targets, and make device upserts fill missing generator-owned values without overwriting pre-existing non-empty operator values such as `serial` and `mgmt_ip`.
+Make `generate-fabric` a reconciliation entry point for existing fabrics, not only a checksum bump for newly generated topology. The implementation should keep the existing trigger-based cascade for changed pod/rack targets, explicitly continue the cascade for unchanged downstream targets, make device upserts fill missing generator-owned values without overwriting pre-existing non-empty operator values such as `serial` and `mgmt_ip`, and reconcile missing generated cabling/interface/IP state while preserving and reporting non-empty connectivity conflicts.
 
 No schema change is planned for the default implementation. The current schema already represents the required fabric, pod, rack, device, IPAM, group, and AVD artifact data. Override mode is not planned as an external operator option in this slice because the local `CoreGeneratorDefinitionRun` schema accepts only `id` and `nodes`; adding an explicit runtime override would require a new generator definition contract, service-portal flow, or schema-backed setting.
 
@@ -24,11 +24,11 @@ No schema change is planned for the default implementation. The current schema a
 
 **Project Type**: Infrahub repository containing schemas, generators, transforms, object data, docs, and a Streamlit service portal.
 
-**Performance Goals**: A single `generate-fabric` run on one target fabric should reconcile only that fabric's pods, racks, devices, and artifacts. Existing hostvar targeting should remain scoped: whole-fabric hostvars only when any device is missing hostvars; otherwise rack-local targets.
+**Performance Goals**: A single `generate-fabric` run on one target fabric should reconcile only that fabric's pods, racks, devices, generated uplinks, interface/IP assignments, and artifacts. Existing hostvar targeting should remain scoped: whole-fabric hostvars only when any device is missing hostvars; otherwise rack-local targets.
 
 **Constraints**: Preserve non-empty operator-provided values by default; keep generator operations idempotent; do not add dependencies; do not hand-edit generated query models or protocols; branch trigger rules run on non-main branches.
 
-**Scale/Scope**: Existing fabric hierarchy sizes supported by the repository: one selected `NetworkFabric`, all child `NetworkPod` targets, all pod `LocationRack` targets, all generated `DcimDevice` targets, and per-device AVD artifacts.
+**Scale/Scope**: Existing fabric hierarchy sizes supported by the repository: one selected `NetworkFabric`, all child `NetworkPod` targets, all pod `LocationRack` targets, all generated `DcimDevice` targets, generated `NetworkLink`/`InterfacePhysical`/`IpamIPAddress` connectivity for that fabric, and per-device AVD artifacts.
 
 ## Constitution Check
 
@@ -71,6 +71,8 @@ generators/
 
 src/solution_arista_avd/
 ├── generator.py                # Shared trigger helpers and fill-only AVD device reconciliation
+├── cabling.py                  # Fill-only generated connectivity reconciliation
+├── addressing.py               # Fill-only point-to-point IP assignment
 └── protocols.py                # Generated; update only if schema changes require regeneration
 
 service_catalog/
@@ -79,6 +81,8 @@ service_catalog/
 
 tests/
 ├── unit/
+│   ├── test_addressing.py
+│   ├── test_cabling.py
 │   ├── test_generate_fabric.py
 │   ├── test_generate_pod.py
 │   ├── test_generate_rack.py
@@ -88,7 +92,7 @@ tests/
     └── test_e2e_pipeline.py
 ```
 
-**Structure Decision**: Use the existing generator/helper structure. The behavior is shared across fabric, pod, and rack generators, so common continuation and device-reconciliation helpers belong in `src/solution_arista_avd/generator.py`; generator-specific orchestration remains in `generators/generate_fabric.py` and `generators/generate_pod.py`.
+**Structure Decision**: Use the existing generator/helper structure. The behavior is shared across fabric, pod, and rack generators, so common continuation and device-reconciliation helpers belong in `src/solution_arista_avd/generator.py`; fill-only link and IP reconciliation belongs beside the current helpers in `src/solution_arista_avd/cabling.py` and `src/solution_arista_avd/addressing.py`; generator-specific orchestration remains in `generators/generate_fabric.py`, `generators/generate_pod.py`, and `generators/generate_rack.py`.
 
 ## Planned Approach
 
@@ -99,18 +103,23 @@ tests/
    - Populate missing generator-owned values such as role, pod/rack, index, object template, AVD group membership, node ID, loopback IP, VTEP IP, ASN, and management IP where absent.
    - Preserve non-empty operator-provided values by default, especially `serial` and `mgmt_ip`.
    - Add `avd_devices` group membership additively without removing unrelated groups.
-4. Preserve rack-owned hostvar cascade behavior: rack generation marks the fabric hostvars stale, marks rack completion, checks all racks, invalidates targeted hostvar files, and triggers hostvar generation for the correct device set.
-5. Do not expose override mode in this slice. The internal reconciliation helper may be designed with a default-false overwrite parameter for future work, but no operator-visible override should be added without an explicit contract.
+4. Refactor generated connectivity writes into fill-only reconciliation:
+   - `connect_interface_maps()` should create or reuse the expected `NetworkLink` by deterministic generated name.
+   - If an endpoint interface has no connector, attach it to the expected link and set missing generated-owned status/role values as needed.
+   - If an endpoint already has a non-empty connector to a different link, preserve it and log/report a skipped conflict instead of replacing it.
+   - Point-to-point IP assignment should populate only interfaces missing generated IPs; existing non-empty IP relationships or address values must be preserved and reported as skipped conflicts when they differ from generated intent.
+5. Preserve rack-owned hostvar cascade behavior: rack generation marks the fabric hostvars stale, marks rack completion, checks all racks, invalidates targeted hostvar files, and triggers hostvar generation for the correct device set.
+6. Do not expose override mode in this slice. The internal reconciliation helper may be designed with a default-false overwrite parameter for future work, but no operator-visible override should be added without an explicit contract.
 
 ## Phase 1 Design Check
 
 **Schema-Driven Architecture**: PASS. `data-model.md` uses existing entities and defines ownership semantics without new schema attributes.
 
-**Idempotent Operations**: PASS. The continuation design avoids fake checksum churn and relies on explicit downstream generator runs only when no trigger-causing update occurred.
+**Idempotent Operations**: PASS. The continuation design avoids fake checksum churn and relies on explicit downstream generator runs only when no trigger-causing update occurred. Connectivity reconciliation uses deterministic link identifiers, existing interface relationships, and fill-only IP assignment so repeated runs do not create duplicate links or addresses.
 
 **Type Safety**: PASS. No query/model changes are required by the design. If implementation needs extra fields for preservation checks, the `.gql` file and generated model must be updated together.
 
-**Test-Required Quality**: PASS. `quickstart.md` defines unit, local integration, required integration-skill, and live idempotence-skill validation paths.
+**Test-Required Quality**: PASS. `quickstart.md` defines unit, local integration, required integration-skill, live idempotence-skill validation paths, and targeted checks for missing generated uplinks plus preserved conflicting connector/IP values.
 
 **Convention-Based Structure**: PASS. Generated artifacts and source layout match repository conventions.
 

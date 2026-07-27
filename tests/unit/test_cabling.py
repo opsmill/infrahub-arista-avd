@@ -7,9 +7,12 @@ in test_server_cabling.py.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
-from solution_arista_avd.cabling import build_pod_cabling_plan, build_rack_cabling_plan
+import pytest
+
+from solution_arista_avd.cabling import build_pod_cabling_plan, build_rack_cabling_plan, connect_interface_maps
 
 
 def _iface(iface_id: str) -> MagicMock:
@@ -129,3 +132,73 @@ class TestBuildRackCablingPlan:
             ("l2-i0", "sp1-3"),
             ("l2-i1", "sp2-3"),
         ]
+
+
+def _physical_interface(
+    interface_id: str,
+    device_label: str,
+    interface_name: str,
+    connector_id: str | None = None,
+) -> MagicMock:
+    iface = MagicMock()
+    iface.id = interface_id
+    iface.name.value = interface_name
+    iface.device.display_label = device_label
+    iface.display_label = f"{device_label}-{interface_name}"
+    iface.connector = SimpleNamespace(id=connector_id)
+    iface.status.value = "planned"
+    iface.save = AsyncMock()
+    return iface
+
+
+class TestConnectInterfaceMaps:
+    @pytest.mark.asyncio
+    async def test_populates_missing_connectors_with_deterministic_link(self) -> None:
+        src_query_iface = _physical_interface("src-query", "leaf-1", "Ethernet1")
+        dst_query_iface = _physical_interface("dst-query", "spine-1", "Ethernet1")
+        src_fetched_iface = _physical_interface("src-query", "leaf-1", "Ethernet1")
+        dst_fetched_iface = _physical_interface("dst-query", "spine-1", "Ethernet1")
+        network_link = SimpleNamespace(id="link-1", name="leaf-1-Ethernet1__spine-1-Ethernet1", save=AsyncMock())
+        client = SimpleNamespace(
+            create=AsyncMock(return_value=network_link),
+            get=AsyncMock(side_effect=[src_fetched_iface, dst_fetched_iface]),
+        )
+        logger = MagicMock()
+
+        await connect_interface_maps(client, logger, [(src_query_iface, dst_query_iface)])  # type: ignore[arg-type]
+
+        client.create.assert_awaited_once_with(
+            kind="NetworkLink",
+            name="leaf-1-Ethernet1__spine-1-Ethernet1",
+            medium="copper",
+        )
+        network_link.save.assert_awaited_once_with(allow_upsert=True)
+        assert src_fetched_iface.connector is network_link
+        assert dst_fetched_iface.connector is network_link
+        assert src_fetched_iface.status.value == "active"
+        assert dst_fetched_iface.status.value == "active"
+        src_fetched_iface.save.assert_awaited_once_with(allow_upsert=True)
+        dst_fetched_iface.save.assert_awaited_once_with(allow_upsert=True)
+
+    @pytest.mark.asyncio
+    async def test_preserves_existing_conflicting_connectors_and_logs_skip(self) -> None:
+        src_query_iface = _physical_interface("src-query", "leaf-1", "Ethernet1")
+        dst_query_iface = _physical_interface("dst-query", "spine-1", "Ethernet1")
+        src_fetched_iface = _physical_interface("src-query", "leaf-1", "Ethernet1", connector_id="manual-link")
+        dst_fetched_iface = _physical_interface("dst-query", "spine-1", "Ethernet1")
+        network_link = SimpleNamespace(
+            id="generated-link", name="leaf-1-Ethernet1__spine-1-Ethernet1", save=AsyncMock()
+        )
+        client = SimpleNamespace(
+            create=AsyncMock(return_value=network_link),
+            get=AsyncMock(side_effect=[src_fetched_iface, dst_fetched_iface]),
+        )
+        logger = MagicMock()
+
+        await connect_interface_maps(client, logger, [(src_query_iface, dst_query_iface)])  # type: ignore[arg-type]
+
+        assert src_fetched_iface.connector.id == "manual-link"
+        src_fetched_iface.save.assert_not_awaited()
+        assert dst_fetched_iface.connector is network_link
+        dst_fetched_iface.save.assert_awaited_once_with(allow_upsert=True)
+        assert any("Skipped connector reconciliation" in call.args[0] for call in logger.warning.call_args_list)

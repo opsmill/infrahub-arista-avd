@@ -16,7 +16,7 @@ set -a; source .env; set +a
 Run focused unit tests after implementation:
 
 ```bash
-uv run pytest tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generate_rack.py
+uv run pytest tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generate_rack.py tests/unit/test_cabling.py tests/unit/test_addressing.py
 ```
 
 Expected outcomes:
@@ -26,6 +26,8 @@ Expected outcomes:
 - Changed targets still rely on checksum-trigger updates and are not directly scheduled a second time.
 - Existing device `serial` and non-empty `mgmt_ip` are preserved.
 - Missing generator-owned device values are populated.
+- Missing generated uplink connector relationships and interface IP relationships are populated.
+- Non-empty conflicting connector and IP values are preserved and reported as skipped conflicts.
 - Repeated reconciliation does not duplicate devices, groups, ASNs, loopback interfaces, or artifacts.
 
 ## Full Local Quality Gates
@@ -48,6 +50,8 @@ Create or use a branch containing an existing fabric with:
 - Pre-populated non-empty `serial`.
 - Pre-populated non-empty `mgmt_ip`.
 - Missing one or more generated fields such as node ID, loopback, VTEP IP, ASN, AVD group membership, hostvars, or structured config.
+- Missing one or more generated uplinks, connector relationships, interface attributes, or point-to-point IP assignments.
+- At least one intentionally conflicting non-empty connector or IP value, if validating skipped-conflict reporting.
 
 Run only `generate-fabric` for the target fabric on that branch.
 
@@ -57,8 +61,10 @@ Expected outcomes:
 - The pre-existing `serial` value is unchanged.
 - The pre-existing `mgmt_ip` relationship is unchanged.
 - Missing generated fields are now present.
+- Missing generated uplinks, connector relationships, interface attributes, and point-to-point IP relationships are now present where source intent existed.
+- Conflicting non-empty connector and IP values are unchanged and appear in the completed run outcome as skipped conflicts.
 - All expected devices have hostvars and structured configs.
-- A second run produces no duplicate objects or relationships.
+- A second run produces no duplicate objects, links, IP addresses, or relationships.
 
 ## Integration Validation
 
@@ -79,6 +85,7 @@ $infrahub-test-generator-idempotence
 ```
 
 The report must cover a repeated `generate-fabric` run against the pre-seeded-device scenario and confirm no drift on the second run.
+The snapshot scope should include generated connectivity kinds such as `NetworkLink`, `InterfacePhysical`, and `IpamIPAddress` so missing-uplink reconciliation and conflict preservation are covered.
 
 ## Override Mode
 
@@ -87,19 +94,19 @@ No override-mode validation is required for this slice because the current exter
 ## Validation Evidence
 
 - Focused unit validation passed on 2026-07-27:
-  `uv run pytest tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generate_rack.py tests/unit/test_generator_cascade_contract.py`
-  (`68 passed`).
+  `uv run pytest tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generate_rack.py tests/unit/test_cabling.py tests/unit/test_addressing.py`
+  (`79 passed`).
 - Targeted changed-file lint passed on 2026-07-27:
-  `uv run ruff check src/solution_arista_avd/generator.py generators/generate_fabric.py generators/generate_pod.py tests/unit/test_generate_fabric.py tests/unit/test_generate_pod.py tests/unit/test_generator_mixin.py tests/unit/test_generator_cascade_contract.py`.
+  `uv run ruff check src/solution_arista_avd/cabling.py src/solution_arista_avd/addressing.py tests/unit/test_cabling.py tests/unit/test_addressing.py`.
 - Targeted type check passed on 2026-07-27:
-  `uv run mypy --show-error-codes src/solution_arista_avd/generator.py`.
+  `uv run mypy --show-error-codes src/solution_arista_avd/cabling.py src/solution_arista_avd/addressing.py`.
 - Full unit validation passed on 2026-07-27:
-  `uv run pytest tests/unit` (`470 passed`).
+  `uv run pytest tests/unit` (`478 passed`).
 - Full lint validation passed on 2026-07-27:
   `uv run invoke lint`.
-- Remote integration validation with `$infrahub-run-integration-tests` is pending
-  a committed/fetchable branch revision so the remote integration worktree can
-  test the exact commit.
+- Remote integration validation with `$infrahub-run-integration-tests` remains
+  pending. A remote validation run was started against a temporary validation
+  commit and stopped before completion at operator request.
 - Live generator idempotence validation with `$infrahub-test-generator-idempotence`
   passed on 2026-07-27 for branch `emdash/pre-seed-devices-b7sa2` at commit
   `2485c0829be374036b41d334d5fe3fb0131852a2`. The shared live validation lab

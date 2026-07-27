@@ -22,16 +22,33 @@ async def assign_ip_address_to_interface(
     host_addresses: Iterator[IPv4Address] | Iterator[IPv6Address],
     prefix_len: int,
 ) -> None:
+    host_address = next(host_addresses)
+    expected_address = f"{host_address}/{prefix_len}"
+    # Re-fetch the generated interface with its existing IP relationship so
+    # preservation is based on current graph state, not stale query data.
+    interface = await client.get(DcimInterface, id=interface.id, include=["ip_address"])  # type: ignore[type-abstract]
+    existing_address = _relationship_address(getattr(interface, "ip_address", None))
+    if existing_address:
+        if existing_address == expected_address:
+            logger.info("Preserved generated IP %s on %s", existing_address, interface.display_label)
+        else:
+            logger.warning(
+                "Skipped IP reconciliation for %s: existing IP %s conflicts with generated IP %s",
+                interface.display_label,
+                existing_address,
+                expected_address,
+            )
+        return
+
     ip_address = cast(
         "IpamIPAddress",
-        await client.create(kind="IpamIPAddress", address=str(next(host_addresses)) + f"/{prefix_len}"),
+        await client.create(kind="IpamIPAddress", address=expected_address),
     )
     await ip_address.save(allow_upsert=True)
     # SDK accepts protocol kinds at runtime; assigning a node to a relationship is the SDK pattern.
-    interface = await client.get(DcimInterface, id=interface.id, include=["connector"])  # type: ignore[type-abstract]
     interface.ip_address = ip_address  # type: ignore[assignment, attr-defined]
     await interface.save(allow_upsert=True)
-    logger.info(f"Assigned {ip_address.address.value} to {interface.display_label}")
+    logger.info("Populated missing IP %s on %s", ip_address.address.value, interface.display_label)
 
 
 async def assign_ip_addresses_to_p2p_connections(
@@ -63,3 +80,27 @@ async def assign_ip_addresses_to_p2p_connections(
 
         for interface in [src_interface, dst_interface]:
             await assign_ip_address_to_interface(client, interface, logger, host_addresses, prefix_len)
+
+
+def _relationship_address(relationship: object | None) -> str | None:
+    if relationship is None:
+        return None
+
+    address = getattr(getattr(relationship, "address", None), "value", None)
+    if isinstance(address, str) and address:
+        return address
+
+    node = getattr(relationship, "node", None) or getattr(relationship, "peer", None)
+    address = getattr(getattr(node, "address", None), "value", None)
+    if isinstance(address, str) and address:
+        return address
+
+    relationship_id = getattr(relationship, "id", None)
+    if isinstance(relationship_id, str) and relationship_id:
+        return relationship_id
+
+    node_id = getattr(node, "id", None)
+    if isinstance(node_id, str) and node_id:
+        return node_id
+
+    return None

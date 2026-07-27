@@ -79,6 +79,81 @@ No new schema entities are planned. This feature defines reconciliation behavior
 - AVD group membership must be additive and must not remove unrelated group memberships.
 - Re-running reconciliation must not create duplicate devices, duplicate ASNs, duplicate loopback interfaces, duplicate IP addresses, or duplicate artifacts.
 
+## InterfacePhysical / DcimInterface
+
+**Purpose**: Existing device interfaces that carry generated uplinks, MLAG peer links, L2 leaf uplinks, server-facing links, and loopback/virtual interface relationships used by AVD hostvars.
+
+**Existing fields used**:
+- `name`: interface identifier and part of the `DcimInterface` human-friendly ID.
+- `device`: owning device and part of the `DcimInterface` human-friendly ID.
+- `role`: generator-owned role when missing or when a specific generated role is required for a generated interface.
+- `status`: generated active state for interfaces attached by the topology generator when missing.
+- `connector`: relationship to `NetworkLink`.
+- `ip_address`: single generated IP relationship used by current interface extension behavior.
+- `ip_addresses`: many-address Layer 3 relationship inherited from the base interface generic.
+
+**Relationships**:
+- Belongs to one `DcimDevice`.
+- May connect to a `NetworkLink` through `DcimEndpoint.connector`.
+- May reference one or more `IpamIPAddress` nodes.
+
+**Rules**:
+- Existing non-empty connector relationships must not be replaced by standard generation.
+- If an expected generated interface has no connector, generation may attach it to the expected generated `NetworkLink`.
+- Existing non-empty IP relationships must not be replaced by standard generation.
+- If an expected generated interface lacks required IP data, generation may populate the missing generated IP relationship.
+- Connectivity decisions must be visible in logs or another completed-run artifact as populated, preserved, or skipped.
+
+## NetworkLink
+
+**Purpose**: Existing connector node that links generated physical endpoints.
+
+**Existing fields used**:
+- `name`: deterministic generated connection identifier derived from endpoint device/interface names.
+- `medium`: generated medium, currently `copper` for the existing cabling helper.
+- Optional role/include fields inherited by schema extensions where present.
+
+**Relationships**:
+- Connected endpoints are the physical interfaces that reference the link through `connector`.
+
+**Rules**:
+- Generation must use deterministic names and `allow_upsert=True` so re-runs reuse the same expected link.
+- If the expected link exists and one endpoint is missing a connector, generation may attach the missing endpoint.
+- If an endpoint already references a different non-empty connector, generation must preserve that connector and report the skipped conflict.
+- Re-running generation must not create duplicate links for the same expected endpoint pair.
+
+## IpamIPAddress for Generated Connectivity
+
+**Purpose**: Existing IPAM address nodes allocated for loopbacks, VTEPs, management addresses, and point-to-point routed uplinks.
+
+**Existing fields used**:
+- `address`: allocated host address with prefix length.
+- IP namespace and pool-derived allocation metadata from existing Infrahub pool primitives.
+
+**Relationships**:
+- May be linked from `DcimDevice.mgmt_ip`, `DcimDevice.loopback_ip`, `DcimDevice.vtep_loopback_ip`, or interface IP relationships.
+
+**Rules**:
+- Existing non-empty device or interface IP relationships are authoritative in standard generation.
+- Missing generated-owned IP relationships may be allocated or attached when the required source pool and topology intent exist.
+- Generated point-to-point allocations must be idempotent by stable identifiers derived from the endpoint pair.
+- Conflicting non-empty IP values must be preserved and reported as skipped conflicts.
+
+## Uplink Connection
+
+**Purpose**: A derived relationship set, not a new stored kind, representing the expected generated connectivity between two fabric devices.
+
+**Fields derived from source intent**:
+- Source device and source interface.
+- Destination device and destination interface.
+- Expected `NetworkLink` name.
+- Optional point-to-point prefix/IP assignments.
+
+**Rules**:
+- Missing links, connector relationships, interface attributes, and IP relationships must be populated when source intent is complete.
+- Non-empty conflicts must be preserved rather than overwritten.
+- Hostvar generation must see a complete enough graph to derive `uplink_interfaces`, `uplink_switches`, and `uplink_switch_interfaces` for every expected device.
+
 ## AvdArtifact and File Nodes
 
 **Purpose**: Store per-device generated hostvars and structured configs.

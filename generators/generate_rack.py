@@ -547,7 +547,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         if not device_ids:
             return
 
-        self.logger.info("Preserving existing hostvar files before targeted regeneration for %s devices", len(device_ids))
+        self.logger.info(
+            "Preserving existing hostvar files before targeted regeneration for %s devices", len(device_ids)
+        )
 
     async def _get_existing_mlag_domain(self, domain_id: str) -> object | None:
         """Return the current MLAG domain for a rack pair, if present."""

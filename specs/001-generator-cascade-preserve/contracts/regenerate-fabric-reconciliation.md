@@ -26,8 +26,11 @@ Running `generate-fabric` MUST:
 4. Continue through rack generation for every expected rack under those pods, including racks whose checksum was already current.
 5. Populate missing generated device values required for AVD.
 6. Preserve non-empty operator-provided device values by default, including `serial` and `mgmt_ip`.
-7. Trigger hostvar generation after all racks for the fabric are complete.
-8. Allow the existing `avd_hostvars_ready` trigger to run structured config generation.
+7. Populate missing generated uplinks, `NetworkLink` nodes, interface connector relationships, generated interface attributes, and point-to-point IP relationships when the source fabric intent exists.
+8. Preserve non-empty existing connector, interface, and IP values that conflict with generated intent.
+9. Report populated, preserved, and skipped connectivity decisions through generator logs or another completed-run artifact visible during validation.
+10. Trigger hostvar generation after all racks for the fabric are complete.
+11. Allow the existing `avd_hostvars_ready` trigger to run structured config generation.
 
 ## Completion Signals
 
@@ -35,9 +38,11 @@ A standard run is complete when:
 
 - Expected pod, rack, and device objects exist for the target fabric.
 - No expected device remains partial solely because it had pre-existing non-empty values.
+- Missing generated uplink connectivity has been populated where source intent was complete.
+- Non-empty conflicting connector, interface, or IP values remain unchanged and are visible as skipped conflicts.
 - Every expected fabric device has an `AvdArtifact.hostvar_file`.
 - Every expected fabric device has an `AvdArtifact.structured_config_file`.
-- Re-running the same fabric does not create duplicate objects or relationships.
+- Re-running the same fabric does not create duplicate objects, links, IP addresses, or relationships.
 
 ## Non-Goals for This Contract
 
