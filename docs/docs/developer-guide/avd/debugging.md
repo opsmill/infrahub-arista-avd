@@ -129,6 +129,22 @@ Cross-reference [Hostvars Reference](./hostvars.md) for the expected types.
 | Artifact regenerates every run even when nothing changed | Hostvars dict has a non-deterministic field (e.g. iteration order of a set) | Sort lists/dicts before JSON-serialising |
 | Transform returns stale output | `CoreFileObject.content` cached somewhere; rare | Force-regenerate the artifact from the UI preview panel |
 
+## Pre-seeded device reconciliation
+
+When a fabric already contains pods, racks, or devices, run `generate-fabric` for
+the fabric first. A standard run preserves non-empty operator-provided device
+values, including `serial` and `mgmt_ip`, and fills missing generator-owned
+relationships needed by AVD. The expected log stream for a reconciled device
+includes field-decision entries for populated, preserved, or skipped fields.
+
+If the cascade stops after fabric generation, check whether the downstream pod
+or rack checksum changed. Changed targets should be handled by the existing
+trigger rules; unchanged targets should be visible as direct
+`CoreGeneratorDefinitionRun` calls for `generate-pod` or `generate-rack` with
+explicit node IDs. If hostvars are still missing after rack generation, follow
+the missing structured config diagnostic flow above and confirm all racks in the
+fabric have `generation_complete=True`.
+
 ## Turning up log verbosity
 
 The generators log via the Infrahub SDK's logging. To see more detail on a dev stack, bump the log level in the Infrahub server's environment:

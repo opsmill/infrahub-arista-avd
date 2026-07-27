@@ -9,7 +9,7 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumb
 from solution_arista_avd import sorting as solution_arista_avd_sorting
 from solution_arista_avd.avd import SPINE_ROLE_BY_UNDERLAY
 from solution_arista_avd.cabling import build_pod_cabling_plan, connect_interface_maps
-from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
+from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready, trigger_rack_generation
 from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
 
 from .asn import ensure_shared_device_asn
@@ -239,6 +239,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
         # store the checksum for the fabric in the object itself
         checksum = self.calculate_checksum()
+        unchanged_rack_ids: list[str] = []
         for rack in racks:
             if rack.checksum.value != checksum:
                 rack.checksum.value = checksum
@@ -248,3 +249,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 # objects as pod-generated outputs.
                 await rack.save(allow_upsert=True, update_group_context=False)
                 self.logger.info(f"Rack {rack.name.value} has been updated to checksum {checksum}")
+            else:
+                unchanged_rack_ids.append(rack.id)
+
+        if unchanged_rack_ids:
+            await trigger_rack_generation(self.client, node_ids=unchanged_rack_ids)

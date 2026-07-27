@@ -3,7 +3,7 @@ from __future__ import annotations
 from infrahub_sdk.generator import InfrahubGenerator
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
-from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
+from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready, trigger_pod_generation
 from solution_arista_avd.protocols import DcimDevice, NetworkPod
 
 from .asn import ensure_shared_device_asn
@@ -121,6 +121,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
 
         # store the checksum for the fabric in the object itself
         fabric_checksum = self.calculate_checksum()
+        unchanged_pod_ids: list[str] = []
         for pod in pods:
             if pod.checksum.value != fabric_checksum:
                 pod.checksum.value = fabric_checksum
@@ -130,3 +131,8 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
                 # objects as fabric-generated outputs.
                 await pod.save(allow_upsert=True, update_group_context=False)
                 self.logger.info(f"Pod {pod.name.value} has been updated to checksum {fabric_checksum}")
+            elif pod.role.value != "fabric":
+                unchanged_pod_ids.append(pod.id)
+
+        if unchanged_pod_ids:
+            await trigger_pod_generation(self.client, node_ids=unchanged_pod_ids)

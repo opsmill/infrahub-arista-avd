@@ -24,11 +24,56 @@ def _json_line(payload: object) -> str:
 
 
 _STOP_WORDS = frozenset(
-    """
-    i a an the to for of in on at by with from is are was were be been being
-    have has had do does did will would should could can may might must shall
-    this that these those my your our their want need add get set
-    """.split()
+    [
+        "i",
+        "a",
+        "an",
+        "the",
+        "to",
+        "for",
+        "of",
+        "in",
+        "on",
+        "at",
+        "by",
+        "with",
+        "from",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "should",
+        "could",
+        "can",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "this",
+        "that",
+        "these",
+        "those",
+        "my",
+        "your",
+        "our",
+        "their",
+        "want",
+        "need",
+        "add",
+        "get",
+        "set",
+    ]
 )
 
 _MAX_BRANCH_LENGTH = 244
@@ -38,16 +83,12 @@ _MAX_FEATURE_NUMBER = 2**63 - 1
 def _int64_from_digits(value: str) -> int | None:
     normalized = value.lstrip("0") or "0"
     maximum = str(_MAX_FEATURE_NUMBER)
-    if len(normalized) > len(maximum) or (
-        len(normalized) == len(maximum) and normalized > maximum
-    ):
+    if len(normalized) > len(maximum) or (len(normalized) == len(maximum) and normalized > maximum):
         return None
     return int(normalized, 10)
 
 
-def _persistence_assignments(
-    branch_name: str, feature_dir: str, *, powershell: bool
-) -> tuple[str, str]:
+def _persistence_assignments(branch_name: str, feature_dir: str, *, powershell: bool) -> tuple[str, str]:
     if powershell:
         quoted_branch = "'" + branch_name.replace("'", "''") + "'"
         quoted_dir = "'" + feature_dir.replace("'", "''") + "'"
@@ -168,11 +209,9 @@ def _generate_branch_name(description: str) -> str:
     for word in clean.split():
         if word in _STOP_WORDS:
             continue
-        if len(word) >= 3:
-            meaningful.append(word)
         # Keep short words that appear as an uppercase acronym in the original,
         # mirroring the bash twin's case-sensitive `grep -qw` check.
-        elif re.search(
+        if len(word) >= 3 or re.search(
             rf"(?<![0-9A-Za-z_]){re.escape(word.upper())}(?![0-9A-Za-z_])",
             description,
         ):
@@ -195,16 +234,14 @@ def _get_highest_from_specs(specs_dir: Path) -> int:
             continue
         name = entry.name
         # Match sequential prefixes (>=3 digits), but skip timestamp dirs.
-        if re.match(r"^[0-9]{3,}-", name) and not re.match(
-            r"^[0-9]{8}-[0-9]{6}-", name
-        ):
+        if re.match(r"^[0-9]{3,}-", name) and not re.match(r"^[0-9]{8}-[0-9]{6}-", name):
             number = _int64_from_digits(re.match(r"^[0-9]+", name).group())
             if number is not None:
                 highest = max(highest, number)
     return highest
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # noqa: C901
     argv0 = sys.argv[0]
     args = _parse_args(list(argv if argv is not None else sys.argv[1:]), argv0)
 
@@ -213,10 +250,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.dry_run:
         specs_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.short_name:
-        branch_suffix = _clean_branch_name(args.short_name)
-    else:
-        branch_suffix = _generate_branch_name(args.description)
+    branch_suffix = _clean_branch_name(args.short_name) if args.short_name else _generate_branch_name(args.description)
 
     branch_number = args.branch_number
     if args.use_timestamp and branch_number:
@@ -227,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
         branch_number = ""
 
     if args.use_timestamp:
-        feature_num = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        feature_num = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
     else:
         if branch_number:
             # Mirrors bash: $((10#$BRANCH_NUMBER)) only accepts unsigned
@@ -235,16 +269,14 @@ def main(argv: list[str] | None = None) -> int:
             # characters that int() would otherwise tolerate.
             if not re.fullmatch(r"[0-9]+", branch_number):
                 print(
-                    "Error: --number must be an unsigned integer, "
-                    f"got '{branch_number}'",
+                    f"Error: --number must be an unsigned integer, got '{branch_number}'",
                     file=sys.stderr,
                 )
                 return 1
             number = _int64_from_digits(branch_number)
             if number is None:
                 print(
-                    "Error: --number must be between 0 and "
-                    f"{_MAX_FEATURE_NUMBER}, got '{branch_number}'",
+                    f"Error: --number must be between 0 and {_MAX_FEATURE_NUMBER}, got '{branch_number}'",
                     file=sys.stderr,
                 )
                 return 1
@@ -254,8 +286,7 @@ def main(argv: list[str] | None = None) -> int:
             rejected_number = branch_number or str(number)
             number_label = "--number" if branch_number else "feature number"
             print(
-                f"Error: {number_label} must be between 0 and "
-                f"{_MAX_FEATURE_NUMBER}, got '{rejected_number}'",
+                f"Error: {number_label} must be between 0 and {_MAX_FEATURE_NUMBER}, got '{rejected_number}'",
                 file=sys.stderr,
             )
             return 1
@@ -278,8 +309,7 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         print(
-            f"[specify] Original: {original_branch_name} "
-            f"({len(original_branch_name)} bytes)",
+            f"[specify] Original: {original_branch_name} ({len(original_branch_name)} bytes)",
             file=sys.stderr,
         )
         print(

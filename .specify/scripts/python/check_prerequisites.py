@@ -195,9 +195,7 @@ def main(argv: list[str] | None = None) -> int:
 
     docs = _available_docs(paths, args.include_tasks)
     if args.json_mode:
-        sys.stdout.write(
-            _json_line({"FEATURE_DIR": str(paths.feature_dir), "AVAILABLE_DOCS": docs})
-        )
+        sys.stdout.write(_json_line({"FEATURE_DIR": str(paths.feature_dir), "AVAILABLE_DOCS": docs}))
     else:
         _print_text_results(paths, args.include_tasks)
     return 0

@@ -106,8 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     tasks_template = resolve_template("tasks-template", paths.repo_root)
     if tasks_template is None or not tasks_template.is_file():
         print(
-            "ERROR: Could not resolve required tasks-template from the template "
-            f"override stack for {paths.repo_root}",
+            f"ERROR: Could not resolve required tasks-template from the template override stack for {paths.repo_root}",
             file=sys.stderr,
         )
         print(
