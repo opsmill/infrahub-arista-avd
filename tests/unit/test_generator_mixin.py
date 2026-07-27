@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from solution_arista_avd.generator import GeneratorMixin
+from solution_arista_avd.generator import GeneratorMixin, save_file_if_changed
 
 
 def _make_generator() -> GeneratorMixin:
@@ -82,6 +82,67 @@ def test_non_empty_value_detects_missing_and_populated_attributes() -> None:
     assert GeneratorMixin._has_non_empty_value(SimpleNamespace(value=None)) is False
     assert GeneratorMixin._has_non_empty_value(SimpleNamespace(value="")) is False
     assert GeneratorMixin._has_non_empty_value(SimpleNamespace(value="SERIAL1")) is True
+
+
+@pytest.mark.asyncio
+async def test_save_file_if_changed_skips_matching_existing_content() -> None:
+    existing_file = MagicMock()
+    existing_file.save = AsyncMock()
+    create_file = AsyncMock()
+
+    uploaded = await save_file_if_changed(
+        existing_file=existing_file,
+        existing_checksum="checksum-1",
+        new_checksum="checksum-1",
+        new_content=b"{}",
+        filename="leaf-1-hostvars.json",
+        create_file=create_file,
+    )
+
+    assert uploaded is False
+    existing_file.upload_from_bytes.assert_not_called()
+    existing_file.save.assert_not_awaited()
+    create_file.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_save_file_if_changed_uploads_existing_file_when_content_differs() -> None:
+    existing_file = MagicMock()
+    existing_file.save = AsyncMock()
+
+    uploaded = await save_file_if_changed(
+        existing_file=existing_file,
+        existing_checksum="checksum-1",
+        new_checksum="checksum-2",
+        new_content=b'{"changed": true}',
+        filename="leaf-1-hostvars.json",
+        create_file=AsyncMock(),
+    )
+
+    assert uploaded is True
+    existing_file.upload_from_bytes.assert_called_once_with(content=b'{"changed": true}', name="leaf-1-hostvars.json")
+    existing_file.save.assert_awaited_once_with(allow_upsert=True)
+
+
+@pytest.mark.asyncio
+async def test_save_file_if_changed_creates_missing_file() -> None:
+    new_file = MagicMock()
+    new_file.save = AsyncMock()
+    create_file = AsyncMock(return_value=new_file)
+
+    uploaded = await save_file_if_changed(
+        existing_file=None,
+        existing_checksum=None,
+        new_checksum="checksum-1",
+        new_content=b"{}",
+        filename="leaf-1-structured-config.json",
+        create_file=create_file,
+    )
+
+    assert uploaded is True
+    create_file.assert_awaited_once()
+    new_file.upload_from_bytes.assert_called_once_with(content=b"{}", name="leaf-1-structured-config.json")
+    new_file.save.assert_awaited_once_with(allow_upsert=True)
 
 
 @pytest.mark.asyncio

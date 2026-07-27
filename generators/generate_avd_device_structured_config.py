@@ -13,6 +13,7 @@ from typing import Any
 from infrahub_sdk.generator import InfrahubGenerator
 from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 
+from solution_arista_avd.generator import save_file_if_changed
 from solution_arista_avd.protocols import AvdArtifact, AvdStructuredConfigFile
 
 from .generate_avd_inputs_query import GenerateAvdInputsQuery
@@ -269,20 +270,20 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                         )
                         existing_file = None
 
-                # Always upload and save to ensure the file exists on this branch
-                if existing_file:
-                    existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
-                    await existing_file.save(allow_upsert=True)
-                else:
-                    sc_file = await self.client.create(
+                uploaded = await save_file_if_changed(
+                    existing_file=existing_file,
+                    existing_checksum=existing_checksum,
+                    new_checksum=new_checksum,
+                    new_content=new_content,
+                    filename=f"{hostname}-structured-config.json",
+                    create_file=lambda avd_artifact=avd_artifact: self.client.create(
                         AvdStructuredConfigFile,
                         artifact=avd_artifact,
                         member_of_groups=["avd_structured_configs"],
-                    )
-                    sc_file.upload_from_bytes(content=new_content, name=f"{hostname}-structured-config.json")
-                    await sc_file.save(allow_upsert=True)
+                    ),
+                )
 
-                if existing_checksum == new_checksum:
+                if not uploaded:
                     skipped_count += 1
                 else:
                     success_count += 1
