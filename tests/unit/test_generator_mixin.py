@@ -121,7 +121,7 @@ async def test_save_file_if_changed_uploads_existing_file_when_content_differs()
 
     assert uploaded is True
     existing_file.upload_from_bytes.assert_called_once_with(content=b'{"changed": true}', name="leaf-1-hostvars.json")
-    existing_file.save.assert_awaited_once_with(allow_upsert=True)
+    existing_file.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
 
 @pytest.mark.asyncio
@@ -142,7 +142,7 @@ async def test_save_file_if_changed_creates_missing_file() -> None:
     assert uploaded is True
     create_file.assert_awaited_once()
     new_file.upload_from_bytes.assert_called_once_with(content=b"{}", name="leaf-1-structured-config.json")
-    new_file.save.assert_awaited_once_with(allow_upsert=True)
+    new_file.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
 
 @pytest.mark.asyncio
