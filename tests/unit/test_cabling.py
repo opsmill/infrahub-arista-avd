@@ -151,6 +151,12 @@ def _physical_interface(
     return iface
 
 
+class _EmptySdkRelationship:
+    @property
+    def peer(self) -> object:
+        raise ValueError("Node must have at least one identifier (ID or HFID) to query it.")
+
+
 class TestConnectInterfaceMaps:
     @pytest.mark.asyncio
     async def test_populates_missing_connectors_with_deterministic_link(self) -> None:
@@ -202,3 +208,25 @@ class TestConnectInterfaceMaps:
         assert dst_fetched_iface.connector is network_link
         dst_fetched_iface.save.assert_awaited_once_with(allow_upsert=True)
         assert any("Skipped connector reconciliation" in call.args[0] for call in logger.warning.call_args_list)
+
+    @pytest.mark.asyncio
+    async def test_populates_empty_sdk_connector_relationship(self) -> None:
+        src_query_iface = _physical_interface("src-query", "leaf-1", "Ethernet1")
+        dst_query_iface = _physical_interface("dst-query", "spine-1", "Ethernet1")
+        src_fetched_iface = _physical_interface("src-query", "leaf-1", "Ethernet1")
+        dst_fetched_iface = _physical_interface("dst-query", "spine-1", "Ethernet1")
+        src_fetched_iface.connector = _EmptySdkRelationship()
+        dst_fetched_iface.connector = _EmptySdkRelationship()
+        network_link = SimpleNamespace(id="link-1", name="leaf-1-Ethernet1__spine-1-Ethernet1", save=AsyncMock())
+        client = SimpleNamespace(
+            create=AsyncMock(return_value=network_link),
+            get=AsyncMock(side_effect=[src_fetched_iface, dst_fetched_iface]),
+        )
+        logger = MagicMock()
+
+        await connect_interface_maps(client, logger, [(src_query_iface, dst_query_iface)])  # type: ignore[arg-type]
+
+        assert src_fetched_iface.connector is network_link
+        assert dst_fetched_iface.connector is network_link
+        src_fetched_iface.save.assert_awaited_once_with(allow_upsert=True)
+        dst_fetched_iface.save.assert_awaited_once_with(allow_upsert=True)
