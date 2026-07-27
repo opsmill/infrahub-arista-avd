@@ -40,7 +40,7 @@ async def save_file_if_changed(
 
     file_node = existing_file or await create_file()
     file_node.upload_from_bytes(content=new_content, name=filename)
-    await file_node.save(allow_upsert=True)
+    await file_node.save(allow_upsert=True, update_group_context=False)
     return True
 
 
