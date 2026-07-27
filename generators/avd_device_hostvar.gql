@@ -237,6 +237,15 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             }
           }
         }
+        vtep_loopback_ip {
+          node {
+            __typename
+            id
+            address {
+              value
+            }
+          }
+        }
         mgmt_ip {
           node {
             __typename

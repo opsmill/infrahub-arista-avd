@@ -31,6 +31,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNode(BaseModel):
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAvdCustomHostvars"
     ]
     loopback_ip: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIp"
+    vtep_loopback_ip: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIp"
     mgmt_ip: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIp"
     mlag_domain: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain"
     rack: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRack"
@@ -628,6 +629,23 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNode(BaseModel):
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeAddress(BaseModel):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIp(BaseModel):
+    node: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNode"]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNode(BaseModel):
+    id: str
+    address: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeAddress"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeAddress(
+    BaseModel
+):
     value: Optional[str]
 
 
@@ -2811,6 +2829,8 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAsn.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAsnNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIp.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIp.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIp.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIpNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain.model_rebuild()

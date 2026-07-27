@@ -1,9 +1,9 @@
 """Unit tests for schema-driven IP pool extraction in the AVD hostvar generator.
 
 These tests pin the behavior introduced when the hardcoded fallback prefixes
-(10.250.0.0/16, 10.251.0.0/24, 10.255.0.0/24) were replaced by mandatory
-fabric pool relationships: the three fabric pools must resolve from data, a
-missing/empty one fails loudly, and the MLAG pools stay optional.
+(10.250.0.0/16, 10.251.0.0/24, 10.255.0.0/24) were replaced by data-model
+relationships: hostvars still require the uplink pool, loopback/VTEP addresses
+come from device relationships, and the MLAG pools stay optional.
 """
 
 from __future__ import annotations
@@ -99,7 +99,7 @@ def _make_generator(prefix_map: dict[int, str | None]) -> GenerateAVDDeviceHostv
 
 
 async def test_extract_l3ls_pools_returns_all_pools() -> None:
-    """All five pyAVD pools resolve from the data model, including loopback."""
+    """Only pyAVD pools still required by hostvars resolve from the data model."""
     uplink, vtep, loopback, mlag_peer, mlag_l3 = (object() for _ in range(5))
     fabric = SimpleNamespace(name=_attr("Fabric-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback)
     pod = SimpleNamespace(mlag_peer_pool=mlag_peer, mlag_l3_pool=mlag_l3)
@@ -116,10 +116,10 @@ async def test_extract_l3ls_pools_returns_all_pools() -> None:
     pools = await gen._extract_l3ls_pools(fabric, pod)
 
     assert pools["uplink_ipv4_pool"] == "10.1.0.0/16"
-    assert pools["vtep_loopback_ipv4_pool"] == "10.2.0.0/24"
-    assert pools["loopback_ipv4_pool"] == "10.3.0.0/24"
     assert pools["mlag_peer_ipv4_pool"] == "10.4.0.0/24"
     assert pools["mlag_peer_l3_ipv4_pool"] == "10.5.0.0/24"
+    assert "vtep_loopback_ipv4_pool" not in pools
+    assert "loopback_ipv4_pool" not in pools
 
 
 async def test_extract_l3ls_pools_no_hardcoded_fallback() -> None:
@@ -136,7 +136,7 @@ async def test_extract_l3ls_pools_no_hardcoded_fallback() -> None:
     assert "10.255.0.0/24" not in pools.values()
 
 
-@pytest.mark.parametrize("missing", ["uplink_pool", "vtep_pool", "loopback_pool"])
+@pytest.mark.parametrize("missing", ["uplink_pool"])
 async def test_extract_l3ls_pools_raises_when_required_pool_empty(missing: str) -> None:
     """A linked-but-empty (or unset) mandatory pool fails loudly, naming the pool."""
     refs = {"uplink_pool": object(), "vtep_pool": object(), "loopback_pool": object()}
@@ -162,7 +162,6 @@ async def test_extract_l3ls_pools_mlag_optional() -> None:
 
     assert pools["mlag_peer_ipv4_pool"] is None
     assert pools["mlag_peer_l3_ipv4_pool"] is None
-    assert pools["loopback_ipv4_pool"] == "10.3.0.0/24"
 
 
 async def test_extract_l3ls_pools_uses_generated_mlag_l3_pool_alias() -> None:

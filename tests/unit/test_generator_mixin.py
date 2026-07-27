@@ -22,6 +22,17 @@ def _device(device_id: str = "device-1", *, asn_id: str | None = None) -> Simple
     return SimpleNamespace(id=device_id, save=AsyncMock(), delete=AsyncMock(), asn=SimpleNamespace(id=asn_id))
 
 
+def _interface(kind: str = "InterfacePhysical") -> SimpleNamespace:
+    return SimpleNamespace(
+        delete=AsyncMock(),
+        get_kind=MagicMock(return_value=kind),
+    )
+
+
+def _resource(resource_id: str) -> SimpleNamespace:
+    return SimpleNamespace(node=SimpleNamespace(id=resource_id))
+
+
 @pytest.mark.asyncio
 async def test_create_avd_device_deletes_new_device_when_asn_allocation_fails() -> None:
     gen = _make_generator()
@@ -49,7 +60,7 @@ async def test_create_avd_device_does_not_delete_existing_device_when_post_save_
     gen.client.filters.return_value = [SimpleNamespace(id="existing-device")]
     device = _device()
     gen.client.create.return_value = device
-    gen._activate_loopback_interface = AsyncMock(side_effect=RuntimeError("loopback failed"))  # type: ignore[method-assign]
+    gen._reconcile_generated_loopback_interfaces = AsyncMock(side_effect=RuntimeError("loopback failed"))  # type: ignore[method-assign]
 
     with pytest.raises(RuntimeError, match="loopback failed"):
         await gen.create_avd_device(
@@ -72,7 +83,7 @@ async def test_create_avd_device_deletes_new_asn_when_later_step_fails() -> None
     routing_asn = SimpleNamespace(id="asn-1", delete=AsyncMock())
     gen.client.create.return_value = device
     gen._ensure_device_asn = AsyncMock(return_value=routing_asn)  # type: ignore[method-assign]
-    gen._activate_loopback_interface = AsyncMock(side_effect=RuntimeError("loopback failed"))  # type: ignore[method-assign]
+    gen._reconcile_generated_loopback_interfaces = AsyncMock(side_effect=RuntimeError("loopback failed"))  # type: ignore[method-assign]
 
     with pytest.raises(RuntimeError, match="loopback failed"):
         await gen.create_avd_device(
@@ -87,6 +98,82 @@ async def test_create_avd_device_deletes_new_asn_when_later_step_fails() -> None
 
     device.delete.assert_awaited_once_with()
     routing_asn.delete.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_create_avd_device_allocates_vtep_loopback_for_leaf_roles_only() -> None:
+    gen = _make_generator()
+    leaf = _device("leaf-1")
+    spine = _device("spine-1")
+    gen.client.create.side_effect = [leaf, spine]
+    gen._reconcile_generated_loopback_interfaces = AsyncMock()  # type: ignore[method-assign]
+
+    await gen.create_avd_device(
+        name="leaf-a",
+        role="leaf",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+        loopback_pool=object(),
+        vtep_loopback_pool="vtep-pool",  # type: ignore[arg-type]
+    )
+    await gen.create_avd_device(
+        name="spine-a",
+        role="spine",
+        object_template_id="template-1",
+        pod_id="pod-1",
+        fabric_id="fabric-1",
+        loopback_pool=object(),
+        vtep_loopback_pool="vtep-pool",  # type: ignore[arg-type]
+    )
+
+    leaf_kwargs = gen.client.create.await_args_list[0].kwargs
+    spine_kwargs = gen.client.create.await_args_list[1].kwargs
+    assert leaf_kwargs["vtep_loopback_ip"] == "vtep-pool"
+    assert "vtep_loopback_ip" not in spine_kwargs
+
+
+@pytest.mark.asyncio
+async def test_ensure_virtual_loopback_replaces_stale_physical_interface() -> None:
+    gen = _make_generator()
+    stale_physical = _interface("InterfacePhysical")
+    virtual = SimpleNamespace(save=AsyncMock())
+    gen.client.filters.return_value = [stale_physical]
+    gen.client.create.return_value = virtual
+
+    await gen._ensure_virtual_loopback_interface(
+        device_id="device-1",
+        name="Loopback0",
+        role="loopback",
+        ip_address_id="ip-1",
+    )
+
+    stale_physical.delete.assert_awaited_once_with()
+    assert gen.client.create.await_args.args[0].__name__ == "InterfaceVirtual"
+    assert gen.client.create.await_args.kwargs["name"] == "Loopback0"
+    assert gen.client.create.await_args.kwargs["role"] == "loopback"
+    assert gen.client.create.await_args.kwargs["device"] == {"id": "device-1"}
+    assert virtual.ip_address == "ip-1"
+    virtual.save.assert_awaited_once_with(allow_upsert=True)
+
+
+@pytest.mark.asyncio
+async def test_ensure_vtep_loopback_address_pool_uses_prefix_pool_resources() -> None:
+    gen = _make_generator()
+    address_pool = SimpleNamespace(save=AsyncMock())
+    gen.client.create.return_value = address_pool
+    prefix_pool = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("prefix-1"), _resource("prefix-2")]))
+
+    result = await gen._ensure_vtep_loopback_address_pool(
+        fabric_name="fabric-a",
+        vtep_prefix_pool_ref=prefix_pool,
+    )
+
+    assert result == address_pool
+    gen.client.create.assert_awaited_once()
+    assert gen.client.create.await_args.kwargs["name"] == "fabric-a-vtep-loopback-address-pool"
+    assert gen.client.create.await_args.kwargs["resources"] == [{"id": "prefix-1"}, {"id": "prefix-2"}]
+    address_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
 
 @pytest.mark.asyncio

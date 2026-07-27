@@ -76,6 +76,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     asn_pool: CoreNumberPool | None
     node_id_pool: CoreNumberPool | None
     mgmt_pool: CoreIPAddressPool | None
+    vtep_loopback_pool: CoreIPAddressPool | None
 
     logger = TASK_LOGGER
 
@@ -155,10 +156,13 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.asn_pool = None
         self.node_id_pool = None
         self.mgmt_pool = None
+        self.vtep_loopback_pool = None
 
         pod_node = data.location_rack.edges[0].node.pod.node
         if pod_node.parent and pod_node.parent.node:
-            self.asn_pool, self.node_id_pool, self.mgmt_pool = await self.resolve_avd_pools(pod_node.parent.node)
+            self.asn_pool, self.node_id_pool, self.mgmt_pool, self.vtep_loopback_pool = await self.resolve_avd_pools(
+                pod_node.parent.node
+            )
 
         await self.create_leaf_switches()
 
@@ -203,6 +207,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
                 rack_id=self.rack_id,
                 index=index,
                 loopback_pool=self.loopback_pool,
+                vtep_loopback_pool=self.vtep_loopback_pool,
                 asn_pool=asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,

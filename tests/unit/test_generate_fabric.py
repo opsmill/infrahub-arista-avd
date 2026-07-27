@@ -45,6 +45,7 @@ def _pod_query_data(*, amount_of_super_spines: int, underlay_routing_protocol: s
                                 "asn_pool": {"node": None},
                                 "node_id_pool": {"node": None},
                                 "mgmt_pool": {"node": None},
+                                "vtep_pool": {"node": None},
                             }
                         },
                     }
@@ -72,6 +73,7 @@ def _fabric_query_data(
                         "asn_pool": {"node": None},
                         "node_id_pool": {"node": None},
                         "mgmt_pool": {"node": None},
+                        "vtep_pool": {"node": None},
                     }
                 }
             ]
@@ -104,7 +106,7 @@ class TestFabricGenerator:
     @pytest.mark.asyncio
     async def test_zero_super_spines_does_not_require_template(self, monkeypatch: pytest.MonkeyPatch) -> None:
         gen = _make_generator()
-        gen.resolve_avd_pools = AsyncMock(return_value=(None, None, None))  # type: ignore[method-assign]
+        gen.resolve_avd_pools = AsyncMock(return_value=(None, None, None, None))  # type: ignore[method-assign]
         gen.allocate_resource_pools = AsyncMock()  # type: ignore[method-assign]
         gen.create_super_spine_switches = AsyncMock()  # type: ignore[method-assign]
         gen.update_checksum = AsyncMock()  # type: ignore[method-assign]
@@ -171,6 +173,8 @@ class TestFabricGenerator:
         gen.asn_pool = object()  # type: ignore[assignment]
         gen.node_id_pool = object()  # type: ignore[assignment]
         gen.mgmt_pool = object()  # type: ignore[assignment]
+        gen.vtep_loopback_pool = object()  # type: ignore[assignment]
+        gen.vtep_loopback_pool = object()  # type: ignore[assignment]
         fabric_pod = SimpleNamespace(id="fabric-pod-1")
         created_devices = [SimpleNamespace(id="ss-1"), SimpleNamespace(id="ss-2")]
         gen.client.get.return_value = fabric_pod
@@ -202,6 +206,8 @@ class TestFabricGenerator:
         gen.asn_pool = object()  # type: ignore[assignment]
         gen.node_id_pool = object()  # type: ignore[assignment]
         gen.mgmt_pool = object()  # type: ignore[assignment]
+        gen.vtep_loopback_pool = object()  # type: ignore[assignment]
+        gen.vtep_loopback_pool = object()  # type: ignore[assignment]
         gen.client.get.return_value = SimpleNamespace(id="fabric-pod-1")
         gen.create_avd_device = AsyncMock(return_value=SimpleNamespace(id="ss-1"))  # type: ignore[method-assign]
         ensure_shared = AsyncMock()
@@ -263,6 +269,7 @@ class TestPodGenerator:
         gen.asn_pool = object()  # type: ignore[assignment]
         gen.node_id_pool = object()  # type: ignore[assignment]
         gen.mgmt_pool = object()  # type: ignore[assignment]
+        gen.vtep_loopback_pool = object()  # type: ignore[assignment]
         created_devices = [SimpleNamespace(id="spine-1"), SimpleNamespace(id="spine-2")]
         gen.create_avd_device = AsyncMock(side_effect=created_devices)  # type: ignore[method-assign]
         ensure_shared = AsyncMock()
@@ -294,6 +301,7 @@ class TestPodGenerator:
         gen.asn_pool = object()  # type: ignore[assignment]
         gen.node_id_pool = object()  # type: ignore[assignment]
         gen.mgmt_pool = object()  # type: ignore[assignment]
+        gen.vtep_loopback_pool = object()  # type: ignore[assignment]
         gen.create_avd_device = AsyncMock(return_value=SimpleNamespace(id="spine-1"))  # type: ignore[method-assign]
         ensure_shared = AsyncMock()
         monkeypatch.setattr(generate_pod_module, "ensure_shared_device_asn", ensure_shared)

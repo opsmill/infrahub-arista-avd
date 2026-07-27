@@ -196,6 +196,9 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric(Base
     mgmt_pool: (
         "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPool"
     )
+    vtep_pool: (
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPool"
+    )
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricUnderlayRoutingProtocol(
@@ -246,6 +249,48 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtP
     id: str
 
 
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPool(
+    BaseModel
+):
+    node: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode"
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode(
+    BaseModel
+):
+    id: str
+    resources: "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResources"
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResourcesEdges"
+        ]
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResourcesEdgesNode"
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResourcesEdgesNode(
+    BaseModel
+):
+    typename__: Literal[
+        "BuiltinIPPrefix", "InternalIPPrefixAvailable", "IpamPrefix"
+    ] = Field(alias="__typename")
+    id: Optional[str]
+
+
 RackGeneratorQuery.model_rebuild()
 RackGeneratorQueryLocationRack.model_rebuild()
 RackGeneratorQueryLocationRackEdges.model_rebuild()
@@ -263,3 +308,7 @@ RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric.model_rebu
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricNodeIdPool.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricMgmtPool.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPool.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResources.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResourcesEdges.model_rebuild()

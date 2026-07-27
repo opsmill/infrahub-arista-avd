@@ -7987,6 +7987,7 @@ type DcimDevice implements DcimGenericDevice & CoreArtifactTarget & DcimPhysical
   """Device-scope custom pyAVD hostvars; generated values take precedence."""
   avd_custom_hostvars: JSONAttribute
   loopback_ip: NestedEdgedIpamIPAddress!
+  vtep_loopback_ip: NestedEdgedIpamIPAddress!
   mgmt_ip: NestedEdgedIpamIPAddress!
   rack: NestedEdgedLocationRack!
   pod: NestedEdgedNetworkPod!
@@ -69699,6 +69700,7 @@ input DcimDeviceCreateInput {
   """On which face of the rack the device is mounted."""
   rack_face: TextAttributeCreate
   loopback_ip: RelatedIPAddressNodeInput
+  vtep_loopback_ip: RelatedIPAddressNodeInput
   mgmt_ip: RelatedIPAddressNodeInput
   rack: RelatedNodeInput
   pod: RelatedNodeInput
@@ -69757,6 +69759,7 @@ input DcimDeviceUpdateInput {
   """On which face of the rack the device is mounted."""
   rack_face: TextAttributeUpdate
   loopback_ip: RelatedIPAddressNodeInput
+  vtep_loopback_ip: RelatedIPAddressNodeInput
   mgmt_ip: RelatedIPAddressNodeInput
   rack: RelatedNodeInput
   pod: RelatedNodeInput
@@ -69815,6 +69818,7 @@ input DcimDeviceUpsertInput {
   """On which face of the rack the device is mounted."""
   rack_face: TextAttributeUpdate
   loopback_ip: RelatedIPAddressNodeInput
+  vtep_loopback_ip: RelatedIPAddressNodeInput
   mgmt_ip: RelatedIPAddressNodeInput
   rack: RelatedNodeInput
   pod: RelatedNodeInput

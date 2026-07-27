@@ -1477,22 +1477,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
     async def _extract_l3ls_pools(self, fabric: object, pod: object) -> dict[str, str | None]:
         """Extract IP pools from the fabric/pod data model.
 
-        The three fabric-level pools (uplink, vtep, loopback) are mandatory and are
-        resolved with no hardcoded fallback — a missing or empty pool raises a clear
-        error. The pod-level MLAG pools remain optional.
+        The fabric-level uplink pool is mandatory and resolved with no hardcoded
+        fallback. Loopback0 and VTEP loopback addresses are allocated by Infrahub
+        onto device relationships, so their pyAVD pool keys are intentionally not
+        emitted. The pod-level MLAG pools remain optional.
         """
         fabric_name = self._get_attr_value(fabric, "name")
 
         uplink = await self._require_pool_prefix(
             getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool", fabric_name, "uplink_pool"
         )
-        vtep = await self._require_pool_prefix(
-            getattr(fabric, "vtep_pool", None), "CoreIPPrefixPool", fabric_name, "vtep_pool"
-        )
-        loopback = await self._require_pool_prefix(
-            getattr(fabric, "loopback_pool", None), "CoreIPPrefixPool", fabric_name, "loopback_pool"
-        )
-
         mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
         # Auto-generated Pydantic model renames mlag_l3_pool to mlag_l_3_pool
         mlag_l3_ref = self._get_first_attr(pod, "mlag_l_3_pool", "mlag_l3_pool")
@@ -1500,8 +1494,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         return {
             "uplink_ipv4_pool": uplink,
-            "vtep_loopback_ipv4_pool": vtep,
-            "loopback_ipv4_pool": loopback,
             "mlag_peer_ipv4_pool": mlag_peer,
             "mlag_peer_l3_ipv4_pool": mlag_l3,
         }
@@ -1825,6 +1817,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         bgp_asn: int | None,
         node_id: int | None,
         loopback_ip: str | None,
+        vtep_loopback_ip: str | None,
         mgmt_ip: str | None,
         fabric_name: str,
         mgmt_gateway: str | None,
@@ -1872,25 +1865,23 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["bgp_as"] = str(bgp_asn)
         if loopback_ip:
             node_config["loopback_ipv4_address"] = loopback_ip
-            if pools.get("loopback_ipv4_pool"):
-                node_config["loopback_ipv4_pool"] = pools["loopback_ipv4_pool"]
+        if vtep_loopback_ip:
+            node_config["vtep_loopback_ipv4_address"] = vtep_loopback_ip
         if mgmt_ip:
             node_config["mgmt_ip"] = mgmt_ip
         if evpn_gateway:
             node_config["evpn_gateway"] = evpn_gateway
 
-        if pools["vtep_loopback_ipv4_pool"]:
-            node_config["vtep_loopback_ipv4_pool"] = pools["vtep_loopback_ipv4_pool"]
-        if pools["mlag_peer_ipv4_pool"]:
+        if pools.get("mlag_peer_ipv4_pool"):
             node_config["mlag_peer_ipv4_pool"] = pools["mlag_peer_ipv4_pool"]
-        if pools["mlag_peer_l3_ipv4_pool"]:
+        if pools.get("mlag_peer_l3_ipv4_pool"):
             node_config["mlag_peer_l3_ipv4_pool"] = pools["mlag_peer_l3_ipv4_pool"]
 
         if uplinks["uplink_interfaces"]:
             node_config["uplink_interfaces"] = uplinks["uplink_interfaces"]
             node_config["uplink_switches"] = uplinks["uplink_switches"]
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
-            if pools["uplink_ipv4_pool"]:
+            if pools.get("uplink_ipv4_pool"):
                 node_config["uplink_ipv4_pool"] = pools["uplink_ipv4_pool"]
             if uplink_pool_reservation:
                 node_config["max_uplink_switches"] = uplink_pool_reservation["max_uplink_switches"]
@@ -2022,7 +2013,20 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if custom_hostvars:
             hostvars = GenerateAVDDeviceHostvar._deep_merge(custom_hostvars, hostvars)
 
-        return hostvars
+        return GenerateAVDDeviceHostvar._strip_disallowed_hostvar_keys(hostvars)
+
+    @staticmethod
+    def _strip_disallowed_hostvar_keys(value: Any) -> Any:
+        disallowed = {"loopback_ipv4_pool", "vtep_loopback_ipv4_pool"}
+        if isinstance(value, dict):
+            return {
+                key: GenerateAVDDeviceHostvar._strip_disallowed_hostvar_keys(item)
+                for key, item in value.items()
+                if key not in disallowed
+            }
+        if isinstance(value, list):
+            return [GenerateAVDDeviceHostvar._strip_disallowed_hostvar_keys(item) for item in value]
+        return value
 
     async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
         raw_data = data
@@ -2049,6 +2053,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             if "/" in loopback_ip:
                 loopback_ip = loopback_ip.split("/")[0]
 
+        vtep_loopback_ip = None
+        if device.vtep_loopback_ip and device.vtep_loopback_ip.node:
+            vtep_loopback_ip = device.vtep_loopback_ip.node.address.value
+            if "/" in vtep_loopback_ip:
+                vtep_loopback_ip = vtep_loopback_ip.split("/")[0]
+
         mgmt_ip = None
         if device.mgmt_ip and device.mgmt_ip.node:
             mgmt_ip = device.mgmt_ip.node.address.value
@@ -2069,11 +2079,13 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         iface_edges = device.interfaces.edges or []
         uplinks = extract_uplinks_from_dict(iface_edges, uplink_role, device_id)
         raw_fabric = (
-            (((raw_data.get("DcimDevice", {}).get("edges") or [{}])[0].get("node") or {})
-            .get("pod", {})
-            .get("node", {})
-            .get("parent", {})
-            .get("node"))
+            (
+                ((raw_data.get("DcimDevice", {}).get("edges") or [{}])[0].get("node") or {})
+                .get("pod", {})
+                .get("node", {})
+                .get("parent", {})
+                .get("node")
+            )
             if isinstance(raw_data, dict)
             else None
         )
@@ -2136,8 +2148,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if is_l2leaf:
             pools: dict[str, str | None] = {
                 "uplink_ipv4_pool": None,
-                "vtep_loopback_ipv4_pool": None,
-                "loopback_ipv4_pool": None,
                 "mlag_peer_ipv4_pool": None,
                 "mlag_peer_l3_ipv4_pool": None,
             }
@@ -2206,6 +2216,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             bgp_asn=bgp_asn,
             node_id=node_id,
             loopback_ip=loopback_ip,
+            vtep_loopback_ip=vtep_loopback_ip,
             mgmt_ip=mgmt_ip,
             fabric_name=fabric_name,
             mgmt_gateway=mgmt_gateway,

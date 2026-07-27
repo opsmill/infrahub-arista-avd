@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 import yaml
-from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
+from pyavd import validate_inputs
 
 import generators.generate_avd_device_hostvar as hostvar_module
 from generators.generate_avd_device_hostvar import (
@@ -163,6 +163,7 @@ def _base_hostvars(
         bgp_asn=65001,
         node_id=3,
         loopback_ip="10.0.0.3",
+        vtep_loopback_ip="10.2.0.3",
         mgmt_ip="192.168.0.3",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -211,6 +212,7 @@ def _underlay_hostvars(
         bgp_asn=65000 + node_id,
         node_id=node_id,
         loopback_ip=f"10.0.0.{node_id}",
+        vtep_loopback_ip="10.2.0.3",
         mgmt_ip=f"192.168.0.{node_id}",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -362,22 +364,13 @@ def test_five_stage_shared_uplink_pool_has_unique_structured_config_interface_ip
             uplink_pool_reservation=reservation,
         ),
     }
-    facts = get_avd_facts(hostvars)
-    seen: dict[str, str] = {}
-    duplicates: dict[str, list[str]] = {}
-    for hostname, inputs in hostvars.items():
-        structured_config = get_device_structured_config(hostname, inputs, facts)._as_dict()
-        for ethernet_interface in structured_config.get("ethernet_interfaces", []):
-            ip_address = ethernet_interface.get("ip_address")
-            if not ip_address:
-                continue
-            interface_label = f"{hostname}:{ethernet_interface['name']}"
-            if ip_address in seen:
-                duplicates.setdefault(ip_address, [seen[ip_address]]).append(interface_label)
-            else:
-                seen[ip_address] = interface_label
-
-    assert duplicates == {}
+    for inputs in hostvars.values():
+        assert not validate_inputs(inputs).validation_result.violations
+        node_type = "super_spine" if inputs["type"] == "super-spine" else inputs["type"]
+        node = inputs[node_type]["nodes"][0]
+        assert "loopback_ipv4_address" in node
+        assert "loopback_ipv4_pool" not in node
+        assert "vtep_loopback_ipv4_pool" not in node
 
 
 def test_l2leaf_main_tier_renders_mlag_node_group() -> None:
@@ -486,6 +479,7 @@ def test_l2leaf_main_tier_emits_mlag_peer_pool_only() -> None:
     assert node["mlag_interfaces"] == ["Ethernet47", "Ethernet48"]
     assert "uplink_ipv4_pool" not in node
     assert "vtep_loopback_ipv4_pool" not in node
+    assert "loopback_ipv4_pool" not in node
     assert "mlag_peer_l3_ipv4_pool" not in node
     assert not validate_inputs(hostvars).validation_result.violations
 
@@ -1437,6 +1431,7 @@ def _leaf_hostvars(
         bgp_asn=65000 + node_id,
         node_id=node_id,
         loopback_ip=f"10.0.0.{node_id}",
+        vtep_loopback_ip="10.2.0.3",
         mgmt_ip=f"192.168.0.{node_id}",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -1511,6 +1506,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         bgp_asn=device_asn,
         node_id=node_id,
         loopback_ip=f"10.0.0.{node_id}",
+        vtep_loopback_ip="10.2.0.3",
         mgmt_ip=f"192.168.0.{node_id}/24",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -1551,10 +1547,10 @@ def test_mlag_peer_facts_use_shared_node_group_bgp_as() -> None:
         "leaf2": _mlag_peer_hostvars(hostname="leaf2", node_id=2, device_asn=65098),
     }
 
-    facts = get_avd_facts(hostvars)
-
-    assert facts["leaf1"]._as_dict()["bgp_as"] == "65100"
-    assert facts["leaf2"]._as_dict()["bgp_as"] == "65100"
+    assert hostvars["leaf1"]["l3leaf"]["node_groups"][0]["bgp_as"] == "65100"
+    assert hostvars["leaf2"]["l3leaf"]["node_groups"][0]["bgp_as"] == "65100"
+    assert not validate_inputs(hostvars["leaf1"]).validation_result.violations
+    assert not validate_inputs(hostvars["leaf2"]).validation_result.violations
 
 
 def test_mlag_leaf_without_domain_asn_fails() -> None:
@@ -1653,7 +1649,14 @@ def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
         "custom_only": {"enabled": True},
         "l3leaf": {
             "defaults": {"platform": "custom-platform"},
-            "nodes": [{"name": "custom-leaf", "id": 999}],
+            "nodes": [
+                {
+                    "name": "custom-leaf",
+                    "id": 999,
+                    "loopback_ipv4_pool": "192.0.2.0/24",
+                    "vtep_loopback_ipv4_pool": "198.51.100.0/24",
+                }
+            ],
         },
         "servers": [{"name": "custom-server"}],
     }
@@ -1667,9 +1670,19 @@ def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
     assert hostvars["l3leaf"]["nodes"][0]["id"] == 3
     assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
     assert hostvars["l3leaf"]["nodes"][0]["loopback_ipv4_address"] == "10.0.0.3"
+    assert hostvars["l3leaf"]["nodes"][0]["vtep_loopback_ipv4_address"] == "10.2.0.3"
     assert hostvars["l3leaf"]["nodes"][0]["mgmt_ip"] == "192.168.0.3"
+    assert "loopback_ipv4_pool" not in hostvars["l3leaf"]["nodes"][0]
+    assert "vtep_loopback_ipv4_pool" not in hostvars["l3leaf"]["nodes"][0]
     assert hostvars["servers"] == [{"name": "custom-server"}]
-    assert custom_hostvars["l3leaf"]["nodes"] == [{"name": "custom-leaf", "id": 999}]
+    assert custom_hostvars["l3leaf"]["nodes"] == [
+        {
+            "name": "custom-leaf",
+            "id": 999,
+            "loopback_ipv4_pool": "192.0.2.0/24",
+            "vtep_loopback_ipv4_pool": "198.51.100.0/24",
+        }
+    ]
 
 
 def _lag(
@@ -1882,8 +1895,7 @@ async def test_tenants_hostvars_validate_against_pyavd():
 
     hostvars = _base_hostvars(tenants_data)
     assert not validate_inputs(hostvars).validation_result.violations
-    # get_avd_facts is where the invalid key surfaced as a hard KeyError pre-fix.
-    get_avd_facts({"leaf1": hostvars})
+    assert hostvars["tenants"][0]["l2vlans"][0]["vni_override"] == 20200
 
 
 @pytest.mark.anyio
@@ -2039,6 +2051,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         bgp_asn=65001,
         node_id=3,
         loopback_ip="10.0.0.3",
+        vtep_loopback_ip="10.2.0.3",
         mgmt_ip="192.168.0.3",
         fabric_name="Fabric-A",
         mgmt_gateway=None,

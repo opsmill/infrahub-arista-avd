@@ -46,6 +46,7 @@ INTERFACE_KIND_MAP: dict[str, type] = {
 }
 
 INTERFACE_SECTIONS = ["ethernet_interfaces", "loopback_interfaces", "management_interfaces"]
+GENERATED_LOOPBACK_INTERFACES = {"Loopback0", "Loopback1"}
 
 ROUTING_SECTIONS = ["router_bgp", "prefix_lists", "route_maps", "static_routes"]
 
@@ -165,7 +166,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             ip_namespace__name__value=namespace,
         )
         if len(existing_ips) > 1:
-            raise ValueError(f"[{hostname}] Multiple IpamIPAddress nodes exist for {address_str} in namespace {namespace}")
+            raise ValueError(
+                f"[{hostname}] Multiple IpamIPAddress nodes exist for {address_str} in namespace {namespace}"
+            )
         if existing_ips:
             existing_ip = existing_ips[0]
             existing_interface = await self._get_existing_ip_interface(existing_ip)
@@ -568,7 +571,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
                 # IP backfill
                 ip_str = iface_config.get("ip_address")
-                if ip_str:
+                if ip_str and iface_name not in GENERATED_LOOPBACK_INTERFACES:
                     await self._backfill_ip(gql_iface, ip_str, hostname, avd_source)
 
                 # MTU update

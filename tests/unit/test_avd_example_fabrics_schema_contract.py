@@ -42,6 +42,13 @@ def _attribute(node: dict[str, Any], name: str) -> dict[str, Any] | None:
     return None
 
 
+def _relationship(node: dict[str, Any], name: str) -> dict[str, Any] | None:
+    for rel in node.get("relationships", []):
+        if rel.get("name") == name:
+            return rel
+    return None
+
+
 def _choice_names(attribute: dict[str, Any]) -> set[str]:
     return {choice["name"] for choice in attribute.get("choices", [])}
 
@@ -116,3 +123,20 @@ def test_isis_ldp_underlay_choice_present() -> None:
 def test_provider_roles_present() -> None:
     names = _dcim_device_role_choice_names()
     assert {"p", "pe", "rr"} <= names
+
+
+def test_vtep_loopback_ip_relationship_present() -> None:
+    device = _extension_node(_DCIM_EXTENSIONS, "DcimDevice")
+    rel = _relationship(device, "vtep_loopback_ip")
+    assert rel is not None
+    assert rel["peer"] == "IpamIPAddress"
+    assert rel["kind"] == "Attribute"
+    assert rel["cardinality"] == "one"
+    assert rel.get("optional") is True
+
+
+def test_vtep_loopback_interface_role_present() -> None:
+    interface = _extension_node(_DCIM_EXTENSIONS, "DcimInterface")
+    role = _attribute(interface, "role")
+    assert role is not None
+    assert "vtep_loopback" in _choice_names(role)

@@ -429,7 +429,9 @@ class TestBackfillIp:
     async def test_backfill_raises_when_ip_assigned_to_other_interface(self) -> None:
         gen = _make_generator()
         existing_ip = MagicMock()
-        existing_ip.interface = SimpleNamespace(peer=SimpleNamespace(id="iface-2", name=SimpleNamespace(value="Ethernet2")))
+        existing_ip.interface = SimpleNamespace(
+            peer=SimpleNamespace(id="iface-2", name=SimpleNamespace(value="Ethernet2"))
+        )
         gen.client.filters = AsyncMock(return_value=[existing_ip])
         iface = _make_interface(iface_id="iface-1", name="Ethernet1", ip_node=None)
 
@@ -442,7 +444,9 @@ class TestBackfillIp:
     async def test_backfill_existing_ip_same_interface_is_noop(self) -> None:
         gen = _make_generator()
         existing_ip = MagicMock()
-        existing_ip.interface = SimpleNamespace(peer=SimpleNamespace(id="iface-1", name=SimpleNamespace(value="Ethernet1")))
+        existing_ip.interface = SimpleNamespace(
+            peer=SimpleNamespace(id="iface-1", name=SimpleNamespace(value="Ethernet1"))
+        )
         gen.client.filters = AsyncMock(return_value=[existing_ip])
         iface = _make_interface(iface_id="iface-1", name="Ethernet1", ip_node=None)
 
@@ -1030,6 +1034,57 @@ class TestGenerate:
 
         # Should have created prefix and IP
         assert gen.client.create.call_count == 2
+
+    async def test_generated_loopbacks_skip_ip_backfill_but_keep_mtu(self) -> None:
+        """Loopback0/1 addresses are generator-owned, but MTU still follows structured config."""
+        gen = _make_generator()
+
+        structured_config = {
+            "loopback_interfaces": [
+                {"name": "Loopback0", "ip_address": "10.0.0.1/32", "mtu": 9214},
+                {"name": "Loopback1", "ip_address": "10.0.0.2/32", "mtu": 9214},
+            ]
+        }
+        mock_sc_file = MagicMock()
+        mock_sc_file.download_file = AsyncMock(return_value=json.dumps(structured_config).encode())
+        mock_avd_group = MagicMock()
+        mock_avd_group.id = "avd-group-id"
+        loopback0 = _make_saveable_mock()
+        loopback1 = _make_saveable_mock()
+
+        gen.client.create = AsyncMock()
+        gen.client.get = AsyncMock(side_effect=[mock_sc_file, mock_avd_group, loopback0, loopback1])
+
+        interfaces = [
+            {
+                "node": {
+                    "__typename": "InterfaceVirtual",
+                    "id": "iface-lo0",
+                    "name": {"value": "Loopback0"},
+                    "role": {"value": "loopback"},
+                    "mtu": {"value": 1500},
+                    "ip_address": {"node": None},
+                }
+            },
+            {
+                "node": {
+                    "__typename": "InterfaceVirtual",
+                    "id": "iface-lo1",
+                    "name": {"value": "Loopback1"},
+                    "role": {"value": "vtep_loopback"},
+                    "mtu": {"value": 1500},
+                    "ip_address": {"node": None},
+                }
+            },
+        ]
+        data = _build_artifact_query_data(interfaces=interfaces)
+        await gen.generate(data)
+
+        gen.client.create.assert_not_called()
+        assert loopback0.mtu.value == 9214
+        assert loopback1.mtu.value == 9214
+        loopback0.save.assert_awaited_once_with(allow_upsert=True)
+        loopback1.save.assert_awaited_once_with(allow_upsert=True)
 
     async def test_upserts_interface_with_existing_ip(self) -> None:
         """Test that interfaces with existing IPs are still upserted."""

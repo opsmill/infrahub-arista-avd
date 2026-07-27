@@ -9,13 +9,18 @@ spec:
     - template_name: "spine-switch"
       role: "spine"
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "SpineSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "spine-switch"
+      role: "spine"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "SpineSwitchEthernet[1-27]"
             name: "Ethernet[1-27]"
             profiles: ["profile-interface-leaf"]
@@ -25,13 +30,18 @@ spec:
     - template_name: "super-spine-switch"
       role: "super_spine"
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "SuperSpineSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "super-spine-switch"
+      role: "super_spine"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "SuperSpineSwitchEthernet[1-28]"
             name: "Ethernet[1-28]"
             profiles: ["profile-interface-spine"]
@@ -39,16 +49,28 @@ spec:
             name: "Ethernet[29-32]"
     - template_name: "Generic Switch"
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "GenericSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "Generic Switch"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "GenericSwitchEthernet[1-32]"
             name: "Ethernet[1-32]"
 
+    - template_name: "leaf-switch-compute"
+      role: "leaf"
+      interfaces:
+        kind: TemplateInterfaceVirtual
+        data:
+          - template_name: "LeafSwitchComputeLoopback0"
+            name: "Loopback0"
+            role: "loopback"
     - template_name: "leaf-switch-compute"
       role: "leaf"
       interfaces:
@@ -56,9 +78,6 @@ spec:
         parameters:
           expand_range: true
         data:
-          - template_name: "LeafSwitchComputeLoopback0"
-            name: "Loopback0"
-            role: "loopback"
           - template_name: "LeafSwitchComputeEthernet[1-24]"
             name: "Ethernet[1-24]"
             profiles: ["profile-interface-server"]
@@ -72,13 +91,18 @@ spec:
     - template_name: "leaf-switch-storage"
       role: "leaf"
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "LeafSwitchStorageLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "leaf-switch-storage"
+      role: "leaf"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "LeafSwitchStorageEthernet[1-8]"
             name: "Ethernet[1-8]"
             profiles: ["profile-interface-compute"]
@@ -106,13 +130,19 @@ spec:
       device_type: ["Dell", "PowerSwitch Z9864F-ON"]
       role: "spine"
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "DellZ9864FSpineSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "dell-z9864f-on-spine-switch"
+      device_type: ["Dell", "PowerSwitch Z9864F-ON"]
+      role: "spine"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "DellZ9864FSpineSwitchEthernet1/[1-32]"
             name: "Ethernet1/[1-32]"
             profiles: ["profile-interface-leaf"]
@@ -123,16 +153,31 @@ spec:
       device_type: ["Dell", "PowerSwitch Z9864F-ON"]
       role: "super_spine"
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "DellZ9864FSuperSpineSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "dell-z9864f-on-super-spine-switch"
+      device_type: ["Dell", "PowerSwitch Z9864F-ON"]
+      role: "super_spine"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "DellZ9864FSuperSpineSwitchEthernet1/[1-64]"
             name: "Ethernet1/[1-64]"
             profiles: ["profile-interface-spine"]
+    - template_name: "dell-s5232f-on-leaf-switch-compute"
+      role: "leaf"
+      device_type: ["Dell", "PowerSwitch S5232F-ON"]
+      interfaces:
+        kind: TemplateInterfaceVirtual
+        data:
+          - template_name: "DellS5232LeafSwitchLoopback0"
+            name: "Loopback0"
+            role: "loopback"
     - template_name: "dell-s5232f-on-leaf-switch-compute"
       role: "leaf"
       device_type: ["Dell", "PowerSwitch S5232F-ON"]
@@ -141,9 +186,6 @@ spec:
         parameters:
           expand_range: true
         data:
-          - template_name: "DellS5232LeafSwitchLoopback0"
-            name: "Loopback0"
-            role: "loopback"
           - template_name: "DellS5232FLeafSwitchEthernet1/1/[1-16]"
             name: Ethernet1/1/[1-16]
             profiles: ["profile-interface-spine"]
@@ -157,13 +199,19 @@ spec:
       role: "leaf"
       device_type: ["Dell", "PowerSwitch S5232F-ON"]
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "DellS5232FLeafStorageSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "dell-s5232f-on-leaf-switch-storage"
+      role: "leaf"
+      device_type: ["Dell", "PowerSwitch S5232F-ON"]
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "DellS5232FLeafStorageSwitchEthernet1/1/[1-16]"
             name: Ethernet1/1/[1-16]
             profiles: ["profile-interface-spine"]
@@ -182,16 +230,31 @@ spec:
       role: "spine"
       device_type: ["Arista", "DCS-7050CX3-32S"]
       interfaces:
-        kind: TemplateInterfacePhysical
-        parameters:
-          expand_range: true
+        kind: TemplateInterfaceVirtual
         data:
           - template_name: "Arista7050CX3SpineSwitchLoopback0"
             name: "Loopback0"
             role: "loopback"
+    - template_name: "arista-7050cx3-32s-spine-switch"
+      role: "spine"
+      device_type: ["Arista", "DCS-7050CX3-32S"]
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
           - template_name: "Arista7050CX3SpineSwitchEthernet[1-32]/1"
             name: "Ethernet[1-32]/1"
             profiles: ["profile-interface-leaf"]
+    - template_name: "arista-7050sx3-48yc8-leaf-switch"
+      role: "leaf"
+      device_type: ["Arista", "DCS-7050SX3-48YC8"]
+      interfaces:
+        kind: TemplateInterfaceVirtual
+        data:
+          - template_name: "Arista7050SX3LeafSwitchLoopback0"
+            name: "Loopback0"
+            role: "loopback"
     - template_name: "arista-7050sx3-48yc8-leaf-switch"
       role: "leaf"
       device_type: ["Arista", "DCS-7050SX3-48YC8"]
@@ -200,9 +263,6 @@ spec:
         parameters:
           expand_range: true
         data:
-          - template_name: "Arista7050SX3LeafSwitchLoopback0"
-            name: "Loopback0"
-            role: "loopback"
           - template_name: "Arista7050SX3LeafSwitchEthernet[1-48]"
             name: "Ethernet[1-48]"
             profiles: ["profile-interface-server"]

@@ -97,6 +97,18 @@ query RackGeneratorQuery($name: String!) {
 											id
 										}
 									}
+									vtep_pool {
+										node {
+											id
+											resources {
+												edges {
+													node {
+														id
+													}
+												}
+											}
+										}
+									}
 								}
 							}
 						}

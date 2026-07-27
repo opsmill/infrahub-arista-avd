@@ -20,6 +20,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
     asn_pool: CoreNumberPool | None
     node_id_pool: CoreNumberPool | None
     mgmt_pool: CoreIPAddressPool | None
+    vtep_loopback_pool: CoreIPAddressPool | None
 
     async def generate(self, data: dict) -> None:
         data: FabricGeneratorQuery = FabricGeneratorQuery(**data)
@@ -35,7 +36,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.super_spine_devices: list[DcimDevice] = []
 
         # Get AVD-related pool references
-        self.asn_pool, self.node_id_pool, self.mgmt_pool = await self.resolve_avd_pools(
+        self.asn_pool, self.node_id_pool, self.mgmt_pool, self.vtep_loopback_pool = await self.resolve_avd_pools(
             data.network_fabric.edges[0].node
         )
 
@@ -65,6 +66,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
                 pod_id=fabric_pod.id,
                 fabric_id=self.fabric_id,
                 loopback_pool=self.loopback_pool,
+                vtep_loopback_pool=self.vtep_loopback_pool,
                 asn_pool=device_asn_pool,
                 node_id_pool=self.node_id_pool,
                 mgmt_pool=self.mgmt_pool,

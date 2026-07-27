@@ -75,6 +75,7 @@ def _make_generator() -> RackGenerator:
     gen.asn_pool = _pool()
     gen.node_id_pool = object()
     gen.mgmt_pool = object()
+    gen.vtep_loopback_pool = object()
     gen.leaf_switches = [_leaf("leaf-a", "leaf-a"), _leaf("leaf-b", "leaf-b")]
     gen.l2leaf_switches = []
     gen.spine_switches = [_named_device("spine-a", "spine-a"), _named_device("spine-b", "spine-b")]

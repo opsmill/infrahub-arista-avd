@@ -4,7 +4,7 @@ import json
 from unittest.mock import AsyncMock
 
 import pytest
-from pyavd import validate_inputs
+from pyavd import get_avd_facts, validate_inputs
 
 from generators.generate_avd_device_structured_config import (
     AvdDeviceStructuredConfigGenerator,
@@ -38,6 +38,7 @@ from generators.generate_avd_inputs_query import (
     GenerateAvdInputsQueryNetworkFabricEdgesNodeChildrenEdgesNodeNetworkPodRacksEdgesNodeDevicesEdgesNodeDcimDeviceName,
     GenerateAvdInputsQueryNetworkFabricEdgesNodeName,
 )
+from tests.unit.test_generate_avd_device_hostvar import _underlay_hostvars
 
 # --- Helpers to build query data ---
 
@@ -346,6 +347,35 @@ class TestValidateInputsAPI:
         """Confirm the old .failed API no longer exists (regression guard)."""
         validated = validate_inputs({})
         assert not hasattr(validated, "failed")
+
+
+class TestPyavdRuntimeHostvars:
+    def test_runtime_hostvars_add_pyavd_only_loopback_pools_without_mutating_stored_hostvars(self):
+        hostvars = {"leaf1": _underlay_hostvars(hostname="leaf1", role="leaf", node_id=3)}
+        stored_node = hostvars["leaf1"]["l3leaf"]["nodes"][0]
+        assert "loopback_ipv4_pool" not in stored_node
+        assert "vtep_loopback_ipv4_pool" not in stored_node
+
+        runtime_hostvars = AvdDeviceStructuredConfigGenerator._build_pyavd_runtime_hostvars(hostvars)
+
+        runtime_node = runtime_hostvars["leaf1"]["l3leaf"]["nodes"][0]
+        assert runtime_node["loopback_ipv4_pool"] == "10.0.0.3/32"
+        assert runtime_node["vtep_loopback_ipv4_pool"] == "10.2.0.3/32"
+        assert "loopback_ipv4_pool" not in stored_node
+        assert "vtep_loopback_ipv4_pool" not in stored_node
+
+    def test_runtime_hostvars_allow_pyavd_facts_with_address_only_stored_hostvars(self):
+        hostvars = {
+            "spine1": _underlay_hostvars(hostname="spine1", role="spine", node_id=1),
+            "leaf1": _underlay_hostvars(hostname="leaf1", role="leaf", node_id=3),
+        }
+
+        runtime_hostvars = AvdDeviceStructuredConfigGenerator._build_pyavd_runtime_hostvars(hostvars)
+        avd_facts = get_avd_facts(runtime_hostvars)
+
+        assert avd_facts["spine1"].loopback_ipv4_pool == "10.0.0.1/32"
+        assert avd_facts["leaf1"].loopback_ipv4_pool == "10.0.0.3/32"
+        assert "loopback_ipv4_pool" not in hostvars["leaf1"]["l3leaf"]["nodes"][0]
 
 
 class TestEvpnGatewayRemotePeerPreflight:

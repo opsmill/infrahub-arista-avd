@@ -172,6 +172,7 @@ def test_evpn_gateway_payload_order_on_l3leaf_node() -> None:
         bgp_asn=65101,
         node_id=1,
         loopback_ip="10.0.0.1",
+        vtep_loopback_ip="10.2.0.3",
         mgmt_ip="192.0.2.1/24",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -186,8 +187,6 @@ def test_evpn_gateway_payload_order_on_l3leaf_node() -> None:
         management={},
         pools={
             "uplink_ipv4_pool": "10.1.0.0/24",
-            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
-            "loopback_ipv4_pool": "10.0.0.0/24",
             "mlag_peer_ipv4_pool": None,
             "mlag_peer_l3_ipv4_pool": None,
         },
@@ -216,10 +215,9 @@ def test_evpn_gateway_payload_order_on_l3leaf_node() -> None:
         "id",
         "bgp_as",
         "loopback_ipv4_address",
-        "loopback_ipv4_pool",
+        "vtep_loopback_ipv4_address",
         "mgmt_ip",
         "evpn_gateway",
-        "vtep_loopback_ipv4_pool",
     ]
 
 

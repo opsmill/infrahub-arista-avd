@@ -85,6 +85,13 @@ extensions:
           cardinality: one
           optional: true
           identifier: "device__ip_address"
+        - name: vtep_loopback_ip
+          label: VTEP Loopback IP
+          peer: IpamIPAddress
+          kind: Attribute
+          cardinality: one
+          optional: true
+          identifier: "device__vtep_loopback_ip"
         - name: mgmt_ip
           label: Management IP
           peer: IpamIPAddress
@@ -140,6 +147,8 @@ extensions:
               label: Leaf
             - name: loopback
               label: Loopback
+            - name: vtep_loopback
+              label: VTEP Loopback
             - name: server
               label: Server
             - name: peering

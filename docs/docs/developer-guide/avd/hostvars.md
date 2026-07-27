@@ -22,6 +22,7 @@ Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overv
 | `id` | int | `DcimDevice.node_id.value` | Fabric-unique device identifier. |
 | `bgp_as` | string | `DcimDevice.asn.node.asn.value` | Stringified; PyAVD expects a string. |
 | `loopback_ipv4_address` | string | `DcimDevice.loopback_ip` | Optional; stripped of CIDR. |
+| `vtep_loopback_ipv4_address` | string | `DcimDevice.vtep_loopback_ip` | Leaf and border-leaf only; stripped of CIDR. |
 | `mgmt_ip` | string | `DcimDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |
 | `spanning_tree_settings.mode` | string | `NetworkFabric.spanning_tree_mode.value` | Optional; pyAVD 6.3 fabric-wide STP mode (`mstp`, `rstp`, `rapid-pvst`, or `none`). |
