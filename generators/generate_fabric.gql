@@ -42,6 +42,7 @@ query FabricGeneratorQuery($name: String!) {
             resources {
               edges {
                 node {
+                  __typename
                   id
                 }
               }
