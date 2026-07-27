@@ -142,6 +142,8 @@ extensions:
               label: Loopback
             - name: server
               label: Server
+            - name: peering
+              label: Peering
             - name: storage
               label: Storage
             - name: mlag_peer

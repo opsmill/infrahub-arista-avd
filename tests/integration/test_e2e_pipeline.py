@@ -927,6 +927,7 @@ async def _create_dci_link_scenario(client: InfrahubClient, branch: str) -> dict
             branch=branch,
             name=DCI_INTERFACE_NAME,
             device={"id": endpoint["device_id"]},
+            role="peering",
         )
         await dci_interface.save(allow_upsert=True)
         iface = await client.get(kind="InterfacePhysical", id=dci_interface.id, branch=branch, include=["connector"])

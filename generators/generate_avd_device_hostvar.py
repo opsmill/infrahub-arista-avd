@@ -79,6 +79,7 @@ class DciEndpoint:
     device_role: str | None
     interface_id: str
     interface_name: str
+    interface_role: str | None
     device_bgp_asn: int | None = None
     fabric_pool: object | None = None
     speed: str | None = None
@@ -357,6 +358,10 @@ def _device_name(interface: object) -> str | None:
 def _device_role(interface: object) -> str | None:
     device = _node(_field(interface, "device"))
     return _value(device, "role") if device else None
+
+
+def _device_typename(interface: object) -> str | None:
+    return _typename(_node(_field(interface, "device")))
 
 
 def _object_id(value: object | None) -> str | None:
@@ -686,6 +691,7 @@ def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
                 device_role=_device_role(endpoint),
                 interface_id=str(_field(endpoint, "id")),
                 interface_name=str(interface_name),
+                interface_role=_value(endpoint, "role"),
                 device_bgp_asn=_device_bgp_asn(endpoint),
                 fabric_pool=_endpoint_fabric_pool(endpoint),
                 speed=_extract_interface_speed(endpoint),
@@ -695,6 +701,17 @@ def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
     endpoint_1, endpoint_2 = _normalize_dci_endpoints(endpoints)
     if endpoint_1.device_role != "border_leaf" or endpoint_2.device_role != "border_leaf":
         msg = f"DCI link {link_name}: both endpoints must be Border Leaf devices"
+        raise ValueError(msg)
+    non_peering = [
+        f"{endpoint.device_name} {endpoint.interface_name}"
+        for endpoint in (endpoint_1, endpoint_2)
+        if endpoint.interface_role != "peering"
+    ]
+    if non_peering:
+        msg = (
+            f"DCI link {link_name}: endpoint interfaces must use role=peering "
+            f"({', '.join(non_peering)} are not peering)"
+        )
         raise ValueError(msg)
     if endpoint_1.device_id == endpoint_2.device_id:
         msg = f"DCI link {link_name}: endpoints must use different devices"
@@ -1107,6 +1124,8 @@ def extract_connected_endpoints(  # noqa: C901
             if endpoint.id != interface.id and hasattr(endpoint, "device"):
                 remote_device = endpoint.device.node
                 if remote_device:
+                    if _device_typename(endpoint) != "ComputePhysicalServer":
+                        continue
                     # Skip L2 leaf devices — AVD handles them via l2leaf type, not connected_endpoints
                     remote_role = getattr(remote_device, "role", None)
                     if skip_l2leaf_endpoints and remote_role and remote_role.value == "l2leaf":

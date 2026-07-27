@@ -58,6 +58,7 @@ def _dci_endpoint(
     device_name: str,
     interface_name: str,
     role: str = "border_leaf",
+    interface_role: str = "peering",
     device_asn: int | None = 65101,
     pool: object = _NO_POOL,
     fabric_name: str = "fabric-a",
@@ -73,6 +74,7 @@ def _dci_endpoint(
         "__typename": "InterfacePhysical",
         "id": endpoint_id,
         "name": {"value": interface_name},
+        "role": {"value": interface_role},
         "device": {
             "node": {
                 "__typename": "DcimDevice",
@@ -1009,6 +1011,32 @@ async def test_invalid_dci_link_reports_non_border_leaf_context(caplog: pytest.L
 
     assert p2p_links == []
     assert "both endpoints must be Border Leaf" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_dci_link_requires_peering_endpoint_interfaces(caplog: pytest.LogCaptureFixture) -> None:
+    gen = _make_generator()
+    caplog.set_level(logging.WARNING, logger="infrahub.tasks")
+
+    p2p_links = await build_dci_l3_edge_p2p_links(
+        gen.client,
+        dci_links=[
+            _dci_link(
+                endpoint_2=_dci_endpoint(
+                    endpoint_id="dc2-eth5",
+                    device_id="dc2-leaf1",
+                    device_name="ih-dc2-leaf1a",
+                    interface_name="Ethernet5",
+                    interface_role="server",
+                )
+            )
+        ],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert p2p_links == []
+    assert "endpoint interfaces must use role=peering" in caplog.text
+    assert "ih-dc2-leaf1a Ethernet5" in caplog.text
 
 
 @pytest.mark.anyio

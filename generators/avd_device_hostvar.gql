@@ -698,6 +698,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                 name {
                   value
                 }
+                role {
+                  value
+                }
                 device {
                   node {
                     __typename

@@ -67,6 +67,16 @@ def test_network_link_role_supports_dci_choice_and_stays_optional() -> None:
     assert choices["dci"] == "DCI"
 
 
+def test_interface_role_choices_include_peering_for_dci_endpoints() -> None:
+    interface = _extension_node(_load_yaml("schemas/dcim_extensions.yml"), "DcimInterface")
+    role = _attrs(interface)["role"]
+
+    choices = {choice["name"]: choice.get("label") for choice in role["choices"]}
+
+    assert {"server", "peering", "mlag_peer"}.issubset(choices)
+    assert choices["peering"] == "Peering"
+
+
 def test_network_link_defines_only_allowed_direct_dci_attributes() -> None:
     network_link = _node(_load_yaml("schemas/dcim_extensions.yml"), "Network", "Link")
     attrs = _attrs(network_link)

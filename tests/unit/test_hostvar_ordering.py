@@ -60,6 +60,7 @@ def _dci_endpoint(
         "__typename": "InterfacePhysical",
         "id": endpoint_id,
         "name": {"value": interface_name},
+        "role": {"value": "peering"},
         "device": {
             "node": {
                 "__typename": "DcimDevice",
@@ -567,8 +568,48 @@ async def test_dci_links_are_sorted_by_link_and_endpoint_identity() -> None:
     assert [link["ip"] for link in result] == [["172.16.0.0/31", "172.16.0.1/31"], ["172.16.0.2/31", "172.16.0.3/31"]]
 
 
+@pytest.mark.anyio
+async def test_dci_link_does_not_emit_partial_server_endpoint() -> None:
+    client = AsyncMock()
+    client.allocate_next_ip_prefix = AsyncMock(return_value=SimpleNamespace(prefix=_attr("172.16.0.0/31")))
+
+    server_like_dci_port = _make_uplink_edge(
+        "i1",
+        "Ethernet5",
+        "server",
+        "r1",
+        "Ethernet5",
+        "dc2-leaf1",
+        "ih-dc2-leaf1a",
+    )
+
+    dci_links = await build_dci_l3_edge_p2p_links(
+        client,
+        dci_links=[_dci_link("dci-1", "DCI-1", "Ethernet5", "Ethernet5")],
+        hostname="ih-dc1-leaf1a",
+    )
+
+    assert dci_links == [
+        {
+            "nodes": ["ih-dc1-leaf1a", "ih-dc2-leaf1a"],
+            "interfaces": ["Ethernet5", "Ethernet5"],
+            "as": [65101, 65201],
+            "ip": ["172.16.0.0/31", "172.16.0.1/31"],
+            "include_in_underlay_protocol": True,
+        }
+    ]
+    assert extract_connected_endpoints([server_like_dci_port], "ih-dc1-leaf1a") == []
+
+
 class TestExtractConnectedEndpointsOrdering:
     """Tests for deterministic ordering in extract_connected_endpoints()."""
+
+    def test_server_role_interface_to_network_device_is_not_server_endpoint(self) -> None:
+        edge = _make_uplink_edge("i1", "Ethernet1", "server", "r1", "Ethernet1", "d1", "spine-1")
+
+        result = extract_connected_endpoints([edge], "leaf-1")
+
+        assert result == []
 
     def test_servers_sorted_by_name(self) -> None:
         """Servers should be sorted alphabetically by name."""

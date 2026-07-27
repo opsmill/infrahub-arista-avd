@@ -85,7 +85,7 @@ The concrete network device (switch). Inherits `Dcim.GenericDevice`, `Dcim.Physi
 
 `DcimInterface` (`Dcim.Interface`) is the interface generic; the concrete nodes are `InterfacePhysical` (`Interface.Physical`), `InterfaceVirtual` (`Interface.Virtual`), and `InterfaceLag` (`Interface.Lag`). GraphQL queries that select any interface root on `DcimInterface`.
 
-- **`DcimInterface` attributes**: `name`, `description`, `mtu`, `status`, `role`. The fabric `role` list (via `dcim_extensions.yml`) is `uplink`, `access`, `spine`, `super_spine`, `leaf`, `loopback`, `server`, `storage`, `mlag_peer`.
+- **`DcimInterface` attributes**: `name`, `description`, `mtu`, `status`, `role`. The fabric `role` list (via `dcim_extensions.yml`) is `uplink`, `access`, `spine`, `super_spine`, `leaf`, `loopback`, `server`, `peering`, `storage`, `mlag_peer`.
 - **`DcimInterface` relationships**: `device` → `DcimGenericDevice` (parent), `ip_address` → `IpamIPAddress`, `untagged_vlan` / `tagged_vlan` → `IpamVLAN`.
 - Layer-2/3 behaviour comes from the `Interface.Layer2` (`l2_mode`) and `Interface.Layer3` (`ip_addresses`, `dot1q_id`, `mac_address`) generics.
 
@@ -198,7 +198,7 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 
 **Device role** (`DcimDevice.role`): `super_spine`, `spine`, `leaf`, `border_leaf`, `l2leaf`.
 
-**Interface role** (`DcimInterface.role`): `uplink`, `access`, `spine`, `super_spine`, `leaf`, `loopback`, `server`, `storage`, `mlag_peer`.
+**Interface role** (`DcimInterface.role`): `uplink`, `access`, `spine`, `super_spine`, `leaf`, `loopback`, `server`, `peering`, `storage`, `mlag_peer`.
 
 **Pod role** (`NetworkPod.role`): `fabric`, `cpu`, `storage`.
 
