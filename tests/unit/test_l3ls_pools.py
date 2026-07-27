@@ -20,6 +20,69 @@ def _attr(value: object) -> SimpleNamespace:
     return SimpleNamespace(value=value)
 
 
+def _edge(node: object) -> dict:
+    return {"node": node}
+
+
+def _uplink_interface(name: str, role: str, uplink_switch: str, remote_interface: str) -> dict:
+    return {
+        "__typename": "InterfacePhysical",
+        "id": f"if-{name}-{uplink_switch}-{remote_interface}",
+        "name": {"value": name},
+        "role": {"value": role},
+        "connector": {
+            "node": {
+                "__typename": "NetworkLink",
+                "id": f"link-{name}-{uplink_switch}-{remote_interface}",
+                "connected_endpoints": {
+                    "edges": [
+                        _edge(
+                            {
+                                "__typename": "DcimInterface",
+                                "id": f"remote-{uplink_switch}-{remote_interface}",
+                                "name": {"value": remote_interface},
+                                "device": {
+                                    "node": {
+                                        "__typename": "DcimDevice",
+                                        "id": f"dev-{uplink_switch}",
+                                        "name": {"value": uplink_switch},
+                                    }
+                                },
+                            }
+                        )
+                    ]
+                },
+            }
+        },
+    }
+
+
+def _fabric_device(name: str, role: str, node_id: int | None, uplinks: list[tuple[str, str, str]]) -> dict:
+    uplink_role = "super_spine" if role == "spine" else "spine"
+    return {
+        "__typename": "DcimDevice",
+        "id": f"dev-{name}",
+        "name": {"value": name},
+        "role": {"value": role},
+        "node_id": {"value": node_id} if node_id is not None else None,
+        "interfaces": {
+            "edges": [
+                _edge(_uplink_interface(interface_name, uplink_role, uplink_switch, remote_interface))
+                for interface_name, uplink_switch, remote_interface in uplinks
+            ]
+        },
+    }
+
+
+def _fabric_with_devices(devices: list[dict]) -> dict:
+    return {
+        "__typename": "NetworkFabric",
+        "id": "fabric-a",
+        "name": {"value": "Fabric-A"},
+        "devices": {"edges": [_edge(device) for device in devices]},
+    }
+
+
 def _make_generator(prefix_map: dict[int, str | None]) -> GenerateAVDDeviceHostvar:
     """Build a generator with `_extract_pool_prefix` stubbed.
 
@@ -119,3 +182,87 @@ async def test_extract_l3ls_pools_uses_generated_mlag_l3_pool_alias() -> None:
     pools = await gen._extract_l3ls_pools(fabric, pod)
 
     assert pools["mlag_peer_l3_ipv4_pool"] == "10.5.0.0/24"
+
+
+def test_derive_uplink_pool_reservation_uses_widest_fabric_fanout() -> None:
+    fabric = _fabric_with_devices(
+        [
+            _fabric_device("super-spine1", "super_spine", 1, []),
+            _fabric_device(
+                "spine1",
+                "spine",
+                2,
+                [("Ethernet1", "super-spine1", "Ethernet1"), ("Ethernet2", "super-spine2", "Ethernet1")],
+            ),
+            _fabric_device(
+                "leaf1",
+                "leaf",
+                3,
+                [("Ethernet1", "spine1", "Ethernet3"), ("Ethernet2", "spine2", "Ethernet3")],
+            ),
+            _fabric_device(
+                "leaf2",
+                "leaf",
+                4,
+                [
+                    ("Ethernet1", "spine1", "Ethernet4"),
+                    ("Ethernet2", "spine2", "Ethernet4"),
+                    ("Ethernet3", "spine3", "Ethernet4"),
+                    ("Ethernet4", "spine4", "Ethernet4"),
+                ],
+            ),
+        ]
+    )
+
+    assert GenerateAVDDeviceHostvar._derive_uplink_pool_reservation(fabric, fabric_underlay="ebgp") == {
+        "max_uplink_switches": 4,
+        "max_parallel_uplinks": None,
+    }
+
+
+def test_derive_uplink_pool_reservation_detects_parallel_uplinks() -> None:
+    fabric = _fabric_with_devices(
+        [
+            _fabric_device(
+                "leaf1",
+                "leaf",
+                3,
+                [
+                    ("Ethernet1", "spine1", "Ethernet3"),
+                    ("Ethernet2", "spine1", "Ethernet4"),
+                    ("Ethernet3", "spine2", "Ethernet3"),
+                    ("Ethernet4", "spine2", "Ethernet4"),
+                ],
+            )
+        ]
+    )
+
+    assert GenerateAVDDeviceHostvar._derive_uplink_pool_reservation(fabric, fabric_underlay="ebgp") == {
+        "max_uplink_switches": 2,
+        "max_parallel_uplinks": 2,
+    }
+
+
+def test_derive_uplink_pool_reservation_ignores_no_uplink_devices() -> None:
+    fabric = _fabric_with_devices([_fabric_device("super-spine1", "super_spine", None, [])])
+
+    assert GenerateAVDDeviceHostvar._derive_uplink_pool_reservation(fabric, fabric_underlay="ebgp") is None
+
+
+def test_derive_uplink_pool_reservation_requires_node_id() -> None:
+    fabric = _fabric_with_devices([_fabric_device("leaf1", "leaf", None, [("Ethernet1", "spine1", "Ethernet3")])])
+
+    with pytest.raises(ValueError, match=r"leaf1.*no node_id"):
+        GenerateAVDDeviceHostvar._derive_uplink_pool_reservation(fabric, fabric_underlay="ebgp")
+
+
+def test_derive_uplink_pool_reservation_rejects_duplicate_node_ids() -> None:
+    fabric = _fabric_with_devices(
+        [
+            _fabric_device("leaf1", "leaf", 3, [("Ethernet1", "spine1", "Ethernet3")]),
+            _fabric_device("leaf2", "leaf", 3, [("Ethernet1", "spine1", "Ethernet4")]),
+        ]
+    )
+
+    with pytest.raises(ValueError, match=r"leaf1.*leaf2.*node_id 3"):
+        GenerateAVDDeviceHostvar._derive_uplink_pool_reservation(fabric, fabric_underlay="ebgp")

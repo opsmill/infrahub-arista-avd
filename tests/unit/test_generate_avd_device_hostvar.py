@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 import yaml
-from pyavd import get_avd_facts, validate_inputs
+from pyavd import get_avd_facts, get_device_structured_config, validate_inputs
 
 import generators.generate_avd_device_hostvar as hostvar_module
 from generators.generate_avd_device_hostvar import (
@@ -153,6 +153,8 @@ def _base_hostvars(
     underlay_routing_protocol: str = "ebgp",
     mlag_capable: bool = False,
     pools: dict | None = None,
+    uplinks: dict | None = None,
+    uplink_pool_reservation: dict | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -183,7 +185,7 @@ def _base_hostvars(
             "mlag_peer_ipv4_pool": None,
             "mlag_peer_l3_ipv4_pool": None,
         },
-        uplinks={"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        uplinks=uplinks or {"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
         rack_info=rack_info or {"name": "DC1_BORDER", "mlag": False, "leaf_names": ["leaf1"]},
         mlag_info=mlag_info or {"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
         tenants_data=tenants_data,
@@ -191,6 +193,50 @@ def _base_hostvars(
         dci_l3_edge_p2p_links=dci_l3_edge_p2p_links,
         evpn_gateway=evpn_gateway,
         custom_hostvars=custom_hostvars or {},
+        uplink_pool_reservation=uplink_pool_reservation,
+    )
+
+
+def _underlay_hostvars(
+    *,
+    hostname: str,
+    role: str,
+    node_id: int,
+    uplinks: dict | None = None,
+    uplink_pool_reservation: dict | None = None,
+) -> dict:
+    return GenerateAVDDeviceHostvar._build_hostvars(
+        hostname=hostname,
+        role=role,
+        bgp_asn=65000 + node_id,
+        node_id=node_id,
+        loopback_ip=f"10.0.0.{node_id}",
+        mgmt_ip=f"192.168.0.{node_id}",
+        fabric_name="Fabric-A",
+        mgmt_gateway=None,
+        virtual_router_mac=None,
+        underlay_routing_protocol="ebgp",
+        overlay_routing_protocol="ebgp",
+        p2p_uplinks_mtu=9000,
+        spanning_tree_mode="mstp",
+        spanning_tree_priorities={},
+        loopback_ipv4_offset=None,
+        bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
+        management={},
+        pools={
+            "uplink_ipv4_pool": "10.1.0.0/24",
+            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
+            "loopback_ipv4_pool": "10.0.0.0/24",
+            "mlag_peer_ipv4_pool": None,
+            "mlag_peer_l3_ipv4_pool": None,
+        },
+        uplinks=uplinks or {"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []},
+        rack_info={"name": f"{hostname}-rack", "mlag": False, "leaf_names": [hostname], "avd_tags": []},
+        mlag_info={"domain_id": None, "bgp_asn": None, "virtual_router_mac": None, "peer_names": []},
+        tenants_data=[],
+        connected_endpoints=[],
+        custom_hostvars={},
+        uplink_pool_reservation=uplink_pool_reservation,
     )
 
 
@@ -242,6 +288,96 @@ def test_non_mlag_leaf_sets_avd_mlag_false_on_rack_node_group() -> None:
     assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
     assert "mlag" not in hostvars["l3leaf"].get("defaults", {})
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_uplink_pool_and_reservation_emit_only_with_routed_uplinks() -> None:
+    no_uplink_hostvars = _base_hostvars([])
+    assert "uplink_ipv4_pool" not in no_uplink_hostvars["l3leaf"]["nodes"][0]
+    assert "max_uplink_switches" not in no_uplink_hostvars["l3leaf"]["nodes"][0]
+
+    routed_hostvars = _base_hostvars(
+        [],
+        uplinks={
+            "uplink_interfaces": ["Ethernet1", "Ethernet2", "Ethernet3", "Ethernet4"],
+            "uplink_switches": ["spine1", "spine1", "spine2", "spine2"],
+            "uplink_switch_interfaces": ["Ethernet1", "Ethernet2", "Ethernet1", "Ethernet2"],
+        },
+        uplink_pool_reservation={"max_uplink_switches": 2, "max_parallel_uplinks": 2},
+    )
+
+    node = routed_hostvars["l3leaf"]["nodes"][0]
+    assert node["uplink_ipv4_pool"] == "10.1.0.0/24"
+    assert node["max_uplink_switches"] == 2
+    assert node["max_parallel_uplinks"] == 2
+    assert not validate_inputs(routed_hostvars).validation_result.violations
+
+
+def test_five_stage_shared_uplink_pool_has_unique_structured_config_interface_ips() -> None:
+    reservation = {"max_uplink_switches": 4, "max_parallel_uplinks": None}
+    hostvars = {
+        "super-spine1": _underlay_hostvars(hostname="super-spine1", role="super_spine", node_id=1),
+        "super-spine2": _underlay_hostvars(hostname="super-spine2", role="super_spine", node_id=2),
+        "spine1": _underlay_hostvars(
+            hostname="spine1",
+            role="spine",
+            node_id=1,
+            uplinks={
+                "uplink_interfaces": ["Ethernet1", "Ethernet2"],
+                "uplink_switches": ["super-spine1", "super-spine2"],
+                "uplink_switch_interfaces": ["Ethernet1", "Ethernet1"],
+            },
+            uplink_pool_reservation=reservation,
+        ),
+        "spine2": _underlay_hostvars(
+            hostname="spine2",
+            role="spine",
+            node_id=2,
+            uplinks={
+                "uplink_interfaces": ["Ethernet1", "Ethernet2"],
+                "uplink_switches": ["super-spine1", "super-spine2"],
+                "uplink_switch_interfaces": ["Ethernet2", "Ethernet2"],
+            },
+            uplink_pool_reservation=reservation,
+        ),
+        "leaf1": _underlay_hostvars(
+            hostname="leaf1",
+            role="leaf",
+            node_id=3,
+            uplinks={
+                "uplink_interfaces": ["Ethernet1", "Ethernet2"],
+                "uplink_switches": ["spine1", "spine2"],
+                "uplink_switch_interfaces": ["Ethernet3", "Ethernet3"],
+            },
+            uplink_pool_reservation=reservation,
+        ),
+        "leaf2": _underlay_hostvars(
+            hostname="leaf2",
+            role="leaf",
+            node_id=4,
+            uplinks={
+                "uplink_interfaces": ["Ethernet1", "Ethernet2"],
+                "uplink_switches": ["spine1", "spine2"],
+                "uplink_switch_interfaces": ["Ethernet4", "Ethernet4"],
+            },
+            uplink_pool_reservation=reservation,
+        ),
+    }
+    facts = get_avd_facts(hostvars)
+    seen: dict[str, str] = {}
+    duplicates: dict[str, list[str]] = {}
+    for hostname, inputs in hostvars.items():
+        structured_config = get_device_structured_config(hostname, inputs, facts)._as_dict()
+        for ethernet_interface in structured_config.get("ethernet_interfaces", []):
+            ip_address = ethernet_interface.get("ip_address")
+            if not ip_address:
+                continue
+            interface_label = f"{hostname}:{ethernet_interface['name']}"
+            if ip_address in seen:
+                duplicates.setdefault(ip_address, [seen[ip_address]]).append(interface_label)
+            else:
+                seen[ip_address] = interface_label
+
+    assert duplicates == {}
 
 
 def test_l2leaf_main_tier_renders_mlag_node_group() -> None:

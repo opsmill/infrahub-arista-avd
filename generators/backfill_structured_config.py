@@ -59,6 +59,8 @@ UNMODELED_SECTIONS = [
     "management_api_http",
 ]
 
+DEFAULT_IP_NAMESPACE = "default"
+
 
 class BackfillStructuredConfigGenerator(InfrahubGenerator):
     """Backfills structured config data into the Infrahub data model."""
@@ -103,12 +105,46 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
                 result[iface.name.value] = iface
         return result
 
+    @staticmethod
+    def _interface_label(interface: Any) -> str:
+        name = getattr(getattr(interface, "name", None), "value", None) or getattr(interface, "display_label", None)
+        interface_id = getattr(interface, "id", None)
+        if name and interface_id:
+            return f"{name} ({interface_id})"
+        if name:
+            return str(name)
+        if interface_id:
+            return str(interface_id)
+        return "<unknown interface>"
+
+    async def _get_existing_ip_interface(self, ip_address: Any) -> Any | None:
+        interface_rel = getattr(ip_address, "interface", None)
+        if interface_rel is None:
+            return None
+
+        interface = getattr(interface_rel, "peer", None) or getattr(interface_rel, "node", None)
+        if interface is not None:
+            return interface
+
+        fetch = getattr(interface_rel, "fetch", None)
+        if fetch:
+            await fetch()
+            interface = getattr(interface_rel, "peer", None) or getattr(interface_rel, "node", None)
+            if interface is not None:
+                return interface
+
+        peers = getattr(interface_rel, "peers", None) or []
+        if peers:
+            return getattr(peers[0], "peer", None) or getattr(peers[0], "node", None)
+        return None
+
     async def _backfill_ip(
         self,
         interface_node: BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
         ip_str: str,
         hostname: str,
         avd_source: str | None = None,
+        namespace: str = DEFAULT_IP_NAMESPACE,
     ) -> None:
         """Create IpamPrefix and IpamIPAddress, assign to interface."""
         iface_name = interface_node.name.value if interface_node.name else "unknown"
@@ -121,11 +157,41 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
         network = ip_iface.network
         prefix_str = str(network)
+        address_str = str(ip_iface)
+
+        existing_ips = await self.client.filters(
+            kind=IpamIPAddress,
+            address__value=address_str,
+            ip_namespace__name__value=namespace,
+        )
+        if len(existing_ips) > 1:
+            raise ValueError(f"[{hostname}] Multiple IpamIPAddress nodes exist for {address_str} in namespace {namespace}")
+        if existing_ips:
+            existing_ip = existing_ips[0]
+            existing_interface = await self._get_existing_ip_interface(existing_ip)
+            if existing_interface is not None:
+                existing_interface_id = getattr(existing_interface, "id", None)
+                current_interface_id = interface_node.id
+                if existing_interface_id == current_interface_id:
+                    self.logger.info(f"[{hostname}] IP address {address_str} is already assigned to {iface_name}")
+                    return
+                raise ValueError(
+                    f"[{hostname}] IP address {address_str} in namespace {namespace} is already assigned to "
+                    f"{self._interface_label(existing_interface)}; cannot assign to {self._interface_label(interface_node)}"
+                )
+
+            iface_kind = INTERFACE_KIND_MAP.get(interface_node.typename__, DcimInterface)
+            interface = await self.client.get(iface_kind, id=interface_node.id)
+            interface.ip_address = existing_ip
+            await interface.save(allow_upsert=True)
+            self.logger.info(f"[{hostname}] Assigned existing {address_str} to {iface_name}")
+            return
 
         prefix = await self.client.create(
             IpamPrefix,
             prefix=prefix_str,
             role="backfill",
+            ip_namespace=namespace,
         )
         self._set_source(prefix, avd_source)
         await prefix.save(allow_upsert=True)
@@ -133,8 +199,9 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
 
         ip_address = await self.client.create(
             IpamIPAddress,
-            address=str(ip_iface),
+            address=address_str,
             ip_prefix=prefix,
+            ip_namespace=namespace,
         )
         self._set_source(ip_address, avd_source)
         await ip_address.save(allow_upsert=True)

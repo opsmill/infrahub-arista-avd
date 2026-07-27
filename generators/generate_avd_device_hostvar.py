@@ -43,6 +43,11 @@ class UplinkData(TypedDict):
     uplink_switch_interfaces: list[str]
 
 
+class UplinkPoolReservation(TypedDict):
+    max_uplink_switches: int
+    max_parallel_uplinks: int | None
+
+
 class ServerEndpoint(TypedDict):
     name: str
     adapters: list[dict[str, Any]]
@@ -411,6 +416,16 @@ def _fabric_id(value: object | None) -> str | None:
 def _domain_id(value: object | None) -> str | None:
     domain_id = _value(value, "domain_id")
     return str(domain_id) if domain_id else None
+
+
+def _device_uplink_role(role: str | None, fabric_underlay: str | None) -> str | None:
+    if role == "spine":
+        return "super_spine"
+    if role in LEAF_FAMILY_ROLES or role in SPINE_UPLINK_LEAF_ROLES:
+        return "spine"
+    if role == "l2leaf":
+        return "spine" if fabric_underlay in SPINE_UPLINK_UNDERLAYS else "leaf"
+    return None
 
 
 def _gateway_error(gateway: object | None, target_hostname: str, message: str) -> ValueError:
@@ -1491,6 +1506,107 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             "mlag_peer_l3_ipv4_pool": mlag_l3,
         }
 
+    @classmethod
+    def _extract_routed_uplinks_for_device(cls, device: object, fabric_underlay: str | None) -> UplinkData:
+        role = _value(device, "role")
+        uplink_role = _device_uplink_role(role, fabric_underlay)
+        if not uplink_role:
+            return {"uplink_interfaces": [], "uplink_switches": [], "uplink_switch_interfaces": []}
+
+        uplink_interfaces: list[str] = []
+        uplink_switches: list[str] = []
+        uplink_switch_interfaces: list[str] = []
+        for edge in _edges(_field(device, "interfaces")):
+            interface = _node(edge)
+            if _typename(interface) != "InterfacePhysical" or _value(interface, "role") != uplink_role:
+                continue
+            interface_name = _value(interface, "name")
+            link = _node(_field(interface, "connector"))
+            if not interface_name or not link:
+                continue
+
+            for endpoint_edge in _edges(_field(link, "connected_endpoints")):
+                endpoint = _node(endpoint_edge)
+                if not endpoint or _field(endpoint, "id") == _field(interface, "id"):
+                    continue
+                remote_device = _node(_field(endpoint, "device"))
+                remote_device_name = _value(remote_device, "name")
+                remote_interface_name = _value(endpoint, "name")
+                if remote_device_name and remote_interface_name:
+                    uplink_interfaces.append(str(interface_name))
+                    uplink_switches.append(str(remote_device_name))
+                    uplink_switch_interfaces.append(str(remote_interface_name))
+
+        if uplink_interfaces:
+            sorted_names = sort_interface_list(uplink_interfaces)
+            name_to_idx = {name: i for i, name in enumerate(uplink_interfaces)}
+            sorted_indices = [name_to_idx[name] for name in sorted_names]
+            uplink_interfaces = [uplink_interfaces[i] for i in sorted_indices]
+            uplink_switches = [uplink_switches[i] for i in sorted_indices]
+            uplink_switch_interfaces = [uplink_switch_interfaces[i] for i in sorted_indices]
+
+        return {
+            "uplink_interfaces": uplink_interfaces,
+            "uplink_switches": uplink_switches,
+            "uplink_switch_interfaces": uplink_switch_interfaces,
+        }
+
+    @classmethod
+    def _derive_uplink_pool_reservation(
+        cls,
+        fabric: object,
+        *,
+        fabric_underlay: str | None,
+    ) -> UplinkPoolReservation | None:
+        """Derive shared uplink pool reservation from all routed-uplink devices in a fabric."""
+        devices = [_node(edge) for edge in _edges(_field(fabric, "devices")) if _node(edge) is not None]
+        for child_edge in _edges(_field(fabric, "children")):
+            child = _node(child_edge)
+            if _typename(child) != "NetworkPod":
+                continue
+            devices.extend(_node(edge) for edge in _edges(_field(child, "devices")) if _node(edge) is not None)
+        if not devices:
+            return None
+
+        max_uplink_switches = 0
+        max_parallel_uplinks = 1
+        node_ids: dict[int, str] = {}
+        for device in devices:
+            role = _value(device, "role")
+            if role == "l2leaf":
+                continue
+
+            uplinks = cls._extract_routed_uplinks_for_device(device, fabric_underlay)
+            if not uplinks["uplink_switches"]:
+                continue
+
+            device_name = str(_value(device, "name") or _field(device, "id") or "<unknown>")
+            node_id = _value(device, "node_id")
+            if node_id is None:
+                raise ValueError(
+                    f"Device '{device_name}' has routed uplinks using the shared uplink pool but no node_id"
+                )
+            node_id = int(node_id)
+            existing_device = node_ids.get(node_id)
+            if existing_device and existing_device != device_name:
+                raise ValueError(
+                    f"Devices '{existing_device}' and '{device_name}' both use node_id {node_id} "
+                    "in the shared uplink pool domain"
+                )
+            node_ids[node_id] = device_name
+
+            unique_uplink_switches = set(uplinks["uplink_switches"])
+            max_uplink_switches = max(max_uplink_switches, len(unique_uplink_switches))
+            for uplink_switch in unique_uplink_switches:
+                max_parallel_uplinks = max(max_parallel_uplinks, uplinks["uplink_switches"].count(uplink_switch))
+
+        if max_uplink_switches == 0:
+            return None
+        return {
+            "max_uplink_switches": max_uplink_switches,
+            "max_parallel_uplinks": max_parallel_uplinks if max_parallel_uplinks > 1 else None,
+        }
+
     @staticmethod
     def _gql_val(node: object, field: str) -> Any | None:
         """Get a value from a GQL node that may be a Pydantic model or raw dict."""
@@ -1732,6 +1848,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         dci_l3_edge_p2p_links: list[dict[str, Any]] | None = None,
         evpn_gateway: EvpnGatewayPayload | None = None,
         custom_hostvars: dict[str, Any] | None = None,
+        uplink_pool_reservation: UplinkPoolReservation | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
         avd_type = get_generator_avd_type(role)
@@ -1762,8 +1879,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if evpn_gateway:
             node_config["evpn_gateway"] = evpn_gateway
 
-        if pools["uplink_ipv4_pool"]:
-            node_config["uplink_ipv4_pool"] = pools["uplink_ipv4_pool"]
         if pools["vtep_loopback_ipv4_pool"]:
             node_config["vtep_loopback_ipv4_pool"] = pools["vtep_loopback_ipv4_pool"]
         if pools["mlag_peer_ipv4_pool"]:
@@ -1775,6 +1890,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["uplink_interfaces"] = uplinks["uplink_interfaces"]
             node_config["uplink_switches"] = uplinks["uplink_switches"]
             node_config["uplink_switch_interfaces"] = uplinks["uplink_switch_interfaces"]
+            if pools["uplink_ipv4_pool"]:
+                node_config["uplink_ipv4_pool"] = pools["uplink_ipv4_pool"]
+            if uplink_pool_reservation:
+                node_config["max_uplink_switches"] = uplink_pool_reservation["max_uplink_switches"]
+                if uplink_pool_reservation["max_parallel_uplinks"]:
+                    node_config["max_parallel_uplinks"] = uplink_pool_reservation["max_parallel_uplinks"]
 
         # Extract MLAG peer interfaces for leaf devices (AVD needs mlag_interfaces)
         if mlag_info["domain_id"] and renders_mlag and "mlag_peer_interfaces" in mlag_info:
@@ -1942,17 +2063,23 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         # under an L3LS fabric uplinks to the L3 leaf via interface role "leaf".
         # l2spine/l3spine are top-of-fabric (no uplinks).
         fabric_underlay = self._get_attr_value(fabric, "underlay_routing_protocol")
-        uplink_role = None
-        if role == "spine":
-            uplink_role = "super_spine"
-        elif role in LEAF_FAMILY_ROLES or role in SPINE_UPLINK_LEAF_ROLES:
-            uplink_role = "spine"
-        elif role == "l2leaf":
-            uplink_role = "spine" if fabric_underlay in SPINE_UPLINK_UNDERLAYS else "leaf"
+        uplink_role = _device_uplink_role(role, fabric_underlay)
 
         # Extract uplinks
         iface_edges = device.interfaces.edges or []
         uplinks = extract_uplinks_from_dict(iface_edges, uplink_role, device_id)
+        raw_fabric = (
+            (((raw_data.get("DcimDevice", {}).get("edges") or [{}])[0].get("node") or {})
+            .get("pod", {})
+            .get("node", {})
+            .get("parent", {})
+            .get("node"))
+            if isinstance(raw_data, dict)
+            else None
+        )
+        uplink_pool_reservation = self._derive_uplink_pool_reservation(
+            raw_fabric or fabric, fabric_underlay=fabric_underlay
+        )
 
         is_l2leaf = role == "l2leaf"
         # In non-L3LS designs (standalone L2LS "none", campus "ospf") the main tier
@@ -2102,6 +2229,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             dci_l3_edge_p2p_links=dci_l3_edge_p2p_links,
             evpn_gateway=evpn_gateway,
             custom_hostvars=custom_hostvars,
+            uplink_pool_reservation=uplink_pool_reservation,
         )
 
         # Validate hostvars against pyAVD schema before saving

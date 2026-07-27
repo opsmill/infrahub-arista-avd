@@ -2,6 +2,7 @@
 
 import ipaddress
 import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -367,6 +368,7 @@ class TestBackfillIp:
             IpamPrefix,
             prefix="10.0.0.0/31",
             role="backfill",
+            ip_namespace="default",
         )
         mock_prefix.save.assert_awaited_once_with(allow_upsert=True)
 
@@ -375,6 +377,7 @@ class TestBackfillIp:
             IpamIPAddress,
             address="10.0.0.1/31",
             ip_prefix=mock_prefix,
+            ip_namespace="default",
         )
         mock_ip.save.assert_awaited_once_with(allow_upsert=True)
 
@@ -391,6 +394,7 @@ class TestBackfillIp:
         await gen._backfill_ip(iface, "not-an-ip", "leaf-1")
 
         gen.client.create.assert_not_called()
+        gen.client.filters.assert_not_called()
 
     async def test_backfill_loopback_ip(self) -> None:
         """Test backfill with a /32 loopback address."""
@@ -409,7 +413,58 @@ class TestBackfillIp:
             IpamPrefix,
             prefix="10.255.0.1/32",
             role="backfill",
+            ip_namespace="default",
         )
+
+    async def test_backfill_raises_for_duplicate_existing_ips(self) -> None:
+        gen = _make_generator()
+        gen.client.filters = AsyncMock(return_value=[MagicMock(id="ip-1"), MagicMock(id="ip-2")])
+        iface = _make_interface(name="Ethernet1", ip_node=None)
+
+        with pytest.raises(ValueError, match=r"Multiple IpamIPAddress.*10.0.0.1/31.*default"):
+            await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1")
+
+        gen.client.create.assert_not_called()
+
+    async def test_backfill_raises_when_ip_assigned_to_other_interface(self) -> None:
+        gen = _make_generator()
+        existing_ip = MagicMock()
+        existing_ip.interface = SimpleNamespace(peer=SimpleNamespace(id="iface-2", name=SimpleNamespace(value="Ethernet2")))
+        gen.client.filters = AsyncMock(return_value=[existing_ip])
+        iface = _make_interface(iface_id="iface-1", name="Ethernet1", ip_node=None)
+
+        with pytest.raises(ValueError, match=r"already assigned to Ethernet2 \(iface-2\).*Ethernet1 \(iface-1\)"):
+            await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1")
+
+        gen.client.create.assert_not_called()
+        gen.client.get.assert_not_called()
+
+    async def test_backfill_existing_ip_same_interface_is_noop(self) -> None:
+        gen = _make_generator()
+        existing_ip = MagicMock()
+        existing_ip.interface = SimpleNamespace(peer=SimpleNamespace(id="iface-1", name=SimpleNamespace(value="Ethernet1")))
+        gen.client.filters = AsyncMock(return_value=[existing_ip])
+        iface = _make_interface(iface_id="iface-1", name="Ethernet1", ip_node=None)
+
+        await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1")
+
+        gen.client.create.assert_not_called()
+        gen.client.get.assert_not_called()
+
+    async def test_backfill_assigns_existing_unassigned_ip(self) -> None:
+        gen = _make_generator()
+        existing_ip = MagicMock()
+        existing_ip.interface = None
+        mock_interface = _make_saveable_mock()
+        gen.client.filters = AsyncMock(return_value=[existing_ip])
+        gen.client.get = AsyncMock(return_value=mock_interface)
+        iface = _make_interface(iface_id="iface-1", name="Ethernet1", ip_node=None)
+
+        await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1")
+
+        gen.client.create.assert_not_called()
+        assert mock_interface.ip_address == existing_ip
+        mock_interface.save.assert_awaited_once_with(allow_upsert=True)
 
 
 class TestUpdateMtu:

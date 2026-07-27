@@ -219,7 +219,6 @@ def test_evpn_gateway_payload_order_on_l3leaf_node() -> None:
         "loopback_ipv4_pool",
         "mgmt_ip",
         "evpn_gateway",
-        "uplink_ipv4_pool",
         "vtep_loopback_ipv4_pool",
     ]
 

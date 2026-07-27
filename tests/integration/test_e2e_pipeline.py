@@ -421,6 +421,24 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         )
         print(f"structured config present on all {report['total']} devices", flush=True)
 
+    # --- Component 11a: backfilled IP uniqueness --------------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_backfilled_ip_assignments_are_unique(self, client: InfrahubClient) -> None:
+        """Backfilled IPAM entries have unique address/namespace keys and interface assignments."""
+        report = await wait_until(
+            fetch=lambda: _ipam_duplicate_report(client, PIPELINE_BRANCH),
+            ready=lambda r: r["total"] > 0 and not r["duplicate_ip_keys"] and not r["duplicate_interface_ips"],
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="unique backfilled IPAM assignments",
+        )
+
+        assert not report["duplicate_ip_keys"], f"duplicate IpamIPAddress keys: {report['duplicate_ip_keys']}"
+        assert not report["duplicate_interface_ips"], (
+            f"duplicate interface-side IP assignments: {report['duplicate_interface_ips']}"
+        )
+        print(f"ipam duplicate report: total={report['total']} assigned={report['assigned']}", flush=True)
+
     # --- Component 11b: DCI link hostvars ----------------------------------
     @pytest.mark.asyncio(loop_scope="class")
     async def test_dci_link_generates_l3_edge_hostvars(self, client: InfrahubClient) -> None:
@@ -683,6 +701,58 @@ async def _cabling_and_ip_report(client: InfrahubClient, branch: str) -> dict:
         **ip_report,
         "network_link_count": len(links),
         "l3_device_count": l3_device_count,
+    }
+
+
+async def _ipam_duplicate_report(client: InfrahubClient, branch: str) -> dict:
+    """Report duplicate IpamIPAddress keys and duplicate assigned interface-side IPs."""
+    query = """
+    query IpamDuplicateReport {
+      IpamIPAddress {
+        edges {
+          node {
+            id
+            address { value }
+            ip_namespace { node { name { value } } }
+            interface { node { id display_label } }
+          }
+        }
+      }
+    }
+    """
+    resp = await client.execute_graphql(query=query, branch_name=branch)
+    key_to_ip_ids: dict[tuple[str, str], list[str]] = {}
+    key_to_interface_ids: dict[tuple[str, str], set[str]] = {}
+    assigned = 0
+    for edge in resp["IpamIPAddress"]["edges"]:
+        node = edge["node"]
+        address = (node.get("address") or {}).get("value")
+        namespace = ((node.get("ip_namespace") or {}).get("node") or {}).get("name", {}).get("value") or "default"
+        if not address:
+            continue
+
+        key = (address, namespace)
+        key_to_ip_ids.setdefault(key, []).append(node["id"])
+        interface = (node.get("interface") or {}).get("node")
+        if interface and interface.get("id"):
+            assigned += 1
+            key_to_interface_ids.setdefault(key, set()).add(interface["id"])
+
+    duplicate_ip_keys = {
+        f"{address} [{namespace}]": sorted(ip_ids)
+        for (address, namespace), ip_ids in key_to_ip_ids.items()
+        if len(ip_ids) > 1
+    }
+    duplicate_interface_ips = {
+        f"{address} [{namespace}]": sorted(interface_ids)
+        for (address, namespace), interface_ids in key_to_interface_ids.items()
+        if len(interface_ids) > 1
+    }
+    return {
+        "total": sum(len(ip_ids) for ip_ids in key_to_ip_ids.values()),
+        "assigned": assigned,
+        "duplicate_ip_keys": duplicate_ip_keys,
+        "duplicate_interface_ips": duplicate_interface_ips,
     }
 
 
