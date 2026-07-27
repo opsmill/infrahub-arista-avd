@@ -155,6 +155,8 @@ def _base_hostvars(
     pools: dict | None = None,
     uplinks: dict | None = None,
     uplink_pool_reservation: dict | None = None,
+    loopback_ipv4_pool: str | None = "10.0.0.0/24",
+    vtep_loopback_ipv4_pool: str | None = "10.2.0.0/24",
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -163,7 +165,9 @@ def _base_hostvars(
         bgp_asn=65001,
         node_id=3,
         loopback_ip="10.0.0.3",
+        loopback_ipv4_pool=loopback_ipv4_pool,
         vtep_loopback_ip="10.2.0.3",
+        vtep_loopback_ipv4_pool=vtep_loopback_ipv4_pool,
         mgmt_ip="192.168.0.3",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -175,14 +179,11 @@ def _base_hostvars(
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
         spanning_tree_priorities={"leaf": 8192},
-        loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
         pools=pools
         or {
             "uplink_ipv4_pool": "10.1.0.0/24",
-            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
-            "loopback_ipv4_pool": "10.0.0.0/24",
             "mlag_peer_ipv4_pool": None,
             "mlag_peer_l3_ipv4_pool": None,
         },
@@ -212,7 +213,9 @@ def _underlay_hostvars(
         bgp_asn=65000 + node_id,
         node_id=node_id,
         loopback_ip=f"10.0.0.{node_id}",
+        loopback_ipv4_pool="10.0.0.0/24",
         vtep_loopback_ip="10.2.0.3",
+        vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip=f"192.168.0.{node_id}",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -222,13 +225,10 @@ def _underlay_hostvars(
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
         spanning_tree_priorities={},
-        loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
         pools={
             "uplink_ipv4_pool": "10.1.0.0/24",
-            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
-            "loopback_ipv4_pool": "10.0.0.0/24",
             "mlag_peer_ipv4_pool": None,
             "mlag_peer_l3_ipv4_pool": None,
         },
@@ -369,8 +369,11 @@ def test_five_stage_shared_uplink_pool_has_unique_structured_config_interface_ip
         node_type = "super_spine" if inputs["type"] == "super-spine" else inputs["type"]
         node = inputs[node_type]["nodes"][0]
         assert "loopback_ipv4_address" in node
-        assert "loopback_ipv4_pool" not in node
-        assert "vtep_loopback_ipv4_pool" not in node
+        assert node["loopback_ipv4_pool"] == "10.0.0.0/24"
+        if inputs["type"] == "l3leaf":
+            assert node["vtep_loopback_ipv4_pool"] == "10.2.0.0/24"
+        else:
+            assert "vtep_loopback_ipv4_pool" not in node
 
 
 def test_l2leaf_main_tier_renders_mlag_node_group() -> None:
@@ -465,6 +468,8 @@ def test_l2leaf_main_tier_emits_mlag_peer_pool_only() -> None:
         mlag_capable=True,
         mlag_info=mlag_info,
         rack_info={"name": "L2LS_RACK1", "mlag": True, "leaf_names": [], "avd_tags": []},
+        loopback_ipv4_pool=None,
+        vtep_loopback_ipv4_pool=None,
         pools={
             "uplink_ipv4_pool": None,
             "vtep_loopback_ipv4_pool": None,
@@ -1431,7 +1436,9 @@ def _leaf_hostvars(
         bgp_asn=65000 + node_id,
         node_id=node_id,
         loopback_ip=f"10.0.0.{node_id}",
+        loopback_ipv4_pool="10.0.0.0/24",
         vtep_loopback_ip="10.2.0.3",
+        vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip=f"192.168.0.{node_id}",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -1441,13 +1448,10 @@ def _leaf_hostvars(
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
         spanning_tree_priorities={"leaf": 8192},
-        loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
         pools={
             "uplink_ipv4_pool": "10.1.0.0/24",
-            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
-            "loopback_ipv4_pool": "10.0.0.0/24",
             "mlag_peer_ipv4_pool": None,
             "mlag_peer_l3_ipv4_pool": None,
         },
@@ -1506,7 +1510,9 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         bgp_asn=device_asn,
         node_id=node_id,
         loopback_ip=f"10.0.0.{node_id}",
+        loopback_ipv4_pool="10.0.0.0/24",
         vtep_loopback_ip="10.2.0.3",
+        vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip=f"192.168.0.{node_id}/24",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -1516,13 +1522,10 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         p2p_uplinks_mtu=9000,
         spanning_tree_mode="mstp",
         spanning_tree_priorities={"leaf": 8192},
-        loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
         pools={
             "uplink_ipv4_pool": "10.1.0.0/24",
-            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
-            "loopback_ipv4_pool": "10.0.0.0/24",
             "mlag_peer_ipv4_pool": "10.3.0.0/31",
             "mlag_peer_l3_ipv4_pool": "10.4.0.0/31",
         },
@@ -1671,9 +1674,9 @@ def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
     assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
     assert hostvars["l3leaf"]["nodes"][0]["loopback_ipv4_address"] == "10.0.0.3"
     assert hostvars["l3leaf"]["nodes"][0]["vtep_loopback_ipv4_address"] == "10.2.0.3"
+    assert hostvars["l3leaf"]["nodes"][0]["loopback_ipv4_pool"] == "10.0.0.0/24"
+    assert hostvars["l3leaf"]["nodes"][0]["vtep_loopback_ipv4_pool"] == "10.2.0.0/24"
     assert hostvars["l3leaf"]["nodes"][0]["mgmt_ip"] == "192.168.0.3"
-    assert "loopback_ipv4_pool" not in hostvars["l3leaf"]["nodes"][0]
-    assert "vtep_loopback_ipv4_pool" not in hostvars["l3leaf"]["nodes"][0]
     assert hostvars["servers"] == [{"name": "custom-server"}]
     assert custom_hostvars["l3leaf"]["nodes"] == [
         {
@@ -2051,7 +2054,9 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         bgp_asn=65001,
         node_id=3,
         loopback_ip="10.0.0.3",
+        loopback_ipv4_pool="10.0.0.0/24",
         vtep_loopback_ip="10.2.0.3",
+        vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip="192.168.0.3",
         fabric_name="Fabric-A",
         mgmt_gateway=None,
@@ -2061,13 +2066,10 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         p2p_uplinks_mtu=p2p_uplinks_mtu,
         spanning_tree_mode=None,
         spanning_tree_priorities={},
-        loopback_ipv4_offset=None,
         bgp_passwords={"evpn_overlay": None, "underlay": None, "mlag": None},
         management={},
         pools={
             "uplink_ipv4_pool": "10.1.0.0/24",
-            "vtep_loopback_ipv4_pool": "10.2.0.0/24",
-            "loopback_ipv4_pool": "10.0.0.0/24",
             "mlag_peer_ipv4_pool": None,
             "mlag_peer_l3_ipv4_pool": None,
         },

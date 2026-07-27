@@ -52,7 +52,6 @@ def _fetch_fabric_topology(client: InfrahubClient, fabric_name: str, branch: str
                 name { value }
                 role { value }
                 amount_of_spines { value }
-                loopback_ipv4_offset { value }
                 devices { count }
                 racks {
                   edges { node {

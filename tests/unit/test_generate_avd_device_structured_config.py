@@ -349,33 +349,33 @@ class TestValidateInputsAPI:
         assert not hasattr(validated, "failed")
 
 
-class TestPyavdRuntimeHostvars:
-    def test_runtime_hostvars_add_pyavd_only_loopback_pools_without_mutating_stored_hostvars(self):
-        hostvars = {"leaf1": _underlay_hostvars(hostname="leaf1", role="leaf", node_id=3)}
-        stored_node = hostvars["leaf1"]["l3leaf"]["nodes"][0]
-        assert "loopback_ipv4_pool" not in stored_node
-        assert "vtep_loopback_ipv4_pool" not in stored_node
-
-        runtime_hostvars = AvdDeviceStructuredConfigGenerator._build_pyavd_runtime_hostvars(hostvars)
-
-        runtime_node = runtime_hostvars["leaf1"]["l3leaf"]["nodes"][0]
-        assert runtime_node["loopback_ipv4_pool"] == "10.0.0.3/32"
-        assert runtime_node["vtep_loopback_ipv4_pool"] == "10.2.0.3/32"
-        assert "loopback_ipv4_pool" not in stored_node
-        assert "vtep_loopback_ipv4_pool" not in stored_node
-
-    def test_runtime_hostvars_allow_pyavd_facts_with_address_only_stored_hostvars(self):
+class TestPyavdLoopbackPools:
+    def test_stored_parent_prefix_pools_allow_pyavd_facts(self):
         hostvars = {
             "spine1": _underlay_hostvars(hostname="spine1", role="spine", node_id=1),
             "leaf1": _underlay_hostvars(hostname="leaf1", role="leaf", node_id=3),
         }
 
-        runtime_hostvars = AvdDeviceStructuredConfigGenerator._build_pyavd_runtime_hostvars(hostvars)
-        avd_facts = get_avd_facts(runtime_hostvars)
+        avd_facts = get_avd_facts(hostvars)
 
-        assert avd_facts["spine1"].loopback_ipv4_pool == "10.0.0.1/32"
-        assert avd_facts["leaf1"].loopback_ipv4_pool == "10.0.0.3/32"
-        assert "loopback_ipv4_pool" not in hostvars["leaf1"]["l3leaf"]["nodes"][0]
+        assert avd_facts["spine1"].loopback_ipv4_pool == "10.0.0.0/24"
+        assert avd_facts["leaf1"].loopback_ipv4_pool == "10.0.0.0/24"
+        assert avd_facts["leaf1"].vtep_loopback_ipv4_pool == "10.2.0.0/24"
+
+    def test_stored_parent_prefix_pools_drive_underlay_prefix_lists(self):
+        hostvars = {
+            "spine1": _underlay_hostvars(hostname="spine1", role="spine", node_id=1),
+            "leaf1": _underlay_hostvars(hostname="leaf1", role="leaf", node_id=3),
+        }
+        avd_facts = get_avd_facts(hostvars)
+
+        structured_config = get_device_structured_config(hostname="leaf1", inputs=hostvars["leaf1"], avd_facts=avd_facts)
+        prefix_lists = structured_config._as_dict()["prefix_lists"]
+        loopbacks = next(prefix_list for prefix_list in prefix_lists if prefix_list["name"] == "PL-LOOPBACKS-EVPN-OVERLAY")
+        prefixes = [sequence["action"].removeprefix("permit ") for sequence in loopbacks["sequence_numbers"]]
+
+        assert "10.0.0.0/24 eq 32" in prefixes
+        assert "10.2.0.0/24 eq 32" in prefixes
 
     def test_mlag_leafs_keep_unique_router_ids_and_shared_vtep_ip(self):
         hostvars = {
@@ -383,15 +383,14 @@ class TestPyavdRuntimeHostvars:
             "leaf2": _mlag_peer_hostvars(hostname="leaf2", node_id=2, device_asn=65098),
         }
 
-        runtime_hostvars = AvdDeviceStructuredConfigGenerator._build_pyavd_runtime_hostvars(hostvars)
-        avd_facts = get_avd_facts(runtime_hostvars)
+        avd_facts = get_avd_facts(hostvars)
 
         assert avd_facts["leaf1"].router_id == "10.0.0.1"
         assert avd_facts["leaf2"].router_id == "10.0.0.2"
         assert avd_facts["leaf1"].vtep_ip == avd_facts["leaf2"].vtep_ip == "10.2.0.3"
 
         loopback_addresses: dict[str, dict[str, str]] = {}
-        for hostname, inputs in runtime_hostvars.items():
+        for hostname, inputs in hostvars.items():
             structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
             loopback_addresses[hostname] = {
                 iface["name"]: iface["ip_address"] for iface in structured_config._as_dict()["loopback_interfaces"]

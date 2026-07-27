@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-from copy import deepcopy
 from typing import Any
 
 from infrahub_sdk.generator import InfrahubGenerator
@@ -181,37 +180,6 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             )
         return validation_errors
 
-    @staticmethod
-    def _address_as_host_pool(address: str) -> str:
-        """Convert an explicit loopback address to the /32 pool shape pyAVD still reads internally."""
-        return f"{address.split('/', maxsplit=1)[0]}/32"
-
-    @classmethod
-    def _build_pyavd_runtime_hostvars(cls, hostvars: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-        """Return pyAVD-only hostvars with compatibility pools derived from explicit loopback addresses.
-
-        pyAVD 6.3 accepts `loopback_ipv4_address` and `vtep_loopback_ipv4_address`
-        during schema validation, but facts and underlay prefix-list rendering still
-        access the legacy pool keys. Keep persisted hostvars address-only and add
-        deterministic /32 pools only to this in-memory copy.
-        """
-        runtime_hostvars = deepcopy(hostvars)
-        for inputs in runtime_hostvars.values():
-            for node_type_config in inputs.values():
-                if not isinstance(node_type_config, dict):
-                    continue
-                nodes = node_type_config.get("nodes")
-                if not isinstance(nodes, list):
-                    continue
-                for node in nodes:
-                    if not isinstance(node, dict):
-                        continue
-                    if node.get("loopback_ipv4_address") and not node.get("loopback_ipv4_pool"):
-                        node["loopback_ipv4_pool"] = cls._address_as_host_pool(node["loopback_ipv4_address"])
-                    if node.get("vtep_loopback_ipv4_address") and not node.get("vtep_loopback_ipv4_pool"):
-                        node["vtep_loopback_ipv4_pool"] = cls._address_as_host_pool(node["vtep_loopback_ipv4_address"])
-        return runtime_hostvars
-
     async def generate(self, data: dict) -> None:
         """Generate AVD inputs and structured config for all devices."""
         data: GenerateAvdInputsQuery = GenerateAvdInputsQuery(**data)
@@ -244,9 +212,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
             )
             return
 
-        runtime_hostvars = self._build_pyavd_runtime_hostvars(hostvars)
-
-        validation_errors = self._collect_input_validation_errors(runtime_hostvars)
+        validation_errors = self._collect_input_validation_errors(hostvars)
         if validation_errors:
             for err in validation_errors:
                 self.logger.error(f"Validation error: {err}")
@@ -257,7 +223,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
 
         self.logger.info("Generating AVD facts for all devices...")
         try:
-            avd_facts = get_avd_facts(runtime_hostvars)
+            avd_facts = get_avd_facts(hostvars)
             self.logger.info(f"Generated facts for {len(avd_facts)} devices")
         except AVD_INPUT_ERRORS:
             # Invalid inputs for this fabric (e.g. one device with a bad MLAG/EVPN
@@ -271,7 +237,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         success_count = 0
         skipped_count = 0
         failed_devices: list[str] = []
-        for hostname, inputs in runtime_hostvars.items():
+        for hostname, inputs in hostvars.items():
             try:
                 structured_config = get_device_structured_config(hostname=hostname, inputs=inputs, avd_facts=avd_facts)
                 structured_config_dict = (

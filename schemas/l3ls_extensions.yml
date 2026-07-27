@@ -234,16 +234,9 @@ extensions:
           description: "Role-specific spanning-tree priorities for AVD node type defaults"
           order_weight: 12300
 
-    # --- NetworkPod: MLAG IP pool relationships + loopback offset ---
+    # --- NetworkPod: MLAG IP pool relationships ---
     - kind: NetworkPod
       attributes:
-        - name: loopback_ipv4_offset
-          label: Loopback IPv4 Offset
-          kind: Number
-          optional: true
-          default_value: 0
-          description: "Offset for leaf loopback IDs to avoid overlap with spines"
-          order_weight: 9000
         - name: avd_custom_hostvars
           label: AVD Custom Hostvars
           kind: JSON

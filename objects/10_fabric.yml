@@ -58,14 +58,12 @@ spec:
           - name: "Pod-A2"
             index: 2
             spine_switch_template: "spine-switch"
-            loopback_ipv4_offset: 2
             mlag_peer_pool: "Fabric-A-Pod-A2-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-A-Pod-A2-MLAG-L3-Pool"
             member_of_groups: ["pods"]
           - name: "Pod-A3"
             index: 3
             spine_switch_template: "spine-switch"
-            loopback_ipv4_offset: 2
             mlag_peer_pool: "Fabric-A-Pod-A3-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-A-Pod-A3-MLAG-L3-Pool"
             member_of_groups: ["pods"]
@@ -121,14 +119,12 @@ spec:
           - name: "Pod-B2"
             index: 2
             spine_switch_template: "dell-z9864f-on-spine-switch"
-            loopback_ipv4_offset: 2
             mlag_peer_pool: "Fabric-B-Pod-B2-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-B-Pod-B2-MLAG-L3-Pool"
             member_of_groups: ["pods"]
           - name: "Pod-B3"
             index: 3
             spine_switch_template: "dell-z9864f-on-spine-switch"
-            loopback_ipv4_offset: 2
             mlag_peer_pool: "Fabric-B-Pod-B3-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-B-Pod-B3-MLAG-L3-Pool"
             member_of_groups: ["pods"]

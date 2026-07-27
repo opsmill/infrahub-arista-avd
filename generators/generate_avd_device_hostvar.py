@@ -1817,7 +1817,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         bgp_asn: int | None,
         node_id: int | None,
         loopback_ip: str | None,
+        loopback_ipv4_pool: str | None,
         vtep_loopback_ip: str | None,
+        vtep_loopback_ipv4_pool: str | None,
         mgmt_ip: str | None,
         fabric_name: str,
         mgmt_gateway: str | None,
@@ -1829,7 +1831,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         mlag_capable: bool = False,
         spanning_tree_mode: str | None,
         spanning_tree_priorities: dict[str, int],
-        loopback_ipv4_offset: int | None,
         bgp_passwords: dict[str, str | None],
         management: dict[str, Any],
         pools: dict[str, str | None],
@@ -1865,8 +1866,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             node_config["bgp_as"] = str(bgp_asn)
         if loopback_ip:
             node_config["loopback_ipv4_address"] = loopback_ip
+            if loopback_ipv4_pool:
+                node_config["loopback_ipv4_pool"] = loopback_ipv4_pool
         if vtep_loopback_ip:
             node_config["vtep_loopback_ipv4_address"] = vtep_loopback_ip
+            if vtep_loopback_ipv4_pool and role in LEAF_FAMILY_ROLES:
+                node_config["vtep_loopback_ipv4_pool"] = vtep_loopback_ipv4_pool
         if mgmt_ip:
             node_config["mgmt_ip"] = mgmt_ip
         if evpn_gateway:
@@ -1926,12 +1931,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars.setdefault(node_type_key, {})
             hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
             hostvars[node_type_key]["defaults"]["spanning_tree_priority"] = role_priority
-
-        # Loopback offset for leaf devices
-        if loopback_ipv4_offset is not None and is_leaf_family:
-            hostvars.setdefault(node_type_key, {})
-            hostvars[node_type_key]["defaults"] = hostvars[node_type_key].get("defaults", {})
-            hostvars[node_type_key]["defaults"]["loopback_ipv4_offset"] = loopback_ipv4_offset
 
         # BGP peer group passwords
         bgp_peer_groups: dict[str, Any] = {}
@@ -2013,20 +2012,20 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         if custom_hostvars:
             hostvars = GenerateAVDDeviceHostvar._deep_merge(custom_hostvars, hostvars)
 
-        return GenerateAVDDeviceHostvar._strip_disallowed_hostvar_keys(hostvars)
+        return hostvars
 
-    @staticmethod
-    def _strip_disallowed_hostvar_keys(value: Any) -> Any:
-        disallowed = {"loopback_ipv4_pool", "vtep_loopback_ipv4_pool"}
-        if isinstance(value, dict):
-            return {
-                key: GenerateAVDDeviceHostvar._strip_disallowed_hostvar_keys(item)
-                for key, item in value.items()
-                if key not in disallowed
-            }
-        if isinstance(value, list):
-            return [GenerateAVDDeviceHostvar._strip_disallowed_hostvar_keys(item) for item in value]
-        return value
+    @classmethod
+    def _extract_ip_address_and_parent_prefix(cls, ip_ref: object | None) -> tuple[str | None, str | None]:
+        ip_node = _node(ip_ref)
+        if not ip_node:
+            return None, None
+
+        address = cls._get_attr_value(ip_node, "address")
+        if isinstance(address, str) and "/" in address:
+            address = address.split("/", maxsplit=1)[0]
+
+        prefix = cls._get_attr_value(_node(_field(ip_node, "ip_prefix")), "prefix")
+        return address if isinstance(address, str) else None, prefix if isinstance(prefix, str) else None
 
     async def generate(self, data: dict) -> None:  # noqa: C901 — top-level generator orchestration
         raw_data = data
@@ -2045,19 +2044,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         bgp_asn = device.asn.node.asn.value if device.asn and device.asn.node and device.asn.node.asn else None
         node_id = device.node_id.value if device.node_id else None
 
-        # Extract IP addresses
-        loopback_ip = None
-        if device.loopback_ip and device.loopback_ip.node:
-            loopback_ip = device.loopback_ip.node.address.value
-            # Strip CIDR notation if present
-            if "/" in loopback_ip:
-                loopback_ip = loopback_ip.split("/")[0]
-
-        vtep_loopback_ip = None
-        if device.vtep_loopback_ip and device.vtep_loopback_ip.node:
-            vtep_loopback_ip = device.vtep_loopback_ip.node.address.value
-            if "/" in vtep_loopback_ip:
-                vtep_loopback_ip = vtep_loopback_ip.split("/")[0]
+        # Extract IP addresses and their parent prefixes.
+        loopback_ip, loopback_ipv4_pool = self._extract_ip_address_and_parent_prefix(device.loopback_ip)
+        vtep_loopback_ip, vtep_loopback_ipv4_pool = self._extract_ip_address_and_parent_prefix(device.vtep_loopback_ip)
 
         mgmt_ip = None
         if device.mgmt_ip and device.mgmt_ip.node:
@@ -2119,11 +2108,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             priority_value = self._get_attr_value(priority_node, "priority")
             if priority_role and priority_value is not None:
                 spanning_tree_priorities[priority_role] = priority_value
-        # Auto-generated Pydantic model renames loopback_ipv4_offset to loopback_ipv_4_offset
-        loopback_ipv4_offset = (
-            None if is_l2leaf else self._get_first_attr_value(pod, "loopback_ipv_4_offset", "loopback_ipv4_offset")
-        )
-
         # BGP peer group passwords (not applicable for L2 leafs)
         bgp_passwords: dict[str, str | None] = {"evpn_overlay": None, "underlay": None, "mlag": None}
         if not is_l2leaf:
@@ -2216,7 +2200,9 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             bgp_asn=bgp_asn,
             node_id=node_id,
             loopback_ip=loopback_ip,
+            loopback_ipv4_pool=loopback_ipv4_pool,
             vtep_loopback_ip=vtep_loopback_ip,
+            vtep_loopback_ipv4_pool=vtep_loopback_ipv4_pool,
             mgmt_ip=mgmt_ip,
             fabric_name=fabric_name,
             mgmt_gateway=mgmt_gateway,
@@ -2228,7 +2214,6 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             p2p_uplinks_mtu=p2p_uplinks_mtu,
             spanning_tree_mode=spanning_tree_mode,
             spanning_tree_priorities=spanning_tree_priorities,
-            loopback_ipv4_offset=loopback_ipv4_offset,
             bgp_passwords=bgp_passwords,
             management=management,
             pools=pools,

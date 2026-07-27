@@ -22,7 +22,9 @@ Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overv
 | `id` | int | `DcimDevice.node_id.value` | Fabric-unique device identifier. |
 | `bgp_as` | string | `DcimDevice.asn.node.asn.value` | Stringified; PyAVD expects a string. |
 | `loopback_ipv4_address` | string | `DcimDevice.loopback_ip` | Optional; stripped of CIDR. |
+| `loopback_ipv4_pool` | string | `DcimDevice.loopback_ip.node.ip_prefix.node.prefix.value` | Parent Infrahub prefix for the Loopback0 address. |
 | `vtep_loopback_ipv4_address` | string | `DcimDevice.vtep_loopback_ip` | Leaf and border-leaf only; stripped of CIDR. |
+| `vtep_loopback_ipv4_pool` | string | `DcimDevice.vtep_loopback_ip.node.ip_prefix.node.prefix.value` | Parent Infrahub prefix for the VTEP loopback address; emitted for VTEP leaf roles. |
 | `mgmt_ip` | string | `DcimDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |
 | `spanning_tree_settings.mode` | string | `NetworkFabric.spanning_tree_mode.value` | Optional; pyAVD 6.3 fabric-wide STP mode (`mstp`, `rstp`, `rapid-pvst`, or `none`). |
@@ -240,6 +242,9 @@ Common validation failures:
   "id": 1,
   "bgp_as": "65101",
   "loopback_ipv4_address": "10.255.1.1",
+  "loopback_ipv4_pool": "10.255.1.0/24",
+  "vtep_loopback_ipv4_address": "10.255.2.1",
+  "vtep_loopback_ipv4_pool": "10.255.2.0/24",
   "mgmt_ip": "10.255.0.11/24",
   "mgmt_gateway": "10.255.0.1",
   "spanning_tree_settings": {

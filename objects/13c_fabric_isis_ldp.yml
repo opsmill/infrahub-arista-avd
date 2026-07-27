@@ -137,7 +137,6 @@ spec:
             index: 1
             amount_of_spines: 2
             spine_switch_template: "arista-7050cx3-32c-spine-switch"
-            loopback_ipv4_offset: 2
             member_of_groups: ["pods"]
 ---
 apiVersion: infrahub.app/v1

@@ -235,6 +235,13 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             address {
               value
             }
+            ip_prefix {
+              node {
+                prefix {
+                  value
+                }
+              }
+            }
           }
         }
         vtep_loopback_ip {
@@ -243,6 +250,13 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             id
             address {
               value
+            }
+            ip_prefix {
+              node {
+                prefix {
+                  value
+                }
+              }
             }
           }
         }
@@ -334,9 +348,6 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   value
                 }
               }
-            }
-            loopback_ipv4_offset {
-              value
             }
             avd_custom_hostvars {
               value

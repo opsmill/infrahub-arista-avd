@@ -626,9 +626,33 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNode(BaseModel):
     address: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeAddress"
     ]
+    ip_prefix: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefix"
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeAddress(BaseModel):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefix(BaseModel):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefixNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefixNode(
+    BaseModel
+):
+    typename__: Literal[
+        "BuiltinIPPrefix", "InternalIPPrefixAvailable", "IpamPrefix"
+    ] = Field(alias="__typename")
+    prefix: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefixNodePrefix"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefixNodePrefix(
+    BaseModel
+):
     value: Optional[str]
 
 
@@ -641,9 +665,37 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNode(BaseMode
     address: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeAddress"
     ]
+    ip_prefix: (
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefix"
+    )
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeAddress(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefix(
+    BaseModel
+):
+    node: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefixNode"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefixNode(
+    BaseModel
+):
+    typename__: Literal[
+        "BuiltinIPPrefix", "InternalIPPrefixAvailable", "IpamPrefix"
+    ] = Field(alias="__typename")
+    prefix: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefixNodePrefix"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefixNodePrefix(
     BaseModel
 ):
     value: Optional[str]
@@ -817,9 +869,6 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode(BaseModel):
     mlag_l_3_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagL3Pool" = Field(
         alias="mlag_l3_pool"
     )
-    loopback_ipv_4_offset: Optional[
-        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeLoopbackIpv4Offset"
-    ] = Field(alias="loopback_ipv4_offset")
     avd_custom_hostvars: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeAvdCustomHostvars"
     ]
@@ -866,12 +915,6 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagL3PoolNodeName(
     BaseModel
 ):
     value: Optional[str]
-
-
-class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeLoopbackIpv4Offset(
-    BaseModel
-):
-    value: Optional[Any]
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeAvdCustomHostvars(
@@ -2829,8 +2872,12 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAsn.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeAsnNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIp.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefix.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeLoopbackIpNodeIpPrefixNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIp.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefix.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeVtepLoopbackIpNodeIpPrefixNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIp.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMgmtIpNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeMlagDomain.model_rebuild()
