@@ -8,7 +8,7 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_FILES = [
     _REPO_ROOT / "objects" / "06_device_template.yml",
-    _REPO_ROOT / "objects" / "06a_fabric_c_device_templates.yml",
+    _REPO_ROOT / "objects" / "06a_fabric_l3ls_multi_domain_device_templates.yml",
 ]
 
 

@@ -1,7 +1,7 @@
 ---
 # ============================================================================
-# Post-generation Fabric-C DCI, EVPN Gateway, and lab management overrides.
-# Load after Fabric-C fabric, pod, and rack generators have created devices and
+# Post-generation Fabric-L3LS-Multi-Domain DCI, EVPN Gateway, and lab management overrides.
+# Load after Fabric-L3LS-Multi-Domain fabric, pod, and rack generators have created devices and
 # interfaces.
 # ============================================================================
 apiVersion: infrahub.app/v1
@@ -115,7 +115,7 @@ kind: Object
 spec:
   kind: NetworkLink
   data:
-    - name: Fabric-C-DCI-1
+    - name: Fabric-L3LS-Multi-Domain-DCI-1
       medium: smf
       role: dci
       include_in_underlay_protocol: true
@@ -126,7 +126,7 @@ spec:
             device: leaf-infrahub-dc1-1-1
           - name: Ethernet5
             device: leaf-infrahub-dc2-1-1
-    - name: Fabric-C-DCI-2
+    - name: Fabric-L3LS-Multi-Domain-DCI-2
       medium: smf
       role: dci
       include_in_underlay_protocol: true
@@ -137,7 +137,7 @@ spec:
             device: leaf-infrahub-dc1-1-1
           - name: Ethernet6
             device: leaf-infrahub-dc2-1-2
-    - name: Fabric-C-DCI-3
+    - name: Fabric-L3LS-Multi-Domain-DCI-3
       medium: smf
       role: dci
       include_in_underlay_protocol: true
@@ -148,7 +148,7 @@ spec:
             device: leaf-infrahub-dc1-1-2
           - name: Ethernet5
             device: leaf-infrahub-dc2-1-2
-    - name: Fabric-C-DCI-4
+    - name: Fabric-L3LS-Multi-Domain-DCI-4
       medium: smf
       role: dci
       include_in_underlay_protocol: true
@@ -165,10 +165,10 @@ kind: Object
 spec:
   kind: EvpnGatewayGroup
   data:
-    - name: Fabric-C-DC1-Gateway
-      local_domain: ["Fabric-C", "65100:1"]
+    - name: Fabric-L3LS-Multi-Domain-DC1-Gateway
+      local_domain: ["Fabric-L3LS-Multi-Domain", "65100:1"]
       pod: infrahub-dc1
-      remote_domain: ["Fabric-C", "65000:100"]
+      remote_domain: ["Fabric-L3LS-Multi-Domain", "65000:100"]
       members:
         - leaf-infrahub-dc1-1-1
         - leaf-infrahub-dc1-1-2
@@ -180,10 +180,10 @@ spec:
       all_active_multihoming_enabled: true
       ethernet_segment_identifier: "0000:0001:0001:0000:0001"
       ethernet_segment_rt_import: "00:01:00:00:00:01"
-    - name: Fabric-C-DC2-Gateway
-      local_domain: ["Fabric-C", "65200:1"]
+    - name: Fabric-L3LS-Multi-Domain-DC2-Gateway
+      local_domain: ["Fabric-L3LS-Multi-Domain", "65200:1"]
       pod: infrahub-dc2
-      remote_domain: ["Fabric-C", "65000:100"]
+      remote_domain: ["Fabric-L3LS-Multi-Domain", "65000:100"]
       members:
         - leaf-infrahub-dc2-1-1
         - leaf-infrahub-dc2-1-2

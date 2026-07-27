@@ -1,6 +1,6 @@
 ---
 # ============================================================================
-# Halls and racks for the Fabric-C dual-DC lab.
+# Halls and racks for the Fabric-L3LS-Multi-Domain dual-DC lab.
 # Rack names match the AVD group names; generated device names remain
 # generator-derived from pod name, rack index, and leaf index.
 # ============================================================================
@@ -64,12 +64,12 @@ spec:
   kind: AvdTag
   data:
     - name: DC1
-      description: "Fabric-C DC1-local AVD services"
+      description: "Fabric-L3LS-Multi-Domain DC1-local AVD services"
       racks:
         - DC1_ACCESS
         - DC1_BORDER
     - name: DC2
-      description: "Fabric-C DC2-local AVD services"
+      description: "Fabric-L3LS-Multi-Domain DC2-local AVD services"
       racks:
         - DC2_ACCESS
         - DC2_BORDER

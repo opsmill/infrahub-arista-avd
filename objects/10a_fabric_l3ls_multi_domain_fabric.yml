@@ -1,28 +1,28 @@
 ---
 # ============================================================================
-# Fabric-C: one generated fabric with two datacenter pods.
+# Fabric-L3LS-Multi-Domain: one generated fabric with two datacenter pods.
 # ============================================================================
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
   kind: NetworkFabric
   data:
-    - name: "Fabric-C"
+    - name: "Fabric-L3LS-Multi-Domain"
       index: 3
       amount_of_super_spines: 0
       fabric_interface_sorting_method: "create_sorted_device_interface_map"
       virtual_router_mac: "00:1c:73:00:00:01"
       mgmt_gateway: "10.0.6.1"
-      asn_pool: "Fabric-C-ASN-Pool"
-      node_id_pool: "Fabric-C-NodeID-Pool"
-      mgmt_pool: "Fabric-C-Mgmt-Pool"
+      asn_pool: "Fabric-L3LS-Multi-Domain-ASN-Pool"
+      node_id_pool: "Fabric-L3LS-Multi-Domain-NodeID-Pool"
+      mgmt_pool: "Fabric-L3LS-Multi-Domain-Mgmt-Pool"
       underlay_routing_protocol: "ebgp"
       overlay_routing_protocol: "ebgp"
       p2p_uplinks_mtu: 1500
-      uplink_pool: "Fabric-C-Uplink-Pool"
-      vtep_pool: "Fabric-C-VTEP-Pool"
-      loopback_pool: "Fabric-C-Loopback-Pool"
-      dci_pool: "Fabric-C-DCI-Pool"
+      uplink_pool: "Fabric-L3LS-Multi-Domain-Uplink-Pool"
+      vtep_pool: "Fabric-L3LS-Multi-Domain-VTEP-Pool"
+      loopback_pool: "Fabric-L3LS-Multi-Domain-Loopback-Pool"
+      dci_pool: "Fabric-L3LS-Multi-Domain-DCI-Pool"
       spanning_tree_mode: "mstp"
       spanning_tree_priority: 4096
       avd_custom_hostvars:
