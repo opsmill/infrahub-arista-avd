@@ -1227,6 +1227,30 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         await relationship.fetch()
         return [peer.peer for peer in getattr(relationship, "peers", [])]
 
+    async def _filter_or_fetch_peers(
+        self,
+        *,
+        kind: str,
+        filter_name: str,
+        parent_id: str | None,
+        relationship: object | None,
+    ) -> list[object]:
+        objects: list[object] = []
+        if parent_id:
+            try:
+                objects = await self.client.filters(kind=kind, **{filter_name: [parent_id]})
+            except (AttributeError, KeyError):
+                objects = []
+
+        if objects:
+            return objects
+
+        if relationship is None:
+            return []
+
+        await relationship.fetch()
+        return [peer.peer for peer in getattr(relationship, "peers", [])]
+
     @classmethod
     async def _fetch_relationship_peer_names(cls, obj: object, relationship_name: str) -> list[str]:
         return sorted(
@@ -1265,11 +1289,15 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 "mac_vrf_vni_base": tenant.mac_vrf_vni_base.value,
             }
 
-            # Fetch VRFs for this tenant
-            await tenant.vrfs.fetch()
+            # Prefer child-side filters; fall back to parent relationship peers for SDK/test objects without IDs.
+            vrfs = await self._filter_or_fetch_peers(
+                kind="IpamVRF",
+                filter_name="tenant__ids",
+                parent_id=getattr(tenant, "id", None),
+                relationship=getattr(tenant, "vrfs", None),
+            )
             vrfs_list: list[dict[str, Any]] = []
-            for vrf_peer in tenant.vrfs.peers:
-                vrf = vrf_peer.peer
+            for vrf in vrfs:
                 vrf_data: dict[str, Any] = {"name": vrf.name.value}
 
                 vrf_vni = getattr(vrf, "vrf_vni", None)
@@ -1283,11 +1311,14 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                     if vtep_diag_ip and vtep_diag_ip.value:
                         vrf_data["vtep_diagnostic"]["loopback_ip_range"] = str(vtep_diag_ip.value)
 
-                # Fetch SVIs for this VRF
-                await vrf.svis.fetch()
+                svis = await self._filter_or_fetch_peers(
+                    kind="EvpnSvi",
+                    filter_name="vrf__ids",
+                    parent_id=getattr(vrf, "id", None),
+                    relationship=getattr(vrf, "svis", None),
+                )
                 svis_list: list[dict[str, Any]] = []
-                for svi_peer in vrf.svis.peers:
-                    svi = svi_peer.peer
+                for svi in svis:
                     svi_data: dict[str, Any] = {
                         "id": svi.svi_id.value,
                         "name": svi.name.value,
@@ -1309,11 +1340,14 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             if vrfs_list:
                 tenant_data["vrfs"] = vrfs_list
 
-            # Fetch L2 VLANs for this tenant
-            await tenant.l2vlans.fetch()
+            l2vlans = await self._filter_or_fetch_peers(
+                kind="EvpnL2Vlan",
+                filter_name="tenant__ids",
+                parent_id=getattr(tenant, "id", None),
+                relationship=getattr(tenant, "l2vlans", None),
+            )
             l2vlans_list: list[dict[str, Any]] = []
-            for l2v_peer in tenant.l2vlans.peers:
-                l2vlan = l2v_peer.peer
+            for l2vlan in l2vlans:
                 l2v_data: dict[str, Any] = {
                     "id": l2vlan.vlan_id.value,
                     "name": l2vlan.name.value,

@@ -1534,6 +1534,141 @@ def _multi_switch_adapter() -> dict:
     }
 
 
+def _evpn_hostvar_objects(*, tenant_id: str | None = None, vrf_id: str | None = None) -> tuple:
+    svi = SimpleNamespace(
+        id="svi-1",
+        svi_id=_attr(100),
+        name=_attr("web"),
+        enabled=_attr(True),
+        ip_address_virtual=_attr("10.10.10.1/24"),
+        rack_tags=_rel([]),
+        avd_tags=_rel([]),
+    )
+    vrf = SimpleNamespace(
+        id=vrf_id,
+        name=_attr("VRF1"),
+        vrf_vni=_attr(10),
+        vtep_diagnostic_loopback=_attr(None),
+        vtep_diagnostic_loopback_ip_range=_attr(None),
+        svis=_rel([svi]),
+    )
+    l2vlan = SimpleNamespace(id="l2vlan-1", vlan_id=_attr(200), name=_attr("l2"), vni_override=_attr(20200))
+    tenant = SimpleNamespace(
+        id=tenant_id,
+        name=_attr("T1"),
+        mac_vrf_vni_base=_attr(10000),
+        vrfs=_rel([vrf]),
+        l2vlans=_rel([l2vlan]),
+    )
+    return tenant, vrf, svi, l2vlan
+
+
+@pytest.mark.anyio
+async def test_tenants_hostvars_returns_empty_when_tenant_lookup_is_empty() -> None:
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(return_value=[])
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data == []
+    gen.client.filters.assert_awaited_once_with(kind="EvpnTenant", fabrics__ids=["fabric-1"])
+
+
+@pytest.mark.anyio
+async def test_tenants_hostvars_prefers_child_side_filters() -> None:
+    tenant, vrf, svi, l2vlan = _evpn_hostvar_objects(tenant_id="tenant-1", vrf_id="vrf-1")
+    tenant.vrfs = _rel([SimpleNamespace(name=_attr("WRONG"))])
+    tenant.l2vlans = _rel([SimpleNamespace(vlan_id=_attr(999), name=_attr("WRONG"))])
+    vrf.svis = _rel([SimpleNamespace(svi_id=_attr(999), name=_attr("WRONG"))])
+
+    async def filters_side_effect(*, kind: str, **kwargs: object) -> list[object]:
+        match kind:
+            case "EvpnTenant":
+                assert kwargs == {"fabrics__ids": ["fabric-1"]}
+                return [tenant]
+            case "IpamVRF":
+                assert kwargs == {"tenant__ids": ["tenant-1"]}
+                return [vrf]
+            case "EvpnSvi":
+                assert kwargs == {"vrf__ids": ["vrf-1"]}
+                return [svi]
+            case "EvpnL2Vlan":
+                assert kwargs == {"tenant__ids": ["tenant-1"]}
+                return [l2vlan]
+        pytest.fail(f"unexpected filter kind {kind}")
+
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data == [
+        {
+            "name": "T1",
+            "mac_vrf_vni_base": 10000,
+            "vrfs": [
+                {
+                    "name": "VRF1",
+                    "vrf_vni": 10,
+                    "svis": [{"id": 100, "name": "web", "enabled": True, "ip_address_virtual": "10.10.10.1/24"}],
+                }
+            ],
+            "l2vlans": [{"id": 200, "name": "l2", "vni_override": 20200}],
+        }
+    ]
+    gen.client.filters.assert_any_await(kind="IpamVRF", tenant__ids=["tenant-1"])
+    gen.client.filters.assert_any_await(kind="EvpnSvi", vrf__ids=["vrf-1"])
+    gen.client.filters.assert_any_await(kind="EvpnL2Vlan", tenant__ids=["tenant-1"])
+    tenant.vrfs.fetch.assert_not_awaited()
+    vrf.svis.fetch.assert_not_awaited()
+    tenant.l2vlans.fetch.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_tenants_hostvars_falls_back_when_child_side_filters_return_empty() -> None:
+    tenant, vrf, _svi, _l2vlan = _evpn_hostvar_objects(tenant_id="tenant-1", vrf_id="vrf-1")
+
+    async def filters_side_effect(*, kind: str, **kwargs: object) -> list[object]:
+        if kind == "EvpnTenant":
+            return [tenant]
+        return []
+
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["name"] == "VRF1"
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["name"] == "web"
+    assert tenants_data[0]["l2vlans"][0]["vni_override"] == 20200
+    tenant.vrfs.fetch.assert_awaited_once()
+    vrf.svis.fetch.assert_awaited_once()
+    tenant.l2vlans.fetch.assert_awaited_once()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("exception_type", [AttributeError, KeyError])
+async def test_tenants_hostvars_falls_back_when_child_side_filters_raise(exception_type: type[Exception]) -> None:
+    tenant, vrf, _svi, _l2vlan = _evpn_hostvar_objects(tenant_id="tenant-1", vrf_id="vrf-1")
+
+    async def filters_side_effect(*, kind: str, **kwargs: object) -> list[object]:
+        if kind == "EvpnTenant":
+            return [tenant]
+        raise exception_type
+
+    gen = _make_generator()
+    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
+
+    tenants_data = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants_data[0]["vrfs"][0]["name"] == "VRF1"
+    assert tenants_data[0]["vrfs"][0]["svis"][0]["name"] == "web"
+    assert tenants_data[0]["l2vlans"][0]["vni_override"] == 20200
+    tenant.vrfs.fetch.assert_awaited_once()
+    vrf.svis.fetch.assert_awaited_once()
+    tenant.l2vlans.fetch.assert_awaited_once()
+
+
 @pytest.mark.anyio
 async def test_tenants_hostvars_validate_against_pyavd():
     """EVPN tenant payload (incl. l2vlan vni_override) must pass pyAVD validation.
