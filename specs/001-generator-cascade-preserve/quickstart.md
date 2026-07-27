@@ -112,9 +112,9 @@ No override-mode validation is required for this slice because the current exter
   `2485c0829be374036b41d334d5fe3fb0131852a2`. The shared live validation lab
   was rebuilt to a known state, then a fresh validation branch
   `idempotence-generate-fabric-20260727-1920` was created. Scenario:
-  run `generate-fabric name=Fabric-C`, wait for the cascade, set
+  run `generate-fabric name=Fabric-L3LS-Multi-Domain`, wait for the cascade, set
   `spine-infrahub-dc1-1.serial` to `PRESEEDED-SERIAL-2485C08`, then run
-  `generate-fabric name=Fabric-C` twice. Snapshot scope:
+  `generate-fabric name=Fabric-L3LS-Multi-Domain` twice. Snapshot scope:
   `NetworkPod`, `LocationRack`, `DcimDevice`, `InterfacePhysical`,
   `InterfaceLag`, `InterfaceVirtual`, `NetworkLink`, `IpamIPAddress`,
   `RoutingAsn`, `MlagDomain`, `AvdArtifact`, `AvdHostvarFile`, and

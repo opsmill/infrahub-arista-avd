@@ -21,9 +21,9 @@ Each scenario has its own loadable fabric design; every device renders valid PyA
 
 | AVD example scenario | Status | Fabric | Design |
 |----------------------|:------:|--------|--------|
-| Single-DC L3LS | ✅ | `Fabric-C` | eBGP underlay, EVPN/VXLAN L3LS. |
+| Single-DC L3LS | ✅ | `Fabric-SDC-L3LS` | eBGP underlay, EVPN/VXLAN L3LS. |
 | Single-DC Multi-Pod L3LS (5-stage Clos) | ✅ | `Fabric-A` | 6 super-spines + 3 pods; super-spines as EVPN route servers; tenants as vlan-aware bundles (`evpn_vlan_aware_bundles`). |
-| Dual-DC L3LS | ✅ | `Fabric-C` | EVPN DC Gateway (next-hop-self) + DCI `l3_edge` p2p links, via `avd_custom_hostvars`. |
+| Dual-DC L3LS | ✅ | `Fabric-L3LS-Multi-Domain` | EVPN DC Gateway (next-hop-self) + DCI `l3_edge` p2p links, via `avd_custom_hostvars`. |
 | L2LS fabric (standalone) | ✅ | `Fabric-L2LS` | underlay `none` → `l2spine` + `l2leaf`, pure Layer-2, MLAG both tiers. |
 | Campus fabric | ✅ | `Fabric-Campus` | underlay `ospf` → `l3spine` core with anycast SVIs (`Evpn.Svi`) + `l2leaf` access; dot1x/PoE via escape hatch. |
 | ISIS-LDP IPVPN | ✅ | `Fabric-ISIS-LDP` | underlay `isis-ldp` → `p` core + `pe` edge; per-customer L3VPN VRFs (`Evpn.Tenant`/`Ipam.VRF`). |

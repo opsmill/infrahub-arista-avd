@@ -4,7 +4,7 @@
 # EVPN/VXLAN with an eBGP underlay and eBGP overlay, a single pod with two
 # spines, and two MLAG leaf racks (one "border" pair, one "access" pair) with
 # connected servers. This is the simple single-pod counterpart to the 5-stage
-# Fabric-A/B and the dual-DC Fabric-C. No super-spines, no DCI, no evpn_gateway.
+# Fabric-A/B and the dual-DC Fabric-L3LS-Multi-Domain. No super-spines, no DCI, no evpn_gateway.
 # Self-contained: pools + fabric + pod + hall + racks in this one file.
 # ============================================================================
 apiVersion: infrahub.app/v1

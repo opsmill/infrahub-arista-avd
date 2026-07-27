@@ -1,7 +1,7 @@
 ---
 # ============================================================================
-# IP and number pools for the Fabric-C lab fabric.
-# Derived from lab/infrahub-avd seed data after renaming to Fabric-C.
+# IP and number pools for the Fabric-L3LS-Multi-Domain lab fabric.
+# Derived from lab/infrahub-avd seed data after renaming to Fabric-L3LS-Multi-Domain.
 # ============================================================================
 apiVersion: infrahub.app/v1
 kind: Object
@@ -24,28 +24,28 @@ kind: Object
 spec:
   kind: CoreIPPrefixPool
   data:
-    - name: Fabric-C-Uplink-Pool
+    - name: Fabric-L3LS-Multi-Domain-Uplink-Pool
       default_member_type: prefix
       default_prefix_type: IpamPrefix
       default_prefix_length: 31
       ip_namespace: default
       resources:
         - 10.250.3.0/24
-    - name: Fabric-C-VTEP-Pool
+    - name: Fabric-L3LS-Multi-Domain-VTEP-Pool
       default_member_type: prefix
       default_prefix_type: IpamPrefix
       default_prefix_length: 32
       ip_namespace: default
       resources:
         - 10.250.2.0/24
-    - name: Fabric-C-Loopback-Pool
+    - name: Fabric-L3LS-Multi-Domain-Loopback-Pool
       default_member_type: prefix
       default_prefix_type: IpamPrefix
       default_prefix_length: 32
       ip_namespace: default
       resources:
         - 10.250.1.0/24
-    - name: Fabric-C-DCI-Pool
+    - name: Fabric-L3LS-Multi-Domain-DCI-Pool
       default_member_type: prefix
       default_prefix_type: IpamPrefix
       default_prefix_length: 31
@@ -58,7 +58,7 @@ kind: Object
 spec:
   kind: CoreIPAddressPool
   data:
-    - name: Fabric-C-Mgmt-Pool
+    - name: Fabric-L3LS-Multi-Domain-Mgmt-Pool
       default_address_type: IpamIPAddress
       default_prefix_length: 24
       ip_namespace: default
@@ -70,12 +70,12 @@ kind: Object
 spec:
   kind: CoreNumberPool
   data:
-    - name: Fabric-C-ASN-Pool
+    - name: Fabric-L3LS-Multi-Domain-ASN-Pool
       node: RoutingAsn
       node_attribute: asn
       start_range: 65100
       end_range: 65199
-    - name: Fabric-C-NodeID-Pool
+    - name: Fabric-L3LS-Multi-Domain-NodeID-Pool
       node: DcimDevice
       node_attribute: node_id
       start_range: 1
