@@ -89,6 +89,29 @@ query ServerCablingQuery($name: String!) {
                   }
                 }
               }
+              ... on InterfaceLag {
+                name {
+                  value
+                }
+                tagged_vlan {
+                  edges {
+                    node {
+                      id
+                      name {
+                        value
+                      }
+                    }
+                  }
+                }
+                untagged_vlan {
+                  node {
+                    id
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
             }
           }
         }

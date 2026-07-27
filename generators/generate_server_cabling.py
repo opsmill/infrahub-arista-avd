@@ -9,7 +9,14 @@ from netutils.interface import sort_interface_list
 
 from solution_arista_avd.cabling import build_server_cabling_plan, connect_interface_maps
 from solution_arista_avd.generator import set_fabric_avd_hostvars_ready, trigger_hostvar_generation
-from solution_arista_avd.protocols import DcimDevice, DcimInterface, InterfacePhysical, LocationRack, NetworkPod
+from solution_arista_avd.protocols import (
+    DcimDevice,
+    DcimInterface,
+    InterfaceLag,
+    InterfacePhysical,
+    LocationRack,
+    NetworkPod,
+)
 from solution_arista_avd.sorting import create_sorted_device_interface_map
 
 
@@ -94,12 +101,13 @@ class ServerCablingGenerator(InfrahubGenerator):
 
             await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=cabling_plan)
 
-        # Assign VLANs from server interfaces to their paired leaf interfaces
-        await self._assign_vlans(cabling_plan, server_interfaces)
-
         # For dual-homed servers (connected to 2+ leaf switches), create server
         # and switch-side LAGs.
         await self._create_server_port_channel(server_hostname, cabling_plan)
+
+        # Assign VLANs from server intent. Single-homed servers keep physical
+        # interface VLANs; dual-homed servers use Bond1 / Port-Channel<ID>.
+        await self._assign_vlans(cabling_plan, server_interfaces)
 
         # Trigger AVD hostvar regeneration for the leaves connected to this server.
         hostvar_target_ids = self._connected_leaf_device_ids(cabling_plan)
@@ -343,7 +351,11 @@ class ServerCablingGenerator(InfrahubGenerator):
         cabling_plan: list[tuple[DcimInterface, DcimInterface]],
         server_interfaces: list[dict[str, Any]],
     ) -> None:
-        """Assign VLANs from server interfaces to their paired leaf interfaces."""
+        """Assign VLANs from server intent to the authoritative switch target."""
+        if self._is_dual_homed(cabling_plan):
+            await self._assign_bond_vlans(cabling_plan, server_interfaces)
+            return
+
         for (_, leaf_iface), server_iface in zip(cabling_plan, server_interfaces, strict=False):
             if not server_iface["tagged_vlan_ids"] and not server_iface["untagged_vlan_id"]:
                 continue
@@ -362,3 +374,120 @@ class ServerCablingGenerator(InfrahubGenerator):
                 leaf_interface.untagged_vlan.add(server_iface["untagged_vlan_id"])  # type: ignore[union-attr]
 
             await leaf_interface.save(allow_upsert=True)
+
+    @staticmethod
+    def _is_dual_homed(cabling_plan: list[tuple[DcimInterface, DcimInterface]]) -> bool:
+        if len(cabling_plan) < 2:
+            return False
+        leaf_ids = {
+            getattr(getattr(leaf_iface, "device", None), "id", None)
+            or getattr(getattr(getattr(leaf_iface, "device", None), "peer", None), "id", None)
+            for _, leaf_iface in cabling_plan
+        }
+        leaf_ids.discard(None)
+        return len(leaf_ids) >= 2
+
+    async def _assign_bond_vlans(
+        self,
+        cabling_plan: list[tuple[DcimInterface, DcimInterface]],
+        server_interfaces: list[dict[str, Any]],
+    ) -> None:
+        tagged_vlan_ids, untagged_vlan_id = self._merge_server_interface_vlans(server_interfaces)
+        if not tagged_vlan_ids and not untagged_vlan_id:
+            return
+
+        server_lag_ids: set[str] = set()
+        switch_lag_ids: set[str] = set()
+
+        for server_iface, leaf_iface in cabling_plan:
+            server_interface = await self.client.get(
+                InterfacePhysical,
+                id=server_iface.id,
+                include=["tagged_vlan", "untagged_vlan", "lag"],
+            )
+            server_lag_id = self._relationship_id(getattr(server_interface, "lag", None))
+            if server_lag_id:
+                server_lag_ids.add(server_lag_id)
+            await self._clear_member_vlan_relationships(server_interface)
+
+            leaf_interface = await self.client.get(InterfacePhysical, id=leaf_iface.id, include=["lag"])
+            switch_lag_id = self._relationship_id(getattr(leaf_interface, "lag", None))
+            if switch_lag_id:
+                switch_lag_ids.add(switch_lag_id)
+
+        for lag_id in sorted(server_lag_ids):
+            lag = await self.client.get(
+                InterfaceLag,
+                id=lag_id,
+                include=["tagged_vlan", "untagged_vlan"],
+            )
+            await self._apply_vlan_relationships(lag, tagged_vlan_ids, untagged_vlan_id)
+
+        for lag_id in sorted(switch_lag_ids):
+            lag = await self.client.get(
+                InterfaceLag,
+                id=lag_id,
+                include=["tagged_vlan", "untagged_vlan"],
+            )
+            await self._apply_vlan_relationships(lag, tagged_vlan_ids, untagged_vlan_id)
+
+    @staticmethod
+    def _merge_server_interface_vlans(server_interfaces: list[dict[str, Any]]) -> tuple[list[str], str | None]:
+        tagged_vlan_ids: list[str] = []
+        untagged_vlan_id: str | None = None
+        for server_iface in server_interfaces:
+            for vlan_id in server_iface["tagged_vlan_ids"]:
+                if vlan_id not in tagged_vlan_ids:
+                    tagged_vlan_ids.append(vlan_id)
+            if untagged_vlan_id is None and server_iface["untagged_vlan_id"]:
+                untagged_vlan_id = server_iface["untagged_vlan_id"]
+        return tagged_vlan_ids, untagged_vlan_id
+
+    @staticmethod
+    def _relationship_id(relationship: object | None) -> str | None:
+        if relationship is None:
+            return None
+        if isinstance(relationship, dict):
+            return relationship.get("id")
+        rel_id = getattr(relationship, "id", None)
+        if rel_id:
+            return rel_id
+        node = getattr(relationship, "node", None)
+        return getattr(node, "id", None)
+
+    async def _apply_vlan_relationships(
+        self,
+        interface: DcimInterface,
+        tagged_vlan_ids: list[str],
+        untagged_vlan_id: str | None,
+    ) -> None:
+        if tagged_vlan_ids:
+            await interface.tagged_vlan.fetch()  # type: ignore[union-attr]
+            interface.tagged_vlan.extend(tagged_vlan_ids)  # type: ignore[union-attr]
+        if untagged_vlan_id:
+            await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
+            interface.untagged_vlan.add(untagged_vlan_id)  # type: ignore[union-attr]
+        await interface.save(allow_upsert=True)
+
+    async def _clear_member_vlan_relationships(self, interface: InterfacePhysical) -> None:
+        await interface.tagged_vlan.fetch()  # type: ignore[union-attr]
+        tagged_peer_ids = getattr(interface.tagged_vlan, "peer_ids", None)
+        if isinstance(tagged_peer_ids, list | tuple | set):
+            for vlan_id in list(tagged_peer_ids):
+                interface.tagged_vlan.remove(vlan_id)  # type: ignore[union-attr]
+        elif hasattr(interface.tagged_vlan, "clear"):
+            interface.tagged_vlan.clear()  # type: ignore[union-attr]
+        else:
+            interface.tagged_vlan = []  # type: ignore[assignment]
+
+        await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
+        untagged_peer_ids = getattr(interface.untagged_vlan, "peer_ids", None)
+        if isinstance(untagged_peer_ids, list | tuple | set):
+            for vlan_id in list(untagged_peer_ids):
+                interface.untagged_vlan.remove(vlan_id)  # type: ignore[union-attr]
+        elif hasattr(interface.untagged_vlan, "clear"):
+            interface.untagged_vlan.clear()  # type: ignore[union-attr]
+        else:
+            interface.untagged_vlan = None  # type: ignore[assignment]
+
+        await interface.save(allow_upsert=True)

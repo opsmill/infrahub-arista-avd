@@ -64,6 +64,7 @@ class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdges(BaseModel)
         Annotated[
             Union[
                 "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeDcimInterface",
+                "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLag",
                 "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysical",
             ],
             Field(discriminator="typename__"),
@@ -74,10 +75,80 @@ class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdges(BaseModel)
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeDcimInterface(
     BaseModel
 ):
-    typename__: Literal["DcimInterface", "InterfaceLag", "InterfaceVirtual"] = Field(
-        alias="__typename"
-    )
+    typename__: Literal["DcimInterface", "InterfaceVirtual"] = Field(alias="__typename")
     id: Optional[str]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLag(
+    BaseModel
+):
+    typename__: Literal["InterfaceLag"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagName"
+    ]
+    tagged_vlan: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlan"
+    untagged_vlan: "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlan"
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlan(
+    BaseModel
+):
+    edges: list[
+        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdges"
+    ]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdges(
+    BaseModel
+):
+    node: Optional[
+        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdgesNode"
+    ]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdgesNode(
+    BaseModel
+):
+    id: str
+    name: Optional[
+        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdgesNodeName"
+    ]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdgesNodeName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlan(
+    BaseModel
+):
+    node: Optional[
+        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlanNode"
+    ]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlanNode(
+    BaseModel
+):
+    id: str
+    name: Optional[
+        "ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlanNodeName"
+    ]
+
+
+class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlanNodeName(
+    BaseModel
+):
+    value: Optional[str]
 
 
 class ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysical(
@@ -366,6 +437,12 @@ ServerCablingQueryComputePhysicalServerEdgesNodeRack.model_rebuild()
 ServerCablingQueryComputePhysicalServerEdgesNodeRackNode.model_rebuild()
 ServerCablingQueryComputePhysicalServerEdgesNodeInterfaces.model_rebuild()
 ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdges.model_rebuild()
+ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLag.model_rebuild()
+ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlan.model_rebuild()
+ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdges.model_rebuild()
+ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagTaggedVlanEdgesNode.model_rebuild()
+ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlan.model_rebuild()
+ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfaceLagUntaggedVlanNode.model_rebuild()
 ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysical.model_rebuild()
 ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnector.model_rebuild()
 ServerCablingQueryComputePhysicalServerEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan.model_rebuild()

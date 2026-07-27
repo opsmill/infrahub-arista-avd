@@ -518,6 +518,30 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                       evpn_ethernet_segment {
                         value
                       }
+                      tagged_vlan {
+                        edges {
+                          node {
+                            __typename
+                            vlan_id {
+                              value
+                            }
+                            status {
+                              value
+                            }
+                          }
+                        }
+                      }
+                      untagged_vlan {
+                        node {
+                          __typename
+                          vlan_id {
+                            value
+                          }
+                          status {
+                            value
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -567,6 +591,30 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                   evpn_ethernet_segment {
                                     value
                                   }
+                                  tagged_vlan {
+                                    edges {
+                                      node {
+                                        __typename
+                                        vlan_id {
+                                          value
+                                        }
+                                        status {
+                                          value
+                                        }
+                                      }
+                                    }
+                                  }
+                                  untagged_vlan {
+                                    node {
+                                      __typename
+                                      vlan_id {
+                                        value
+                                      }
+                                      status {
+                                        value
+                                      }
+                                    }
+                                  }
                                   lag_members {
                                     edges {
                                       node {
@@ -607,6 +655,30 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                                           }
                                                           evpn_ethernet_segment {
                                                             value
+                                                          }
+                                                          tagged_vlan {
+                                                            edges {
+                                                              node {
+                                                                __typename
+                                                                vlan_id {
+                                                                  value
+                                                                }
+                                                                status {
+                                                                  value
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                          untagged_vlan {
+                                                            node {
+                                                              __typename
+                                                              vlan_id {
+                                                                value
+                                                              }
+                                                              status {
+                                                                value
+                                                              }
+                                                            }
                                                           }
                                                         }
                                                       }

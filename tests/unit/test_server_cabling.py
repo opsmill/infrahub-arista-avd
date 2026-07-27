@@ -378,6 +378,22 @@ class TestDualHomedCabling:
 class TestVlanAssignment:
     """T010: Test VLAN assignment via _assign_vlans."""
 
+    @staticmethod
+    def _vlan_target(lag_id: str | None = None) -> MagicMock:
+        target = MagicMock()
+        target.lag = MagicMock()
+        target.lag.id = lag_id
+        target.tagged_vlan = MagicMock()
+        target.tagged_vlan.fetch = AsyncMock()
+        target.tagged_vlan.extend = MagicMock()
+        target.tagged_vlan.clear = MagicMock()
+        target.untagged_vlan = MagicMock()
+        target.untagged_vlan.fetch = AsyncMock()
+        target.untagged_vlan.add = MagicMock()
+        target.untagged_vlan.clear = MagicMock()
+        target.save = AsyncMock()
+        return target
+
     @pytest.mark.asyncio
     async def test_tagged_vlans_copied_to_leaf(self) -> None:
         gen = _make_generator()
@@ -431,6 +447,60 @@ class TestVlanAssignment:
         await gen._assign_vlans(cabling_plan, server_ifaces)
 
         mock_leaf_iface.untagged_vlan.add.assert_called_once_with("vlan-100")
+
+    @pytest.mark.asyncio
+    async def test_dual_homed_vlans_are_assigned_to_bond_and_switch_lags(self) -> None:
+        gen = _make_generator()
+
+        server_ifaces = [
+            {"id": "s1", "name": "Ethernet1", "tagged_vlan_ids": ["vlan-300"], "untagged_vlan_id": "vlan-100"},
+            {"id": "s2", "name": "Ethernet2", "tagged_vlan_ids": ["vlan-400"], "untagged_vlan_id": None},
+        ]
+
+        server_iface1 = MagicMock(id="s1")
+        server_iface2 = MagicMock(id="s2")
+        leaf_iface1 = MagicMock(id="leaf-eth1")
+        leaf_iface1.device.id = "leaf-1"
+        leaf_iface2 = MagicMock(id="leaf-eth2")
+        leaf_iface2.device.id = "leaf-2"
+        cabling_plan = [(server_iface1, leaf_iface1), (server_iface2, leaf_iface2)]
+
+        server_member1 = self._vlan_target("server-bond")
+        server_member2 = self._vlan_target("server-bond")
+        switch_member1 = self._vlan_target("leaf1-po")
+        switch_member2 = self._vlan_target("leaf2-po")
+        server_bond = self._vlan_target()
+        leaf1_po = self._vlan_target()
+        leaf2_po = self._vlan_target()
+
+        gen.client.get = AsyncMock(
+            side_effect=[
+                server_member1,
+                switch_member1,
+                server_member2,
+                switch_member2,
+                server_bond,
+                leaf1_po,
+                leaf2_po,
+            ]
+        )
+
+        await gen._assign_vlans(cabling_plan, server_ifaces)
+
+        server_member1.tagged_vlan.clear.assert_called_once()
+        server_member2.tagged_vlan.clear.assert_called_once()
+        server_member1.untagged_vlan.clear.assert_called_once()
+        server_member2.untagged_vlan.clear.assert_called_once()
+
+        server_bond.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
+        server_bond.untagged_vlan.add.assert_called_once_with("vlan-100")
+        leaf1_po.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
+        leaf2_po.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
+        leaf1_po.untagged_vlan.add.assert_called_once_with("vlan-100")
+        leaf2_po.untagged_vlan.add.assert_called_once_with("vlan-100")
+
+        assert leaf_iface1.tagged_vlan.extend.call_count == 0
+        assert leaf_iface2.tagged_vlan.extend.call_count == 0
 
 
 class TestNoLeafSwitches:

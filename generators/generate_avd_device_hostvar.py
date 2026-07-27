@@ -350,6 +350,21 @@ def _vlan_signature(interface: object) -> tuple[tuple[int, ...], int | None]:
     return tuple(sorted(tagged_vlans)), untagged_vlan
 
 
+def _has_vlan_signature(signature: tuple[tuple[int, ...], int | None]) -> bool:
+    tagged_vlans, untagged_vlan = signature
+    return bool(tagged_vlans) or untagged_vlan is not None
+
+
+def _first_vlan_signature(*interfaces: object | None) -> tuple[tuple[int, ...], int | None]:
+    for interface in interfaces:
+        if interface is None:
+            continue
+        signature = _vlan_signature(interface)
+        if _has_vlan_signature(signature):
+            return signature
+    return (), None
+
+
 def _device_name(interface: object) -> str | None:
     device = _node(_field(interface, "device"))
     return _value(device, "name") if device else None
@@ -879,7 +894,7 @@ def _lag_member_adapter(
     if not members:
         return None
 
-    local_tagged_vlans, local_untagged_vlan = _extract_vlan_config(local_interface)
+    tagged_vlans, untagged_vlan = _first_vlan_signature(lag_node, switch_lag_node, local_interface)
     member_links: list[tuple[str, str, str]] = []
     for member_edge in members:
         member = _node(member_edge)
@@ -919,7 +934,7 @@ def _lag_member_adapter(
         evpn_lag_node=switch_lag_node,
         endpoint_lag_node=lag_node,
     )
-    _apply_vlan_adapter_config(adapter, local_tagged_vlans, local_untagged_vlan)
+    _apply_vlan_adapter_config(adapter, list(tagged_vlans), untagged_vlan)
     adapter["spanning_tree_portfast"] = "edge"
     return adapter
 
@@ -941,7 +956,7 @@ def _switch_lag_member_links(
                 "switch_port": _value(fallback_local_interface, "name"),
                 "switch": hostname,
                 "switch_lag": fallback_switch_lag_node,
-                "vlan": _vlan_signature(fallback_local_interface),
+                "vlan": _first_vlan_signature(server_lag_node, fallback_switch_lag_node, fallback_local_interface),
             }
         ]
 
@@ -973,7 +988,7 @@ def _switch_lag_member_links(
                     "switch_port": switch_port,
                     "switch": switch_name,
                     "switch_lag": switch_lag_node,
-                    "vlan": _vlan_signature(endpoint),
+                    "vlan": _first_vlan_signature(server_lag_node, switch_lag_node, endpoint),
                 }
             )
 

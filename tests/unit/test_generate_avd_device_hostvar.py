@@ -1542,12 +1542,23 @@ def _lag(
     *,
     name: str | None = None,
     channel_id: int | None = None,
+    tagged_vlans: list[int] | None = None,
+    untagged_vlan: int | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         name=_attr(name) if name else None,
         channel_id=_attr(channel_id) if channel_id is not None else None,
         lacp_mode=_attr(lacp_mode),
         evpn_ethernet_segment=_attr(evpn_ethernet_segment),
+        tagged_vlan=SimpleNamespace(
+            edges=[
+                SimpleNamespace(node=SimpleNamespace(vlan_id=_attr(vlan_id), status=_attr("active")))
+                for vlan_id in tagged_vlans or []
+            ]
+        ),
+        untagged_vlan=SimpleNamespace(
+            node=SimpleNamespace(vlan_id=_attr(untagged_vlan), status=_attr("active")) if untagged_vlan else None
+        ),
     )
 
 
@@ -2040,6 +2051,83 @@ def test_conflicting_switch_lag_vlans_fail() -> None:
                 },
             ],
         )
+
+
+def test_server_bond_vlans_drive_switch_lag_adapter_without_member_vlans() -> None:
+    server = {"name": "server1", "adapters": []}
+    groups: dict[tuple[str, int], dict] = {}
+    server_bond = _lag(name="Bond1", tagged_vlans=[300, 400], untagged_vlan=100)
+    switch_lag = _lag(name="Port-Channel1117", channel_id=1117)
+    fallback_local = SimpleNamespace(
+        name=_attr("Ethernet1/1/17"),
+        tagged_vlan=SimpleNamespace(edges=[]),
+        untagged_vlan=SimpleNamespace(node=None),
+    )
+    fallback_endpoint = SimpleNamespace(name=_attr("Ethernet1"))
+
+    links = hostvar_module._switch_lag_member_links(
+        server_lag_node=server_bond,
+        fallback_switch_lag_node=switch_lag,
+        fallback_local_interface=fallback_local,
+        fallback_endpoint=fallback_endpoint,
+        hostname="leaf1",
+    )
+    _add_switch_lag_adapter(
+        server,
+        groups,
+        server_name="server1",
+        switch_lag_node=switch_lag,
+        endpoint_lag_node=server_bond,
+        links=links,
+    )
+    hostvar_module._flush_switch_lag_groups(groups, mlag_active=False)
+
+    assert server["adapters"] == [
+        {
+            "endpoint_ports": ["Ethernet1"],
+            "switch_ports": ["Ethernet1/1/17"],
+            "switches": ["leaf1"],
+            "port_channel": {"mode": "active", "channel_id": 1117, "endpoint_port_channel": "Bond1"},
+            "spanning_tree_portfast": "edge",
+            "mode": "trunk",
+            "vlans": "300,400",
+            "native_vlan": 100,
+        }
+    ]
+    assert not validate_inputs(_base_hostvars([], connected_endpoints=[server])).validation_result.violations
+
+
+def test_switch_lag_vlans_are_used_when_server_bond_has_no_vlan_relationships() -> None:
+    server = {"name": "server1", "adapters": []}
+    groups: dict[tuple[str, int], dict] = {}
+    server_bond = _lag(name="Bond1")
+    switch_lag = _lag(name="Port-Channel1117", channel_id=1117, tagged_vlans=[300, 400])
+    fallback_local = SimpleNamespace(
+        name=_attr("Ethernet1/1/17"),
+        tagged_vlan=SimpleNamespace(edges=[]),
+        untagged_vlan=SimpleNamespace(node=None),
+    )
+    fallback_endpoint = SimpleNamespace(name=_attr("Ethernet1"))
+
+    links = hostvar_module._switch_lag_member_links(
+        server_lag_node=server_bond,
+        fallback_switch_lag_node=switch_lag,
+        fallback_local_interface=fallback_local,
+        fallback_endpoint=fallback_endpoint,
+        hostname="leaf1",
+    )
+    _add_switch_lag_adapter(
+        server,
+        groups,
+        server_name="server1",
+        switch_lag_node=switch_lag,
+        endpoint_lag_node=server_bond,
+        links=links,
+    )
+    hostvar_module._flush_switch_lag_groups(groups, mlag_active=False)
+
+    assert server["adapters"][0]["mode"] == "trunk"
+    assert server["adapters"][0]["vlans"] == "300,400"
 
 
 def test_server_lag_evpn_hostvars_validate_against_pyavd() -> None:

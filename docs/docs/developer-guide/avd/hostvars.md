@@ -168,6 +168,7 @@ For every interface on the device whose `role.value == "server"`, an entry is em
 - `mode: "trunk"` + `vlans: "100-105"` for interfaces with multiple tagged VLANs (formatted via `netutils`).
 - `mode: "access"` + a single `vlans: "100"` for access-only interfaces.
 - `native_vlan: 100` added if an untagged VLAN is configured alongside tagged VLANs.
+- For bonded servers, server `Bond1` is the primary VLAN source. Switch `Port-Channel<ID>` VLANs are used when the Bond has no VLAN relationships, and member Ethernet VLANs are only a compatibility fallback.
 
 ## AVD custom hostvars escape hatch
 

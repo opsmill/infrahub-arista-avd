@@ -60,15 +60,15 @@ For a newly added server, the generator:
 2. Finds leaf switches in the same rack and their `server` role physical interfaces.
 3. Selects the first available leaf port index that is free on all target leaves.
 4. Creates `NetworkLink` objects between the server interfaces and selected leaf physical interfaces.
-5. Copies tagged and untagged VLANs from server interfaces and server interface profiles onto the paired leaf physical interfaces.
-6. For idempotence, reconciles already-cabled servers by rebuilding the cabling plan from existing `NetworkLink` objects, then reapplying VLANs and LAG state.
-7. For dual-homed, multi-leaf servers, creates server-side `Bond1`.
-8. Creates one switch-side `InterfaceLag` named `Port-Channel<ID>` on each attached leaf. The `channel_id` is derived from the selected leaf port number and is owned in Infrahub.
-9. Attaches each leaf physical interface to its local switch-side LAG.
+5. For dual-homed, multi-leaf servers, creates server-side `Bond1`.
+6. Creates one switch-side `InterfaceLag` named `Port-Channel<ID>` on each attached leaf. The `channel_id` is derived from the selected leaf port number and is owned in Infrahub.
+7. Attaches each leaf physical interface to its local switch-side LAG.
+8. Applies tagged and untagged VLANs. Single-homed servers use the paired leaf physical interface; dual-homed servers merge VLAN intent onto server `Bond1` and the switch `Port-Channel<ID>` objects instead of the member Ethernet interfaces.
+9. For idempotence, reconciles already-cabled servers by rebuilding the cabling plan from existing `NetworkLink` objects, then reapplying VLANs and LAG state.
 10. Sets EVPN Ethernet Segment on switch-side LAGs when the server is attached across non-MLAG leaves.
 11. Marks AVD hostvars as not ready for the fabric and triggers hostvar generation, which cascades into structured config generation.
 
-The resulting hostvars include `port_channel.channel_id` for switch-side server LAGs, so pyAVD receives the explicit Port-Channel ID from Infrahub.
+The resulting hostvars include `port_channel.channel_id` for switch-side server LAGs, so pyAVD receives the explicit Port-Channel ID from Infrahub. For bonded servers, VLAN mode and VLAN lists are derived from the logical Bond or Port-Channel VLAN relationships, not from member Ethernet ports.
 
 ## If the wait times out
 

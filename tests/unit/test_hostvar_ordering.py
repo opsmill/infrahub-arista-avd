@@ -367,6 +367,8 @@ def _make_lagged_server_edge() -> IfaceEdge:
                     "channel_id": {"value": 1117},
                     "lacp_mode": {"value": "active"},
                     "evpn_ethernet_segment": {"value": True},
+                    "tagged_vlan": {"edges": []},
+                    "untagged_vlan": {"node": None},
                 }
             },
             connector=IfaceConnector(
@@ -424,6 +426,8 @@ def _make_switch_lagged_server_edge(
                     "channel_id": {"value": channel_id},
                     "lacp_mode": {"value": "active"},
                     "evpn_ethernet_segment": {"value": True},
+                    "tagged_vlan": {"edges": []},
+                    "untagged_vlan": {"node": None},
                 }
             },
             connector=IfaceConnector(
