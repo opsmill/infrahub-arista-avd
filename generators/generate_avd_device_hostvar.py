@@ -22,7 +22,7 @@ from solution_arista_avd.avd import (
     SVI_RENDERING_ROLES,
 )
 from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
-from solution_arista_avd.generator import set_fabric_avd_hostvars_ready
+from solution_arista_avd.generator import save_file_if_changed, set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
 
 from .generate_avd_device_inputs_query import (
@@ -2275,16 +2275,16 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 self.logger.warning("Could not read existing hostvar file for %s, forcing re-upload: %s", hostname, exc)
                 existing_file = None
 
-        # Always upload and save to ensure the file exists on this branch
-        if existing_file:
-            existing_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
-            await existing_file.save(allow_upsert=True)
-        else:
-            hostvar_file = await self.client.create(AvdHostvarFile, artifact=avd_artifact)
-            hostvar_file.upload_from_bytes(content=new_content, name=f"{hostname}-hostvars.json")
-            await hostvar_file.save(allow_upsert=True)
+        uploaded = await save_file_if_changed(
+            existing_file=existing_file,
+            existing_checksum=existing_checksum,
+            new_checksum=new_checksum,
+            new_content=new_content,
+            filename=f"{hostname}-hostvars.json",
+            create_file=lambda: self.client.create(AvdHostvarFile, artifact=avd_artifact),
+        )
 
-        if existing_checksum == new_checksum:
+        if not uploaded:
             self.logger.info(f"Hostvars unchanged for {hostname}")
         else:
             self.logger.info(f"Hostvars updated for {hostname}")

@@ -10,6 +10,8 @@ from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumb
 from .protocols import DcimDevice, DcimInterface, InterfaceVirtual, RoutingAsn
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from infrahub_sdk import InfrahubClient
 
     from .protocols import LocationRack, NetworkPod
@@ -21,6 +23,25 @@ logger = logging.getLogger("infrahub.tasks")
 DEVICE_STATUS_PROVISIONING = "provisioning"
 AVD_DEVICES_GROUP = "avd_devices"
 VTEP_LOOPBACK_ROLES = {"leaf", "border_leaf"}
+
+
+async def save_file_if_changed(
+    *,
+    existing_file: Any | None,
+    existing_checksum: str | None,
+    new_checksum: str,
+    new_content: bytes,
+    filename: str,
+    create_file: Callable[[], Awaitable[Any]],
+) -> bool:
+    """Upload and save a file node only when the stored content differs."""
+    if existing_file is not None and existing_checksum == new_checksum:
+        return False
+
+    file_node = existing_file or await create_file()
+    file_node.upload_from_bytes(content=new_content, name=filename)
+    await file_node.save(allow_upsert=True)
+    return True
 
 
 async def set_fabric_avd_hostvars_ready(client: InfrahubClient, fabric_id: str, ready: bool) -> None:
