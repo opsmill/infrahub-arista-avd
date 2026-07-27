@@ -604,27 +604,18 @@ async def test_hostvar_target_device_ids_uses_rack_targets_when_fabric_hostvars_
 
 
 @pytest.mark.asyncio
-async def test_invalidate_hostvars_deletes_target_hostvar_files() -> None:
+async def test_invalidate_hostvars_preserves_target_hostvar_files() -> None:
     gen = _make_generator()
     hostvar_file = SimpleNamespace(delete=AsyncMock())
-    hostvar_rel = SimpleNamespace(id="hostvar-file-1", fetch=AsyncMock(), peer=hostvar_file)
-    artifact = SimpleNamespace(hostvar_file=hostvar_rel)
-
-    async def filters_side_effect(*args: object, **kwargs: object) -> list[SimpleNamespace]:
-        kind = kwargs.get("kind", args[0] if args else None)
-        kind_name = kind if isinstance(kind, str) else getattr(kind, "__name__", str(kind))
-        if kind_name == "DcimDevice":
-            return [_named_device("leaf-a", "leaf-a")]
-        if kind_name == "AvdArtifact":
-            return [artifact]
-        return []
-
-    gen.client.filters = AsyncMock(side_effect=filters_side_effect)
+    gen.logger = MagicMock()
 
     await gen.invalidate_hostvars(["leaf-a"])
 
-    hostvar_rel.fetch.assert_awaited_once()
-    hostvar_file.delete.assert_awaited_once()
+    gen.client.filters.assert_not_awaited()
+    hostvar_file.delete.assert_not_awaited()
+    gen.logger.info.assert_called_once_with(
+        "Preserving existing hostvar files before targeted regeneration for %s devices", 1
+    )
 
 
 @pytest.mark.asyncio

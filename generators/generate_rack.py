@@ -539,38 +539,15 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         return missing
 
     async def invalidate_hostvars(self, device_ids: list[str]) -> None:
-        """Remove existing hostvar files for targeted devices before regeneration.
+        """Keep existing hostvar files in place before targeted regeneration.
 
-        The hostvar generator marks the fabric ready once every device has a
-        hostvar file. If existing target files remain in place, the first
-        regenerated device can flip the fabric back to ready before the rest of
-        the targeted devices have refreshed. Deleting only the target files
-        makes the existing readiness check wait for the full target set.
+        Hostvar and structured-config generators checksum-gate file writes, so a
+        no-op rack reconciliation must not delete and recreate file nodes.
         """
         if not device_ids:
             return
 
-        devices = await self.client.filters(kind=DcimDevice, ids=device_ids)
-        for device in devices:
-            hostname = device.name.value
-            artifacts = await self.client.filters(kind=AvdArtifact, name__value=hostname)
-            if not artifacts:
-                continue
-
-            artifact = artifacts[0]
-            if not artifact.hostvar_file.id:
-                continue
-
-            try:
-                await artifact.hostvar_file.fetch()
-                hostvar_file = artifact.hostvar_file.peer
-            except Exception as exc:  # noqa: BLE001 - a missing file is already invalidated
-                self.logger.debug("Could not fetch hostvar file for %s before invalidation: %s", hostname, exc)
-                continue
-
-            if hostvar_file:
-                await hostvar_file.delete()
-                self.logger.info("Invalidated hostvars for %s before targeted regeneration", hostname)
+        self.logger.info("Preserving existing hostvar files before targeted regeneration for %s devices", len(device_ids))
 
     async def _get_existing_mlag_domain(self, domain_id: str) -> object | None:
         """Return the current MLAG domain for a rack pair, if present."""
