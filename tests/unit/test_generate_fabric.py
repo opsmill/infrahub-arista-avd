@@ -46,6 +46,7 @@ def _pod_query_data(*, amount_of_super_spines: int, underlay_routing_protocol: s
                                 "node_id_pool": {"node": None},
                                 "mgmt_pool": {"node": None},
                                 "vtep_pool": {"node": None},
+                                "loopback_pool": {"node": None},
                             }
                         },
                     }
@@ -74,6 +75,7 @@ def _fabric_query_data(
                         "node_id_pool": {"node": None},
                         "mgmt_pool": {"node": None},
                         "vtep_pool": {"node": None},
+                        "loopback_pool": {"node": None},
                     }
                 }
             ]
@@ -86,7 +88,6 @@ def _make_pod_generator() -> PodGenerator:
     gen.client = MagicMock()
     gen.client.execute_graphql = AsyncMock()
     gen.logger = MagicMock()
-    gen.allocate_resource_pools = AsyncMock()  # type: ignore[method-assign]
     gen.create_spine_switches = AsyncMock()  # type: ignore[method-assign]
     gen.connect_spine_to_super_spine = AsyncMock()  # type: ignore[method-assign]
     gen.get_super_spine_switches_for_fabric = AsyncMock()  # type: ignore[method-assign]
@@ -106,8 +107,7 @@ class TestFabricGenerator:
     @pytest.mark.asyncio
     async def test_zero_super_spines_does_not_require_template(self, monkeypatch: pytest.MonkeyPatch) -> None:
         gen = _make_generator()
-        gen.resolve_avd_pools = AsyncMock(return_value=(None, None, None, None))  # type: ignore[method-assign]
-        gen.allocate_resource_pools = AsyncMock()  # type: ignore[method-assign]
+        gen.resolve_avd_pools = AsyncMock(return_value=(None, None, None, None, None))  # type: ignore[method-assign]
         gen.create_super_spine_switches = AsyncMock()  # type: ignore[method-assign]
         gen.update_checksum = AsyncMock()  # type: ignore[method-assign]
         set_ready = AsyncMock()

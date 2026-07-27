@@ -72,6 +72,19 @@ query PodGeneratorQuery($name: String!) {
                   }
                 }
               }
+              loopback_pool {
+                node {
+                  id
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        id
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }

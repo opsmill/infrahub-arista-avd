@@ -121,7 +121,7 @@ spec:
   kind: IpamPrefix
   data:
     - prefix: 10.255.2.0/24
-      role: pod_loopback
+      role: loopback
 ---
 # Device Loopback Pool for Fabric-A
 apiVersion: infrahub.app/v1
@@ -190,7 +190,7 @@ spec:
   kind: IpamPrefix
   data:
     - prefix: 10.254.2.0/24
-      role: pod_loopback
+      role: loopback
 ---
 # Device Loopback Pool for Fabric-B
 apiVersion: infrahub.app/v1

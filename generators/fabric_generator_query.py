@@ -34,6 +34,7 @@ class FabricGeneratorQueryNetworkFabricEdgesNode(BaseModel):
     node_id_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool"
     mgmt_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool"
     vtep_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeVtepPool"
+    loopback_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPool"
 
 
 class FabricGeneratorQueryNetworkFabricEdgesNodeName(BaseModel):
@@ -119,6 +120,38 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeVtepPoolNodeResourcesEdgesNode(
     id: Optional[str]
 
 
+class FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPool(BaseModel):
+    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNode"]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNode(BaseModel):
+    id: str
+    resources: "FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResources"
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResources(BaseModel):
+    edges: Optional[
+        list["FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResourcesEdges"]
+    ]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        "FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResourcesEdgesNode"
+    ]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResourcesEdgesNode(
+    BaseModel
+):
+    typename__: Literal[
+        "BuiltinIPPrefix", "InternalIPPrefixAvailable", "IpamPrefix"
+    ] = Field(alias="__typename")
+    id: Optional[str]
+
+
 FabricGeneratorQuery.model_rebuild()
 FabricGeneratorQueryNetworkFabric.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdges.model_rebuild()
@@ -131,3 +164,7 @@ FabricGeneratorQueryNetworkFabricEdgesNodeVtepPool.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNodeVtepPoolNode.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNodeVtepPoolNodeResources.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNodeVtepPoolNodeResourcesEdges.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPool.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNode.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResources.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeLoopbackPoolNodeResourcesEdges.model_rebuild()

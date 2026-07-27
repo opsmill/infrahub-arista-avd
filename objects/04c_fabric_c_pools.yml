@@ -11,7 +11,7 @@ spec:
     - prefix: 10.0.6.0/24
       role: management
     - prefix: 10.250.1.0/24
-      role: pod_loopback
+      role: loopback
     - prefix: 10.250.2.0/24
       role: loopback-vtep
     - prefix: 10.250.3.0/24

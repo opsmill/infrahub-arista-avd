@@ -41,13 +41,12 @@ Each generator consists of:
 **Purpose**: Initialize fabric infrastructure
 
 **Actions**:
-1. Allocate IP pools from FabricSupernetPool
-   - Loopback prefix pool
-   - Interconnect prefix pool
-   - Management prefix pool
-2. Allocate number pools
-   - ASN pool (BGP autonomous systems)
-   - Node ID pool (unique device identifiers)
+1. Resolve fabric-scoped pools
+   - `loopback_pool` for device Loopback0 addresses
+   - `vtep_pool` for VTEP loopback addresses
+   - `mgmt_pool` for management addresses
+   - `asn_pool` for BGP autonomous systems
+   - `node_id_pool` for unique device identifiers
 3. Create super-spine devices from template
 4. Assign loopback IPs to super-spines
 

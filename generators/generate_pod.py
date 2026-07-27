@@ -4,7 +4,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from infrahub_sdk.generator import InfrahubGenerator
-from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_arista_avd import sorting as solution_arista_avd_sorting
 from solution_arista_avd.avd import SPINE_ROLE_BY_UNDERLAY
@@ -17,6 +16,8 @@ from .pod_generator_query import PodGeneratorQuery
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
 
 EXCLUDED_POD_ROLES = ["fabric"]
 
@@ -37,9 +38,8 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
     fabric_name: str
     underlay_routing_protocol: str | None
 
-    loopback_pool: CoreIPAddressPool
+    loopback_pool: CoreIPAddressPool | None
 
-    pod_prefix_pool: CoreIPPrefixPool
     spine_switches: list[DcimDevice]
     super_spine_switches: list[DcimDevice]
 
@@ -113,11 +113,13 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
         self.spine_role = SPINE_ROLE_BY_UNDERLAY.get(self.underlay_routing_protocol, "spine")
 
         # Get AVD-related pool references from parent fabric
-        self.asn_pool, self.node_id_pool, self.mgmt_pool, self.vtep_loopback_pool = await self.resolve_avd_pools(
-            data.network_pod.edges[0].node.parent.node
-        )
-
-        await self.allocate_resource_pools()
+        (
+            self.asn_pool,
+            self.node_id_pool,
+            self.mgmt_pool,
+            self.loopback_pool,
+            self.vtep_loopback_pool,
+        ) = await self.resolve_avd_pools(data.network_pod.edges[0].node.parent.node)
 
         await self.create_spine_switches()
 
@@ -153,52 +155,6 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 fabric_id=self.fabric_id,
                 allocate_routing_asn=self.allocate_routing_asn,
             )
-
-    async def allocate_resource_pools(self) -> None:
-        """Allocate IP Space for the Pod"""
-
-        fabric_prefix_pool = await self.client.get(CoreIPPrefixPool, name__value=f"{self.fabric_name}-prefix-pool")
-
-        pod_supernet = await self.client.allocate_next_ip_prefix(
-            resource_pool=fabric_prefix_pool,
-            identifier=self.pod_id,
-            member_type="prefix",
-            prefix_length=19,
-            data={"role": "pod_supernet"},
-        )
-
-        self.pod_prefix_pool = await self.client.create(
-            kind=CoreIPPrefixPool,
-            name=f"{self.fabric_name}-{self.pod_name}-prefix-pool",
-            default_prefix_type="IpamPrefix",
-            default_prefix_length=24,
-            ip_namespace={"hfid": ["default"]},
-            resources=[pod_supernet],
-        )
-        await self.pod_prefix_pool.save(allow_upsert=True)
-
-        pod_loopback_prefix = await self.client.allocate_next_ip_prefix(
-            resource_pool=self.pod_prefix_pool,
-            identifier=str(self.pod_id),
-            member_type="address",
-            prefix_length=27,
-            data={"role": "pod_loopback"},
-        )
-
-        self.loopback_pool = await self.client.create(
-            kind=CoreIPAddressPool,
-            name=f"{self.fabric_name}-{self.pod_name}-loopback-pool",
-            default_address_type="IpamIPAddress",
-            default_prefix_length=32,
-            ip_namespace={"hfid": ["default"]},
-            resources=[pod_loopback_prefix],
-        )
-        await self.loopback_pool.save(allow_upsert=True)
-
-        pod = await self.client.get(kind=NetworkPod, id=self.pod_id)
-        pod.loopback_pool = self.loopback_pool
-        pod.prefix_pool = self.pod_prefix_pool
-        await pod.save(allow_upsert=True)
 
     async def get_super_spine_switches_for_fabric(self) -> tuple[NetworkPod | None, list[DcimDevice]]:
         if self.fabric_amount_of_super_spines == 0:

@@ -107,6 +107,9 @@ class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabric(BaseModel):
     )
     mgmt_pool: "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricMgmtPool"
     vtep_pool: "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricVtepPool"
+    loopback_pool: (
+        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPool"
+    )
 
 
 class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricName(BaseModel):
@@ -211,6 +214,48 @@ class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricVtepPoolNodeRes
     id: Optional[str]
 
 
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPool(
+    BaseModel
+):
+    node: Optional[
+        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNode"
+    ]
+
+
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNode(
+    BaseModel
+):
+    id: str
+    resources: "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResources"
+
+
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdges"
+        ]
+    ]
+
+
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        "PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdgesNode"
+    ]
+
+
+class PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdgesNode(
+    BaseModel
+):
+    typename__: Literal[
+        "BuiltinIPPrefix", "InternalIPPrefixAvailable", "IpamPrefix"
+    ] = Field(alias="__typename")
+    id: Optional[str]
+
+
 PodGeneratorQuery.model_rebuild()
 PodGeneratorQueryNetworkPod.model_rebuild()
 PodGeneratorQueryNetworkPodEdges.model_rebuild()
@@ -226,3 +271,7 @@ PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricVtepPool.model_rebuil
 PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
 PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricVtepPoolNodeResources.model_rebuild()
 PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricVtepPoolNodeResourcesEdges.model_rebuild()
+PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPool.model_rebuild()
+PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNode.model_rebuild()
+PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResources.model_rebuild()
+PodGeneratorQueryNetworkPodEdgesNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdges.model_rebuild()

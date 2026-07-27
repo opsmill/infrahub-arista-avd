@@ -51,14 +51,14 @@ The device and interface `role` dropdowns that the fabric uses are defined in `d
 Top-level container for a datacenter fabric. Inherits `Network.BuildingBlock` and `CoreArtifactTarget`; parents `NetworkPod`.
 
 - **Attributes**: `name` (unique), `index`, `amount_of_super_spines` (default 4), interface-sorting methods, `mgmt_gateway`, `avd_hostvars_ready`. L3LS attributes (via `l3ls_extensions.yml`): `underlay_routing_protocol` (`ebgp`/`ospf`), `overlay_routing_protocol` (`ebgp`/`ibgp`), `p2p_uplinks_mtu`, `spanning_tree_mode`, `virtual_router_mac`, EVPN/underlay/MLAG passwords, `anta_enabled`.
-- **Relationships**: `uplink_pool` / `vtep_pool` / `loopback_pool` / `dci_pool` → `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` → `CoreNumberPool`, `mgmt_pool` → `CoreIPAddressPool`, `avd_evpn` → `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` → management kinds.
+- **Relationships**: `uplink_pool` / `vtep_pool` / `loopback_pool` / `dci_pool` → `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` → `CoreNumberPool`, `mgmt_pool` → `CoreIPAddressPool`, `avd_evpn` → `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` → management kinds. `loopback_pool` is the authoritative source for generated device Loopback0 addresses, `vtep_pool` for generated VTEP loopbacks, and `uplink_pool` for routed link prefixes.
 
 ### `NetworkPod` — `Network.Pod`
 
 A pod within a fabric. Inherits `Network.BuildingBlock` and `Generator.Target`; parented by `NetworkFabric`.
 
 - **Attributes**: `name` (unique), `index`, `amount_of_spines` (default 4), `role` (`fabric`, `cpu`, `storage`), interface-sorting methods, `checksum` (from `Generator.Target`).
-- **Relationships**: `racks` → `LocationRack`, `devices` → `DcimDevice` (the pod's spines), `loopback_pool` / `mlag_peer_pool` / `mlag_l3_pool` → `CoreIPAddressPool`, `prefix_pool` → `CoreIPPrefixPool`.
+- **Relationships**: `racks` → `LocationRack`, `devices` → `DcimDevice` (the pod's spines), `mlag_peer_pool` / `mlag_l3_pool` → `CoreIPAddressPool`.
 
 ### `NetworkBuildingBlock` — `Network.BuildingBlock` (generic)
 
@@ -120,7 +120,7 @@ An IP address. Inherits `BuiltinIPAddress`. Relationships: `interface` → `Inte
 
 An IP prefix. Inherits `BuiltinIPPrefix`.
 
-- **`role`** (required, via `ipam_extensions.yml`): `supernet`, `fabric_supernet`, `super_spine_loopback`, `pod_supernet`, `pod_loopback`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
+- **`role`** (required, via `ipam_extensions.yml`): `supernet`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
 - **`status`** (via `ipam_extensions.yml`): `active`, `deprecated`, `reserved`.
 - **Relationships**: `gateway` → `IpamIPAddress`, `vlan` → `IpamVLAN`, `vrf` → `IpamVRF`, `location` → `Location.Hosting`.
 
@@ -202,7 +202,7 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 
 **Pod role** (`NetworkPod.role`): `fabric`, `cpu`, `storage`.
 
-**Prefix role** (`IpamPrefix.role`): `supernet`, `fabric_supernet`, `super_spine_loopback`, `pod_supernet`, `pod_loopback`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
+**Prefix role** (`IpamPrefix.role`): `supernet`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
 
 **Prefix status** (`IpamPrefix.status`): `active`, `deprecated`, `reserved`.
 

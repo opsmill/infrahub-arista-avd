@@ -46,16 +46,12 @@ def _rack_query_data(
     leaf_count: int = 2,
     l2leaf_template_id: str | None = None,
     l2leaf_count: int = 0,
-    loopback_pool_id: str | None = "loopback-pool",
-    prefix_pool_id: str | None = "prefix-pool",
 ) -> dict:
     if pod_node == "default":
         pod_node = {
             "id": "pod-1",
             "name": {"value": "Pod-A"},
             "index": {"value": 1},
-            "prefix_pool": {"node": {"id": prefix_pool_id} if prefix_pool_id else None},
-            "loopback_pool": {"node": {"id": loopback_pool_id} if loopback_pool_id else None},
             "amount_of_spines": {"value": 2},
             "leaf_interface_sorting_method": {"value": "sort_interfaces"},
             "spine_interface_sorting_method": {"value": "sort_interfaces"},
@@ -68,6 +64,7 @@ def _rack_query_data(
                     "node_id_pool": {"node": None},
                     "mgmt_pool": {"node": None},
                     "vtep_pool": {"node": None},
+                    "loopback_pool": {"node": None},
                 }
             },
         }
@@ -173,8 +170,6 @@ def _iface(name: str, role: str) -> SimpleNamespace:
     ("data", "reason"),
     [
         (_rack_query_data(pod_node=None), "rack has no pod"),
-        (_rack_query_data(loopback_pool_id=None), "pod has no loopback_pool"),
-        (_rack_query_data(prefix_pool_id=None), "pod has no prefix_pool"),
     ],
 )
 async def test_generate_defers_when_required_relationships_are_missing(data: dict, reason: str) -> None:

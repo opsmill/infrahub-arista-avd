@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from infrahub_sdk.generator import InfrahubGenerator
-from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready
 from solution_arista_avd.protocols import DcimDevice, NetworkPod
 
 from .asn import ensure_shared_device_asn
 from .fabric_generator_query import FabricGeneratorQuery
+
+if TYPE_CHECKING:
+    from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
 
 
 class FabricGenerator(InfrahubGenerator, GeneratorMixin):
@@ -16,7 +20,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
     fabric_super_spine_switch_template: str | None
     underlay_routing_protocol: str | None
 
-    loopback_pool: CoreIPAddressPool
+    loopback_pool: CoreIPAddressPool | None
     asn_pool: CoreNumberPool | None
     node_id_pool: CoreNumberPool | None
     mgmt_pool: CoreIPAddressPool | None
@@ -36,11 +40,13 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
         self.super_spine_devices: list[DcimDevice] = []
 
         # Get AVD-related pool references
-        self.asn_pool, self.node_id_pool, self.mgmt_pool, self.vtep_loopback_pool = await self.resolve_avd_pools(
-            data.network_fabric.edges[0].node
-        )
-
-        await self.allocate_resource_pools()
+        (
+            self.asn_pool,
+            self.node_id_pool,
+            self.mgmt_pool,
+            self.loopback_pool,
+            self.vtep_loopback_pool,
+        ) = await self.resolve_avd_pools(data.network_fabric.edges[0].node)
 
         await self.create_super_spine_switches()
 
@@ -81,40 +87,6 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
                 fabric_id=self.fabric_id,
                 allocate_routing_asn=self.allocate_routing_asn,
             )
-
-    async def allocate_resource_pools(self) -> None:
-        fabric_supernet_pool = await self.client.get(kind=CoreIPPrefixPool, name__value="FabricSupernetPool")
-        fabric_supernet = await self.client.allocate_next_ip_prefix(
-            resource_pool=fabric_supernet_pool, identifier=self.fabric_id, data={"role": "fabric_supernet"}
-        )
-
-        fabric_prefix_pool = await self.client.create(
-            kind=CoreIPPrefixPool,
-            name=f"{self.fabric_name}-prefix-pool",
-            default_prefix_type="IpamPrefix",
-            default_prefix_length=24,
-            ip_namespace={"hfid": ["default"]},
-            resources=[fabric_supernet],
-        )
-        await fabric_prefix_pool.save(allow_upsert=True)
-
-        ss_loopback_prefix = await self.client.allocate_next_ip_prefix(
-            resource_pool=fabric_prefix_pool,
-            identifier=self.fabric_id,
-            member_type="address",
-            prefix_length=28,
-            data={"role": "super_spine_loopback"},
-        )
-
-        self.loopback_pool = await self.client.create(
-            kind=CoreIPAddressPool,
-            name=f"{self.fabric_name}-super-spine-loopback-pool",
-            default_address_type="IpamIPAddress",
-            default_prefix_length=32,
-            ip_namespace={"hfid": ["default"]},
-            resources=[ss_loopback_prefix],
-        )
-        await self.loopback_pool.save(allow_upsert=True)
 
     async def update_checksum(self) -> None:
         pods = await self.client.filters(kind=NetworkPod, parent__ids=[self.fabric_id])

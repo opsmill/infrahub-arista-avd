@@ -54,8 +54,14 @@ class GeneratorMixin:
 
     async def resolve_avd_pools(
         self, node: Any
-    ) -> tuple[CoreNumberPool | None, CoreNumberPool | None, CoreIPAddressPool | None, CoreIPAddressPool | None]:
-        """Resolve the (asn, node_id, mgmt, vtep) AVD pools referenced by a fabric node.
+    ) -> tuple[
+        CoreNumberPool | None,
+        CoreNumberPool | None,
+        CoreIPAddressPool | None,
+        CoreIPAddressPool | None,
+        CoreIPAddressPool | None,
+    ]:
+        """Resolve the (asn, node_id, mgmt, loopback, vtep) AVD pools referenced by a fabric node.
 
         The fabric/pod/rack generators all read the same optional pool
         relationships off the fabric (directly, or via the pod's parent). Each
@@ -64,6 +70,7 @@ class GeneratorMixin:
         asn_pool: CoreNumberPool | None = None
         node_id_pool: CoreNumberPool | None = None
         mgmt_pool: CoreIPAddressPool | None = None
+        loopback_pool: CoreIPAddressPool | None = None
         vtep_loopback_pool: CoreIPAddressPool | None = None
 
         asn_rel = getattr(node, "asn_pool", None)
@@ -79,34 +86,53 @@ class GeneratorMixin:
             mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=mgmt_rel.node.id)  # type: ignore[type-abstract]
 
         fabric_name = getattr(getattr(node, "name", None), "value", None)
-        vtep_rel = getattr(node, "vtep_pool", None)
-        if fabric_name and vtep_rel and vtep_rel.node:
-            vtep_loopback_pool = await self._ensure_vtep_loopback_address_pool(
+        loopback_rel = getattr(node, "loopback_pool", None)
+        if fabric_name and loopback_rel and loopback_rel.node:
+            loopback_pool = await self._ensure_address_pool_from_prefix_pool(
                 fabric_name=str(fabric_name).lower(),
-                vtep_prefix_pool_ref=vtep_rel.node,
+                pool_role="loopback",
+                prefix_pool_ref=loopback_rel.node,
             )
 
-        return asn_pool, node_id_pool, mgmt_pool, vtep_loopback_pool
+        vtep_rel = getattr(node, "vtep_pool", None)
+        if fabric_name and vtep_rel and vtep_rel.node:
+            vtep_loopback_pool = await self._ensure_address_pool_from_prefix_pool(
+                fabric_name=str(fabric_name).lower(),
+                pool_role="vtep-loopback",
+                prefix_pool_ref=vtep_rel.node,
+            )
+
+        return asn_pool, node_id_pool, mgmt_pool, loopback_pool, vtep_loopback_pool
 
     async def _ensure_vtep_loopback_address_pool(
         self, *, fabric_name: str, vtep_prefix_pool_ref: object
     ) -> CoreIPAddressPool:
         """Create or update the address pool used for Infrahub-owned VTEP IP allocation."""
-        prefix_ids = await self._prefix_resource_ids(vtep_prefix_pool_ref)
+        return await self._ensure_address_pool_from_prefix_pool(
+            fabric_name=fabric_name,
+            pool_role="vtep-loopback",
+            prefix_pool_ref=vtep_prefix_pool_ref,
+        )
+
+    async def _ensure_address_pool_from_prefix_pool(
+        self, *, fabric_name: str, pool_role: str, prefix_pool_ref: object
+    ) -> CoreIPAddressPool:
+        """Create or update an address pool wrapper around fabric prefix-pool resources."""
+        prefix_ids = await self._prefix_resource_ids(prefix_pool_ref)
         if not prefix_ids:
-            msg = f"Fabric '{fabric_name}': vtep_pool has no prefix resources for VTEP loopback allocation"
+            msg = f"Fabric '{fabric_name}': {pool_role} pool has no prefix resources for IP address allocation"
             raise ValueError(msg)
 
-        vtep_loopback_pool = await self.client.create(
+        address_pool = await self.client.create(
             kind=CoreIPAddressPool,
-            name=f"{fabric_name}-vtep-loopback-address-pool",
+            name=f"{fabric_name}-{pool_role}-address-pool",
             default_address_type="IpamIPAddress",
             default_prefix_length=32,
             ip_namespace={"hfid": ["default"]},
             resources=[{"id": prefix_id} for prefix_id in prefix_ids],
         )
-        await vtep_loopback_pool.save(allow_upsert=True, update_group_context=False)
-        return vtep_loopback_pool
+        await address_pool.save(allow_upsert=True, update_group_context=False)
+        return address_pool
 
     async def _prefix_resource_ids(self, prefix_pool_ref: object) -> list[str]:
         resources = getattr(prefix_pool_ref, "resources", None)

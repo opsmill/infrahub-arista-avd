@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.generator import InfrahubGenerator
-from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 from netutils.interface import sort_interface_list
 
 from solution_arista_avd import sorting as solution_arista_avd_sorting
@@ -32,6 +31,8 @@ from .rack_generator_query import RackGeneratorQuery
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from infrahub_sdk.protocols import CoreIPAddressPool, CoreNumberPool
 
 TASK_LOGGER = logging.getLogger("infrahub.tasks")
 
@@ -73,8 +74,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     leaf_role: str = "leaf"
     spine_role: str = "spine"
 
-    loopback_pool: CoreIPAddressPool
-    prefix_pool: CoreIPPrefixPool
+    loopback_pool: CoreIPAddressPool | None
 
     asn_pool: CoreNumberPool | None
     node_id_pool: CoreNumberPool | None
@@ -130,16 +130,6 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             await self.defer_rack_generation("pod has no parent fabric")
             return
 
-        self.loopback_pool_id = self._relationship_node_id(pod_node.loopback_pool)
-        if not self.loopback_pool_id:
-            await self.defer_rack_generation("pod has no loopback_pool")
-            return
-
-        self.prefix_pool_id = self._relationship_node_id(pod_node.prefix_pool)
-        if not self.prefix_pool_id:
-            await self.defer_rack_generation("pod has no prefix_pool")
-            return
-
         self.pod_id = pod_node.id
         self.pod_index = self._attr_value(pod_node.index, default=0)
         self.pod_name = str(self._attr_value(pod_node.name, default=self.pod_id)).lower()
@@ -171,9 +161,6 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         # Reset generation_complete flag to prevent stale flags during re-runs
         await self.set_rack_generation_complete(False)
 
-        self.loopback_pool = await self.client.get(kind=CoreIPAddressPool, id=self.loopback_pool_id)
-        self.prefix_pool = await self.client.get(kind=CoreIPPrefixPool, id=self.prefix_pool_id)
-
         leaf_interface_sorting_method: str = pod_node.leaf_interface_sorting_method.value
         spine_interface_sorting_method: str = pod_node.spine_interface_sorting_method.value
 
@@ -186,9 +173,13 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.mgmt_pool = None
         self.vtep_loopback_pool = None
 
-        self.asn_pool, self.node_id_pool, self.mgmt_pool, self.vtep_loopback_pool = await self.resolve_avd_pools(
-            fabric_node
-        )
+        (
+            self.asn_pool,
+            self.node_id_pool,
+            self.mgmt_pool,
+            self.loopback_pool,
+            self.vtep_loopback_pool,
+        ) = await self.resolve_avd_pools(fabric_node)
 
         await self.create_leaf_switches()
 

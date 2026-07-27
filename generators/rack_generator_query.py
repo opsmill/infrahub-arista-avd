@@ -110,8 +110,6 @@ class RackGeneratorQueryLocationRackEdgesNodePodNode(BaseModel):
     id: str
     name: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeName"]
     index: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeIndex"]
-    prefix_pool: "RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPool"
-    loopback_pool: "RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPool"
     amount_of_spines: Optional[
         "RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines"
     ]
@@ -130,22 +128,6 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeName(BaseModel):
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeIndex(BaseModel):
     value: Optional[Any]
-
-
-class RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPool(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPoolNode"]
-
-
-class RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPoolNode(BaseModel):
-    id: str
-
-
-class RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPool(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPoolNode"]
-
-
-class RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPoolNode(BaseModel):
-    id: str
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines(BaseModel):
@@ -202,6 +184,7 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric(Base
     vtep_pool: (
         "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPool"
     )
+    loopback_pool: "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool"
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricName(
@@ -300,6 +283,48 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepP
     id: Optional[str]
 
 
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool(
+    BaseModel
+):
+    node: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode"
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode(
+    BaseModel
+):
+    id: str
+    resources: "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResources"
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdges"
+        ]
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdgesNode"
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdgesNode(
+    BaseModel
+):
+    typename__: Literal[
+        "BuiltinIPPrefix", "InternalIPPrefixAvailable", "IpamPrefix"
+    ] = Field(alias="__typename")
+    id: Optional[str]
+
+
 RackGeneratorQuery.model_rebuild()
 RackGeneratorQueryLocationRack.model_rebuild()
 RackGeneratorQueryLocationRackEdges.model_rebuild()
@@ -310,8 +335,6 @@ RackGeneratorQueryLocationRackEdgesNodeParent.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodeParentNode.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePod.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNode.model_rebuild()
-RackGeneratorQueryLocationRackEdgesNodePodNodePrefixPool.model_rebuild()
-RackGeneratorQueryLocationRackEdgesNodePodNodeLoopbackPool.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParent.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool.model_rebuild()
@@ -321,3 +344,7 @@ RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPool.mo
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResources.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNodeResourcesEdges.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNode.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResources.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricLoopbackPoolNodeResourcesEdges.model_rebuild()

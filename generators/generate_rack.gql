@@ -54,18 +54,6 @@ query RackGeneratorQuery($name: String!) {
 						index {
 							value
 						}
-						prefix_pool {
-							node {
-								__typename
-								id
-							}
-						}
-						loopback_pool {
-							node {
-								__typename
-								id
-							}
-						}
 						amount_of_spines {
 							value
 						}
@@ -101,6 +89,19 @@ query RackGeneratorQuery($name: String!) {
 										}
 									}
 									vtep_pool {
+										node {
+											id
+											resources {
+												edges {
+													node {
+														__typename
+														id
+													}
+												}
+											}
+										}
+									}
+									loopback_pool {
 										node {
 											id
 											resources {

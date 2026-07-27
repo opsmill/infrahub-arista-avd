@@ -26,7 +26,7 @@ flowchart TD
 
 | Step | Generator | What it creates |
 |------|-----------|-----------------|
-| 1 | **generate-fabric** | Super-spine switches, allocates IP pools from `FabricSupernetPool` |
+| 1 | **generate-fabric** | Super-spine switches using the fabric loopback, VTEP, management, ASN, and node ID pools |
 | 2 | **generate-pod** | Spine switches for each pod |
 | 3 | **generate-rack** | Leaf switches for each rack |
 | 4 | **generate-avd-device-hostvar** | Per-device PyAVD hostvars (stored in the graph as an `AvdHostvarFile`) |

@@ -63,16 +63,18 @@ NetworkFabric (e.g., "Fabric-A")
 
 ## IP Address Management
 
-Hierarchical pool allocation:
+Fabric-level pool allocation:
 
 ```
-FabricSupernetPool (e.g., 10.0.0.0/8)
-├── CoreIPPrefixPool: Loopback Pool (e.g., 10.255.0.0/16)
-│   └── CoreIPAddressPool: Device loopbacks
-├── CoreIPPrefixPool: Interconnect Pool (e.g., 10.250.0.0/16)
-│   └── CoreIPAddressPool: Point-to-point links
-├── CoreIPPrefixPool: Management Pool (e.g., 10.254.0.0/16)
-│   └── CoreIPAddressPool: OOB management
+NetworkFabric
+├── loopback_pool: CoreIPPrefixPool
+│   └── Internal CoreIPAddressPool wrapper: Loopback0 addresses
+├── vtep_pool: CoreIPPrefixPool
+│   └── Internal CoreIPAddressPool wrapper: VTEP loopback addresses
+├── uplink_pool: CoreIPPrefixPool
+│   └── Prefix allocations for point-to-point links
+├── mgmt_pool: CoreIPAddressPool
+│   └── OOB management addresses
 ├── CoreNumberPool: ASN Pool (65000-65999)
 │   └── Tier-aware eBGP ASN allocation: shared super-spine ASN per fabric, shared spine ASN per pod, leaf ASNs per device or MLAG domain
 └── CoreNumberPool: Node ID Pool (1-65535)
@@ -86,7 +88,7 @@ Generators run in sequence to build infrastructure:
 ```
 ┌─────────────────────────┐
 │  1. FabricGenerator     │  Triggered on: NetworkFabric
-│  - Allocate IP pools    │  Creates: Super-spine devices
+│  - Resolve fabric pools │  Creates: Super-spine devices
 │  - Create super-spines  │
 └───────────┬─────────────┘
             ▼

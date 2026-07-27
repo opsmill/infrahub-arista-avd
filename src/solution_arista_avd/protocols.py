@@ -336,8 +336,6 @@ class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
     spine_interface_sorting_method: Dropdown
     devices: RelationshipManager[DcimDevice]
     evpn_domain: RelationshipAttribute[EvpnDomain]
-    loopback_pool: RelationshipAttribute[CoreIPAddressPool]
-    prefix_pool: RelationshipAttribute[CoreIPPrefixPool]
     racks: RelationshipManager[LocationRack]
     spine_switch_template: RelationshipAttribute[CoreObjectTemplate]
 

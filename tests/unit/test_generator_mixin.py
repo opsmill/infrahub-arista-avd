@@ -178,6 +178,36 @@ async def test_ensure_vtep_loopback_address_pool_uses_prefix_pool_resources() ->
 
 
 @pytest.mark.asyncio
+async def test_resolve_avd_pools_creates_loopback_and_vtep_address_pools_from_fabric_prefix_pools() -> None:
+    gen = _make_generator()
+    loopback_address_pool = SimpleNamespace(save=AsyncMock())
+    vtep_address_pool = SimpleNamespace(save=AsyncMock())
+    gen.client.create.side_effect = [loopback_address_pool, vtep_address_pool]
+    loopback_prefix_pool = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("loopback-prefix")]))
+    vtep_prefix_pool = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("vtep-prefix")]))
+    fabric = SimpleNamespace(
+        name=SimpleNamespace(value="Fabric-A"),
+        asn_pool=SimpleNamespace(node=None),
+        node_id_pool=SimpleNamespace(node=None),
+        mgmt_pool=SimpleNamespace(node=None),
+        loopback_pool=SimpleNamespace(node=loopback_prefix_pool),
+        vtep_pool=SimpleNamespace(node=vtep_prefix_pool),
+    )
+
+    result = await gen.resolve_avd_pools(fabric)
+
+    assert result == (None, None, None, loopback_address_pool, vtep_address_pool)
+    assert [call.kwargs["name"] for call in gen.client.create.await_args_list] == [
+        "fabric-a-loopback-address-pool",
+        "fabric-a-vtep-loopback-address-pool",
+    ]
+    assert gen.client.create.await_args_list[0].kwargs["resources"] == [{"id": "loopback-prefix"}]
+    assert gen.client.create.await_args_list[1].kwargs["resources"] == [{"id": "vtep-prefix"}]
+    loopback_address_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+    vtep_address_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+
+
+@pytest.mark.asyncio
 async def test_set_device_vtep_loopback_ip_uses_targeted_mutation() -> None:
     gen = _make_generator()
 
