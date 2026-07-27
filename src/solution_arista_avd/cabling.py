@@ -138,7 +138,14 @@ def _relationship_node_id(relationship: object | None) -> str | None:
     relationship_id = getattr(relationship, "id", None)
     if isinstance(relationship_id, str) and relationship_id:
         return relationship_id
-    node = getattr(relationship, "node", None) or getattr(relationship, "peer", None)
+    node = getattr(relationship, "node", None)
+    if node is None:
+        try:
+            node = getattr(relationship, "peer", None)
+        except ValueError as exc:
+            if str(exc) == "Node must have at least one identifier (ID or HFID) to query it.":
+                return None
+            raise
     node_id = getattr(node, "id", None)
     if isinstance(node_id, str) and node_id:
         return node_id
