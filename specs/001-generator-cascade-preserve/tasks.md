@@ -110,7 +110,7 @@
 - [X] T030 Run focused unit validation from `specs/001-generator-cascade-preserve/quickstart.md` against `tests/unit/test_generate_fabric.py`, `tests/unit/test_generate_pod.py`, `tests/unit/test_generator_mixin.py`, and `tests/unit/test_generate_rack.py`
 - [X] T031 Run full local validation from `specs/001-generator-cascade-preserve/quickstart.md` with `uv run pytest tests/unit` and `uv run invoke lint`
 - [ ] T032 Use `$infrahub-run-integration-tests` for the generator code changes and record branch/commit evidence in `specs/001-generator-cascade-preserve/quickstart.md`
-- [ ] T033 Use `$infrahub-test-generator-idempotence` when live validation is permitted and record repeated-run no-drift evidence in `specs/001-generator-cascade-preserve/quickstart.md`
+- [X] T033 Use `$infrahub-test-generator-idempotence` when live validation is permitted and record repeated-run no-drift evidence in `specs/001-generator-cascade-preserve/quickstart.md`
 - [X] T034 Add unit coverage in `tests/unit/test_generator_mixin.py` proving `GeneratorMixin.create_avd_device()` logs or records preserved, populated, and skipped field decisions for the target device
 
 ---
@@ -211,4 +211,4 @@ Task: "T026 [US3] Verify no override input is added to service_catalog/pages/4_F
 ## Phase 7: Convergence
 
 - [ ] T035 CRITICAL complete remote integration validation with `$infrahub-run-integration-tests` and record tested branch/commit evidence in `specs/001-generator-cascade-preserve/quickstart.md` per Constitution IV / T032 (missing)
-- [ ] T036 CRITICAL complete live generator idempotence validation with `$infrahub-test-generator-idempotence` when permitted, or record an approved repeated-run validation exception in `specs/001-generator-cascade-preserve/quickstart.md`, per Constitution II / T033 (missing)
+- [X] T036 CRITICAL complete live generator idempotence validation with `$infrahub-test-generator-idempotence` when permitted, or record an approved repeated-run validation exception in `specs/001-generator-cascade-preserve/quickstart.md`, per Constitution II / T033 (missing)
