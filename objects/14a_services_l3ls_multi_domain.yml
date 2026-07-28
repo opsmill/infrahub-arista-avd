@@ -1,4 +1,32 @@
 ---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamL2Domain
+  data:
+    - name: Fabric-L3LS-Multi-Domain
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVLAN
+  data:
+    - name: L3LS-DC1
+      vlan_id: 21
+      status: active
+      role: user
+      l2domain: Fabric-L3LS-Multi-Domain
+    - name: L2LS-DC2
+      vlan_id: 22
+      status: active
+      role: user
+      l2domain: Fabric-L3LS-Multi-Domain
+    - name: L3LS-STRETCHED
+      vlan_id: 29
+      status: active
+      role: user
+      l2domain: Fabric-L3LS-Multi-Domain
+---
 # ============================================================================
 # EVPN Services for the Fabric-L3LS-Multi-Domain fabric
 # Tenant "Arista" with VRF20 routed and stretched services.
@@ -41,7 +69,7 @@ spec:
   data:
     - name: VRF20
       namespace: default
-      vrf_vni: 10
+      vrf_vni: 20
 ---
 # EVPN Tenant linked to the generated lab fabric.
 apiVersion: infrahub.app/v1
@@ -67,6 +95,7 @@ spec:
       ip_address_virtual: "10.20.21.1/24"
       enabled: true
       vrf: VRF20
+      vlan: L3LS-DC1
       avd_tags:
         - DC1
     - name: VLAN22_DC2
@@ -74,6 +103,7 @@ spec:
       ip_address_virtual: "10.20.22.1/24"
       enabled: true
       vrf: VRF20
+      vlan: L3LS-DC2
       avd_tags:
         - DC2
     - name: VLAN29_STRETCHED
@@ -81,6 +111,7 @@ spec:
       ip_address_virtual: "10.20.29.1/24"
       enabled: true
       vrf: VRF20
+      vlan: L3LS-STRETCHED
       avd_tags:
         - DC1
         - DC2

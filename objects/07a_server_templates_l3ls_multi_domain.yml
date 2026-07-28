@@ -1,0 +1,48 @@
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ProfileDcimInterface
+  data:
+    - profile_name: "profile-server-dc1"
+      role: "server"
+      mtu: 9000
+      tagged_vlan:
+        - ["L3LS-DC1"]
+        - ["L3LS-STRETCHED"]
+    - profile_name: "profile-server-dc2"
+      role: "server"
+      mtu: 9000
+      tagged_vlan:
+        - ["L3LS-DC2"]
+        - ["L3LS-STRETCHED"]
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: TemplateComputePhysicalServer
+  parameters:
+    expand_range: true
+  data:
+    - template_name: "compute-server-dual-dc1"
+      role: "compute"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "ComputeServerDualEthernet[1-2]"
+            name: "Ethernet[1-2]"
+            profiles: ["profile-server-dc1"]
+    - template_name: "compute-server-dual-dc2"
+      role: "compute"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "ComputeServerDualEthernet[1-2]"
+            name: "Ethernet[1-2]"
+            profiles: ["profile-server-dc2"]

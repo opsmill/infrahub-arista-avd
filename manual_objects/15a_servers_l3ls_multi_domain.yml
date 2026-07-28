@@ -10,10 +10,10 @@ spec:
     - name: "dc1-server"
       status: "provisioning"
       rack: "DC1_ACCESS"
-      object_template: "compute-server-dual"
+      object_template: "compute-server-dual-dc1"
       member_of_groups: ["servers"]
     - name: "dc2-server"
       status: "provisioning"
       rack: "DC2_ACCESS"
-      object_template: "compute-server-dual"
+      object_template: "compute-server-dual-dc2"
       member_of_groups: ["servers"]

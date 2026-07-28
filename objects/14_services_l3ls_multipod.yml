@@ -1,0 +1,157 @@
+---
+# L2 Domain for Fabric-L3LS-MultiPod-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamL2Domain
+  data:
+    - name: Fabric-L3LS-MultiPod-A-L2Domain
+---
+# VLANs for Fabric-L3LS-MultiPod-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVLAN
+  data:
+    - name: MGMT
+      vlan_id: 100
+      status: active
+      role: management
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: Users
+      vlan_id: 200
+      status: active
+      role: user
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: Servers
+      vlan_id: 300
+      status: active
+      role: server
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: Storage
+      vlan_id: 400
+      status: active
+      role: server
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: Backup
+      vlan_id: 500
+      status: active
+      role: server
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: DMZ
+      vlan_id: 600
+      status: active
+      role: server
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: Guest
+      vlan_id: 700
+      status: active
+      role: user
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: VoIP
+      vlan_id: 800
+      status: active
+      role: user
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: Provisioning
+      vlan_id: 900
+      status: provisioning
+      role: server
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+    - name: Legacy
+      vlan_id: 999
+      status: drained
+      role: server
+      l2domain: Fabric-L3LS-MultiPod-A-L2Domain
+---
+# AVD EVPN settings for Fabric-L3LS-MultiPod-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: AvdEvpn
+  data:
+    - name: "Fabric-L3LS-MultiPod-A-EVPN"
+      ebgp_multihop: 3
+      overlay_bgp_rtc: false
+---
+# VRFs for Fabric-L3LS-MultiPod-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVRF
+  data:
+    - name: VRF10
+      vrf_rd: "10:10"
+      namespace: default
+      vrf_vni: 10
+      vtep_diagnostic_loopback: 10
+      vtep_diagnostic_loopback_ip_range: "10.255.10.0/27"
+    - name: VRF11
+      vrf_rd: "11:11"
+      namespace: default
+      vrf_vni: 11
+      vtep_diagnostic_loopback: 11
+      vtep_diagnostic_loopback_ip_range: "10.255.11.0/27"
+---
+# EVPN Tenant for Fabric-L3LS-MultiPod-A
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnTenant
+  data:
+    - name: TENANT1
+      mac_vrf_vni_base: 10000
+      fabrics:
+        - "Fabric-L3LS-MultiPod-A"
+      vrfs:
+        - VRF10
+        - VRF11
+---
+# SVIs for VRF10
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnSvi
+  data:
+    - name: "Servers-11"
+      svi_id: 11
+      ip_address_virtual: "10.10.11.1/24"
+      enabled: true
+      vrf: VRF10
+      vlan: Servers
+    - name: "Users-12"
+      svi_id: 12
+      ip_address_virtual: "10.10.12.1/24"
+      enabled: true
+      vrf: VRF10
+      vlan: Users
+---
+# SVIs for VRF11
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnSvi
+  data:
+    - name: "Storage-21"
+      svi_id: 21
+      ip_address_virtual: "10.10.21.1/24"
+      enabled: true
+      vrf: VRF11
+      vlan: Storage
+    - name: "Backup-22"
+      svi_id: 22
+      ip_address_virtual: "10.10.22.1/24"
+      enabled: true
+      vrf: VRF11
+      vlan: Backup
+---
+# L2-only VLAN in TENANT1 (no gateway)
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnL2Vlan
+  data:
+    - name: "Guest-L2"
+      vlan_id: 700
+      tenant: TENANT1
+      vlan: Guest
