@@ -16,7 +16,7 @@ spec:
       status: active
       role: user
       l2domain: Fabric-L3LS-Multi-Domain
-    - name: L2LS-DC2
+    - name: L3LS-DC2
       vlan_id: 22
       status: active
       role: user
