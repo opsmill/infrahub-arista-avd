@@ -50,19 +50,57 @@ The device and interface `role` dropdowns that the fabric uses are defined in `d
 
 Top-level container for a datacenter fabric. Inherits `Network.BuildingBlock` and `CoreArtifactTarget`; parents `NetworkPod`.
 
-- **Attributes**: `name` (unique), `index`, `amount_of_super_spines` (default 4), interface-sorting methods, `mgmt_gateway`, `avd_hostvars_ready`. L3LS attributes (via `l3ls_extensions.yml`): `underlay_routing_protocol` (`ebgp`/`ospf`), `overlay_routing_protocol` (`ebgp`/`ibgp`), `p2p_uplinks_mtu`, `spanning_tree_mode`, `virtual_router_mac`, EVPN/underlay/MLAG passwords, `anta_enabled`.
-- **Relationships**: `uplink_pool` / `vtep_pool` / `loopback_pool` / `dci_pool` → `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` → `CoreNumberPool`, `mgmt_pool` → `CoreIPAddressPool`, `avd_evpn` → `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` → management kinds. `loopback_pool` is the authoritative source for generated device Loopback0 addresses, `vtep_pool` for generated VTEP loopbacks, and `uplink_pool` for routed link prefixes.
+- **Attributes**: `name` (unique), `index`, interface-sorting methods, `mgmt_gateway`, `avd_hostvars_ready`. L3LS attributes (via `l3ls_extensions.yml`): `underlay_routing_protocol` (`ebgp`/`ospf`), `overlay_routing_protocol` (`ebgp`/`ibgp`), `p2p_uplinks_mtu`, `spanning_tree_mode`, `virtual_router_mac`, EVPN/underlay/MLAG passwords, `anta_enabled`.
+- **Relationships**: `device_designs` → `NetworkFabricDeviceDesign` (super-spine sizing), `uplink_pool` / `vtep_pool` / `loopback_pool` / `dci_pool` → `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` → `CoreNumberPool`, `mgmt_pool` → `CoreIPAddressPool`, `avd_evpn` → `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` → management kinds. `loopback_pool` is the authoritative source for generated device Loopback0 addresses, `vtep_pool` for generated VTEP loopbacks, and `uplink_pool` for routed link prefixes.
 
 ### `NetworkPod` — `Network.Pod`
 
 A pod within a fabric. Inherits `Network.BuildingBlock` and `Generator.Target`; parented by `NetworkFabric`.
 
-- **Attributes**: `name` (unique), `index`, `amount_of_spines` (default 4), `role` (`fabric`, `cpu`, `storage`), interface-sorting methods, `checksum` (from `Generator.Target`).
-- **Relationships**: `racks` → `LocationRack`, `devices` → `DcimDevice` (the pod's spines), `mlag_peer_pool` / `mlag_l3_pool` → `CoreIPAddressPool`.
+- **Attributes**: `name` (unique), `index`, `role` (`fabric`, `cpu`, `storage`), interface-sorting methods, `checksum` (from `Generator.Target`).
+- **Relationships**: `device_designs` → `NetworkPodDeviceDesign` (spine sizing), `racks` → `LocationRack`, `devices` → `DcimDevice` (the pod's spines), `mlag_peer_pool` / `mlag_l3_pool` → `CoreIPAddressPool`.
 
 ### `NetworkBuildingBlock` — `Network.BuildingBlock` (generic)
 
 Hierarchical base for `NetworkFabric` and `NetworkPod`. Attributes: `name` (unique), `index`.
+
+### Device design entities — `Network.DeviceDesign` (generic)
+
+Normalized description of the devices a container should produce, defined in `device_design.yml`. Instead of a fixed `<role>_switch_template` relationship plus an `amount_of_<role>s` attribute per role, each container relates to *many* device design entities — one per device role — through a `device_designs` relationship.
+
+- **`NetworkDeviceDesign`** (generic): `role` (`super_spine`, `spine`, `leaf`, `l2leaf`), `device_quantity` (Number ≥ 1), and `device_template` → `CoreObjectTemplate` (cardinality one; `on_delete: no-action`, so the shared template survives a design deletion). `role` is authoritative for generation.
+- **Concrete nodes**, each inheriting the generic and parented by one container:
+  - `NetworkFabricDeviceDesign` → parent `NetworkFabric` (super-spine designs)
+  - `NetworkPodDeviceDesign` → parent `NetworkPod` (spine designs)
+  - `NetworkRackDeviceDesign` → parent `LocationRack` (leaf / l2leaf designs)
+- **Ownership**: each container's `device_designs` is a `Component` (many, `on_delete: cascade`) — deleting the container deletes its designs; the templates are untouched.
+- **Identity**: a design is unique per `(container, role)`; `human_friendly_id` is `"<container-name>__<role>"`. "None of a role" is the **absence** of a design (replacing `amount_of_*: 0`).
+
+In seed data, designs are nested under their container. A rack with an MLAG leaf
+pair and a single L2 leaf looks like this (from `objects/11_rack.yml`):
+
+```yaml
+- name: "Rack-A2-1"
+  index: 1
+  rack_type: compute
+  pod: Pod-A2
+  parent: "Hall-A1"
+  device_designs:
+    data:
+      - role: leaf
+        device_quantity: 2
+        device_template: leaf-switch-compute
+      - role: l2leaf
+        device_quantity: 1
+        device_template: l2leaf-switch
+  member_of_groups: ["racks"]
+```
+
+Omit a role's entry to get none of that device type — a rack with no `l2leaf`
+design gets no L2 leaves. Fabric and pod designs follow the same shape with
+`role: super_spine` and `role: spine` respectively.
+
+Adding a new device design for a supported role is data, not a schema change. Device designs are the only source of device sizing: the fabric, pod, and rack generators read `device_designs` exclusively, and the legacy paired fields they replaced (`amount_of_super_spines` / `super_spine_switch_template`, `amount_of_spines` / `spine_switch_template`, `amount_of_leafs` / `leaf_switch_template`, `amount_of_l2leafs` / `l2leaf_switch_template`) no longer exist in the schema.
 
 ### `NetworkLink` — `Network.Link`
 
@@ -107,8 +145,8 @@ A datacenter hall. Inherits `Location.Generic`; parents `LocationRack`. Attribut
 
 A physical rack. Inherits `Location.Generic`, `Location.Hosting`, and `Generator.Target`; parented by `LocationHall`.
 
-- **Attributes**: `name`, `index`, `rack_type` (`compute`, `storage`), `amount_of_leafs` (1–2), `amount_of_l2leafs` (via `l3ls_extensions.yml`), `generation_complete`, `checksum`.
-- **Relationships**: `pod` → `NetworkPod`, `devices` → `DcimPhysicalDevice`, `leaf_switch_template` / `l2leaf_switch_template` → `CoreObjectTemplate`.
+- **Attributes**: `name`, `index`, `rack_type` (`compute`, `storage`), `mlag`, `generation_complete`, `checksum`.
+- **Relationships**: `device_designs` → `NetworkRackDeviceDesign` (leaf and l2leaf sizing), `pod` → `NetworkPod`, `devices` → `DcimPhysicalDevice`.
 
 ## IPAM
 

@@ -3,9 +3,6 @@ query PodGeneratorQuery($name: String!) {
     edges {
       node {
         id
-        amount_of_spines {
-          value
-        }
         name {
           value
         }
@@ -18,10 +15,22 @@ query PodGeneratorQuery($name: String!) {
         role {
           value
         }
-        spine_switch_template {
-          node {
-            __typename
-            id
+        device_designs {
+          edges {
+            node {
+              role {
+                value
+              }
+              device_quantity {
+                value
+              }
+              device_template {
+                node {
+                  __typename
+                  id
+                }
+              }
+            }
           }
         }
         parent {
@@ -32,9 +41,6 @@ query PodGeneratorQuery($name: String!) {
               value
             }
             ... on NetworkFabric {
-              amount_of_super_spines {
-                value
-              }
               underlay_routing_protocol {
                 value
               }
@@ -43,6 +49,24 @@ query PodGeneratorQuery($name: String!) {
               }
               spine_interface_sorting_method {
                 value
+              }
+              device_designs {
+                edges {
+                  node {
+                    role {
+                      value
+                    }
+                    device_quantity {
+                      value
+                    }
+                    device_template {
+                      node {
+                        __typename
+                        id
+                      }
+                    }
+                  }
+                }
               }
               asn_pool {
                 node {

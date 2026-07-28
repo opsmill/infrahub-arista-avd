@@ -122,12 +122,86 @@ async def wait_until(
         await asyncio.sleep(interval)
 
 
+async def device_design_mismatches(client: InfrahubClient, branch: str) -> list[str]:
+    """Compare each pod's and rack's generated devices against its device designs.
+
+    Device designs are the sole source of sizing, so for each container and each
+    design role the number of devices produced must equal ``device_quantity``.
+    The design ``role`` names a tier, which the generators map onto a device role
+    using the fabric's underlay (non-L3LS example fabrics use l2spine / l3spine /
+    p / pe / l2leaf), so the same mapping is applied here.
+
+    The fabric tier is covered separately by ``expected_super_spine_count``.
+
+    Returns a list of human-readable mismatch descriptions; empty means parity.
+    """
+    from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY
+
+    def device_role(design_role: str, underlay: str | None) -> str:
+        if underlay is None:
+            return design_role
+        if design_role == "spine":
+            return SPINE_ROLE_BY_UNDERLAY.get(underlay, "spine")
+        if design_role == "leaf":
+            return LEAF_ROLE_BY_UNDERLAY.get(underlay, "leaf")
+        return design_role
+
+    # Underlay per pod (from its fabric) and per rack (from its pod).
+    underlay_by_pod: dict[str, str | None] = {}
+    pods = await client.all(kind="NetworkPod", branch=branch)
+    for pod in pods:
+        fabric = await client.get(kind="NetworkFabric", id=pod.parent.id, branch=branch)
+        protocol = getattr(fabric, "underlay_routing_protocol", None)
+        underlay_by_pod[pod.id] = protocol.value if protocol else None
+    racks = await client.all(kind="LocationRack", branch=branch)
+    underlay_by_rack = {rack.id: underlay_by_pod.get(rack.pod.id) if rack.pod else None for rack in racks}
+
+    # Devices bucketed by their rack, else by their pod (spines and super-spines).
+    per_rack: dict[str, dict[str, int]] = {}
+    per_pod: dict[str, dict[str, int]] = {}
+    for device in await client.all(kind="DcimDevice", branch=branch, prefetch_relationships=False):
+        bucket = per_rack.setdefault(device.rack.id, {}) if device.rack.id else None
+        if bucket is None and device.pod.id:
+            bucket = per_pod.setdefault(device.pod.id, {})
+        if bucket is not None:
+            bucket[device.role.value] = bucket.get(device.role.value, 0) + 1
+
+    mismatches: list[str] = []
+
+    async def check(design_kind: str, parent_attr: str, container_kind: str) -> None:
+        for design in await client.all(kind=design_kind, branch=branch):
+            container_id = getattr(design, parent_attr).id
+            role = design.role.value
+            want = int(design.device_quantity.value)
+            if parent_attr == "rack":
+                actual, underlay = per_rack.get(container_id, {}), underlay_by_rack.get(container_id)
+            else:
+                actual, underlay = per_pod.get(container_id, {}), underlay_by_pod.get(container_id)
+            mapped = device_role(role, underlay)
+            got = actual.get(mapped, 0)
+            if got != want:
+                container = await client.get(kind=container_kind, id=container_id, branch=branch)
+                mismatches.append(
+                    f"{container_kind} {container.name.value} design_role={role} -> "
+                    f"device_role={mapped}: design={want} actual={got}"
+                )
+
+    await check("NetworkPodDeviceDesign", "pod", "NetworkPod")
+    await check("NetworkRackDeviceDesign", "rack", "LocationRack")
+    return mismatches
+
+
 async def expected_super_spine_count(client: InfrahubClient, branch: str) -> int:
-    """Sum ``amount_of_super_spines`` across all fabrics (derive, don't hardcode)."""
-    fabrics = await client.all(kind="NetworkFabric", branch=branch)
+    """Sum the ``super_spine`` design quantities across all fabrics.
+
+    Derives the expected count from the fabrics' ``device_designs`` rather than
+    hardcoding it; a fabric with no ``super_spine`` design contributes nothing.
+    """
+    designs = await client.all(kind="NetworkFabricDeviceDesign", branch=branch)
     total = 0
-    for fabric in fabrics:
-        amount = getattr(fabric, "amount_of_super_spines", None)
-        if amount is not None and amount.value is not None:
-            total += int(amount.value)
+    for design in designs:
+        if design.role.value != "super_spine":
+            continue
+        if design.device_quantity.value is not None:
+            total += int(design.device_quantity.value)
     return total

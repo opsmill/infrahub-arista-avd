@@ -44,16 +44,20 @@ spec:
           - attribute_name: index
             value_match: any
 
-    - name: trigger-pod-generator-update-amount-of-spines
+    # Spine sizing lives on the pod's device_designs (role `spine`), so the
+    # trigger watches that relationship. `updated` covers a design being added
+    # or removed; editing device_quantity on an existing design mutates the
+    # design node rather than the pod, so that case needs an explicit run.
+    - name: trigger-pod-generator-update-device-designs
       branch_scope: "other_branches"
       node_kind: NetworkPod
       mutation_action: "updated"
       action: run-pod-generator
       matches:
-        kind: CoreNodeTriggerAttributeMatch
+        kind: CoreNodeTriggerRelationshipMatch
         data:
-          - attribute_name: amount_of_spines
-            value_match: any
+          - relationship_name: device_designs
+            modification_type: updated
 
     - name: trigger-pod-generator-update-role
       branch_scope: "other_branches"

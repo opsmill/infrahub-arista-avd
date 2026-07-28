@@ -20,28 +20,42 @@ def _make_generator() -> FabricGenerator:
     return gen
 
 
+def _design_edge(role: str, quantity: int, template_id: str | None) -> dict:
+    """Build a single device_designs edge for a role."""
+    template_node = {"__typename": "TemplateDcimDevice", "id": template_id} if template_id else None
+    return {
+        "node": {
+            "role": {"value": role},
+            "device_quantity": {"value": quantity},
+            "device_template": {"node": template_node},
+        }
+    }
+
+
 def _pod_query_data(*, amount_of_super_spines: int, underlay_routing_protocol: str = "ebgp") -> dict:
+    fabric_designs = (
+        [_design_edge("super_spine", amount_of_super_spines, "ss-template")] if amount_of_super_spines > 0 else []
+    )
     return {
         "NetworkPod": {
             "edges": [
                 {
                     "node": {
                         "id": "pod-1",
-                        "amount_of_spines": {"value": 2},
                         "name": {"value": "infrahub-dc1"},
                         "checksum": {"value": "old-checksum"},
                         "index": {"value": 1},
                         "role": {"value": "cpu"},
-                        "spine_switch_template": {"node": {"__typename": "TemplateDcimDevice", "id": "spine-template"}},
+                        "device_designs": {"edges": [_design_edge("spine", 2, "spine-template")]},
                         "parent": {
                             "node": {
                                 "__typename": "NetworkFabric",
                                 "id": "fabric-1",
                                 "name": {"value": "INFRAHUB_AVD"},
-                                "amount_of_super_spines": {"value": amount_of_super_spines},
                                 "underlay_routing_protocol": {"value": underlay_routing_protocol},
                                 "fabric_interface_sorting_method": {"value": "create_sorted_device_interface_map"},
                                 "spine_interface_sorting_method": {"value": "create_sorted_device_interface_map"},
+                                "device_designs": {"edges": fabric_designs},
                                 "asn_pool": {"node": None},
                                 "node_id_pool": {"node": None},
                                 "mgmt_pool": {"node": None},
@@ -59,7 +73,7 @@ def _pod_query_data(*, amount_of_super_spines: int, underlay_routing_protocol: s
 def _fabric_query_data(
     *, amount_of_super_spines: int, template_id: str | None, underlay_routing_protocol: str = "ebgp"
 ) -> dict:
-    template_node = {"__typename": "TemplateDcimDevice", "id": template_id} if template_id else None
+    designs = [_design_edge("super_spine", amount_of_super_spines, template_id)] if template_id else []
     return {
         "NetworkFabric": {
             "edges": [
@@ -67,9 +81,8 @@ def _fabric_query_data(
                     "node": {
                         "id": "fabric-1",
                         "name": {"value": "INFRAHUB_AVD"},
-                        "amount_of_super_spines": {"value": amount_of_super_spines},
                         "underlay_routing_protocol": {"value": underlay_routing_protocol},
-                        "super_spine_switch_template": {"node": template_node},
+                        "device_designs": {"edges": designs},
                         "mgmt_gateway": {"value": None},
                         "asn_pool": {"node": None},
                         "node_id_pool": {"node": None},

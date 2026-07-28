@@ -81,6 +81,35 @@ class GeneratorMixin:
         "vtep_loopback_ip",
     ]
 
+    @staticmethod
+    def resolve_device_designs(device_designs: Any) -> dict[str, tuple[str | None, int]]:
+        """Map a container's ``device_designs`` relationship to ``{role: (template_id, quantity)}``.
+
+        ``device_designs`` is the relationship object from a generated query
+        model (it exposes ``.edges``, each ``.node`` carrying ``role``,
+        ``device_quantity``, and a ``device_template`` relationship). A role
+        with no design is simply absent from the returned map — see
+        ``device_design_for`` for the absence-means-none default. The schema
+        uniqueness constraint ``(container, role)`` guarantees at most one design
+        per role, so later edges never silently shadow earlier ones in practice.
+        """
+        resolved: dict[str, tuple[str | None, int]] = {}
+        for edge in getattr(device_designs, "edges", None) or []:
+            node = edge.node
+            template = node.device_template.node
+            resolved[node.role.value] = (template.id if template else None, node.device_quantity.value)
+        return resolved
+
+    @classmethod
+    def device_design_for(cls, device_designs: Any, role: str) -> tuple[str | None, int]:
+        """Return ``(template_id, quantity)`` for one role's device design.
+
+        Returns ``(None, 0)`` when the container has no design for ``role``
+        (absence-means-none): the generator creates zero devices of that role
+        and does not error, replacing the previous ``amount_of_<role>s: 0`` idiom.
+        """
+        return cls.resolve_device_designs(device_designs).get(role, (None, 0))
+
     def calculate_checksum(self) -> str:
         """Calculates a checksum of the generator based on the related ids during the session"""
 

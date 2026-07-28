@@ -29,13 +29,6 @@ nodes:
     children: NetworkPod
     include_in_menu: false
     attributes:
-      - name: amount_of_super_spines
-        label: Amount of Super Spine switches
-        kind: Number
-        optional: false
-        default_value: 4
-        branch: aware
-        order_weight: 1000
       - name: fabric_interface_sorting_method
         kind: Dropdown
         branch: aware
@@ -79,14 +72,6 @@ nodes:
         branch: aware
         order_weight: 4100
     relationships:
-      - name: super_spine_switch_template
-        branch: aware
-        peer: CoreObjectTemplate
-        kind: Attribute
-        cardinality: one
-        optional: true
-        identifier: "fabric__super_spine_template"
-        order_weight: 4000
       - name: asn_pool
         label: BGP ASN Pool
         peer: CoreNumberPool
@@ -130,13 +115,6 @@ nodes:
     children: ""
     include_in_menu: false
     attributes:
-      - name: amount_of_spines
-        label: Amount of Spine switches
-        branch: aware
-        kind: Number
-        optional: false
-        default_value: 4
-        order_weight: 1000
       - name: role
         kind: Dropdown
         branch: aware
@@ -171,13 +149,6 @@ nodes:
         default_value: create_sorted_device_interface_map
         order_weight: 4000
     relationships:
-      - name: spine_switch_template
-        peer: CoreObjectTemplate
-        branch: aware
-        kind: Attribute
-        cardinality: one
-        identifier: "pod__spine_template"
-        order_weight: 5000
       - name: racks
         peer: LocationRack
         branch: aware

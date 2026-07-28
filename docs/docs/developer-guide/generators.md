@@ -30,6 +30,50 @@ Each generator consists of:
 └──────────────────┘     └────────────────────┘     └─────────────────┘
 ```
 
+## Device-design-driven generation
+
+The fabric, pod, and rack generators take device counts and templates from their
+container's `device_designs` relationship — not from per-role fields on the
+container. Each design carries a `role`, a `device_quantity`, and a
+`device_template`; see [Schemas](schemas.md#device-design-entities--networkdevicedesign-generic)
+for the entity itself.
+
+Every generator resolves designs through the same `GeneratorMixin` helper:
+
+```python
+# Which super-spines should this fabric have?
+template_id, quantity = self.device_design_for(fabric_node.device_designs, "super_spine")
+```
+
+`device_design_for` returns `(template_id, quantity)`, or `(None, 0)` when the
+container has no design for that role. **Absence means none**: a rack with no
+`l2leaf` design gets no L2 leaves, and the generator does not error. This
+replaces the older "set the count to `0`" idiom.
+
+Which role each tier reads:
+
+| Generator | Container | Design roles read |
+| --- | --- | --- |
+| `FabricGenerator` | `NetworkFabric` | `super_spine` |
+| `PodGenerator` | `NetworkPod` | `spine` |
+| `RackGenerator` | `LocationRack` | `leaf`, `l2leaf` |
+
+### Cross-tier completeness reads
+
+A generator also reads the *upstream* container's designs to decide whether its
+prerequisites exist yet, so a partially-generated fabric defers instead of
+producing a half-cabled topology:
+
+- `PodGenerator` reads the fabric's `super_spine` design. If the fabric expects
+  super-spines but they do not all exist yet, the pod generator waits rather
+  than cabling spines to an incomplete super-spine layer. A fabric with no
+  `super_spine` design skips super-spine uplinks entirely.
+- `RackGenerator` reads the pod's `spine` design and compares it to the spines
+  that exist, applying the same rule before cabling leaves upward.
+
+These reads are why the generator `.gql` queries select `device_designs` on the
+parent as well as on the target.
+
 ## Generators
 
 ### FabricGenerator
@@ -47,7 +91,7 @@ Each generator consists of:
    - `mgmt_pool` for management addresses
    - `asn_pool` for BGP autonomous systems
    - `node_id_pool` for unique device identifiers
-3. Create super-spine devices from template
+3. Create super-spine devices from the fabric's `super_spine` device design
 4. Assign loopback IPs to super-spines
 
 **Query**: `generate_fabric.gql`
@@ -76,7 +120,7 @@ query FabricGenerator($fabric_id: String!) {
 **Purpose**: Create pod infrastructure
 
 **Actions**:
-1. Create spine devices from template
+1. Create spine devices from the pod's `spine` device design
 2. Link spines to super-spines
 3. Allocate loopback IPs from pod pools
 4. Set BGP ASN and node IDs
@@ -107,7 +151,7 @@ query PodGenerator($pod_id: String!) {
 **Purpose**: Create rack infrastructure
 
 **Actions**:
-1. Create leaf devices from template
+1. Create leaf and L2-leaf devices from the rack's `leaf` / `l2leaf` device designs
 2. Link leaves to pod spines
 3. Allocate loopback IPs
 4. Set BGP ASN and node IDs
@@ -238,6 +282,13 @@ class GeneratorMixin:
         sorted_ids = sorted(related_node_ids)
         combined = "".join(sorted_ids)
         return hashlib.sha256(combined.encode()).hexdigest()
+
+    @classmethod
+    def device_design_for(cls, device_designs, role) -> tuple[str | None, int]:
+        """
+        Return (template_id, quantity) for one role's device design,
+        or (None, 0) when the container has no design for that role.
+        """
 ```
 
 Usage in generator:

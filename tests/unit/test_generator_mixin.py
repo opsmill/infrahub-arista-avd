@@ -213,6 +213,53 @@ async def test_create_avd_device_deletes_new_asn_when_later_step_fails() -> None
     routing_asn.delete.assert_awaited_once_with()
 
 
+def _designs(*specs: tuple[str, int, str | None]) -> SimpleNamespace:
+    """Build a fake ``device_designs`` relationship: (role, quantity, template_id) per edge."""
+    edges = [
+        SimpleNamespace(
+            node=SimpleNamespace(
+                role=SimpleNamespace(value=role),
+                device_quantity=SimpleNamespace(value=quantity),
+                device_template=SimpleNamespace(node=None if template_id is None else SimpleNamespace(id=template_id)),
+            )
+        )
+        for role, quantity, template_id in specs
+    ]
+    return SimpleNamespace(edges=edges)
+
+
+def test_resolve_device_designs_maps_each_role() -> None:
+    designs = _designs(("leaf", 2, "tmpl-leaf"), ("l2leaf", 1, "tmpl-l2leaf"))
+    assert GeneratorMixin.resolve_device_designs(designs) == {
+        "leaf": ("tmpl-leaf", 2),
+        "l2leaf": ("tmpl-l2leaf", 1),
+    }
+
+
+def test_device_design_for_returns_template_and_quantity() -> None:
+    designs = _designs(("spine", 4, "tmpl-spine"))
+    assert GeneratorMixin.device_design_for(designs, "spine") == ("tmpl-spine", 4)
+
+
+def test_device_design_for_absent_role_is_none_zero() -> None:
+    """Absence-means-none: a role with no design resolves to (None, 0), not an error."""
+    designs = _designs(("leaf", 2, "tmpl-leaf"))
+    assert GeneratorMixin.device_design_for(designs, "l2leaf") == (None, 0)
+    # A missing primary role (e.g. no leaf design at all) is also zero, not an error.
+    assert GeneratorMixin.device_design_for(_designs(), "leaf") == (None, 0)
+
+
+def test_device_design_for_empty_relationship_is_none_zero() -> None:
+    assert GeneratorMixin.device_design_for(SimpleNamespace(edges=[]), "super_spine") == (None, 0)
+    assert GeneratorMixin.device_design_for(SimpleNamespace(edges=None), "super_spine") == (None, 0)
+
+
+def test_resolve_device_designs_missing_template_node_yields_none_template() -> None:
+    """A design whose template relationship is unset still returns its quantity."""
+    designs = _designs(("leaf", 2, None))
+    assert GeneratorMixin.resolve_device_designs(designs) == {"leaf": (None, 2)}
+
+
 @pytest.mark.asyncio
 async def test_create_avd_device_allocates_vtep_loopback_for_leaf_roles_only() -> None:
     gen = _make_generator()

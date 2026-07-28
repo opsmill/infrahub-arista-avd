@@ -55,7 +55,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
     rack_id: str
     rack_index: int
     rack_name: str
-    rack_leaf_switch_template: str
+    rack_leaf_switch_template: str | None
     rack_amount_of_leafs: int
 
     spine_interface_sorting_function: Callable
@@ -93,10 +93,16 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.rack_id = rack_node.id
         self.rack_index = self._attr_value(rack_node.index, default=0)
         self.rack_name = self._attr_value(rack_node.name, default=self.rack_id)
-        self.rack_leaf_switch_template = self._relationship_node_id(rack_node.leaf_switch_template)
-        self.rack_amount_of_leafs = self._attr_value(rack_node.amount_of_leafs, default=0)
+        # Leaf count + template come from the rack's device_designs (role "leaf");
+        # an absent design means zero leaves.
+        self.rack_leaf_switch_template, self.rack_amount_of_leafs = self.device_design_for(
+            rack_node.device_designs, "leaf"
+        )
         if self.rack_amount_of_leafs > 0 and not self.rack_leaf_switch_template:
-            msg = f"Rack {self.rack_name}: amount_of_leafs is {self.rack_amount_of_leafs} but leaf_switch_template is missing"
+            msg = (
+                f"Rack {self.rack_name}: leaf device design quantity is "
+                f"{self.rack_amount_of_leafs} but its device_template is missing"
+            )
             raise ValueError(msg)
 
         rack_mlag_attr = rack_node.mlag
@@ -106,17 +112,15 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.leaf_switches = []
         self.l2leaf_switches: list[DcimDevice] = []
 
-        # L2 leaf fields (optional)
-        l2leaf_count_attr = getattr(rack_node, "amount_of_l_2_leafs", None)
-        self.rack_amount_of_l2leafs: int = (
-            l2leaf_count_attr.value if l2leaf_count_attr and l2leaf_count_attr.value else 0
+        # L2-leaf count + template come from the rack's device_designs (role
+        # "l2leaf"); an absent design means no L2 leaves.
+        self.rack_l2leaf_switch_template, self.rack_amount_of_l2leafs = self.device_design_for(
+            rack_node.device_designs, "l2leaf"
         )
-        l2leaf_template_attr = getattr(rack_node, "l_2_leaf_switch_template", None)
-        self.rack_l2leaf_switch_template = self._relationship_node_id(l2leaf_template_attr)
         if self.rack_amount_of_l2leafs > 0 and not self.rack_l2leaf_switch_template:
             msg = (
-                f"Rack {self.rack_name}: amount_of_l2leafs is {self.rack_amount_of_l2leafs} "
-                "but l2leaf_switch_template is missing"
+                f"Rack {self.rack_name}: l2leaf device design quantity is "
+                f"{self.rack_amount_of_l2leafs} but its device_template is missing"
             )
             raise ValueError(msg)
 
@@ -133,7 +137,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
         self.pod_id = pod_node.id
         self.pod_index = self._attr_value(pod_node.index, default=0)
         self.pod_name = str(self._attr_value(pod_node.name, default=self.pod_id)).lower()
-        self.pod_amount_of_spines = self._attr_value(pod_node.amount_of_spines, default=0)
+        # Cross-tier completeness read: the expected spine count comes from the
+        # pod's device_designs (role "spine"), not a legacy field.
+        _, self.pod_amount_of_spines = self.device_design_for(pod_node.device_designs, "spine")
         self.pod = await self.client.get(kind=NetworkPod, id=self.pod_id)
         await self.pod.parent.fetch()
         self.fabric = self.pod.parent.peer

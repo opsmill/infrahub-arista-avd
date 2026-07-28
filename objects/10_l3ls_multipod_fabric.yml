@@ -6,8 +6,11 @@ spec:
   data:
     - name: "Fabric-L3LS-MultiPod-A"
       index: 1
-      amount_of_super_spines: 6
-      super_spine_switch_template: "super-spine-switch"
+      device_designs:
+        data:
+          - role: super_spine
+            device_quantity: 6
+            device_template: super-spine-switch
       fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
       mgmt_gateway: "10.255.0.1"
       asn_pool: "Fabric-L3LS-MultiPod-A-ASN-Pool"
@@ -57,20 +60,31 @@ spec:
             member_of_groups: ["pods"]
           - name: "Pod-A2"
             index: 2
-            spine_switch_template: "spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 4
+                  device_template: spine-switch
             mlag_peer_pool: "Fabric-L3LS-MultiPod-A-Pod-A2-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-L3LS-MultiPod-A-Pod-A2-MLAG-L3-Pool"
             member_of_groups: ["pods"]
           - name: "Pod-A3"
             index: 3
-            spine_switch_template: "spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 4
+                  device_template: spine-switch
             mlag_peer_pool: "Fabric-L3LS-MultiPod-A-Pod-A3-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-L3LS-MultiPod-A-Pod-A3-MLAG-L3-Pool"
             member_of_groups: ["pods"]
     - name: "Fabric-L3LS-MultiPod-B"
       index: 2
-      amount_of_super_spines: 4
-      super_spine_switch_template: "dell-z9864f-on-super-spine-switch"
+      device_designs:
+        data:
+          - role: super_spine
+            device_quantity: 4
+            device_template: dell-z9864f-on-super-spine-switch
       fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
       mgmt_gateway: "10.254.0.1"
       asn_pool: "Fabric-L3LS-MultiPod-B-ASN-Pool"
@@ -118,13 +132,21 @@ spec:
             member_of_groups: ["pods"]
           - name: "Pod-B2"
             index: 2
-            spine_switch_template: "dell-z9864f-on-spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 4
+                  device_template: dell-z9864f-on-spine-switch
             mlag_peer_pool: "Fabric-L3LS-MultiPod-B-Pod-B2-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-L3LS-MultiPod-B-Pod-B2-MLAG-L3-Pool"
             member_of_groups: ["pods"]
           - name: "Pod-B3"
             index: 3
-            spine_switch_template: "dell-z9864f-on-spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 4
+                  device_template: dell-z9864f-on-spine-switch
             mlag_peer_pool: "Fabric-L3LS-MultiPod-B-Pod-B3-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-L3LS-MultiPod-B-Pod-B3-MLAG-L3-Pool"
             member_of_groups: ["pods"]

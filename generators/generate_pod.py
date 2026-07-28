@@ -26,7 +26,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
     pod_id: str
     pod_index: int
     pod_name: str
-    pod_spine_switch_template: str
+    pod_spine_switch_template: str | None
     pod_role: str
     # L3LS default; generate() switches to l2spine for standalone L2LS fabrics.
     spine_role: str = "spine"
@@ -53,23 +53,22 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
     async def generate(self, data: dict) -> None:
         data: PodGeneratorQuery = PodGeneratorQuery(**data)
 
-        self.pod_id: str = data.network_pod.edges[0].node.id
-        self.pod_index: int = data.network_pod.edges[0].node.index.value
-        self.pod_name: str = data.network_pod.edges[0].node.name.value.lower()
-        self.pod_role: str = data.network_pod.edges[0].node.role.value
-        self.pod_spine_switch_template: str | None = (
-            data.network_pod.edges[0].node.spine_switch_template.node.id
-            if data.network_pod.edges[0].node.spine_switch_template.node
-            else None
+        pod_node = data.network_pod.edges[0].node
+        self.pod_id: str = pod_node.id
+        self.pod_index: int = pod_node.index.value
+        self.pod_name: str = pod_node.name.value.lower()
+        self.pod_role: str = pod_node.role.value
+        # Spine count + template come from the pod's device_designs (role "spine").
+        self.pod_spine_switch_template, self.amount_of_spines = self.device_design_for(pod_node.device_designs, "spine")
+        self.fabric_id: str = pod_node.parent.node.id
+        self.fabric_name: str = pod_node.parent.node.name.value.lower()
+        # Cross-tier completeness read: the expected super-spine count comes from
+        # the parent fabric's device_designs (role "super_spine"), not a legacy field.
+        _, self.fabric_amount_of_super_spines = self.device_design_for(
+            pod_node.parent.node.device_designs, "super_spine"
         )
-        self.fabric_id: str = data.network_pod.edges[0].node.parent.node.id
-        self.fabric_name: str = data.network_pod.edges[0].node.parent.node.name.value.lower()
-        underlay_attr = data.network_pod.edges[0].node.parent.node.underlay_routing_protocol
+        underlay_attr = pod_node.parent.node.underlay_routing_protocol
         self.underlay_routing_protocol = underlay_attr.value if underlay_attr else None
-        self.amount_of_spines: int = data.network_pod.edges[0].node.amount_of_spines.value
-        self.fabric_amount_of_super_spines: int = data.network_pod.edges[
-            0
-        ].node.parent.node.amount_of_super_spines.value
 
         await set_fabric_avd_hostvars_ready(self.client, self.fabric_id, False)
 

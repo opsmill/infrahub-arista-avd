@@ -6,16 +6,25 @@ query FabricGeneratorQuery($name: String!) {
         name {
           value
         }
-        amount_of_super_spines {
-          value
-        }
         underlay_routing_protocol {
           value
         }
-        super_spine_switch_template {
-          node {
-            __typename
-            id
+        device_designs {
+          edges {
+            node {
+              role {
+                value
+              }
+              device_quantity {
+                value
+              }
+              device_template {
+                node {
+                  __typename
+                  id
+                }
+              }
+            }
           }
         }
         mgmt_gateway {
