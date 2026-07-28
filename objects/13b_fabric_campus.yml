@@ -233,3 +233,107 @@ spec:
       mlag: true
       leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
+---
+# ============================================================================
+# Campus L3 services for Fabric-Campus — schema objects (IpamVRF + EvpnTenant +
+# EvpnSvi) rendered as anycast SVIs on the l3spine core. Loads after the fabric
+# (13b). Access-layer features (dot1x/PoE) are supplied via the escape hatch.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamL2Domain
+  data:
+    - name: Fabric-Campus-L2Domain
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVLAN
+  data:
+    - name: Campus-Data
+      vlan_id: 110
+      status: active
+      role: user
+      l2domain: Fabric-Campus-L2Domain
+    - name: Campus-Voice
+      vlan_id: 120
+      status: active
+      role: user
+      l2domain: Fabric-Campus-L2Domain
+    - name: Campus-Guest
+      vlan_id: 130
+      status: active
+      role: user
+      l2domain: Fabric-Campus-L2Domain
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVRF
+  data:
+    - name: CAMPUS_VRF
+      namespace: default
+      vrf_vni: 30
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnTenant
+  data:
+    - name: CAMPUS-TENANT
+      mac_vrf_vni_base: 30000
+      fabrics:
+        - "Fabric-Campus"
+      vrfs:
+        - CAMPUS_VRF
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnSvi
+  data:
+    - name: "Campus-Data-SVI"
+      svi_id: 110
+      ip_address_virtual: "10.110.0.1/24"
+      enabled: true
+      vrf: CAMPUS_VRF
+      vlan: Campus-Data
+    - name: "Campus-Voice-SVI"
+      svi_id: 120
+      ip_address_virtual: "10.120.0.1/24"
+      enabled: true
+      vrf: CAMPUS_VRF
+      vlan: Campus-Voice
+    - name: "Campus-Guest-SVI"
+      svi_id: 130
+      ip_address_virtual: "10.130.0.1/24"
+      enabled: true
+      vrf: CAMPUS_VRF
+      vlan: Campus-Guest
+---
+# ============================================================================
+# Fabric-Campus — connected endpoints (access-layer physical servers) for
+# CAMPUS_IDF1. Loaded after 13b so the fabric/pod/rack exist first. Each
+# server declares only its rack + object_template + servers-group membership;
+# the generate-server-cabling generator (targets the "servers" group)
+# auto-cables the server to the rack's access leaf switches. member_of_groups
+# is set atomically in the same object so the generator trigger does not race
+# group membership.
+#   - campus-endpoint1 / campus-endpoint2: single-homed (compute-server-single)
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ComputePhysicalServer
+  data:
+    - name: "campus-endpoint1"
+      status: "provisioning"
+      rack: "CAMPUS_IDF1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]
+    - name: "campus-endpoint2"
+      status: "provisioning"
+      rack: "CAMPUS_IDF1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]

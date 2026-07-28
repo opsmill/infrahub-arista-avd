@@ -1,5 +1,116 @@
 ---
 # ============================================================================
+# IP and number pools for the Fabric-L3LS-Multi-Domain lab fabric.
+# Derived from lab/infrahub-avd seed data after renaming to Fabric-L3LS-Multi-Domain.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamPrefix
+  data:
+    - prefix: 10.0.6.0/24
+      role: management
+    - prefix: 10.250.1.0/24
+      role: loopback
+    - prefix: 10.250.2.0/24
+      role: loopback-vtep
+    - prefix: 10.250.3.0/24
+      role: pod_leaf_spine
+    - prefix: 172.16.0.0/28
+      role: technical
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPPrefixPool
+  data:
+    - name: Fabric-L3LS-Multi-Domain-Uplink-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - 10.250.3.0/24
+    - name: Fabric-L3LS-Multi-Domain-VTEP-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - 10.250.2.0/24
+    - name: Fabric-L3LS-Multi-Domain-Loopback-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 32
+      ip_namespace: default
+      resources:
+        - 10.250.1.0/24
+    - name: Fabric-L3LS-Multi-Domain-DCI-Pool
+      default_member_type: prefix
+      default_prefix_type: IpamPrefix
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - 172.16.0.0/28
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreIPAddressPool
+  data:
+    - name: Fabric-L3LS-Multi-Domain-Mgmt-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 24
+      ip_namespace: default
+      resources:
+        - 10.0.6.0/24
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: CoreNumberPool
+  data:
+    - name: Fabric-L3LS-Multi-Domain-ASN-Pool
+      node: RoutingAsn
+      node_attribute: asn
+      start_range: 65100
+      end_range: 65199
+    - name: Fabric-L3LS-Multi-Domain-NodeID-Pool
+      node: DcimDevice
+      node_attribute: node_id
+      start_range: 1
+      end_range: 100
+---
+# DNS Servers
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: NetworkDnsServer
+  data:
+    - name: dns-google
+      ip_address: 8.8.8.8/32
+---
+# NTP Servers
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: NetworkNtpServer
+  data:
+    - name: time.google.com
+---
+# Local Users
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: NetworkLocalUser
+  data:
+    - name: mtache
+      privilege: 15
+      role: network-admin
+      password_type: type7
+      password: "nopassword"
+---
+# ============================================================================
 # Fabric-L3LS-Multi-Domain: one generated fabric with two datacenter pods.
 # ============================================================================
 apiVersion: infrahub.app/v1
@@ -103,3 +214,78 @@ spec:
             amount_of_spines: 2
             spine_switch_template: "arista-7050cx3-32c-spine-switch"
             member_of_groups: ["pods"]
+---
+# ============================================================================
+# Halls and racks for the Fabric-L3LS-Multi-Domain dual-DC lab.
+# Rack names match the AVD group names; generated device names remain
+# generator-derived from pod name, rack index, and leaf index.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: LocationHall
+  data:
+    - name: "Hall-DC1"
+      index: 1
+    - name: "Hall-DC2"
+      index: 2
+
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: LocationRack
+  data:
+    - name: "DC1_BORDER"
+      index: 1
+      rack_type: compute
+      pod: infrahub-dc1
+      parent: "Hall-DC1"
+      amount_of_leafs: 2
+      mlag: false
+      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      member_of_groups: ["racks"]
+    - name: "DC1_ACCESS"
+      index: 2
+      rack_type: compute
+      pod: infrahub-dc1
+      parent: "Hall-DC1"
+      amount_of_leafs: 2
+      mlag: false
+      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      member_of_groups: ["racks"]
+    - name: "DC2_BORDER"
+      index: 1
+      rack_type: compute
+      pod: infrahub-dc2
+      parent: "Hall-DC2"
+      amount_of_leafs: 2
+      mlag: false
+      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      member_of_groups: ["racks"]
+    - name: "DC2_ACCESS"
+      index: 2
+      rack_type: compute
+      pod: infrahub-dc2
+      parent: "Hall-DC2"
+      amount_of_leafs: 2
+      mlag: false
+      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      member_of_groups: ["racks"]
+
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: AvdTag
+  data:
+    - name: DC1
+      description: "Fabric-L3LS-Multi-Domain DC1-local AVD services"
+      racks:
+        - DC1_ACCESS
+        - DC1_BORDER
+    - name: DC2
+      description: "Fabric-L3LS-Multi-Domain DC2-local AVD services"
+      racks:
+        - DC2_ACCESS
+        - DC2_BORDER

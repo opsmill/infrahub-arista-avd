@@ -1,9 +1,4 @@
 ---
-# ============================================================================
-# Post-generation Fabric-L3LS-Multi-Domain DCI, EVPN Gateway, and lab management overrides.
-# Load after Fabric-L3LS-Multi-Domain fabric, pod, and rack generators have created devices and
-# interfaces.
-# ============================================================================
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
@@ -39,45 +34,57 @@ kind: Object
 spec:
   kind: DcimDevice
   data:
-    - name: spine-infrahub-dc1-1
+    - name: "spine-infrahub-dc1-1"
       status: provisioning
+      serial: "INFRAHUB001"
       mgmt_ip: ["10.0.6.11/24", default]
-    - name: spine-infrahub-dc1-2
+    - name: "spine-infrahub-dc1-2"
       status: provisioning
+      serial: "INFRAHUB002"
       mgmt_ip: ["10.0.6.12/24", default]
-    - name: leaf-infrahub-dc1-1-1
+    - name: "leaf-infrahub-dc1-1-1"
       status: provisioning
+      serial: "INFRAHUB003"
       role: border_leaf
       mgmt_ip: ["10.0.6.13/24", default]
-    - name: leaf-infrahub-dc1-1-2
+    - name: "leaf-infrahub-dc1-1-2"
       status: provisioning
+      serial: "INFRAHUB004"
       role: border_leaf
       mgmt_ip: ["10.0.6.14/24", default]
-    - name: leaf-infrahub-dc1-2-1
+    - name: "leaf-infrahub-dc1-2-1"
       status: provisioning
+      serial: "INFRAHUB005"
       mgmt_ip: ["10.0.6.15/24", default]
-    - name: leaf-infrahub-dc1-2-2
+    - name: "leaf-infrahub-dc1-2-2"
       status: provisioning
+      serial: "INFRAHUB006"
       mgmt_ip: ["10.0.6.16/24", default]
-    - name: spine-infrahub-dc2-1
+    - name: "spine-infrahub-dc2-1"
       status: provisioning
+      serial: "INFRAHUB011"
       mgmt_ip: ["10.0.6.21/24", default]
-    - name: spine-infrahub-dc2-2
+    - name: "spine-infrahub-dc2-2"
       status: provisioning
+      serial: "INFRAHUB012"
       mgmt_ip: ["10.0.6.22/24", default]
-    - name: leaf-infrahub-dc2-1-1
+    - name: "leaf-infrahub-dc2-1-1"
       status: provisioning
+      serial: "INFRAHUB013"
       role: border_leaf
       mgmt_ip: ["10.0.6.23/24", default]
-    - name: leaf-infrahub-dc2-1-2
+    - name: "leaf-infrahub-dc2-1-2"
       status: provisioning
+      serial: "INFRAHUB014"
       role: border_leaf
       mgmt_ip: ["10.0.6.24/24", default]
-    - name: leaf-infrahub-dc2-2-1
+    - name: "leaf-infrahub-dc2-2-1"
       status: provisioning
+      serial: "INFRAHUB015"
       mgmt_ip: ["10.0.6.25/24", default]
-    - name: leaf-infrahub-dc2-2-2
+    - name: "leaf-infrahub-dc2-2-2"
       status: provisioning
+      serial: "INFRAHUB016"
       mgmt_ip: ["10.0.6.26/24", default]
 ---
 apiVersion: infrahub.app/v1

@@ -143,3 +143,90 @@ spec:
       mlag: true
       leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
+---
+# ============================================================================
+# L2 services for Fabric-L2LS — modeled as schema objects (IpamVLAN + EvpnTenant
+# + EvpnL2Vlan), rendered by the hostvar generator. Schema-first: no escape hatch.
+# Loads after the fabric (13a) so relationships resolve.
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamL2Domain
+  data:
+    - name: Fabric-L2LS-L2Domain
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: IpamVLAN
+  data:
+    - name: L2LS-DATA
+      vlan_id: 10
+      status: active
+      role: user
+      l2domain: Fabric-L2LS-L2Domain
+    - name: L2LS-VOICE
+      vlan_id: 20
+      status: active
+      role: user
+      l2domain: Fabric-L2LS-L2Domain
+    - name: L2LS-GUEST
+      vlan_id: 30
+      status: active
+      role: user
+      l2domain: Fabric-L2LS-L2Domain
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnTenant
+  data:
+    - name: L2LS-TENANT
+      mac_vrf_vni_base: 20000
+      fabrics:
+        - "Fabric-L2LS"
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: EvpnL2Vlan
+  data:
+    - name: "L2LS-DATA-L2"
+      vlan_id: 10
+      tenant: L2LS-TENANT
+      vlan: L2LS-DATA
+    - name: "L2LS-VOICE-L2"
+      vlan_id: 20
+      tenant: L2LS-TENANT
+      vlan: L2LS-VOICE
+    - name: "L2LS-GUEST-L2"
+      vlan_id: 30
+      tenant: L2LS-TENANT
+      vlan: L2LS-GUEST
+---
+# ============================================================================
+# Fabric-L2LS — connected endpoints (physical servers) for L2LS_RACK1.
+# Loaded after 13a so the fabric/pod/rack exist first. Each server declares
+# only its rack + object_template + servers-group membership; the
+# generate-server-cabling generator (targets the "servers" group) auto-cables
+# the server to the rack's leaf switches. member_of_groups is set atomically
+# in the same object so the generator trigger does not race group membership.
+#   - l2ls-server1: dual-homed (compute-server-dual) across the MLAG leaf pair
+#   - l2ls-server2: single-homed (compute-server-single)
+# ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ComputePhysicalServer
+  data:
+    - name: "l2ls-server1"
+      status: "provisioning"
+      rack: "L2LS_RACK1"
+      object_template: "compute-server-dual"
+      member_of_groups: ["servers"]
+    - name: "l2ls-server2"
+      status: "provisioning"
+      rack: "L2LS_RACK1"
+      object_template: "compute-server-single"
+      member_of_groups: ["servers"]

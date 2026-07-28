@@ -36,5 +36,5 @@ spec:
     - name: admin
       privilege: 15
       role: network-admin
-      password_type: sha512
-      password: "$6$admin$abc123examplehashreplacewithreal"
+      password_type: type7
+      password: "nopassword"
