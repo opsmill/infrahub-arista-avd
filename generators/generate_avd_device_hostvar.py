@@ -1333,10 +1333,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         tenants_list: list[dict[str, Any]] = []
         for tenant in tenants:
-            tenant_data: dict[str, Any] = {
-                "name": tenant.name.value,
-                "mac_vrf_vni_base": tenant.mac_vrf_vni_base.value,
-            }
+            tenant_data: dict[str, Any] = {"name": tenant.name.value}
+            # Overlay-free (pure Layer-2 / L2LS) tenants have no VNI base: omit it
+            # so PyAVD derives no VNI/VXLAN. Overlay tenants keep emitting theirs.
+            mac_vrf_vni_base = tenant.mac_vrf_vni_base.value
+            if mac_vrf_vni_base is not None:
+                tenant_data["mac_vrf_vni_base"] = mac_vrf_vni_base
 
             # Prefer child-side filters; fall back to parent relationship peers for SDK/test objects without IDs.
             vrfs = await self._filter_or_fetch_peers(
@@ -1389,29 +1391,45 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             if vrfs_list:
                 tenant_data["vrfs"] = vrfs_list
 
-            l2vlans = await self._filter_or_fetch_peers(
-                kind="EvpnL2Vlan",
-                filter_name="tenant__ids",
-                parent_id=getattr(tenant, "id", None),
-                relationship=getattr(tenant, "l2vlans", None),
-            )
-            l2vlans_list: list[dict[str, Any]] = []
-            for l2vlan in l2vlans:
-                l2v_data: dict[str, Any] = {
-                    "id": l2vlan.vlan_id.value,
-                    "name": l2vlan.name.value,
-                }
-                vni_override = getattr(l2vlan, "vni_override", None)
-                if vni_override and vni_override.value is not None:
-                    l2v_data["vni_override"] = vni_override.value
-                l2vlans_list.append(l2v_data)
-
+            # Fetch L2 VLANs for this tenant
+            l2vlans_list = await self._build_l2vlans_hostvars(tenant)
             if l2vlans_list:
                 tenant_data["l2vlans"] = l2vlans_list
 
             tenants_list.append(tenant_data)
 
         return tenants_list
+
+    async def _build_l2vlans_hostvars(self, tenant: Any) -> list[dict[str, Any]]:
+        """Build the AVD ``l2vlans`` list for a tenant, with tag-based scoping.
+
+        Tags come from each VLAN's ``rack_tags``/``avd_tags`` (same mechanism as
+        SVIs); AVD matches them against each node's ``filter.tags`` to scope the
+        VLAN to the right leaf pairs.
+        """
+        l2vlans = await self._filter_or_fetch_peers(
+            kind="EvpnL2Vlan",
+            filter_name="tenant__ids",
+            parent_id=getattr(tenant, "id", None),
+            relationship=getattr(tenant, "l2vlans", None),
+        )
+        l2vlans_list: list[dict[str, Any]] = []
+        for l2vlan in l2vlans:
+            l2v_data: dict[str, Any] = {
+                "id": l2vlan.vlan_id.value,
+                "name": l2vlan.name.value,
+            }
+            vni_override = getattr(l2vlan, "vni_override", None)
+            if vni_override and vni_override.value is not None:
+                l2v_data["vni_override"] = vni_override.value
+            rack_tag_peers = await self._fetch_relationship_peers(l2vlan, "rack_tags")
+            avd_tag_peers = await self._fetch_relationship_peers(l2vlan, "avd_tags")
+            l2v_tags = self._build_svi_tags(rack_tag_peers, avd_tag_peers)
+            if l2v_tags:
+                l2v_data["tags"] = l2v_tags
+            l2vlans_list.append(l2v_data)
+
+        return l2vlans_list
 
     async def _extract_pool_prefix(self, pool_ref: object, pool_kind: str) -> str | None:
         """Extract the first resource prefix from a pool relationship reference."""

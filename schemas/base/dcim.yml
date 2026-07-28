@@ -259,6 +259,19 @@ generics:
             description: "Trunk all mode"
         description: "Layer 2 mode of the interface"
         order_weight: 1500
+      - name: spanning_tree_portfast
+        label: Spanning Tree PortFast
+        kind: Dropdown
+        optional: true
+        choices:
+          - name: edge
+            label: Edge
+            description: "Edge port (host-facing); enables PortFast"
+          - name: network
+            label: Network
+            description: "Network port (switch-facing)"
+        description: "Spanning-tree PortFast setting for host/edge access ports"
+        order_weight: 1600
 
   - name: Layer3
     namespace: Interface

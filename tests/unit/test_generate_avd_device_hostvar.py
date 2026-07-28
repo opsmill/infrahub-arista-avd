@@ -2291,3 +2291,57 @@ def test_server_lag_evpn_hostvars_validate_against_pyavd() -> None:
     )
 
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+# --- L2LS generator capabilities (feature 002): overlay-free + tag-scoped VLANs -
+
+
+def _l2vlan(vlan_id: int, name: str, *, rack_tags: list[str], avd_tags: list[str]) -> SimpleNamespace:
+    return SimpleNamespace(
+        vlan_id=_attr(vlan_id),
+        name=_attr(name),
+        vni_override=_attr(None),
+        rack_tags=_rel([_named_peer(t) for t in rack_tags]),
+        avd_tags=_rel([_named_peer(t) for t in avd_tags]),
+    )
+
+
+def _tenant(name: str, vni_base: int | None, l2vlans: list[SimpleNamespace]) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=_attr(name),
+        mac_vrf_vni_base=_attr(vni_base),
+        vrfs=_rel([]),
+        l2vlans=_rel(l2vlans),
+    )
+
+
+async def test_overlay_free_tenant_omits_vni_base_and_emits_l2vlan_tags() -> None:
+    """FR-006/FR-007: an overlay-free tenant emits no VNI base; L2 VLANs carry tags."""
+    gen = _make_generator()
+    tenant = _tenant(
+        "MY_FABRIC",
+        None,
+        [
+            _l2vlan(10, "BLUE-NET", rack_tags=[], avd_tags=["bluezone"]),
+            _l2vlan(20, "GREEN-NET", rack_tags=[], avd_tags=["greenzone"]),
+        ],
+    )
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants = await gen._build_tenants_hostvars("fabric-1")
+
+    assert len(tenants) == 1
+    assert "mac_vrf_vni_base" not in tenants[0]
+    l2vlans = tenants[0]["l2vlans"]
+    assert {v["id"]: v.get("tags") for v in l2vlans} == {10: ["bluezone"], 20: ["greenzone"]}
+
+
+async def test_overlay_tenant_keeps_vni_base() -> None:
+    """FR-009: an overlay tenant that sets a VNI base still emits it (no regression)."""
+    gen = _make_generator()
+    tenant = _tenant("OVERLAY", 20000, [])
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants[0]["mac_vrf_vni_base"] == 20000

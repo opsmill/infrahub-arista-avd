@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.generator import InfrahubGenerator
-from netutils.interface import sort_interface_list
 
 from solution_arista_avd import sorting as solution_arista_avd_sorting
 from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY
@@ -395,44 +394,14 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             self.logger.info(f"MLAG domain {domain_id} created successfully with shared ASN node {routing_asn_id}")
 
     async def _assign_l2leaf_mlag_peer_interfaces(self, leaf: DcimDevice) -> None:
-        """Repurpose access ports as the MLAG peer-link on an l2leaf main-tier switch.
+        """Carve the MLAG peer-link on an l2leaf main-tier switch.
 
-        The L3LS leaf templates ship dedicated ``mlag_peer``-role interfaces, but the
-        standalone-L2LS / campus main-tier switch model (arista-7050sx3-48yc8c) does
-        not. Without ``mlag_peer`` interfaces PyAVD raises ``'mlag_interfaces' not set``
-        for the pair. Convert the highest-numbered access ports to role ``mlag_peer``
-        so the pair renders a peer-link, mirroring the L3LS leaf logic.
-
-        The peer-link set is selected deterministically from the whole access-port
-        pool (interfaces already in role ``server`` or ``mlag_peer``), so the choice
-        never shifts once a port has been converted — making a re-run a no-op. The
-        highest-numbered ports are used so the peer-link never collides with server
-        cabling (which allocates the lowest-numbered ports). Saves use
-        ``update_group_context=False`` so these template-owned interfaces are not
-        enrolled in the rack generator's tracking group and never risk being reset
-        or deleted by the tracking reconciliation on a subsequent run.
+        Thin wrapper over the shared ``GeneratorMixin.assign_mlag_peer_interfaces``
+        helper, pinned to the l2leaf peer-link port count. The l2leaf model
+        (arista-7050sx3-48yc8c) ships no dedicated ``mlag_peer`` interfaces, so the
+        peer-link is carved from its highest-numbered access ports.
         """
-        interfaces = await self.client.filters(kind=DcimInterface, device__ids=[leaf.id])
-        access_ports = {
-            iface.name.value: iface
-            for iface in interfaces
-            if getattr(iface, "role", None) and iface.role.value in {"server", "mlag_peer"}
-        }
-        if len(access_ports) < L2LEAF_MLAG_PEER_INTERFACE_COUNT:
-            msg = (
-                f"l2leaf {leaf.name.value}: only {len(access_ports)} access ports available to "
-                f"repurpose as an MLAG peer-link, need {L2LEAF_MLAG_PEER_INTERFACE_COUNT}"
-            )
-            raise ValueError(msg)
-
-        peer_link_names = sort_interface_list(list(access_ports))[-L2LEAF_MLAG_PEER_INTERFACE_COUNT:]
-        for name in peer_link_names:
-            iface = access_ports[name]
-            if iface.role.value == "mlag_peer":
-                continue
-            iface.role.value = "mlag_peer"
-            await iface.save(allow_upsert=True, update_group_context=False)
-            self.logger.info("Assigned MLAG peer-link role to %s on %s", name, leaf.name.value)
+        await self.assign_mlag_peer_interfaces(leaf, count=L2LEAF_MLAG_PEER_INTERFACE_COUNT)
 
     async def delete_stale_mlag_domains(self) -> None:
         """Delete MLAG domains for this rack before hostvar generation runs.

@@ -24,7 +24,8 @@ nodes:
       - name: mac_vrf_vni_base
         label: MAC VRF VNI Base
         kind: Number
-        description: "Base VNI number for MAC VRFs in this tenant (VLAN VNI = base + VLAN ID)"
+        optional: true
+        description: "Base VNI for MAC VRFs (VLAN VNI = base + VLAN ID). Leave unset for an overlay-free (pure L2 / L2LS) tenant."
         order_weight: 1100
       - name: description
         kind: Text
@@ -187,3 +188,19 @@ nodes:
         optional: true
         description: "Underlying VLAN object"
         order_weight: 950
+      - name: rack_tags
+        label: "Rack Tags"
+        peer: LocationRack
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: "Rack names emitted as AVD L2 VLAN tags (scopes the VLAN to those leaf pairs)"
+        order_weight: 960
+      - name: avd_tags
+        label: "AVD Tags"
+        peer: AvdTag
+        cardinality: many
+        kind: Attribute
+        optional: true
+        description: "AVD tag names emitted as AVD L2 VLAN tags (scopes the VLAN to tagged nodes)"
+        order_weight: 970

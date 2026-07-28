@@ -48,15 +48,18 @@ from .helpers import (
     ARTIFACT_AVD_EOS_CONFIG,
     ARTIFACT_CONTAINERLAB_TOPOLOGY,
     ARTIFACT_TIMEOUT,
+    FABRIC_EXPECTED_ROLES,
     GENERATOR_FABRIC,
     GENERATOR_RACK,
     GENERATOR_TIMEOUT,
     GROUP_TIMEOUT,
+    L2LS_MLAG_ROLES,
     POLL_INTERVAL,
     REPO_SYNC_INTERVAL,
     REPO_SYNC_RETRIES,
     device_design_mismatches,
     expected_super_spine_count,
+    fabric_deployment_report,
     wait_until,
 )
 
@@ -588,6 +591,43 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         untranslated = [ep for link in links for ep in link["endpoints"] if "Ethernet" in ep]
         assert not untranslated, f"untranslated EOS interface names in links: {untranslated[:5]}"
 
+    # --- Fabric-scoped deployment validation (US4 / `--fabric` selector) ----
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_selected_fabric_deployment(self, client: InfrahubClient, target_fabric: str | None) -> None:
+        """Validate one fabric's deployment when selected via ``--fabric``.
+
+        With no ``--fabric`` this skips, so the default suite is unchanged
+        (FR-022). An unknown fabric fails fast (FR-023). For a known fabric it
+        asserts the design's expected device roles were generated; for the
+        standalone-L2LS design it also asserts MLAG on both tiers and that the
+        rendered EOS is pure Layer-2 (no VXLAN/BGP/EVPN).
+        """
+        if not target_fabric:
+            pytest.skip("no --fabric selector; pass --fabric <name> to validate a single fabric")
+
+        report = await wait_until(
+            fetch=lambda: fabric_deployment_report(client, PIPELINE_BRANCH, target_fabric),
+            ready=lambda r: r is None or r["device_count"] > 0,
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe=f"generated devices for fabric {target_fabric!r}",
+        )
+        assert report is not None, f"--fabric {target_fabric!r} not found on {PIPELINE_BRANCH}"
+        assert report["device_count"] > 0, f"fabric {target_fabric!r} generated no devices"
+
+        expected_roles = FABRIC_EXPECTED_ROLES.get(target_fabric)
+        if expected_roles:
+            got_roles = set(report["roles"])
+            assert expected_roles <= got_roles, (
+                f"{target_fabric}: expected roles {sorted(expected_roles)}, got {sorted(got_roles)}"
+            )
+
+        if target_fabric == "Fabric-L2LS":
+            assert report["mlag_roles"] >= L2LS_MLAG_ROLES, (
+                f"L2LS MLAG missing a tier: expected {sorted(L2LS_MLAG_ROLES)}, got {sorted(report['mlag_roles'])}"
+            )
+            await _assert_pure_layer2_configs(client, PIPELINE_BRANCH, report["roles"])
+
     async def _wait_for_ready_artifact(
         self, client: InfrahubClient, branch: str, artifact_name: str, definitions: list
     ) -> None:
@@ -610,6 +650,35 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             interval=POLL_INTERVAL,
             describe=f"Ready artifact '{artifact_name}'",
         )
+
+
+async def _assert_pure_layer2_configs(client: InfrahubClient, branch: str, roles: dict[str, list[str]]) -> None:
+    """Assert rendered EOS for the L2LS devices carries no overlay constructs.
+
+    A standalone-L2LS fabric is pure Layer-2: its device configs must contain no
+    VXLAN interface, no ``router bgp`` and no EVPN address-family (SC-002).
+    """
+    l2ls_hostnames = {name for role in ("l2spine", "l2leaf") for name in roles.get(role, [])}
+    if not l2ls_hostnames:
+        return
+
+    forbidden = ("interface Vxlan", "router bgp", "address-family evpn")
+    contents = await wait_until(
+        fetch=lambda: _fetch_ready_artifact_contents(client, branch, ARTIFACT_AVD_EOS_CONFIG),
+        ready=lambda cs: any(any(f"hostname {h}" in (c or "") for h in l2ls_hostnames) for c in cs),
+        timeout=ARTIFACT_TIMEOUT,
+        interval=POLL_INTERVAL,
+        describe="rendered EOS configs for the L2LS devices",
+    )
+
+    checked = 0
+    for content in contents:
+        if not content or not any(f"hostname {h}" in content for h in l2ls_hostnames):
+            continue
+        checked += 1
+        for token in forbidden:
+            assert token not in content, f"L2LS EOS config contains forbidden overlay construct {token!r}"
+    assert checked, "no L2LS EOS configs found to assert pure Layer-2"
 
 
 async def _template_interface_counts(client: InfrahubClient, branch: str, template_names: list[str]) -> dict[str, int]:

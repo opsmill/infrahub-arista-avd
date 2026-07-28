@@ -137,6 +137,8 @@ kind: Object
 spec:
   kind: LocationRack
   data:
+    # Two MLAG rack pairs mirror the AVD l2ls-fabric example (RACK1: LEAF1/2,
+    # RACK2: LEAF3/4). Each rack is an MLAG leaf pair.
     - name: "L2LS_RACK1"
       index: 1
       rack_type: compute
@@ -149,11 +151,39 @@ spec:
             device_quantity: 2
             device_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
+    - name: "L2LS_RACK2"
+      index: 2
+      rack_type: compute
+      pod: l2ls-pod1
+      parent: "Hall-L2LS"
+      mlag: true
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: arista-7050sx3-48yc8c-leaf-switch
+      member_of_groups: ["racks"]
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  # Per-tier MSTP priorities matching the AVD l2ls-fabric example
+  # (l2spine=4096, l2leaf=16384).
+  kind: NetworkSpanningTreePriority
+  data:
+    - fabric: "Fabric-L2LS"
+      role: l2spine
+      priority: 4096
+    - fabric: "Fabric-L2LS"
+      role: l2leaf
+      priority: 16384
 ---
 # ============================================================================
-# L2 services for Fabric-L2LS — modeled as schema objects (IpamVLAN + EvpnTenant
-# + EvpnL2Vlan), rendered by the hostvar generator. Schema-first: no escape hatch.
-# Loads after the fabric (13a) so relationships resolve.
+# L2 services for Fabric-L2LS - mirrors the AVD "l2ls-fabric" example exactly:
+# tenant MY_FABRIC with three pure-Layer-2 VLANs (BLUE-NET/GREEN-NET/ORANGE-NET)
+# scoped to leaf pairs by AVD tag (RACK1 = blue+green, RACK2 = blue+orange).
+# Overlay-free: the tenant has NO mac_vrf_vni_base, so no VNI/VXLAN/EVPN is
+# derived (l2spine/l2leaf are not VTEPs). Schema-first: no escape hatch.
 # ============================================================================
 apiVersion: infrahub.app/v1
 kind: Object
@@ -167,17 +197,17 @@ kind: Object
 spec:
   kind: IpamVLAN
   data:
-    - name: L2LS-DATA
+    - name: BLUE-NET
       vlan_id: 10
       status: active
       role: user
       l2domain: Fabric-L2LS-L2Domain
-    - name: L2LS-VOICE
+    - name: GREEN-NET
       vlan_id: 20
       status: active
       role: user
       l2domain: Fabric-L2LS-L2Domain
-    - name: L2LS-GUEST
+    - name: ORANGE-NET
       vlan_id: 30
       status: active
       role: user
@@ -186,10 +216,31 @@ spec:
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
+  # AVD tag zones scope VLANs to leaf pairs (the example's bluezone/greenzone/
+  # orangezone). A tag is linked to the racks whose leaves carry the VLAN.
+  kind: AvdTag
+  data:
+    - name: bluezone
+      description: "Blue zone — VLAN 10 across all racks"
+      racks:
+        - L2LS_RACK1
+        - L2LS_RACK2
+    - name: greenzone
+      description: "Green zone — VLAN 20 on RACK1"
+      racks:
+        - L2LS_RACK1
+    - name: orangezone
+      description: "Orange zone — VLAN 30 on RACK2"
+      racks:
+        - L2LS_RACK2
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
   kind: EvpnTenant
   data:
-    - name: L2LS-TENANT
-      mac_vrf_vni_base: 20000
+    # Overlay-free tenant: no mac_vrf_vni_base -> pure Layer-2, no VNI/VXLAN.
+    - name: MY_FABRIC
       fabrics:
         - "Fabric-L2LS"
 ---
@@ -198,18 +249,24 @@ kind: Object
 spec:
   kind: EvpnL2Vlan
   data:
-    - name: "L2LS-DATA-L2"
+    - name: "BLUE-NET-L2"
       vlan_id: 10
-      tenant: L2LS-TENANT
-      vlan: L2LS-DATA
-    - name: "L2LS-VOICE-L2"
+      tenant: MY_FABRIC
+      vlan: BLUE-NET
+      avd_tags:
+        - bluezone
+    - name: "GREEN-NET-L2"
       vlan_id: 20
-      tenant: L2LS-TENANT
-      vlan: L2LS-VOICE
-    - name: "L2LS-GUEST-L2"
+      tenant: MY_FABRIC
+      vlan: GREEN-NET
+      avd_tags:
+        - greenzone
+    - name: "ORANGE-NET-L2"
       vlan_id: 30
-      tenant: L2LS-TENANT
-      vlan: L2LS-GUEST
+      tenant: MY_FABRIC
+      vlan: ORANGE-NET
+      avd_tags:
+        - orangezone
 ---
 # ============================================================================
 # Fabric-L2LS — connected endpoints (physical servers) for L2LS_RACK1.
