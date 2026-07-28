@@ -370,9 +370,9 @@ class ServerCablingGenerator(InfrahubGenerator):
                 await leaf_interface.tagged_vlan.fetch()  # type: ignore[union-attr]
                 leaf_interface.tagged_vlan.extend(server_iface["tagged_vlan_ids"])  # type: ignore[union-attr]
             if server_iface["untagged_vlan_id"]:
-                if self._relationship_id(getattr(leaf_interface, "untagged_vlan", None)):
-                    await leaf_interface.untagged_vlan.fetch()  # type: ignore[union-attr]
-                leaf_interface.untagged_vlan.add(server_iface["untagged_vlan_id"])  # type: ignore[union-attr]
+                # `untagged_vlan` is cardinality one — a RelatedNode, which is assigned
+                # rather than added to (only the many-side `tagged_vlan` supports extend).
+                leaf_interface.untagged_vlan = {"id": server_iface["untagged_vlan_id"]}  # type: ignore[assignment]
 
             await leaf_interface.save(allow_upsert=True)
 
@@ -466,9 +466,8 @@ class ServerCablingGenerator(InfrahubGenerator):
             await interface.tagged_vlan.fetch()  # type: ignore[union-attr]
             interface.tagged_vlan.extend(tagged_vlan_ids)  # type: ignore[union-attr]
         if untagged_vlan_id:
-            if self._relationship_id(getattr(interface, "untagged_vlan", None)):
-                await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
-            interface.untagged_vlan.add(untagged_vlan_id)  # type: ignore[union-attr]
+            # Cardinality-one relationship: assign, don't add (see _assign_vlans).
+            interface.untagged_vlan = {"id": untagged_vlan_id}  # type: ignore[assignment]
         await interface.save(allow_upsert=True)
 
     async def _clear_member_vlan_relationships(self, interface: InterfacePhysical) -> None:
