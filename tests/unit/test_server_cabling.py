@@ -502,6 +502,35 @@ class TestVlanAssignment:
         assert leaf_iface1.tagged_vlan.extend.call_count == 0
         assert leaf_iface2.tagged_vlan.extend.call_count == 0
 
+    @pytest.mark.asyncio
+    async def test_clear_member_vlans_skips_empty_untagged_relationship(self) -> None:
+        gen = _make_generator()
+        server_member = self._vlan_target()
+        server_member.tagged_vlan.peer_ids = ["vlan-300"]
+        server_member.untagged_vlan.id = None
+        server_member.untagged_vlan.node = None
+        server_member.untagged_vlan.fetch = AsyncMock(side_effect=AssertionError("empty peer must not be fetched"))
+
+        await gen._clear_member_vlan_relationships(server_member)
+
+        server_member.tagged_vlan.remove.assert_called_once_with("vlan-300")
+        server_member.untagged_vlan.fetch.assert_not_awaited()
+        server_member.save.assert_awaited_once_with(allow_upsert=True)
+
+    @pytest.mark.asyncio
+    async def test_apply_untagged_vlan_skips_fetch_when_relationship_is_empty(self) -> None:
+        gen = _make_generator()
+        target = self._vlan_target()
+        target.untagged_vlan.id = None
+        target.untagged_vlan.node = None
+        target.untagged_vlan.fetch = AsyncMock(side_effect=AssertionError("empty peer must not be fetched"))
+
+        await gen._apply_vlan_relationships(target, [], "vlan-100")
+
+        target.untagged_vlan.fetch.assert_not_awaited()
+        target.untagged_vlan.add.assert_called_once_with("vlan-100")
+        target.save.assert_awaited_once_with(allow_upsert=True)
+
 
 class TestNoLeafSwitches:
     """T012: Test warning when no leaf switches in rack."""

@@ -1,0 +1,19 @@
+---
+# Manual seed data for the addServer branch. These servers are dual-homed to
+# the access racks in the Fabric-L3LS-Multi-Domain lab and trigger server
+# cabling through the servers generator group membership.
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ComputePhysicalServer
+  data:
+    - name: "dc1-server"
+      status: "provisioning"
+      rack: "DC1_ACCESS"
+      object_template: "compute-server-dual"
+      member_of_groups: ["servers"]
+    - name: "dc2-server"
+      status: "provisioning"
+      rack: "DC2_ACCESS"
+      object_template: "compute-server-dual"
+      member_of_groups: ["servers"]

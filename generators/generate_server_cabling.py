@@ -370,7 +370,8 @@ class ServerCablingGenerator(InfrahubGenerator):
                 await leaf_interface.tagged_vlan.fetch()  # type: ignore[union-attr]
                 leaf_interface.tagged_vlan.extend(server_iface["tagged_vlan_ids"])  # type: ignore[union-attr]
             if server_iface["untagged_vlan_id"]:
-                await leaf_interface.untagged_vlan.fetch()  # type: ignore[union-attr]
+                if self._relationship_id(getattr(leaf_interface, "untagged_vlan", None)):
+                    await leaf_interface.untagged_vlan.fetch()  # type: ignore[union-attr]
                 leaf_interface.untagged_vlan.add(server_iface["untagged_vlan_id"])  # type: ignore[union-attr]
 
             await leaf_interface.save(allow_upsert=True)
@@ -465,7 +466,8 @@ class ServerCablingGenerator(InfrahubGenerator):
             await interface.tagged_vlan.fetch()  # type: ignore[union-attr]
             interface.tagged_vlan.extend(tagged_vlan_ids)  # type: ignore[union-attr]
         if untagged_vlan_id:
-            await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
+            if self._relationship_id(getattr(interface, "untagged_vlan", None)):
+                await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
             interface.untagged_vlan.add(untagged_vlan_id)  # type: ignore[union-attr]
         await interface.save(allow_upsert=True)
 
@@ -480,14 +482,15 @@ class ServerCablingGenerator(InfrahubGenerator):
         else:
             interface.tagged_vlan = []  # type: ignore[assignment]
 
-        await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
-        untagged_peer_ids = getattr(interface.untagged_vlan, "peer_ids", None)
-        if isinstance(untagged_peer_ids, list | tuple | set):
-            for vlan_id in list(untagged_peer_ids):
-                interface.untagged_vlan.remove(vlan_id)  # type: ignore[union-attr]
-        elif hasattr(interface.untagged_vlan, "clear"):
-            interface.untagged_vlan.clear()  # type: ignore[union-attr]
-        else:
-            interface.untagged_vlan = None  # type: ignore[assignment]
+        if self._relationship_id(getattr(interface, "untagged_vlan", None)):
+            await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
+            untagged_peer_ids = getattr(interface.untagged_vlan, "peer_ids", None)
+            if isinstance(untagged_peer_ids, list | tuple | set):
+                for vlan_id in list(untagged_peer_ids):
+                    interface.untagged_vlan.remove(vlan_id)  # type: ignore[union-attr]
+            elif hasattr(interface.untagged_vlan, "clear"):
+                interface.untagged_vlan.clear()  # type: ignore[union-attr]
+            else:
+                interface.untagged_vlan = None  # type: ignore[assignment]
 
         await interface.save(allow_upsert=True)
