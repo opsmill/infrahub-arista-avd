@@ -35,6 +35,12 @@ nodes:
           - name: l2leaf
             label: L2 Leaf
             color: "#F9E79F"
+          - name: l2spine
+            label: L2 Spine
+            color: "#F5CBA7"
+          - name: l3spine
+            label: L3 Spine
+            color: "#AED6F1"
         order_weight: 1000
       - name: priority
         kind: Number

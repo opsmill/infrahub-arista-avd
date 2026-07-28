@@ -110,6 +110,52 @@ class GeneratorMixin:
         """
         return cls.resolve_device_designs(device_designs).get(role, (None, 0))
 
+    async def assign_mlag_peer_interfaces(
+        self,
+        device: DcimDevice,
+        count: int = 2,
+        carvable_roles: frozenset[str] = frozenset({"server", "mlag_peer"}),
+    ) -> None:
+        """Repurpose the highest-numbered carvable ports as the MLAG peer-link.
+
+        Some standalone-L2LS / campus main-tier switch models ship no dedicated
+        ``mlag_peer``-role interfaces; without them PyAVD raises
+        ``'mlag_interfaces' not set`` for the pair. Convert the highest-numbered
+        ports whose role is in ``carvable_roles`` to role ``mlag_peer`` so the
+        pair renders a peer-link.
+
+        Deterministic + idempotent: ports are ordered by the interface's computed
+        ``index`` attribute (the same numeric ordering used to build leaf-spine
+        interface maps) and the highest ``count`` are chosen, so the choice never
+        shifts once a port has been converted (a re-run is a no-op). Highest-index
+        ports avoid colliding with server/uplink cabling, which fills the
+        lowest-index ports first. Saves use ``update_group_context=False`` so these
+        template-owned interfaces are not enrolled in the generator's tracking group
+        and are never reset or deleted by the tracking reconciliation on a
+        subsequent run.
+        """
+        interfaces = await self.client.filters(kind=DcimInterface, device__ids=[device.id])
+        carvable_ports = [
+            iface for iface in interfaces if getattr(iface, "role", None) and iface.role.value in carvable_roles
+        ]
+        if len(carvable_ports) < count:
+            msg = (
+                f"{device.name.value}: only {len(carvable_ports)} carvable ports available to "
+                f"repurpose as an MLAG peer-link, need {count}"
+            )
+            raise ValueError(msg)
+
+        # Order by the interface's computed index and take the highest-numbered ports.
+        # ``index`` is a read-only computed attribute (present at runtime) that the
+        # generated protocol does not type, hence the ignore.
+        carvable_ports.sort(key=lambda iface: int(iface.index.value))  # type: ignore[attr-defined]
+        for iface in carvable_ports[-count:]:
+            if iface.role.value == "mlag_peer":
+                continue
+            iface.role.value = "mlag_peer"
+            await iface.save(allow_upsert=True, update_group_context=False)
+            logger.info("Assigned MLAG peer-link role to %s on %s", iface.name.value, device.name.value)
+
     def calculate_checksum(self) -> str:
         """Calculates a checksum of the generator based on the related ids during the session"""
 

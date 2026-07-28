@@ -73,6 +73,19 @@ These come from `SPINE_ROLE_BY_UNDERLAY` and `LEAF_ROLE_BY_UNDERLAY` in [`avd.py
 
 `MLAG_MAIN_TIER_ROLES` (`l2leaf`, `l2spine`, `l3spine`) is the main tier of the non-L3LS designs that forms MLAG pairs. When the fabric underlay is one of `SPINE_UPLINK_UNDERLAYS` (`none`, `ospf`, `isis-ldp`), devices in these roles render node-group / peer-link / MLAG-domain configuration — just like the L3LS leaf family. The gate leaves the L3LS access-tier `l2leaf` (pure access under EVPN) unaffected.
 
+Which generator forms the pair depends on the tier:
+
+| Tier | Generator | Peer-link source |
+|------|-----------|------------------|
+| `l2leaf` (rack tier) | `generate-rack` | Highest-numbered free access ports — the `arista-7050sx3-48yc8c` l2leaf model ships no dedicated `mlag_peer` interfaces |
+| `l2spine` (pod tier, underlay `none`) | `generate-pod` | Highest-numbered free **super-spine-facing** ports, unused in a standalone L2LS fabric (it has no super-spines) |
+
+Both go through the shared `assign_mlag_peer_interfaces` helper on the generator mixin, so the choice is deterministic (ordered by the interface's computed `index`) and idempotent — a re-run converts nothing further. The l2spine pair carries **no BGP ASN**: a pure Layer-2 tier runs no BGP.
+
+## Per-tier spanning-tree priorities
+
+`Network.SpanningTreePriority` links a fabric to a per-role MSTP priority. Its `role` dropdown covers `super_spine`, `spine`, `leaf`, `l2leaf` and — for the non-L3LS designs — `l2spine` and `l3spine`. The L2LS example sets `l2spine: 4096` / `l2leaf: 16384`, which the hostvars generator emits as each tier's `spanning_tree_priority`.
+
 ## Role implications
 
 The role governs several downstream behaviours in the hostvars generator and in PyAVD itself:

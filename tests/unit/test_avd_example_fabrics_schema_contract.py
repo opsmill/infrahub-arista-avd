@@ -35,6 +35,16 @@ def _extension_node(path: Path, kind: str) -> dict[str, Any]:
     raise AssertionError(msg)
 
 
+def _top_level_node(path: Path, namespace: str, name: str) -> dict[str, Any]:
+    """Return the top-level ``nodes`` entry for the given namespace + name."""
+    doc = _load_yaml(path)
+    for node in doc.get("nodes", []):
+        if node.get("namespace") == namespace and node.get("name") == name:
+            return node
+    msg = f"Node {namespace}{name!r} not found in {path}"
+    raise AssertionError(msg)
+
+
 def _attribute(node: dict[str, Any], name: str) -> dict[str, Any] | None:
     for attr in node.get("attributes", []):
         if attr.get("name") == name:
@@ -140,3 +150,25 @@ def test_vtep_loopback_interface_role_present() -> None:
     role = _attribute(interface, "role")
     assert role is not None
     assert "vtep_loopback" in _choice_names(role)
+
+
+# --- L2LS conformance (feature 001): spanning-tree priority roles -------------
+
+
+def _spanning_tree_priority_role_choice_names() -> set[str]:
+    node = _top_level_node(_L3LS_EXTENSIONS, "Network", "SpanningTreePriority")
+    role = _attribute(node, "role")
+    assert role is not None, "Network.SpanningTreePriority.role attribute is missing"
+    return _choice_names(role)
+
+
+def test_spanning_tree_priority_roles_include_l2ls_tiers() -> None:
+    """Contract C1: STP priority roles cover the L2LS/campus tiers."""
+    names = _spanning_tree_priority_role_choice_names()
+    assert {"l2spine", "l3spine"} <= names
+
+
+def test_spanning_tree_priority_existing_roles_preserved() -> None:
+    """Contract C5: additive change — existing STP roles are preserved."""
+    names = _spanning_tree_priority_role_choice_names()
+    assert {"super_spine", "spine", "leaf", "l2leaf"} <= names

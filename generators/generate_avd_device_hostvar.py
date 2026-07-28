@@ -103,6 +103,8 @@ class DciNetworkLinkIntent:
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
 PORT_CHANNEL_RE = re.compile(r"^Port-Channel(?P<channel_id>\d+)$")
 LEAF_FAMILY_ROLES = {"leaf", "border_leaf"}
+# Host-facing access ports are PortFast edge ports unless the interface says otherwise.
+PORTFAST_DEFAULT = "edge"
 FIELD_ALIASES = {
     "evpn_l2_enabled": "evpn_l_2_enabled",
     "evpn_l3_enabled": "evpn_l_3_enabled",
@@ -897,6 +899,16 @@ async def build_dci_l3_edge_p2p_links(
     return p2p_links
 
 
+def _portfast_setting(interface: object) -> str:
+    """Resolve the spanning-tree PortFast intent for a host-facing switch port.
+
+    Host/server-facing access ports are ``edge`` by AVD convention, so that stays
+    the default when the interface expresses no intent. An interface that sets
+    ``spanning_tree_portfast`` explicitly (``edge``/``network``) overrides it.
+    """
+    return str(_value(interface, "spanning_tree_portfast") or PORTFAST_DEFAULT)
+
+
 def _lag_member_adapter(
     *,
     lag_node: object,
@@ -950,7 +962,7 @@ def _lag_member_adapter(
         endpoint_lag_node=lag_node,
     )
     _apply_vlan_adapter_config(adapter, list(tagged_vlans), untagged_vlan)
-    adapter["spanning_tree_portfast"] = "edge"
+    adapter["spanning_tree_portfast"] = _portfast_setting(local_interface)
     return adapter
 
 
@@ -972,6 +984,7 @@ def _switch_lag_member_links(
                 "switch": hostname,
                 "switch_lag": fallback_switch_lag_node,
                 "vlan": _first_vlan_signature(server_lag_node, fallback_switch_lag_node, fallback_local_interface),
+                "portfast": _portfast_setting(fallback_local_interface),
             }
         ]
 
@@ -1004,6 +1017,7 @@ def _switch_lag_member_links(
                     "switch": switch_name,
                     "switch_lag": switch_lag_node,
                     "vlan": _first_vlan_signature(server_lag_node, switch_lag_node, endpoint),
+                    "portfast": _portfast_setting(endpoint),
                 }
             )
 
@@ -1089,7 +1103,11 @@ def _flush_switch_lag_groups(groups: dict[tuple[str, int], dict[str, Any]], *, m
                 "mode": LACP_MODE_MAP.get(group["lacp_mode"], "active"),
                 "channel_id": group["channel_id"],
             },
-            "spanning_tree_portfast": "edge",
+            # A Port-Channel carries one PortFast setting; take the first member
+            # that expresses an explicit intent, else the host-facing default.
+            "spanning_tree_portfast": next(
+                (link["portfast"] for link in links if link.get("portfast")), PORTFAST_DEFAULT
+            ),
         }
         if group["endpoint_port_channel"]:
             adapter["port_channel"]["endpoint_port_channel"] = group["endpoint_port_channel"]
@@ -1241,7 +1259,7 @@ def extract_connected_endpoints(  # noqa: C901
                     _apply_vlan_adapter_config(adapter, tagged_vlans, untagged_vlan)
 
                     # Add spanning tree portfast for server ports
-                    adapter["spanning_tree_portfast"] = "edge"
+                    adapter["spanning_tree_portfast"] = _portfast_setting(interface)
 
                     servers[server_name]["adapters"].append(adapter)
                     server_adapter_keys[server_name].add(adapter_key)
@@ -1333,10 +1351,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         tenants_list: list[dict[str, Any]] = []
         for tenant in tenants:
-            tenant_data: dict[str, Any] = {
-                "name": tenant.name.value,
-                "mac_vrf_vni_base": tenant.mac_vrf_vni_base.value,
-            }
+            tenant_data: dict[str, Any] = {"name": tenant.name.value}
+            # Overlay-free (pure Layer-2 / L2LS) tenants have no VNI base: omit it
+            # so PyAVD derives no VNI/VXLAN. Overlay tenants keep emitting theirs.
+            mac_vrf_vni_base = tenant.mac_vrf_vni_base.value
+            if mac_vrf_vni_base is not None:
+                tenant_data["mac_vrf_vni_base"] = mac_vrf_vni_base
 
             # Prefer child-side filters; fall back to parent relationship peers for SDK/test objects without IDs.
             vrfs = await self._filter_or_fetch_peers(
@@ -1389,29 +1409,45 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             if vrfs_list:
                 tenant_data["vrfs"] = vrfs_list
 
-            l2vlans = await self._filter_or_fetch_peers(
-                kind="EvpnL2Vlan",
-                filter_name="tenant__ids",
-                parent_id=getattr(tenant, "id", None),
-                relationship=getattr(tenant, "l2vlans", None),
-            )
-            l2vlans_list: list[dict[str, Any]] = []
-            for l2vlan in l2vlans:
-                l2v_data: dict[str, Any] = {
-                    "id": l2vlan.vlan_id.value,
-                    "name": l2vlan.name.value,
-                }
-                vni_override = getattr(l2vlan, "vni_override", None)
-                if vni_override and vni_override.value is not None:
-                    l2v_data["vni_override"] = vni_override.value
-                l2vlans_list.append(l2v_data)
-
+            # Fetch L2 VLANs for this tenant
+            l2vlans_list = await self._build_l2vlans_hostvars(tenant)
             if l2vlans_list:
                 tenant_data["l2vlans"] = l2vlans_list
 
             tenants_list.append(tenant_data)
 
         return tenants_list
+
+    async def _build_l2vlans_hostvars(self, tenant: Any) -> list[dict[str, Any]]:
+        """Build the AVD ``l2vlans`` list for a tenant, with tag-based scoping.
+
+        Tags come from each VLAN's ``rack_tags``/``avd_tags`` (same mechanism as
+        SVIs); AVD matches them against each node's ``filter.tags`` to scope the
+        VLAN to the right leaf pairs.
+        """
+        l2vlans = await self._filter_or_fetch_peers(
+            kind="EvpnL2Vlan",
+            filter_name="tenant__ids",
+            parent_id=getattr(tenant, "id", None),
+            relationship=getattr(tenant, "l2vlans", None),
+        )
+        l2vlans_list: list[dict[str, Any]] = []
+        for l2vlan in l2vlans:
+            l2v_data: dict[str, Any] = {
+                "id": l2vlan.vlan_id.value,
+                "name": l2vlan.name.value,
+            }
+            vni_override = getattr(l2vlan, "vni_override", None)
+            if vni_override and vni_override.value is not None:
+                l2v_data["vni_override"] = vni_override.value
+            rack_tag_peers = await self._fetch_relationship_peers(l2vlan, "rack_tags")
+            avd_tag_peers = await self._fetch_relationship_peers(l2vlan, "avd_tags")
+            l2v_tags = self._build_svi_tags(rack_tag_peers, avd_tag_peers)
+            if l2v_tags:
+                l2v_data["tags"] = l2v_tags
+            l2vlans_list.append(l2v_data)
+
+        return l2vlans_list
 
     async def _extract_pool_prefix(self, pool_ref: object, pool_kind: str) -> str | None:
         """Extract the first resource prefix from a pool relationship reference."""

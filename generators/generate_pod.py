@@ -122,6 +122,10 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
 
         await self.create_spine_switches()
 
+        # Standalone-L2LS spines form an MLAG pair (the example MLAGs both tiers).
+        # Gated on the l2spine role so routed L3LS spines are unaffected.
+        await self.create_spine_mlag_pair()
+
         if self.fabric_amount_of_super_spines > 0:
             await self.connect_spine_to_super_spine()
 
@@ -153,6 +157,46 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
                 asn_pool=self.asn_pool,
                 fabric_id=self.fabric_id,
                 allocate_routing_asn=self.allocate_routing_asn,
+            )
+
+    async def create_spine_mlag_pair(self) -> None:
+        """Form the l2spine MLAG pair for a standalone-L2LS pod.
+
+        Only the underlay-``none`` spine tier (l2spine) is MLAG'd here; routed L3LS
+        spines are untouched. The l2spine model ships no dedicated ``mlag_peer``
+        interfaces, so the peer-link is carved from its highest free
+        super-spine-facing ports (unused in a standalone L2LS fabric, which has no
+        super-spines) via the shared ``assign_mlag_peer_interfaces`` helper. Pure
+        Layer-2: the domain carries no ASN because the pair runs no BGP.
+        """
+        if self.spine_role != "l2spine" or len(self.spine_switches) < 2:
+            return
+
+        for pair_idx in range(0, len(self.spine_switches) - 1, 2):
+            spine_a = self.spine_switches[pair_idx]
+            spine_b = self.spine_switches[pair_idx + 1]
+
+            pair_suffix = f"-{pair_idx // 2 + 1}" if len(self.spine_switches) > 2 else ""
+            domain_id = f"{self.pod_name}-spine{pair_suffix}"
+
+            mlag_domain = await self.client.create(
+                "MlagDomain",
+                domain_id=domain_id,
+                peers=[{"id": spine_a.id}, {"id": spine_b.id}],
+                pod={"id": self.pod_id},
+            )
+            await mlag_domain.save(allow_upsert=True)
+
+            # Carve the peer-link from the free super-spine-facing ports.
+            carvable_roles = frozenset({"super_spine", "mlag_peer"})
+            await self.assign_mlag_peer_interfaces(spine_a, carvable_roles=carvable_roles)
+            await self.assign_mlag_peer_interfaces(spine_b, carvable_roles=carvable_roles)
+
+            self.logger.info(
+                "Created l2spine MLAG domain %s: %s + %s",
+                domain_id,
+                spine_a.name.value,
+                spine_b.name.value,
             )
 
     async def get_super_spine_switches_for_fabric(self) -> tuple[NetworkPod | None, list[DcimDevice]]:

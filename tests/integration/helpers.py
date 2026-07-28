@@ -205,3 +205,49 @@ async def expected_super_spine_count(client: InfrahubClient, branch: str) -> int
         if design.device_quantity.value is not None:
             total += int(design.device_quantity.value)
     return total
+
+
+# Device roles each example fabric design must generate (used by the
+# fabric-scoped deployment validation selected via ``--fabric``).
+FABRIC_EXPECTED_ROLES: dict[str, set[str]] = {
+    "Fabric-A": {"super_spine", "spine", "leaf"},
+    "Fabric-C": {"spine", "leaf"},
+    "Fabric-L2LS": {"l2spine", "l2leaf"},
+    "Fabric-Campus": {"l3spine", "l2leaf"},
+    "Fabric-ISIS-LDP": {"p", "pe"},
+}
+
+# Roles that form MLAG pairs (and so must carry an ``mlag_domain``) in the
+# standalone-L2LS design — MLAG on both the spine and leaf tier.
+L2LS_MLAG_ROLES = {"l2spine", "l2leaf"}
+
+
+async def fabric_deployment_report(client: InfrahubClient, branch: str, fabric_name: str) -> dict[str, Any] | None:
+    """Report a single fabric's generated devices, grouped by role, with MLAG membership.
+
+    Returns ``None`` when the named fabric does not exist (so callers can fail fast
+    on an unknown ``--fabric``). Otherwise returns ``{roles, device_count,
+    mlag_roles}`` where ``roles`` maps each role to its device names and
+    ``mlag_roles`` is the set of roles whose devices carry an ``mlag_domain``.
+    """
+    fabrics = await client.filters(kind="NetworkFabric", name__value=fabric_name, branch=branch)
+    if not fabrics:
+        return None
+
+    pods = await client.filters(kind="NetworkPod", parent__ids=[fabrics[0].id], branch=branch)
+    pod_ids = [pod.id for pod in pods]
+
+    devices: list[Any] = []
+    if pod_ids:
+        devices = await client.filters(kind="DcimDevice", pod__ids=pod_ids, branch=branch, include=["mlag_domain"])
+
+    roles: dict[str, list[str]] = {}
+    mlag_roles: set[str] = set()
+    for device in devices:
+        role = device.role.value
+        roles.setdefault(role, []).append(device.name.value)
+        mlag_domain = getattr(device, "mlag_domain", None)
+        if mlag_domain is not None and getattr(mlag_domain, "node", None):
+            mlag_roles.add(role)
+
+    return {"roles": roles, "device_count": len(devices), "mlag_roles": mlag_roles}

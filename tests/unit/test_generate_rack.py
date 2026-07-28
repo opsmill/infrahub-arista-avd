@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
@@ -160,9 +161,14 @@ def _make_generator() -> RackGenerator:
 
 
 def _iface(name: str, role: str) -> SimpleNamespace:
+    # Mirror the schema's computed `index` attribute: zero-padded number of the
+    # interface's first numeric segment (e.g. Ethernet47 -> "047").
+    match = re.search(r"\d+", name)
+    index_value = f"{int(match.group()):03d}" if match else "000"
     return SimpleNamespace(
         name=SimpleNamespace(value=name),
         role=SimpleNamespace(value=role),
+        index=SimpleNamespace(value=index_value),
         save=AsyncMock(),
     )
 

@@ -24,11 +24,13 @@ Each scenario has its own loadable fabric design; every device renders valid PyA
 | Single-DC L3LS | ✅ | `Fabric-L3LS` | eBGP underlay, EVPN/VXLAN L3LS. |
 | Single-DC Multi-Pod L3LS (5-stage Clos) | ✅ | `Fabric-L3LS-MultiPod-A` | 6 super-spines + 3 pods; super-spines as EVPN route servers; tenants as vlan-aware bundles (`evpn_vlan_aware_bundles`). |
 | Dual-DC L3LS | ✅ | `Fabric-L3LS-Multi-Domain` | EVPN DC Gateway (next-hop-self) + DCI `l3_edge` p2p links, via `avd_custom_hostvars`. |
-| L2LS fabric (standalone) | ✅ | `Fabric-L2LS` | underlay `none` → `l2spine` + `l2leaf`, pure Layer-2, MLAG both tiers. |
+| L2LS fabric (standalone) | ✅ | `Fabric-L2LS` | underlay `none` → `l2spine` + `l2leaf`, pure Layer-2 (no VNI/VXLAN/EVPN), MLAG both tiers, two MLAG rack pairs; overlay-free `Evpn.Tenant` (`MY_FABRIC`) with tag-scoped VLANs `BLUE-NET`/`GREEN-NET`/`ORANGE-NET` and per-tier MSTP priorities (l2spine 4096 / l2leaf 16384), mirroring the AVD `l2ls-fabric` example. Host endpoints sit on leaf access ports via per-colour access profiles (one untagged VLAN each, PortFast `edge`). The example's dual-homed `FIREWALL` (trunk Port-Channel to both spines) is **not modeled** — deliberately deferred, see below. |
 | Campus fabric | ✅ | `Fabric-Campus` | underlay `ospf` → `l3spine` core with anycast SVIs (`Evpn.Svi`) + `l2leaf` access; dot1x/PoE via escape hatch. |
 | ISIS-LDP IPVPN | ✅ | `Fabric-ISIS-LDP` | underlay `isis-ldp` → `p` core + `pe` edge; per-customer L3VPN VRFs (`Evpn.Tenant`/`Ipam.VRF`). |
 
 The non-L3LS designs are driven by the fabric `underlay_routing_protocol`, which the pod/rack generators map to the correct device roles (gated so eBGP L3LS fabrics are unaffected).
+
+**Deferred — L2LS spine-attached firewall.** The upstream `l2ls-fabric` example dual-homes a firewall to both `l2spine` switches as a trunk Port-Channel. Modeling it needs a connected endpoint attachable to spine-tier devices, which the current endpoint/cabling path does not cover (it cables endpoints to a rack's leaves). It was scoped out rather than forced through `avd_custom_hostvars`, so the L2LS example is feature-complete for the fabric, services and host endpoints but carries no firewall. Everything else in that design is modeled natively.
 
 Services are modeled **schema-first**: L2 VLANs (L2LS), anycast SVIs on the campus l3spine core, and per-customer L3VPN VRFs on the ISIS-LDP PE are all `Ipam.VLAN` / `Evpn.Tenant` / `Ipam.VRF` / `Evpn.Svi` **objects** rendered by the generator — the same service model as the L3LS fabrics. The `avd_custom_hostvars` escape hatch is reserved for capabilities the schema does not yet model — EVPN DC Gateway remote-peers and campus dot1x/PoE — a deliberate, documented niche exception (native modeling of those is future schema work). Native-vs-escape-hatch guidance is in the [developer guide](./developer-guide/avd/extending.md).
 

@@ -47,6 +47,9 @@ EndpointPhysicalLagNodeLacpMode = getattr(q, f"{_ep}InterfacePhysicalLagNodeLacp
 EndpointPhysicalLagNodeEvpnEthernetSegment = getattr(q, f"{_ep}InterfacePhysicalLagNodeEvpnEthernetSegment")
 TaggedVlan = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalTaggedVlan
 UntaggedVlan = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlan
+UntaggedVlanNode = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalUntaggedVlanNode
+# The query always selects `spanning_tree_portfast`; a port with no intent carries None.
+Portfast = q.GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysicalSpanningTreePortfast
 
 
 def _attr(value: object) -> SimpleNamespace:
@@ -135,6 +138,7 @@ def _make_uplink_edge(
             role=IfaceRole(value=role),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
+            spanning_tree_portfast=Portfast(value=None),
             lag={"node": None},
             connector=IfaceConnector(
                 node=ConnectorNode(
@@ -241,6 +245,7 @@ def _make_server_edge(
             role=IfaceRole(value="server"),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
+            spanning_tree_portfast=Portfast(value=None),
             lag={"node": None},
             connector=IfaceConnector(
                 node=ConnectorNode(
@@ -359,6 +364,7 @@ def _make_lagged_server_edge() -> IfaceEdge:
             role=IfaceRole(value="server"),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
+            spanning_tree_portfast=Portfast(value=None),
             lag={
                 "node": {
                     "__typename": "InterfaceLag",
@@ -418,6 +424,7 @@ def _make_switch_lagged_server_edge(
             role=IfaceRole(value="server"),
             tagged_vlan=TaggedVlan(edges=[]),
             untagged_vlan=UntaggedVlan(node=None),
+            spanning_tree_portfast=Portfast(value=None),
             lag={
                 "node": {
                     "__typename": "InterfaceLag",
@@ -729,3 +736,51 @@ class TestExtractConnectedEndpointsOrdering:
                 "spanning_tree_portfast": "edge",
             }
         ]
+
+
+# --- Host access ports: switchport intent + PortFast (feature 002) -------------
+
+
+def _make_access_server_edge(
+    iface_name: str,
+    *,
+    untagged_vlan: int,
+    portfast: str | None = None,
+    server_name: str = "host1",
+) -> IfaceEdge:
+    """A leaf access port facing a host, carrying one untagged (access) VLAN."""
+    edge = _make_server_edge("s1", iface_name, "rs1", "eth0", "ds1", server_name)
+    node = edge.node
+    node.untagged_vlan = UntaggedVlan(
+        node=UntaggedVlanNode(__typename="IpamVLAN", vlan_id={"value": untagged_vlan}, status={"value": "active"})
+    )
+    node.spanning_tree_portfast = Portfast(value=portfast)
+    return edge
+
+
+def test_host_access_port_renders_access_mode_and_edge_portfast() -> None:
+    """A host access port becomes an access adapter on its VLAN, PortFast edge by default."""
+    edge = _make_access_server_edge("Ethernet10", untagged_vlan=10)
+
+    adapters = extract_connected_endpoints([edge], "leaf1")[0]["adapters"]
+
+    assert adapters == [
+        {
+            "endpoint_ports": ["eth0"],
+            "switch_ports": ["Ethernet10"],
+            "switches": ["leaf1"],
+            "mode": "access",
+            "vlans": "10",
+            "spanning_tree_portfast": "edge",
+        }
+    ]
+
+
+def test_host_access_port_honours_explicit_portfast_intent() -> None:
+    """An interface stating `network` overrides the host-facing edge default."""
+    edge = _make_access_server_edge("Ethernet10", untagged_vlan=10, portfast="network")
+
+    adapters = extract_connected_endpoints([edge], "leaf1")[0]["adapters"]
+
+    assert adapters[0]["spanning_tree_portfast"] == "network"
+    assert adapters[0]["mode"] == "access"

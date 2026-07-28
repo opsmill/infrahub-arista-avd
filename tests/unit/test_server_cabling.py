@@ -436,7 +436,6 @@ class TestVlanAssignment:
         mock_leaf_iface.tagged_vlan.extend = MagicMock()
         mock_leaf_iface.untagged_vlan = MagicMock()
         mock_leaf_iface.untagged_vlan.fetch = AsyncMock()
-        mock_leaf_iface.untagged_vlan.add = MagicMock()
         mock_leaf_iface.save = AsyncMock()
 
         gen.client.get = AsyncMock(return_value=mock_leaf_iface)
@@ -446,7 +445,8 @@ class TestVlanAssignment:
 
         await gen._assign_vlans(cabling_plan, server_ifaces)
 
-        mock_leaf_iface.untagged_vlan.add.assert_called_once_with("vlan-100")
+        # `untagged_vlan` is cardinality one, so it is assigned — not added to.
+        assert mock_leaf_iface.untagged_vlan == {"id": "vlan-100"}
 
     @pytest.mark.asyncio
     async def test_dual_homed_vlans_are_assigned_to_bond_and_switch_lags(self) -> None:
@@ -493,11 +493,12 @@ class TestVlanAssignment:
         server_member2.untagged_vlan.clear.assert_called_once()
 
         server_bond.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
-        server_bond.untagged_vlan.add.assert_called_once_with("vlan-100")
         leaf1_po.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
         leaf2_po.tagged_vlan.extend.assert_called_once_with(["vlan-300", "vlan-400"])
-        leaf1_po.untagged_vlan.add.assert_called_once_with("vlan-100")
-        leaf2_po.untagged_vlan.add.assert_called_once_with("vlan-100")
+        # The untagged VLAN lands on the Port-Channels by assignment (cardinality one).
+        assert server_bond.untagged_vlan == {"id": "vlan-100"}
+        assert leaf1_po.untagged_vlan == {"id": "vlan-100"}
+        assert leaf2_po.untagged_vlan == {"id": "vlan-100"}
 
         assert leaf_iface1.tagged_vlan.extend.call_count == 0
         assert leaf_iface2.tagged_vlan.extend.call_count == 0
@@ -518,17 +519,22 @@ class TestVlanAssignment:
         server_member.save.assert_awaited_once_with(allow_upsert=True)
 
     @pytest.mark.asyncio
-    async def test_apply_untagged_vlan_skips_fetch_when_relationship_is_empty(self) -> None:
+    async def test_apply_untagged_vlan_assigns_without_fetching(self) -> None:
+        """`untagged_vlan` is cardinality one: assign the peer, never fetch-then-add.
+
+        A real cardinality-one relationship is a ``RelatedNode``, which has no
+        ``add()`` — reaching for one raised ``AttributeError`` against a live
+        Infrahub, so an access port could never take its VLAN.
+        """
         gen = _make_generator()
         target = self._vlan_target()
-        target.untagged_vlan.id = None
-        target.untagged_vlan.node = None
-        target.untagged_vlan.fetch = AsyncMock(side_effect=AssertionError("empty peer must not be fetched"))
+        fetch = AsyncMock(side_effect=AssertionError("cardinality-one peer must not be fetched"))
+        target.untagged_vlan.fetch = fetch
 
         await gen._apply_vlan_relationships(target, [], "vlan-100")
 
-        target.untagged_vlan.fetch.assert_not_awaited()
-        target.untagged_vlan.add.assert_called_once_with("vlan-100")
+        fetch.assert_not_awaited()
+        assert target.untagged_vlan == {"id": "vlan-100"}
         target.save.assert_awaited_once_with(allow_upsert=True)
 
 

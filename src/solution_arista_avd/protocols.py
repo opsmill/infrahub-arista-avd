@@ -103,6 +103,7 @@ class GenericInterfaceBundle(CoreNode):
 
 class InterfaceLayer2(CoreNode):
     l2_mode: DropdownOptional
+    spanning_tree_portfast: DropdownOptional
 
 class InterfaceLayer3(CoreNode):
     dot1q_id: IntegerOptional
@@ -279,6 +280,8 @@ class EvpnL2Vlan(CoreNode):
     name: String
     vlan_id: Integer
     vni_override: IntegerOptional
+    avd_tags: RelationshipManager[AvdTag]
+    rack_tags: RelationshipManager[LocationRack]
     tenant: RelationshipAttribute[EvpnTenant]
     vlan: RelationshipAttribute[IpamVLAN]
 
@@ -448,7 +451,7 @@ class AvdTag(CoreNode):
 
 class EvpnTenant(CoreNode):
     description: StringOptional
-    mac_vrf_vni_base: Integer
+    mac_vrf_vni_base: IntegerOptional
     name: String
     fabrics: RelationshipManager[NetworkFabric]
     l2vlans: RelationshipManager[EvpnL2Vlan]

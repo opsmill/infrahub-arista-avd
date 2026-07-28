@@ -2291,3 +2291,140 @@ def test_server_lag_evpn_hostvars_validate_against_pyavd() -> None:
     )
 
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+# --- L2LS generator capabilities (feature 002): overlay-free + tag-scoped VLANs -
+
+
+def _l2vlan(vlan_id: int, name: str, *, rack_tags: list[str], avd_tags: list[str]) -> SimpleNamespace:
+    return SimpleNamespace(
+        vlan_id=_attr(vlan_id),
+        name=_attr(name),
+        vni_override=_attr(None),
+        rack_tags=_rel([_named_peer(t) for t in rack_tags]),
+        avd_tags=_rel([_named_peer(t) for t in avd_tags]),
+    )
+
+
+def _tenant(name: str, vni_base: int | None, l2vlans: list[SimpleNamespace]) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=_attr(name),
+        mac_vrf_vni_base=_attr(vni_base),
+        vrfs=_rel([]),
+        l2vlans=_rel(l2vlans),
+    )
+
+
+async def test_overlay_free_tenant_omits_vni_base_and_emits_l2vlan_tags() -> None:
+    """FR-006/FR-007: an overlay-free tenant emits no VNI base; L2 VLANs carry tags."""
+    gen = _make_generator()
+    tenant = _tenant(
+        "MY_FABRIC",
+        None,
+        [
+            _l2vlan(10, "BLUE-NET", rack_tags=[], avd_tags=["bluezone"]),
+            _l2vlan(20, "GREEN-NET", rack_tags=[], avd_tags=["greenzone"]),
+        ],
+    )
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants = await gen._build_tenants_hostvars("fabric-1")
+
+    assert len(tenants) == 1
+    assert "mac_vrf_vni_base" not in tenants[0]
+    l2vlans = tenants[0]["l2vlans"]
+    assert {v["id"]: v.get("tags") for v in l2vlans} == {10: ["bluezone"], 20: ["greenzone"]}
+
+
+async def test_overlay_tenant_keeps_vni_base() -> None:
+    """FR-009: an overlay tenant that sets a VNI base still emits it (no regression)."""
+    gen = _make_generator()
+    tenant = _tenant("OVERLAY", 20000, [])
+    gen.client.filters = AsyncMock(return_value=[tenant])
+
+    tenants = await gen._build_tenants_hostvars("fabric-1")
+
+    assert tenants[0]["mac_vrf_vni_base"] == 20000
+
+
+def test_l2leaf_node_group_filter_tags_come_from_rack_avd_tags() -> None:
+    """An l2leaf MLAG pair is tag-scoped by its rack, so PyAVD matches the
+    tag-scoped l2vlans onto the right leaf pair (and runs no BGP)."""
+    hostvars = _base_hostvars(
+        [],
+        role="l2leaf",
+        mlag_capable=True,
+        underlay_routing_protocol="none",
+        rack_info={
+            "name": "L2LS_RACK1",
+            "mlag": True,
+            "leaf_names": ["leaf1", "leaf2"],
+            "avd_tags": ["bluezone", "greenzone"],
+        },
+        mlag_info={
+            "domain_id": "L2LS_RACK1",
+            "bgp_asn": None,
+            "virtual_router_mac": None,
+            "peer_names": ["leaf1", "leaf2"],
+        },
+    )
+
+    node_group = hostvars["l2leaf"]["node_groups"][0]
+    assert node_group["filter"] == {"tags": ["bluezone", "greenzone"]}
+    # Pure Layer-2 tier: the pair carries no BGP ASN.
+    assert "bgp_as" not in node_group
+
+
+# --- Host access ports: switchport intent + PortFast (feature 002) -------------
+
+
+def _access_switch_port(name: str, *, untagged_vlan: int, portfast: str | None = None) -> SimpleNamespace:
+    """A host-facing switch access port carrying only an untagged VLAN."""
+    port = SimpleNamespace(
+        name=_attr(name),
+        tagged_vlan=SimpleNamespace(edges=[]),
+        untagged_vlan=SimpleNamespace(node=SimpleNamespace(vlan_id=_attr(untagged_vlan), status=_attr("active"))),
+    )
+    if portfast is not None:
+        port.spanning_tree_portfast = _attr(portfast)
+    return port
+
+
+def _host_adapter(switch_port: SimpleNamespace) -> dict:
+    """Build the single adapter a host endpoint gets from one switch access port."""
+    server: dict = {"name": "host1", "adapters": []}
+    groups: dict[tuple[str, int], dict] = {}
+    switch_lag = _lag(name="Port-Channel10", channel_id=10)
+    links = hostvar_module._switch_lag_member_links(
+        server_lag_node=None,
+        fallback_switch_lag_node=switch_lag,
+        fallback_local_interface=switch_port,
+        fallback_endpoint=SimpleNamespace(name=_attr("eth0")),
+        hostname="leaf1",
+    )
+    _add_switch_lag_adapter(
+        server,
+        groups,
+        server_name="host1",
+        switch_lag_node=switch_lag,
+        endpoint_lag_node=None,
+        links=links,
+    )
+    hostvar_module._flush_switch_lag_groups(groups, mlag_active=False)
+    return server["adapters"][0]
+
+
+def test_host_access_adapter_renders_access_mode_and_edge_portfast() -> None:
+    """A host access port renders mode access + its VLAN, PortFast edge by default."""
+    adapter = _host_adapter(_access_switch_port("Ethernet10", untagged_vlan=10))
+
+    assert adapter["mode"] == "access"
+    assert adapter["vlans"] == "10"
+    assert adapter["spanning_tree_portfast"] == "edge"
+
+
+def test_explicit_spanning_tree_portfast_overrides_the_host_default() -> None:
+    """An interface that states its PortFast intent wins over the edge default."""
+    adapter = _host_adapter(_access_switch_port("Ethernet10", untagged_vlan=10, portfast="network"))
+
+    assert adapter["spanning_tree_portfast"] == "network"
