@@ -102,7 +102,7 @@ spec:
   data:
     - name: "Fabric-L3LS"
       index: 64
-      amount_of_super_spines: 0
+      # Single-DC 3-stage L3LS: no super-spines (no super_spine device design).
       fabric_interface_sorting_method: "create_sorted_device_interface_map"
       virtual_router_mac: "00:1c:73:00:00:64"
       mgmt_gateway: "10.64.0.1"
@@ -129,8 +129,11 @@ spec:
         data:
           - name: "sdc-l3ls-pod1"
             index: 1
-            amount_of_spines: 2
-            spine_switch_template: "arista-7050cx3-32c-spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 2
+                  device_template: arista-7050cx3-32c-spine-switch
             mlag_peer_pool: "Fabric-L3LS-MLAG-Peer-Pool"
             mlag_l3_pool: "Fabric-L3LS-MLAG-L3-Pool"
             member_of_groups: ["pods"]
@@ -153,16 +156,22 @@ spec:
       rack_type: compute
       pod: sdc-l3ls-pod1
       parent: "Hall-SDC-L3LS"
-      amount_of_leafs: 2
       mlag: true
-      leaf_switch_template: leaf-switch-compute
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: leaf-switch-compute
       member_of_groups: ["racks"]
     - name: "SDC_L3LS_ACCESS"
       index: 2
       rack_type: compute
       pod: sdc-l3ls-pod1
       parent: "Hall-SDC-L3LS"
-      amount_of_leafs: 2
       mlag: true
-      leaf_switch_template: leaf-switch-compute
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: leaf-switch-compute
       member_of_groups: ["racks"]

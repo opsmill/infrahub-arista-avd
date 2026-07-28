@@ -44,15 +44,6 @@ nodes:
           - name: storage
             label: Storage
         default_value: compute
-      - name: amount_of_leafs
-        kind: Number
-        branch: aware
-        label: Amount of leaf switches
-        default_value: 1
-        optional: false
-        parameters:
-          min_value: 1
-          max_value: 2
       - name: mlag
         kind: Boolean
         branch: aware
@@ -64,12 +55,6 @@ nodes:
         optional: true
         default_value: false
     relationships:
-      - name: leaf_switch_template
-        kind: Attribute
-        branch: aware
-        peer: CoreObjectTemplate
-        cardinality: one
-        identifier: "rack__leaf_template"
       - name: pod
         peer: NetworkPod
         branch: aware

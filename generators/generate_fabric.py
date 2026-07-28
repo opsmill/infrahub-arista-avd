@@ -29,13 +29,16 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
     async def generate(self, data: dict) -> None:
         data: FabricGeneratorQuery = FabricGeneratorQuery(**data)
 
-        self.fabric_name = data.network_fabric.edges[0].node.name.value.lower()
-        self.fabric_id = data.network_fabric.edges[0].node.id
-        self.amount_of_super_spines = data.network_fabric.edges[0].node.amount_of_super_spines.value
-        underlay_attr = data.network_fabric.edges[0].node.underlay_routing_protocol
+        fabric_node = data.network_fabric.edges[0].node
+        self.fabric_name = fabric_node.name.value.lower()
+        self.fabric_id = fabric_node.id
+        underlay_attr = fabric_node.underlay_routing_protocol
         self.underlay_routing_protocol = underlay_attr.value if underlay_attr else None
-        super_spine_template = data.network_fabric.edges[0].node.super_spine_switch_template.node
-        self.fabric_super_spine_switch_template = super_spine_template.id if super_spine_template else None
+        # Super-spine count + template now come from the fabric's device_designs
+        # (role "super_spine"); an absent design means zero super-spines.
+        self.fabric_super_spine_switch_template, self.amount_of_super_spines = self.device_design_for(
+            fabric_node.device_designs, "super_spine"
+        )
         await set_fabric_avd_hostvars_ready(self.client, self.fabric_id, False)
         self.super_spine_devices: list[DcimDevice] = []
 
@@ -54,7 +57,7 @@ class FabricGenerator(InfrahubGenerator, GeneratorMixin):
 
     async def create_super_spine_switches(self) -> None:
         if self.amount_of_super_spines == 0:
-            self.logger.info("Skipping super-spine creation for %s: amount_of_super_spines is 0", self.fabric_name)
+            self.logger.info("Skipping super-spine creation for %s: no super_spine device design", self.fabric_name)
             return
 
         if not self.fabric_super_spine_switch_template:

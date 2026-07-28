@@ -6,10 +6,7 @@ from typing import Any
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_TEMPLATE_FILES = [
-    _REPO_ROOT / "objects" / "06_device_template.yml",
-    _REPO_ROOT / "objects" / "06a_fabric_l3ls_multi_domain_device_templates.yml",
-]
+_OBJECTS_DIR = _REPO_ROOT / "objects"
 
 
 def _documents(path: Path) -> list[dict[str, Any]]:
@@ -28,7 +25,9 @@ def test_seeded_loopback0_templates_are_virtual_not_physical() -> None:
     physical_loopbacks: list[str] = []
     virtual_loopbacks: list[str] = []
 
-    for path in _TEMPLATE_FILES:
+    # Discovered rather than hardcoded: seed files get renamed and consolidated,
+    # and a stale path list silently stops checking the templates it named.
+    for path in sorted(_OBJECTS_DIR.glob("*.yml")):
         for doc in _documents(path):
             if doc.get("spec", {}).get("kind") != "TemplateDcimDevice":
                 continue

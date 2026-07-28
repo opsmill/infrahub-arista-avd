@@ -1,0 +1,166 @@
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+---
+# Normalized device design entities.
+#
+# Replaces the per-tier, per-role paired fields (`<role>_switch_template`
+# relationship + `amount_of_<role>s` attribute) on NetworkFabric, NetworkPod, and
+# LocationRack with a reusable device-design entity: one object template + a
+# quantity + an explicit role, related *many* from each container. Adding a
+# device type becomes data, not schema.
+#
+# See specs/005-device-design-entities/ for the spec, plan, and data model.
+version: "1.0"
+
+generics:
+  # Shared shape of a device design. Not instantiated directly; each tier has a
+  # concrete node (below) that inherits this and adds its container Parent.
+  - name: DeviceDesign
+    namespace: Network
+    include_in_menu: false
+    display_label: role__value
+    attributes:
+      - name: role
+        kind: Dropdown
+        optional: false
+        description: "Device role this design produces. Authoritative for generation."
+        order_weight: 1000
+        choices:
+          - name: super_spine
+            label: Super Spine
+            color: "#A9CCE3"
+          - name: spine
+            label: Spine
+            color: "#A9DFBF"
+          - name: leaf
+            label: Leaf
+            color: "#D2B4DE"
+          - name: l2leaf
+            label: L2 Leaf
+            color: "#F9E79F"
+      - name: device_quantity
+        kind: Number
+        optional: false
+        description: "Number of devices of this design to create in the container."
+        order_weight: 1100
+        parameters:
+          min_value: 1
+    relationships:
+      - name: device_template
+        label: Device Template
+        peer: CoreObjectTemplate
+        kind: Attribute
+        cardinality: one
+        optional: false
+        on_delete: no-action
+        identifier: "device_design__template"
+        order_weight: 900
+
+nodes:
+  # --- Fabric tier: super-spine designs ---
+  - name: FabricDeviceDesign
+    namespace: Network
+    include_in_menu: false
+    inherit_from:
+      - NetworkDeviceDesign
+    uniqueness_constraints:
+      - [fabric, role__value]
+    human_friendly_id:
+      - fabric__name__value
+      - role__value
+    order_by:
+      - fabric__name__value
+      - role__value
+    relationships:
+      - name: fabric
+        peer: NetworkFabric
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: "fabric__device_designs"
+        order_weight: 800
+
+  # --- Pod tier: spine designs ---
+  - name: PodDeviceDesign
+    namespace: Network
+    include_in_menu: false
+    inherit_from:
+      - NetworkDeviceDesign
+    uniqueness_constraints:
+      - [pod, role__value]
+    human_friendly_id:
+      - pod__name__value
+      - role__value
+    order_by:
+      - pod__name__value
+      - role__value
+    relationships:
+      - name: pod
+        peer: NetworkPod
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: "pod__device_designs"
+        order_weight: 800
+
+  # --- Rack tier: leaf and L2-leaf designs ---
+  - name: RackDeviceDesign
+    namespace: Network
+    include_in_menu: false
+    inherit_from:
+      - NetworkDeviceDesign
+    uniqueness_constraints:
+      - [rack, role__value]
+    human_friendly_id:
+      - rack__name__value
+      - role__value
+    order_by:
+      - rack__name__value
+      - role__value
+    relationships:
+      - name: rack
+        peer: LocationRack
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: "rack__device_designs"
+        order_weight: 800
+
+extensions:
+  nodes:
+    # Container -> device_designs (many, cascade). Identifiers match the Parent
+    # relationships on the concrete design nodes above.
+    - kind: NetworkFabric
+      relationships:
+        - name: device_designs
+          label: Device Designs
+          peer: NetworkFabricDeviceDesign
+          kind: Component
+          cardinality: many
+          optional: true
+          on_delete: cascade
+          identifier: "fabric__device_designs"
+          order_weight: 4500
+
+    - kind: NetworkPod
+      relationships:
+        - name: device_designs
+          label: Device Designs
+          peer: NetworkPodDeviceDesign
+          kind: Component
+          cardinality: many
+          optional: true
+          on_delete: cascade
+          identifier: "pod__device_designs"
+          order_weight: 5500
+
+    - kind: LocationRack
+      relationships:
+        - name: device_designs
+          label: Device Designs
+          peer: NetworkRackDeviceDesign
+          kind: Component
+          cardinality: many
+          optional: true
+          on_delete: cascade
+          identifier: "rack__device_designs"
+          order_weight: 9700

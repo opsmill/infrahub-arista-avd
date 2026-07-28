@@ -47,6 +47,11 @@ class NetworkBuildingBlock(CoreNode):
 class DcimConnector(CoreNode):
     connected_endpoints: RelationshipManager[DcimEndpoint]
 
+class NetworkDeviceDesign(CoreNode):
+    device_quantity: Integer
+    role: Dropdown
+    device_template: RelationshipAttribute[CoreObjectTemplate]
+
 class DcimEndpoint(CoreNode):
     connector: RelationshipAttribute[DcimConnector]
 
@@ -209,7 +214,6 @@ class AvdEvpn(CoreNode):
 
 
 class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
-    amount_of_super_spines: Integer
     avd_hostvars_ready: Boolean
     cloudvision_managed: Boolean
     fabric_interface_sorting_method: Dropdown
@@ -220,7 +224,10 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     avd_evpn: RelationshipAttribute[AvdEvpn]
     mgmt_pool: RelationshipAttribute[CoreIPAddressPool]
     node_id_pool: RelationshipAttribute[CoreNumberPool]
-    super_spine_switch_template: RelationshipAttribute[CoreObjectTemplate]
+
+
+class NetworkFabricDeviceDesign(NetworkDeviceDesign):
+    fabric: RelationshipAttribute[NetworkFabric]
 
 
 class EvpnGatewayGroup(CoreNode):
@@ -330,14 +337,16 @@ class DcimPlatform(CoreNode):
 
 
 class NetworkPod(NetworkBuildingBlock, GeneratorTarget):
-    amount_of_spines: Integer
     leaf_interface_sorting_method: Dropdown
     role: Dropdown
     spine_interface_sorting_method: Dropdown
     devices: RelationshipManager[DcimDevice]
     evpn_domain: RelationshipAttribute[EvpnDomain]
     racks: RelationshipManager[LocationRack]
-    spine_switch_template: RelationshipAttribute[CoreObjectTemplate]
+
+
+class NetworkPodDeviceDesign(NetworkDeviceDesign):
+    pod: RelationshipAttribute[NetworkPod]
 
 
 class IpamPrefix(BuiltinIPPrefix):
@@ -363,15 +372,17 @@ class OrganizationProvider(OrganizationGeneric):
 
 
 class LocationRack(LocationGeneric, LocationHosting, GeneratorTarget):
-    amount_of_leafs: Integer
     generation_complete: Boolean
     index: Integer
     mlag: Boolean
     rack_type: Dropdown
     avd_tags: RelationshipManager[AvdTag]
     devices: RelationshipManager[DcimPhysicalDevice]
-    leaf_switch_template: RelationshipAttribute[CoreObjectTemplate]
     pod: RelationshipAttribute[NetworkPod]
+
+
+class NetworkRackDeviceDesign(NetworkDeviceDesign):
+    rack: RelationshipAttribute[LocationRack]
 
 
 class RoutingRouteMap(CoreNode):

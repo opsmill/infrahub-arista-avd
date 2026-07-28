@@ -39,6 +39,18 @@ def _named_device(device_id: str, name: str) -> SimpleNamespace:
     return SimpleNamespace(id=device_id, name=SimpleNamespace(value=name))
 
 
+def _design_edge(role: str, quantity: int, template_id: str | None) -> dict:
+    """Build a single device_designs edge; sizing comes only from these."""
+    template_node = {"__typename": "TemplateDcimDevice", "id": template_id} if template_id else None
+    return {
+        "node": {
+            "role": {"value": role},
+            "device_quantity": {"value": quantity},
+            "device_template": {"node": template_node},
+        }
+    }
+
+
 def _rack_query_data(
     *,
     pod_node: dict | object | None = "default",
@@ -52,7 +64,7 @@ def _rack_query_data(
             "id": "pod-1",
             "name": {"value": "Pod-A"},
             "index": {"value": 1},
-            "amount_of_spines": {"value": 2},
+            "device_designs": {"edges": [_design_edge("spine", 2, "spine-template")]},
             "leaf_interface_sorting_method": {"value": "sort_interfaces"},
             "spine_interface_sorting_method": {"value": "sort_interfaces"},
             "parent": {
@@ -79,21 +91,11 @@ def _rack_query_data(
                         "checksum": {"value": "checksum"},
                         "index": {"value": 1},
                         "rack_type": {"value": "leaf"},
-                        "amount_of_leafs": {"value": leaf_count},
                         "mlag": {"value": True},
-                        "leaf_switch_template": {
-                            "node": (
-                                {"__typename": "TemplateDcimDevice", "id": leaf_template_id}
-                                if leaf_template_id
-                                else None
-                            )
-                        },
-                        "amount_of_l2leafs": {"value": l2leaf_count},
-                        "l2leaf_switch_template": {
-                            "node": (
-                                {"__typename": "TemplateDcimDevice", "id": l2leaf_template_id}
-                                if l2leaf_template_id
-                                else None
+                        "device_designs": {
+                            "edges": (
+                                ([_design_edge("leaf", leaf_count, leaf_template_id)] if leaf_count else [])
+                                + ([_design_edge("l2leaf", l2leaf_count, l2leaf_template_id)] if l2leaf_count else [])
                             )
                         },
                         "parent": {"node": {"__typename": "LocationRack", "id": "parent-1", "name": {"value": "P"}}},
@@ -224,7 +226,7 @@ async def test_generate_defers_when_spines_are_missing() -> None:
 async def test_generate_requires_leaf_template_when_leaf_count_is_positive() -> None:
     gen = _make_generator()
 
-    with pytest.raises(ValueError, match=r"DC1_BORDER.*leaf_switch_template is missing"):
+    with pytest.raises(ValueError, match=r"DC1_BORDER.*leaf device design.*device_template is missing"):
         await gen.generate(_rack_query_data(leaf_template_id=None, leaf_count=2))
 
     gen.client.get.assert_not_awaited()
@@ -235,7 +237,7 @@ async def test_generate_requires_leaf_template_when_leaf_count_is_positive() -> 
 async def test_generate_requires_l2leaf_template_when_l2leaf_count_is_positive() -> None:
     gen = _make_generator()
 
-    with pytest.raises(ValueError, match=r"DC1_BORDER.*l2leaf_switch_template is missing"):
+    with pytest.raises(ValueError, match=r"DC1_BORDER.*l2leaf device design.*device_template is missing"):
         await gen.generate(_rack_query_data(l2leaf_template_id=None, l2leaf_count=1))
 
     gen.client.get.assert_not_awaited()

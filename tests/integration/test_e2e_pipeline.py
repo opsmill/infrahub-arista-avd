@@ -55,6 +55,7 @@ from .helpers import (
     POLL_INTERVAL,
     REPO_SYNC_INTERVAL,
     REPO_SYNC_RETRIES,
+    device_design_mismatches,
     expected_super_spine_count,
     wait_until,
 )
@@ -253,6 +254,24 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             describe="leaf devices (rack generator fired via trigger)",
         )
         print(f"leaf devices: {len(leaves)}", flush=True)
+
+    # --- Component 9a: device designs drive the generated device set -------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_devices_match_device_designs(self, client: InfrahubClient) -> None:
+        """Every pod/rack produced exactly the devices its device designs declare.
+
+        Device designs are the only source of device sizing, so this is the parity
+        guard for the whole chain: a design quantity that stops being honoured, or
+        devices created for a role with no design, fails here.
+        """
+        mismatches = await wait_until(
+            fetch=lambda: device_design_mismatches(client, PIPELINE_BRANCH),
+            ready=lambda problems: problems == [],
+            timeout=GENERATOR_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe="devices matching device designs",
+        )
+        assert mismatches == [], "device/design mismatches: " + "; ".join(mismatches)
 
     # --- Component 9b: BGP ASN nodes (regression 002) ----------------------
     @pytest.mark.asyncio(loop_scope="class")

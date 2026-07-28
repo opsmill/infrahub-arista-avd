@@ -23,15 +23,8 @@ class RackGeneratorQueryLocationRackEdgesNode(BaseModel):
     checksum: Optional["RackGeneratorQueryLocationRackEdgesNodeChecksum"]
     index: Optional["RackGeneratorQueryLocationRackEdgesNodeIndex"]
     rack_type: Optional["RackGeneratorQueryLocationRackEdgesNodeRackType"]
-    amount_of_leafs: Optional["RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs"]
     mlag: Optional["RackGeneratorQueryLocationRackEdgesNodeMlag"]
-    leaf_switch_template: "RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate"
-    amount_of_l_2_leafs: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs"
-    ] = Field(alias="amount_of_l2leafs")
-    l_2_leaf_switch_template: "RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate" = Field(
-        alias="l2leaf_switch_template"
-    )
+    device_designs: "RackGeneratorQueryLocationRackEdgesNodeDeviceDesigns"
     parent: "RackGeneratorQueryLocationRackEdgesNodeParent"
     pod: "RackGeneratorQueryLocationRackEdgesNodePod"
 
@@ -52,34 +45,49 @@ class RackGeneratorQueryLocationRackEdgesNodeRackType(BaseModel):
     value: Optional[str]
 
 
-class RackGeneratorQueryLocationRackEdgesNodeAmountOfLeafs(BaseModel):
-    value: Optional[Any]
-
-
 class RackGeneratorQueryLocationRackEdgesNodeMlag(BaseModel):
     value: Optional[bool]
 
 
-class RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplateNode"]
+class RackGeneratorQueryLocationRackEdgesNodeDeviceDesigns(BaseModel):
+    edges: list["RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdges"]
 
 
-class RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplateNode(BaseModel):
-    typename__: Literal[
-        "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
-    ] = Field(alias="__typename")
-    id: Optional[str]
+class RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdges(BaseModel):
+    node: Optional["RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNode"]
 
 
-class RackGeneratorQueryLocationRackEdgesNodeAmountOfL2Leafs(BaseModel):
+class RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNode(BaseModel):
+    role: Optional["RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeRole"]
+    device_quantity: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeDeviceQuantity"
+    ]
+    device_template: (
+        "RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeDeviceTemplate"
+    )
+
+
+class RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeRole(BaseModel):
+    value: Optional[str]
+
+
+class RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeDeviceQuantity(
+    BaseModel
+):
     value: Optional[Any]
 
 
-class RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate(BaseModel):
-    node: Optional["RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplateNode"]
+class RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeDeviceTemplate(
+    BaseModel
+):
+    node: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeDeviceTemplateNode"
+    ]
 
 
-class RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplateNode(BaseModel):
+class RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeDeviceTemplateNode(
+    BaseModel
+):
     typename__: Literal[
         "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
     ] = Field(alias="__typename")
@@ -110,9 +118,7 @@ class RackGeneratorQueryLocationRackEdgesNodePodNode(BaseModel):
     id: str
     name: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeName"]
     index: Optional["RackGeneratorQueryLocationRackEdgesNodePodNodeIndex"]
-    amount_of_spines: Optional[
-        "RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines"
-    ]
+    device_designs: "RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesigns"
     leaf_interface_sorting_method: Optional[
         "RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod"
     ]
@@ -130,8 +136,53 @@ class RackGeneratorQueryLocationRackEdgesNodePodNodeIndex(BaseModel):
     value: Optional[Any]
 
 
-class RackGeneratorQueryLocationRackEdgesNodePodNodeAmountOfSpines(BaseModel):
+class RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesigns(BaseModel):
+    edges: list["RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdges"]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdges(BaseModel):
+    node: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNode"
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNode(BaseModel):
+    role: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeRole"
+    ]
+    device_quantity: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeDeviceQuantity"
+    ]
+    device_template: "RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeDeviceTemplate"
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeRole(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeDeviceQuantity(
+    BaseModel
+):
     value: Optional[Any]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeDeviceTemplate(
+    BaseModel
+):
+    node: Optional[
+        "RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeDeviceTemplateNode"
+    ]
+
+
+class RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeDeviceTemplateNode(
+    BaseModel
+):
+    typename__: Literal[
+        "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
+    ] = Field(alias="__typename")
+    id: Optional[str]
 
 
 class RackGeneratorQueryLocationRackEdgesNodePodNodeLeafInterfaceSortingMethod(
@@ -329,12 +380,18 @@ RackGeneratorQuery.model_rebuild()
 RackGeneratorQueryLocationRack.model_rebuild()
 RackGeneratorQueryLocationRackEdges.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNode.model_rebuild()
-RackGeneratorQueryLocationRackEdgesNodeLeafSwitchTemplate.model_rebuild()
-RackGeneratorQueryLocationRackEdgesNodeL2LeafSwitchTemplate.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodeDeviceDesigns.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdges.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNode.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodeDeviceDesignsEdgesNodeDeviceTemplate.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodeParent.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodeParentNode.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePod.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNode.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesigns.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdges.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNode.model_rebuild()
+RackGeneratorQueryLocationRackEdgesNodePodNodeDeviceDesignsEdgesNodeDeviceTemplate.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParent.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabric.model_rebuild()
 RackGeneratorQueryLocationRackEdgesNodePodNodeParentNodeNetworkFabricAsnPool.model_rebuild()

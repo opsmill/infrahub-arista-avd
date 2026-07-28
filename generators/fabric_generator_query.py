@@ -20,15 +20,10 @@ class FabricGeneratorQueryNetworkFabricEdges(BaseModel):
 class FabricGeneratorQueryNetworkFabricEdgesNode(BaseModel):
     id: str
     name: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeName"]
-    amount_of_super_spines: Optional[
-        "FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines"
-    ]
     underlay_routing_protocol: Optional[
         "FabricGeneratorQueryNetworkFabricEdgesNodeUnderlayRoutingProtocol"
     ]
-    super_spine_switch_template: (
-        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate"
-    )
+    device_designs: "FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesigns"
     mgmt_gateway: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeMgmtGateway"]
     asn_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool"
     node_id_pool: "FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool"
@@ -41,21 +36,51 @@ class FabricGeneratorQueryNetworkFabricEdgesNodeName(BaseModel):
     value: Optional[str]
 
 
-class FabricGeneratorQueryNetworkFabricEdgesNodeAmountOfSuperSpines(BaseModel):
-    value: Optional[Any]
-
-
 class FabricGeneratorQueryNetworkFabricEdgesNodeUnderlayRoutingProtocol(BaseModel):
     value: Optional[str]
 
 
-class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate(BaseModel):
+class FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesigns(BaseModel):
+    edges: list["FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdges"]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdges(BaseModel):
+    node: Optional["FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNode"]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNode(BaseModel):
+    role: Optional[
+        "FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeRole"
+    ]
+    device_quantity: Optional[
+        "FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeDeviceQuantity"
+    ]
+    device_template: (
+        "FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeDeviceTemplate"
+    )
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeRole(BaseModel):
+    value: Optional[str]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeDeviceQuantity(
+    BaseModel
+):
+    value: Optional[Any]
+
+
+class FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeDeviceTemplate(
+    BaseModel
+):
     node: Optional[
-        "FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode"
+        "FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeDeviceTemplateNode"
     ]
 
 
-class FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplateNode(BaseModel):
+class FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeDeviceTemplateNode(
+    BaseModel
+):
     typename__: Literal[
         "CoreObjectTemplate", "TemplateComputePhysicalServer", "TemplateDcimDevice"
     ] = Field(alias="__typename")
@@ -156,7 +181,10 @@ FabricGeneratorQuery.model_rebuild()
 FabricGeneratorQueryNetworkFabric.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdges.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNode.model_rebuild()
-FabricGeneratorQueryNetworkFabricEdgesNodeSuperSpineSwitchTemplate.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesigns.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdges.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNode.model_rebuild()
+FabricGeneratorQueryNetworkFabricEdgesNodeDeviceDesignsEdgesNodeDeviceTemplate.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNodeAsnPool.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNodeNodeIdPool.model_rebuild()
 FabricGeneratorQueryNetworkFabricEdgesNodeMgmtPool.model_rebuild()

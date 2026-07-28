@@ -120,7 +120,6 @@ spec:
   data:
     - name: "Fabric-L3LS-Multi-Domain"
       index: 3
-      amount_of_super_spines: 0
       fabric_interface_sorting_method: "create_sorted_device_interface_map"
       virtual_router_mac: "00:1c:73:00:00:01"
       mgmt_gateway: "10.0.6.1"
@@ -206,13 +205,19 @@ spec:
         data:
           - name: "infrahub-dc1"
             index: 1
-            amount_of_spines: 2
-            spine_switch_template: "arista-7050cx3-32c-spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 2
+                  device_template: arista-7050cx3-32c-spine-switch
             member_of_groups: ["pods"]
           - name: "infrahub-dc2"
             index: 2
-            amount_of_spines: 2
-            spine_switch_template: "arista-7050cx3-32c-spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 2
+                  device_template: arista-7050cx3-32c-spine-switch
             member_of_groups: ["pods"]
 ---
 # ============================================================================
@@ -241,36 +246,48 @@ spec:
       rack_type: compute
       pod: infrahub-dc1
       parent: "Hall-DC1"
-      amount_of_leafs: 2
       mlag: false
-      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
     - name: "DC1_ACCESS"
       index: 2
       rack_type: compute
       pod: infrahub-dc1
       parent: "Hall-DC1"
-      amount_of_leafs: 2
       mlag: false
-      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
     - name: "DC2_BORDER"
       index: 1
       rack_type: compute
       pod: infrahub-dc2
       parent: "Hall-DC2"
-      amount_of_leafs: 2
       mlag: false
-      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
     - name: "DC2_ACCESS"
       index: 2
       rack_type: compute
       pod: infrahub-dc2
       parent: "Hall-DC2"
-      amount_of_leafs: 2
       mlag: false
-      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
 
 ---

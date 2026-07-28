@@ -26,6 +26,20 @@ elif "fabric_view_branch" not in st.session_state:
     st.session_state.fabric_view_branch = "main"
 
 
+def _design_quantity(node: dict[str, Any], role: str) -> int:
+    """Return the device quantity a container's design declares for ``role``.
+
+    Sizing lives on the ``device_designs`` relationship (one design per role per
+    container); a role with no design means none of that device type.
+    """
+    total = 0
+    for edge in node.get("device_designs", {}).get("edges", []):
+        design = edge["node"]
+        if design.get("role", {}).get("value") == role:
+            total += design.get("device_quantity", {}).get("value", 0) or 0
+    return total
+
+
 def _fetch_fabric_topology(client: InfrahubClient, fabric_name: str, branch: str) -> dict[str, Any]:
     """Fetch complete fabric topology data."""
     query = """
@@ -45,20 +59,34 @@ def _fetch_fabric_topology(client: InfrahubClient, fabric_name: str, branch: str
               priority { value }
             } }
           }
-          amount_of_super_spines { value }
+          device_designs {
+            edges { node {
+              role { value }
+              device_quantity { value }
+            } }
+          }
           children {
             edges { node {
               ... on NetworkPod {
                 name { value }
                 role { value }
-                amount_of_spines { value }
                 devices { count }
+                device_designs {
+                  edges { node {
+                    role { value }
+                    device_quantity { value }
+                  } }
+                }
                 racks {
                   edges { node {
                     name { value }
                     rack_type { value }
-                    amount_of_leafs { value }
-                    amount_of_l2leafs { value }
+                    device_designs {
+                      edges { node {
+                        role { value }
+                        device_quantity { value }
+                      } }
+                    }
                     devices {
                       edges { node {
                         ... on DcimDevice {
@@ -127,7 +155,7 @@ def _render_topology(data: dict[str, Any]) -> None:
 
     fabric = data["NetworkFabric"]["edges"][0]["node"]
     fabric_name = fabric["name"]["value"]
-    ss_count = fabric.get("amount_of_super_spines", {}).get("value", 0)
+    ss_count = _design_quantity(fabric, "super_spine")
 
     nodes = []
     edges = []
@@ -162,7 +190,7 @@ def _render_topology(data: dict[str, Any]) -> None:
         pn = p["name"]["value"]
         pid = pn.replace("-", "_")
         role = p.get("role", {}).get("value", "")
-        spines = p.get("amount_of_spines", {}).get("value", 0)
+        spines = _design_quantity(p, "spine")
         pcx = (cursor * SLOT) + (pi["w"] * SLOT) // 2
 
         if role == "fabric":
@@ -185,8 +213,8 @@ def _render_topology(data: dict[str, Any]) -> None:
             rn = r["name"]["value"]
             rid = rn.replace("-", "_")
             rt = r.get("rack_type", {}).get("value", "")
-            lc = r.get("amount_of_leafs", {}).get("value", 0)
-            l2c = r.get("amount_of_l2leafs", {}).get("value", 0)
+            lc = _design_quantity(r, "leaf")
+            l2c = _design_quantity(r, "l2leaf")
             rx = (cursor + ri) * SLOT
 
             devs = r.get("devices", {}).get("edges", [])
@@ -516,7 +544,7 @@ def _render_fabric_summary(data: dict[str, Any]) -> None:
 
     # Count devices by type
     total_devices = 0
-    super_spines = fabric.get("amount_of_super_spines", {}).get("value", 0)
+    super_spines = _design_quantity(fabric, "super_spine")
     total_spines = 0
     total_leafs = 0
     total_l2leafs = 0
@@ -526,12 +554,12 @@ def _render_fabric_summary(data: dict[str, Any]) -> None:
         pod = pod_edge["node"]
         pod_role = pod.get("role", {}).get("value", "")
         if pod_role != "fabric":
-            total_spines += pod.get("amount_of_spines", {}).get("value", 0)
+            total_spines += _design_quantity(pod, "spine")
             for rack_edge in pod.get("racks", {}).get("edges", []):
                 rack = rack_edge["node"]
                 total_racks += 1
-                total_leafs += rack.get("amount_of_leafs", {}).get("value", 0)
-                total_l2leafs += rack.get("amount_of_l2leafs", {}).get("value", 0)
+                total_leafs += _design_quantity(rack, "leaf")
+                total_l2leafs += _design_quantity(rack, "l2leaf")
 
     total_devices = super_spines + total_spines + total_leafs + total_l2leafs
 

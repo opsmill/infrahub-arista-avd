@@ -15,25 +15,25 @@ query RackGeneratorQuery($name: String!) {
 				rack_type {
 					value
 				}
-				amount_of_leafs {
-					value
-				}
 				mlag {
 					value
 				}
-				leaf_switch_template {
-					node {
-						__typename
-						id
-					}
-				}
-				amount_of_l2leafs {
-					value
-				}
-				l2leaf_switch_template {
-					node {
-						__typename
-						id
+				device_designs {
+					edges {
+						node {
+							role {
+								value
+							}
+							device_quantity {
+								value
+							}
+							device_template {
+								node {
+									__typename
+									id
+								}
+							}
+						}
 					}
 				}
 				parent {
@@ -54,8 +54,23 @@ query RackGeneratorQuery($name: String!) {
 						index {
 							value
 						}
-						amount_of_spines {
-							value
+						device_designs {
+							edges {
+								node {
+									role {
+												value
+									}
+									device_quantity {
+												value
+									}
+									device_template {
+												node {
+													__typename
+													id
+												}
+									}
+								}
+							}
 						}
 						leaf_interface_sorting_method {
 							value

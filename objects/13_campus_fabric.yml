@@ -91,7 +91,7 @@ spec:
   data:
     - name: "Fabric-Campus"
       index: 61
-      amount_of_super_spines: 0
+      # Campus (single-tier core): no super-spines (no super_spine device design).
       fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
       mgmt_gateway: "10.61.0.1"
       asn_pool: "Fabric-Campus-ASN-Pool"
@@ -206,8 +206,11 @@ spec:
         data:
           - name: "campus-mdf"
             index: 1
-            amount_of_spines: 2
-            spine_switch_template: "arista-7050cx3-32c-spine-switch"
+            device_designs:
+              data:
+                - role: spine
+                  device_quantity: 2
+                  device_template: arista-7050cx3-32c-spine-switch
             mlag_peer_pool: "Fabric-Campus-MLAG-Peer-Pool"
             member_of_groups: ["pods"]
 ---
@@ -229,9 +232,12 @@ spec:
       rack_type: compute
       pod: campus-mdf
       parent: "Hall-Campus"
-      amount_of_leafs: 2
       mlag: true
-      leaf_switch_template: arista-7050sx3-48yc8c-leaf-switch
+      device_designs:
+        data:
+          - role: leaf
+            device_quantity: 2
+            device_template: arista-7050sx3-48yc8c-leaf-switch
       member_of_groups: ["racks"]
 ---
 # ============================================================================
