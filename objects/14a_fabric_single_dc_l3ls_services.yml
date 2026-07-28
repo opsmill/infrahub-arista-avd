@@ -1,6 +1,6 @@
 ---
 # ============================================================================
-# EVPN services for Fabric-SDC-L3LS — a small single-tenant, single-VRF design
+# EVPN services for Fabric-L3LS — a small single-tenant, single-VRF design
 # with three L3 SVIs, mirroring the 12_evpn_services.yml shape (IpamL2Domain +
 # IpamVLAN + IpamVRF + EvpnTenant + EvpnSvi). Loads after the fabric (14) so the
 # tenant->fabric relationship resolves. SVI virtual IPs are tenant overlay
@@ -11,7 +11,7 @@ kind: Object
 spec:
   kind: IpamL2Domain
   data:
-    - name: Fabric-SDC-L3LS-L2Domain
+    - name: Fabric-L3LS-L2Domain
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -22,17 +22,17 @@ spec:
       vlan_id: 11
       status: active
       role: server
-      l2domain: Fabric-SDC-L3LS-L2Domain
+      l2domain: Fabric-L3LS-L2Domain
     - name: SDC-APP
       vlan_id: 12
       status: active
       role: server
-      l2domain: Fabric-SDC-L3LS-L2Domain
+      l2domain: Fabric-L3LS-L2Domain
     - name: SDC-STORAGE
       vlan_id: 21
       status: active
       role: server
-      l2domain: Fabric-SDC-L3LS-L2Domain
+      l2domain: Fabric-L3LS-L2Domain
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -52,7 +52,7 @@ spec:
     - name: SDC-L3LS-TENANT
       mac_vrf_vni_base: 30000
       fabrics:
-        - "Fabric-SDC-L3LS"
+        - "Fabric-L3LS"
       vrfs:
         - SDC-VRF10
 ---

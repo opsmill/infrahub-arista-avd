@@ -11,7 +11,7 @@ from transforms.avd_anta_catalog import AvdAntaCatalogTransform
 FABRIC_ID = "fabric-1"
 
 
-def _fabric_parent(anta_enabled: bool | None, name: str = "Fabric-A") -> dict:
+def _fabric_parent(anta_enabled: bool | None, name: str = "Fabric-L3LS-MultiPod-A") -> dict:
     return {
         "node": {
             "__typename": "NetworkFabric",
@@ -72,7 +72,7 @@ def _transform(structured_config: dict | None = None) -> AvdAntaCatalogTransform
 
 async def test_disabled_fabric_returns_marker() -> None:
     result = await _transform().transform(_data(anta_enabled=False))
-    assert result.startswith("# ANTA disabled for fabric Fabric-A")
+    assert result.startswith("# ANTA disabled for fabric Fabric-L3LS-MultiPod-A")
 
 
 async def test_flag_absent_treated_as_disabled() -> None:

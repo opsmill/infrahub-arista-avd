@@ -1,5 +1,5 @@
 ---
-# VRFs for Fabric-A
+# VRFs for Fabric-L3LS-MultiPod-A
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
@@ -18,7 +18,7 @@ spec:
       vtep_diagnostic_loopback: 11
       vtep_diagnostic_loopback_ip_range: "10.255.11.0/27"
 ---
-# EVPN Tenant for Fabric-A
+# EVPN Tenant for Fabric-L3LS-MultiPod-A
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
@@ -27,7 +27,7 @@ spec:
     - name: TENANT1
       mac_vrf_vni_base: 10000
       fabrics:
-        - "Fabric-A"
+        - "Fabric-L3LS-MultiPod-A"
       vrfs:
         - VRF10
         - VRF11

@@ -18,7 +18,7 @@ Topology"** artifact for every fabric (target group `fabrics`). Render it locall
 ```bash
 # COLUMNS is set because infrahubctl prints via Rich, which wraps long lines at the terminal
 # width — irrelevant to the server-rendered artifact, but needed when saving locally.
-COLUMNS=500 uv run infrahubctl transform containerlab_topology name=Fabric-A > lab/topology.clab.yml
+COLUMNS=500 uv run infrahubctl transform containerlab_topology name=Fabric-L3LS-MultiPod-A > lab/topology.clab.yml
 ```
 
 Each network device (super_spine / spine / leaf / l2leaf) becomes an `arista_ceos` node with its
@@ -32,7 +32,7 @@ On a ContainerLab-capable host with the `opsmill.infrahub` collection installed:
 
 ```bash
 cd lab
-uv run ansible-playbook playbooks/deploy_clab.yml -e fabric=Fabric-A
+uv run ansible-playbook playbooks/deploy_clab.yml -e fabric=Fabric-L3LS-MultiPod-A
 ```
 
 The playbook fetches the ContainerLab Topology artifact and each device's AVD EOS Configuration

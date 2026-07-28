@@ -73,7 +73,7 @@ def _dci_endpoint(
                         "parent": {
                             "node": {
                                 "__typename": "NetworkFabric",
-                                "name": {"value": "fabric-a"},
+                                "name": {"value": "fabric-l3ls-multipod-a"},
                                 "dci_pool": {"node": SimpleNamespace(id="pool-1")},
                             }
                         }
@@ -176,7 +176,7 @@ def test_evpn_gateway_payload_order_on_l3leaf_node() -> None:
         vtep_loopback_ip="10.2.0.3",
         vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip="192.0.2.1/24",
-        fabric_name="Fabric-A",
+        fabric_name="Fabric-L3LS-MultiPod-A",
         mgmt_gateway=None,
         virtual_router_mac=None,
         underlay_routing_protocol="ebgp",

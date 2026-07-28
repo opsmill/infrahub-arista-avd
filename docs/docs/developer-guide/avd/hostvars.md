@@ -238,7 +238,7 @@ Common validation failures:
 ```json
 {
   "type": "l3leaf",
-  "fabric_name": "Fabric-A",
+  "fabric_name": "Fabric-L3LS-MultiPod-A",
   "id": 1,
   "bgp_as": "65101",
   "loopback_ipv4_address": "10.255.1.1",

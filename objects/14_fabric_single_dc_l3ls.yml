@@ -1,10 +1,11 @@
 ---
 # ============================================================================
-# Fabric-SDC-L3LS — minimal single-DC 3-stage L3LS example (AVD "single-dc-l3ls").
+# Fabric-L3LS — minimal single-DC 3-stage L3LS example (AVD "single-dc-l3ls").
 # EVPN/VXLAN with an eBGP underlay and eBGP overlay, a single pod with two
 # spines, and two MLAG leaf racks (one "border" pair, one "access" pair) with
 # connected servers. This is the simple single-pod counterpart to the 5-stage
-# Fabric-A/B and the dual-DC Fabric-L3LS-Multi-Domain. No super-spines, no DCI, no evpn_gateway.
+# Fabric-L3LS-MultiPod-A, Fabric-L3LS-MultiPod-B, and the dual-DC
+# Fabric-L3LS-Multi-Domain. No super-spines, no DCI, no evpn_gateway.
 # Self-contained: pools + fabric + pod + hall + racks in this one file.
 # ============================================================================
 apiVersion: infrahub.app/v1
@@ -30,21 +31,21 @@ kind: Object
 spec:
   kind: CoreIPPrefixPool
   data:
-    - name: Fabric-SDC-L3LS-Uplink-Pool
+    - name: Fabric-L3LS-Uplink-Pool
       default_member_type: prefix
       default_prefix_type: IpamPrefix
       default_prefix_length: 31
       ip_namespace: default
       resources:
         - 10.64.3.0/24
-    - name: Fabric-SDC-L3LS-VTEP-Pool
+    - name: Fabric-L3LS-VTEP-Pool
       default_member_type: prefix
       default_prefix_type: IpamPrefix
       default_prefix_length: 32
       ip_namespace: default
       resources:
         - 10.64.2.0/24
-    - name: Fabric-SDC-L3LS-Loopback-Pool
+    - name: Fabric-L3LS-Loopback-Pool
       default_member_type: prefix
       default_prefix_type: IpamPrefix
       default_prefix_length: 32
@@ -57,21 +58,21 @@ kind: Object
 spec:
   kind: CoreIPAddressPool
   data:
-    - name: Fabric-SDC-L3LS-Mgmt-Pool
+    - name: Fabric-L3LS-Mgmt-Pool
       default_address_type: IpamIPAddress
       default_prefix_length: 24
       ip_namespace: default
       resources:
         - 10.64.0.0/24
     # MLAG peer-link pool (both MLAG leaf pairs carve disjoint /31s from here).
-    - name: Fabric-SDC-L3LS-MLAG-Peer-Pool
+    - name: Fabric-L3LS-MLAG-Peer-Pool
       default_address_type: IpamIPAddress
       default_prefix_length: 31
       ip_namespace: default
       resources:
         - 10.64.4.0/24
     # MLAG L3 peering pool (iBGP over the MLAG peer link for the routed L3LS leaves).
-    - name: Fabric-SDC-L3LS-MLAG-L3-Pool
+    - name: Fabric-L3LS-MLAG-L3-Pool
       default_address_type: IpamIPAddress
       default_prefix_length: 31
       ip_namespace: default
@@ -83,12 +84,12 @@ kind: Object
 spec:
   kind: CoreNumberPool
   data:
-    - name: Fabric-SDC-L3LS-ASN-Pool
+    - name: Fabric-L3LS-ASN-Pool
       node: RoutingAsn
       node_attribute: asn
       start_range: 66000
       end_range: 66099
-    - name: Fabric-SDC-L3LS-NodeID-Pool
+    - name: Fabric-L3LS-NodeID-Pool
       node: DcimDevice
       node_attribute: node_id
       start_range: 1
@@ -99,21 +100,21 @@ kind: Object
 spec:
   kind: NetworkFabric
   data:
-    - name: "Fabric-SDC-L3LS"
+    - name: "Fabric-L3LS"
       index: 64
       amount_of_super_spines: 0
       fabric_interface_sorting_method: "create_sorted_device_interface_map"
       virtual_router_mac: "00:1c:73:00:00:64"
       mgmt_gateway: "10.64.0.1"
-      asn_pool: "Fabric-SDC-L3LS-ASN-Pool"
-      node_id_pool: "Fabric-SDC-L3LS-NodeID-Pool"
-      mgmt_pool: "Fabric-SDC-L3LS-Mgmt-Pool"
+      asn_pool: "Fabric-L3LS-ASN-Pool"
+      node_id_pool: "Fabric-L3LS-NodeID-Pool"
+      mgmt_pool: "Fabric-L3LS-Mgmt-Pool"
       underlay_routing_protocol: "ebgp"
       overlay_routing_protocol: "ebgp"
       p2p_uplinks_mtu: 1500
-      uplink_pool: "Fabric-SDC-L3LS-Uplink-Pool"
-      vtep_pool: "Fabric-SDC-L3LS-VTEP-Pool"
-      loopback_pool: "Fabric-SDC-L3LS-Loopback-Pool"
+      uplink_pool: "Fabric-L3LS-Uplink-Pool"
+      vtep_pool: "Fabric-L3LS-VTEP-Pool"
+      loopback_pool: "Fabric-L3LS-Loopback-Pool"
       spanning_tree_mode: "mstp"
       spanning_tree_priority: 4096
       dns_servers:
@@ -130,8 +131,8 @@ spec:
             index: 1
             amount_of_spines: 2
             spine_switch_template: "arista-7050cx3-32c-spine-switch"
-            mlag_peer_pool: "Fabric-SDC-L3LS-MLAG-Peer-Pool"
-            mlag_l3_pool: "Fabric-SDC-L3LS-MLAG-L3-Pool"
+            mlag_peer_pool: "Fabric-L3LS-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-L3LS-MLAG-L3-Pool"
             member_of_groups: ["pods"]
 ---
 apiVersion: infrahub.app/v1

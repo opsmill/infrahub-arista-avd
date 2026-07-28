@@ -147,7 +147,7 @@ def _make_fabric_query(
                 GenerateAvdInputsQueryNetworkFabricEdges(
                     node=GenerateAvdInputsQueryNetworkFabricEdgesNode(
                         id="fabric-1",
-                        name=GenerateAvdInputsQueryNetworkFabricEdgesNodeName(value="Fabric-A"),
+                        name=GenerateAvdInputsQueryNetworkFabricEdgesNodeName(value="Fabric-L3LS-MultiPod-A"),
                         children=GenerateAvdInputsQueryNetworkFabricEdgesNodeChildren(edges=pods),
                     )
                 )

@@ -908,7 +908,7 @@ class TestAvdCascadeTrigger:
         # Build mock chain: rack.pod.peer → pod, pod.parent.peer → fabric
         mock_fabric = MagicMock()
         mock_fabric.id = "fabric-1"
-        mock_fabric.name.value = "Fabric-A"
+        mock_fabric.name.value = "Fabric-L3LS-MultiPod-A"
 
         mock_pod = MagicMock()
         mock_pod.parent.fetch = AsyncMock()
@@ -939,7 +939,7 @@ class TestAvdCascadeTrigger:
 
         mock_fabric = MagicMock()
         mock_fabric.id = "fabric-1"
-        mock_fabric.name.value = "Fabric-A"
+        mock_fabric.name.value = "Fabric-L3LS-MultiPod-A"
 
         mock_pod = MagicMock()
         mock_pod.parent.fetch = AsyncMock()

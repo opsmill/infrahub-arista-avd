@@ -479,13 +479,13 @@ async def test_ensure_vtep_loopback_address_pool_uses_prefix_pool_resources() ->
     prefix_pool = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("prefix-1"), _resource("prefix-2")]))
 
     result = await gen._ensure_vtep_loopback_address_pool(
-        fabric_name="fabric-a",
+        fabric_name="fabric-l3ls-multipod-a",
         vtep_prefix_pool_ref=prefix_pool,
     )
 
     assert result == address_pool
     gen.client.create.assert_awaited_once()
-    assert gen.client.create.await_args.kwargs["name"] == "fabric-a-vtep-loopback-address-pool"
+    assert gen.client.create.await_args.kwargs["name"] == "fabric-l3ls-multipod-a-vtep-loopback-address-pool"
     assert gen.client.create.await_args.kwargs["resources"] == [{"id": "prefix-1"}, {"id": "prefix-2"}]
     address_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
@@ -499,7 +499,7 @@ async def test_resolve_avd_pools_creates_loopback_and_vtep_address_pools_from_fa
     loopback_prefix_pool = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("loopback-prefix")]))
     vtep_prefix_pool = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("vtep-prefix")]))
     fabric = SimpleNamespace(
-        name=SimpleNamespace(value="Fabric-A"),
+        name=SimpleNamespace(value="Fabric-L3LS-MultiPod-A"),
         asn_pool=SimpleNamespace(node=None),
         node_id_pool=SimpleNamespace(node=None),
         mgmt_pool=SimpleNamespace(node=None),
@@ -511,8 +511,8 @@ async def test_resolve_avd_pools_creates_loopback_and_vtep_address_pools_from_fa
 
     assert result == (None, None, None, loopback_address_pool, vtep_address_pool)
     assert [call.kwargs["name"] for call in gen.client.create.await_args_list] == [
-        "fabric-a-loopback-address-pool",
-        "fabric-a-vtep-loopback-address-pool",
+        "fabric-l3ls-multipod-a-loopback-address-pool",
+        "fabric-l3ls-multipod-a-vtep-loopback-address-pool",
     ]
     assert gen.client.create.await_args_list[0].kwargs["resources"] == [{"id": "loopback-prefix"}]
     assert gen.client.create.await_args_list[1].kwargs["resources"] == [{"id": "vtep-prefix"}]

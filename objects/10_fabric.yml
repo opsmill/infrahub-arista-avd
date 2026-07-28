@@ -4,15 +4,15 @@ kind: Object
 spec:
   kind: NetworkFabric
   data:
-    - name: "Fabric-A"
+    - name: "Fabric-L3LS-MultiPod-A"
       index: 1
       amount_of_super_spines: 6
       super_spine_switch_template: "super-spine-switch"
       fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
       mgmt_gateway: "10.255.0.1"
-      asn_pool: "Fabric-A-ASN-Pool"
-      node_id_pool: "Fabric-A-NodeID-Pool"
-      mgmt_pool: "Fabric-A-Mgmt-Pool"
+      asn_pool: "Fabric-L3LS-MultiPod-A-ASN-Pool"
+      node_id_pool: "Fabric-L3LS-MultiPod-A-NodeID-Pool"
+      mgmt_pool: "Fabric-L3LS-MultiPod-A-Mgmt-Pool"
       # L3LS settings
       virtual_router_mac: "00:1c:73:00:00:99"
       underlay_routing_protocol: "ebgp"
@@ -20,9 +20,9 @@ spec:
       # 5-stage Clos: render tenant L2 services as vlan-aware bundles.
       evpn_vlan_aware_bundles: true
       p2p_uplinks_mtu: 9214
-      uplink_pool: "Fabric-A-Uplink-Pool"
-      vtep_pool: "Fabric-A-VTEP-Pool"
-      loopback_pool: "Fabric-A-Loopback-Pool"
+      uplink_pool: "Fabric-L3LS-MultiPod-A-Uplink-Pool"
+      vtep_pool: "Fabric-L3LS-MultiPod-A-VTEP-Pool"
+      loopback_pool: "Fabric-L3LS-MultiPod-A-Loopback-Pool"
       # STP settings
       spanning_tree_mode: "mstp"
       spanning_tree_priorities:
@@ -58,32 +58,32 @@ spec:
           - name: "Pod-A2"
             index: 2
             spine_switch_template: "spine-switch"
-            mlag_peer_pool: "Fabric-A-Pod-A2-MLAG-Peer-Pool"
-            mlag_l3_pool: "Fabric-A-Pod-A2-MLAG-L3-Pool"
+            mlag_peer_pool: "Fabric-L3LS-MultiPod-A-Pod-A2-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-L3LS-MultiPod-A-Pod-A2-MLAG-L3-Pool"
             member_of_groups: ["pods"]
           - name: "Pod-A3"
             index: 3
             spine_switch_template: "spine-switch"
-            mlag_peer_pool: "Fabric-A-Pod-A3-MLAG-Peer-Pool"
-            mlag_l3_pool: "Fabric-A-Pod-A3-MLAG-L3-Pool"
+            mlag_peer_pool: "Fabric-L3LS-MultiPod-A-Pod-A3-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-L3LS-MultiPod-A-Pod-A3-MLAG-L3-Pool"
             member_of_groups: ["pods"]
-    - name: "Fabric-B"
+    - name: "Fabric-L3LS-MultiPod-B"
       index: 2
       amount_of_super_spines: 4
       super_spine_switch_template: "dell-z9864f-on-super-spine-switch"
       fabric_interface_sorting_method: "create_reverse_sorted_device_interface_map"
       mgmt_gateway: "10.254.0.1"
-      asn_pool: "Fabric-B-ASN-Pool"
-      node_id_pool: "Fabric-B-NodeID-Pool"
-      mgmt_pool: "Fabric-B-Mgmt-Pool"
+      asn_pool: "Fabric-L3LS-MultiPod-B-ASN-Pool"
+      node_id_pool: "Fabric-L3LS-MultiPod-B-NodeID-Pool"
+      mgmt_pool: "Fabric-L3LS-MultiPod-B-Mgmt-Pool"
       # L3LS settings
       virtual_router_mac: "00:1c:73:00:00:99"
       underlay_routing_protocol: "ebgp"
       overlay_routing_protocol: "ebgp"
       p2p_uplinks_mtu: 9214
-      uplink_pool: "Fabric-B-Uplink-Pool"
-      vtep_pool: "Fabric-B-VTEP-Pool"
-      loopback_pool: "Fabric-B-Loopback-Pool"
+      uplink_pool: "Fabric-L3LS-MultiPod-B-Uplink-Pool"
+      vtep_pool: "Fabric-L3LS-MultiPod-B-VTEP-Pool"
+      loopback_pool: "Fabric-L3LS-MultiPod-B-Loopback-Pool"
       # STP settings
       spanning_tree_mode: "mstp"
       spanning_tree_priorities:
@@ -119,12 +119,12 @@ spec:
           - name: "Pod-B2"
             index: 2
             spine_switch_template: "dell-z9864f-on-spine-switch"
-            mlag_peer_pool: "Fabric-B-Pod-B2-MLAG-Peer-Pool"
-            mlag_l3_pool: "Fabric-B-Pod-B2-MLAG-L3-Pool"
+            mlag_peer_pool: "Fabric-L3LS-MultiPod-B-Pod-B2-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-L3LS-MultiPod-B-Pod-B2-MLAG-L3-Pool"
             member_of_groups: ["pods"]
           - name: "Pod-B3"
             index: 3
             spine_switch_template: "dell-z9864f-on-spine-switch"
-            mlag_peer_pool: "Fabric-B-Pod-B3-MLAG-Peer-Pool"
-            mlag_l3_pool: "Fabric-B-Pod-B3-MLAG-L3-Pool"
+            mlag_peer_pool: "Fabric-L3LS-MultiPod-B-Pod-B3-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-L3LS-MultiPod-B-Pod-B3-MLAG-L3-Pool"
             member_of_groups: ["pods"]

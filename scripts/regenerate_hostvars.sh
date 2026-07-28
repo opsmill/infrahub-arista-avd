@@ -1,15 +1,15 @@
 #!/bin/bash
 # Regenerate AVD hostvars for all devices in the fabric
 
-BRANCH="${1:-fabric-a}"
+BRANCH="${1:-fabric-l3ls-multipod-a}"
 
 HOSTNAMES=(
-  ss-fabric-a-1
-  ss-fabric-a-2
-  ss-fabric-a-3
-  ss-fabric-a-4
-  ss-fabric-a-5
-  ss-fabric-a-6
+  ss-fabric-l3ls-multipod-a-1
+  ss-fabric-l3ls-multipod-a-2
+  ss-fabric-l3ls-multipod-a-3
+  ss-fabric-l3ls-multipod-a-4
+  ss-fabric-l3ls-multipod-a-5
+  ss-fabric-l3ls-multipod-a-6
   spine-pod-a2-1
   spine-pod-a3-1
   spine-pod-a2-2

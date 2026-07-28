@@ -16,7 +16,7 @@ Navigate to **`http://localhost:8501`**. From the sidebar, open **Fabric View** 
 ## Pick branch and fabric
 
 - **Select Branch** (sidebar dropdown) — choose which Infrahub branch to view. For inspection, any branch is fine. For regeneration, use a non-default branch so the change is isolated and reviewable.
-- **Select Fabric** (main area) — choose the fabric to view, e.g. `Fabric-A`.
+- **Select Fabric** (main area) — choose the fabric to view, e.g. `Fabric-L3LS-MultiPod-A`.
 
 ## Tabs
 
@@ -60,8 +60,8 @@ Review and merge as usual.
 
 You don't need to regenerate to browse. Pick a branch and fabric and switch between the four tabs to answer questions like:
 
-- "Is `Fabric-A` cabled consistently across pods?" → **Cabling Topology**.
-- "Which tenants are on `Fabric-B`?" → **EVPN Tenants**.
+- "Is `Fabric-L3LS-MultiPod-A` cabled consistently across pods?" → **Cabling Topology**.
+- "Which tenants are on `Fabric-L3LS-MultiPod-B`?" → **EVPN Tenants**.
 - "What MTU is configured for the underlay?" → **Fabric Settings**.
 
 ## If the service portal is unavailable

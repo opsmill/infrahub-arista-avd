@@ -95,7 +95,7 @@ Open the Infrahub UI and check each of these lists is populated:
 |------|----------|
 | Devices → Types & Models → Manufacturers | Arista, Dell, and others |
 | Devices → Types & Models → Device Types | Arista models (7050-CX3, etc.) |
-| Fabric Design → Fabrics | `Fabric-A` and `Fabric-B` |
+| Fabric Design → Fabrics | `Fabric-L3LS-MultiPod-A` and `Fabric-L3LS-MultiPod-B` |
 | IPAM → Prefixes | supernet and per-fabric pools |
 
 If any are empty, seed data did not load.
@@ -129,7 +129,7 @@ Re-run the structured-config generator for the fabric:
 
 1. In the Infrahub UI, on the correct branch, open **Actions → Generator definitions**.
 2. Click **`generate-avd-device-structured-config`**.
-3. Click **Run** and select the fabric (e.g. `Fabric-A`).
+3. Click **Run** and select the fabric (e.g. `Fabric-L3LS-MultiPod-A`).
 
 Once the task completes, the artifact will render on the next open.
 

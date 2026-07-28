@@ -83,7 +83,7 @@ This runs, in order:
 Open the Infrahub UI at **`http://localhost:8000`** and log in. You should see:
 
 - **Devices → Types & Models → Manufacturers**: Arista, Dell, and other manufacturers.
-- **Fabric Design → Fabrics**: `Fabric-A` and `Fabric-B` with their pods.
+- **Fabric Design → Fabrics**: `Fabric-L3LS-MultiPod-A` and `Fabric-L3LS-MultiPod-B` with their pods.
 - **Locations → Racks**: pre-defined racks per pod.
 - **IPAM → Prefixes**: the fabric supernet and per-fabric prefix pools.
 

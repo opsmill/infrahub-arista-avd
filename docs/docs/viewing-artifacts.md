@@ -53,7 +53,7 @@ The fabric and device markdown documents include tables, topology descriptions, 
 ## Finding the fabric documentation
 
 1. Open **Fabric Design → Fabrics**.
-2. Click the fabric (`Fabric-A`).
+2. Click the fabric (`Fabric-L3LS-MultiPod-A`).
 3. Click the **Artifacts** tab.
 4. Open **AVD Fabric Documentation**.
 

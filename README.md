@@ -54,7 +54,7 @@ Then follow [Provision Your First Fabric](docs/docs/provision-first-fabric.md) t
 
 After `invoke load` completes and you run the generator chain on a fabric:
 
-1. **Seed data appears in the UI** — manufacturers, device types, addressing pools, device templates, two example fabrics (Fabric-A, Fabric-B) with pods and racks, and seed VLANs are loaded.
+1. **Seed data appears in the UI** — manufacturers, device types, addressing pools, device templates, two example fabrics (Fabric-L3LS-MultiPod-A, Fabric-L3LS-MultiPod-B) with pods and racks, and seed VLANs are loaded.
 2. **FabricGenerator runs** — super-spine devices appear on the branch, with loopback and management addresses allocated from pools.
 3. **PodGenerator and RackGenerator trigger automatically** — spine and leaf devices appear, cabled to their uplinks, with interconnect addresses, BGP ASNs, and node IDs assigned.
 4. **AVD generators run** — each device's PyAVD host_vars and structured configuration are stored as `AvdArtifact` graph objects.

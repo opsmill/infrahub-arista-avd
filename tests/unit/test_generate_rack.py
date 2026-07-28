@@ -58,7 +58,7 @@ def _rack_query_data(
             "parent": {
                 "node": {
                     "__typename": "NetworkFabric",
-                    "name": {"value": "Fabric-A"},
+                    "name": {"value": "Fabric-L3LS-MultiPod-A"},
                     "underlay_routing_protocol": {"value": "ebgp"},
                     "asn_pool": {"node": None},
                     "node_id_pool": {"node": None},

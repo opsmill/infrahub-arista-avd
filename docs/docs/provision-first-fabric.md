@@ -1,6 +1,6 @@
 ---
 title: Provision Your First Fabric
-description: Run the generator chain end-to-end on Fabric-A and reach rendered AVD artifacts.
+description: Run the generator chain end-to-end on Fabric-L3LS-MultiPod-A and reach rendered AVD artifacts.
 audience: user
 sidebar_position: 2
 ---
@@ -9,7 +9,7 @@ sidebar_position: 2
 
 Prerequisites: [Quick Start](./quick-start.md) complete — Infrahub is running at `http://localhost:8000`, and seed data (fabrics, pods, racks, device types, IP pools) is loaded.
 
-At this point you have fabrics defined but **no devices**. The steps below generate the devices, cabling, hostvars, and configurations for `Fabric-A`.
+At this point you have fabrics defined but **no devices**. The steps below generate the devices, cabling, hostvars, and configurations for `Fabric-L3LS-MultiPod-A`.
 
 ## The generator chain
 
@@ -34,12 +34,12 @@ flowchart TD
 
 ## Step 1 — Create a branch
 
-Do this work on a branch so the changes stay isolated and you can review them as a proposed change before bringing them into `main`. In the Infrahub UI: click the branch selector in the top bar, then **+ Create branch**, and name it something like `generate-fabric-a`.
+Do this work on a branch so the changes stay isolated and you can review them as a proposed change before bringing them into `main`. In the Infrahub UI: click the branch selector in the top bar, then **+ Create branch**, and name it something like `generate-fabric-l3ls-multipod-a`.
 
 You can also create a branch from the CLI:
 
 ```bash
-uv run infrahubctl branch create generate-fabric-a
+uv run infrahubctl branch create generate-fabric-l3ls-multipod-a
 ```
 
 The CLI route needs credentials in your shell — either `source .envrc` first or set `INFRAHUB_USERNAME`/`INFRAHUB_PASSWORD` (or `INFRAHUB_API_TOKEN`). If you take the CLI route, also switch the UI's branch selector to the new branch — subsequent UI actions need to be scoped there.
@@ -49,7 +49,7 @@ The CLI route needs credentials in your shell — either `source .envrc` first o
 1. In the Infrahub UI, open **Actions → Generator definitions** from the main menu.
 2. Find **`generate-fabric`** in the list and click it.
 3. In the generator page, click the **Run** button.
-4. Select the target fabric (`Fabric-A`) from the dropdown.
+4. Select the target fabric (`Fabric-L3LS-MultiPod-A`) from the dropdown.
 5. Click **Run** to start.
 
 Infrahub queues the generator and shows progress. The fabric generator itself takes under a minute.

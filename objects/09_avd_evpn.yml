@@ -1,10 +1,10 @@
 ---
-# AVD EVPN settings for Fabric-A
+# AVD EVPN settings for Fabric-L3LS-MultiPod-A
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
   kind: AvdEvpn
   data:
-    - name: "Fabric-A-EVPN"
+    - name: "Fabric-L3LS-MultiPod-A-EVPN"
       ebgp_multihop: 3
       overlay_bgp_rtc: false

@@ -50,7 +50,7 @@ The solution is a repository of schemas, generators, and transforms loaded on to
 The system models a 3-tier datacenter network fabric:
 
 ```
-NetworkFabric (e.g., "Fabric-A")
+NetworkFabric (e.g., "Fabric-L3LS-MultiPod-A")
 ├── NetworkPod (e.g., "Pod-A1", "Pod-A2")
 │   ├── LocationRack (e.g., "Rack-A1-01", "Rack-A1-02")
 │   │   └── DcimDevice [leaf] (e.g., "leaf-A1-01-1")

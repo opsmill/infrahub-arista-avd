@@ -3,7 +3,7 @@
 # Infrahub, then deploy the lab with ContainerLab.
 #
 # Usage (from the lab/ directory, on a ContainerLab-capable host):
-#   uv run ansible-playbook playbooks/deploy_clab.yml -e fabric=Fabric-A
+#   uv run ansible-playbook playbooks/deploy_clab.yml -e fabric=Fabric-L3LS-MultiPod-A
 #
 # Requirements on the lab host:
 #   - opsmill.infrahub collection   (ansible-galaxy collection install opsmill.infrahub)
@@ -21,7 +21,7 @@
   gather_facts: false
   vars:
     # Mandatory: the play fails with the hint below if -e fabric=... is not set.
-    fabric: "{{ undef(hint='Set the fabric name, e.g. -e fabric=Fabric-A') }}"
+    fabric: "{{ undef(hint='Set the fabric name, e.g. -e fabric=Fabric-L3LS-MultiPod-A') }}"
     lab_dir: "{{ playbook_dir }}/.."
     topology_file: "{{ lab_dir }}/topology.clab.yml"
     config_dir: "{{ lab_dir }}/configs"

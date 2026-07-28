@@ -61,7 +61,7 @@ def _dci_endpoint(
     interface_role: str = "peering",
     device_asn: int | None = 65101,
     pool: object = _NO_POOL,
-    fabric_name: str = "fabric-a",
+    fabric_name: str = "fabric-l3ls-multipod-a",
     speed: str | None = "100g",
 ) -> dict:
     pool_node = _pool() if pool is _NO_POOL else pool
@@ -169,7 +169,7 @@ def _base_hostvars(
         vtep_loopback_ip="10.2.0.3",
         vtep_loopback_ipv4_pool=vtep_loopback_ipv4_pool,
         mgmt_ip="192.168.0.3",
-        fabric_name="Fabric-A",
+        fabric_name="Fabric-L3LS-MultiPod-A",
         mgmt_gateway=None,
         virtual_router_mac="00:1c:73:00:00:99",
         underlay_routing_protocol=underlay_routing_protocol,
@@ -217,7 +217,7 @@ def _underlay_hostvars(
         vtep_loopback_ip="10.2.0.3",
         vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip=f"192.168.0.{node_id}",
-        fabric_name="Fabric-A",
+        fabric_name="Fabric-L3LS-MultiPod-A",
         mgmt_gateway=None,
         virtual_router_mac=None,
         underlay_routing_protocol="ebgp",
@@ -657,7 +657,7 @@ def _gateway_device(device_id: str, name: str, role: str, pod: object) -> Simple
     )
 
 
-def _fabric(fabric_id: str = "fabric-a") -> SimpleNamespace:
+def _fabric(fabric_id: str = "fabric-l3ls-multipod-a") -> SimpleNamespace:
     return SimpleNamespace(id=fabric_id, name=_attr(fabric_id))
 
 
@@ -1440,7 +1440,7 @@ def _leaf_hostvars(
         vtep_loopback_ip="10.2.0.3",
         vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip=f"192.168.0.{node_id}",
-        fabric_name="Fabric-A",
+        fabric_name="Fabric-L3LS-MultiPod-A",
         mgmt_gateway=None,
         virtual_router_mac="00:1c:73:00:00:99",
         underlay_routing_protocol="ebgp",
@@ -1514,7 +1514,7 @@ def _mlag_peer_hostvars(*, hostname: str, node_id: int, device_asn: int) -> dict
         vtep_loopback_ip="10.2.0.3",
         vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip=f"192.168.0.{node_id}/24",
-        fabric_name="Fabric-A",
+        fabric_name="Fabric-L3LS-MultiPod-A",
         mgmt_gateway=None,
         virtual_router_mac="00:1c:73:00:00:99",
         underlay_routing_protocol="ebgp",
@@ -1666,7 +1666,7 @@ def test_generated_hostvars_take_precedence_over_custom_hostvars() -> None:
 
     hostvars = _base_hostvars([], custom_hostvars=custom_hostvars)
 
-    assert hostvars["fabric_name"] == "Fabric-A"
+    assert hostvars["fabric_name"] == "Fabric-L3LS-MultiPod-A"
     assert hostvars["custom_only"] == {"enabled": True}
     assert hostvars["l3leaf"]["defaults"] == {"platform": "custom-platform", "spanning_tree_priority": 8192}
     assert hostvars["l3leaf"]["nodes"][0]["name"] == "leaf1"
@@ -2058,7 +2058,7 @@ def test_hostvars_include_p2p_mtu_from_generated_alias() -> None:
         vtep_loopback_ip="10.2.0.3",
         vtep_loopback_ipv4_pool="10.2.0.0/24",
         mgmt_ip="192.168.0.3",
-        fabric_name="Fabric-A",
+        fabric_name="Fabric-L3LS-MultiPod-A",
         mgmt_gateway=None,
         virtual_router_mac=None,
         underlay_routing_protocol=None,
