@@ -22,15 +22,23 @@ description: "Task list for Normalized Device Design Entities (schema cycle)"
 because the project is pre-production with no populated live instance, `state: absent`
 and the backfill helper were unnecessary, so the 8 legacy fields were deleted outright.
 
-Validated on a live local stack (branch `main`, plus branch `device-design-convergence`
-for the convergence scenarios):
+Validated on a live local stack:
 
-- Schema loads clean with the legacy fields gone; `protocols.py` and `schema.graphql`
-  regenerated and confirmed free of all 8 fields.
+- Schema loads clean with the legacy fields gone; `protocols.py`, `schema.graphql`, and
+  all three generator `*_query.py` models regenerated and confirmed free of all 8 fields.
 - Seed objects load and materialize 39 device designs (2 fabric, 10 pod, 27 rack).
-- Full generator chain runs, producing 80 devices / 200 links / 10 MLAG domains that
-  match the designs exactly (39/39 per-container assertions).
-- `ruff`, `ruff format`, `mypy`, `yamllint` clean; 417 unit tests pass.
+- Migration parity: all 44 sizing containers (7 fabrics, 12 pods, 25 racks) match `main`'s
+  legacy `(template, count)` values exactly.
+- `ruff`, `ruff format`, `mypy`, `yamllint` clean; 501 unit tests pass; the schema-contract
+  integration test (`tests/integration/test_device_design_schema.py`) passes.
+
+Convergence (resize / remove / decrease) and repeated-run idempotence were verified
+against the pre-rebase tree and are unchanged in intent by the rebase. Note that since
+`main` made `_trigger_generator` raise rather than log, a standalone
+`infrahubctl generator` chain now aborts partway without a registered `CoreRepository`
+(the `generate-avd-device-hostvar` definition is missing), so re-running those two gates
+requires the repository-backed path — the nightly full-stack job or
+`pytest tests/integration/test_e2e_pipeline.py -m e2e`.
 
 Descoped (recorded, not skipped by omission):
 
@@ -74,7 +82,7 @@ Infrahub reference-design repo (single project). Schema under `schemas/`, genera
 
 ### Tests for User Story 1 ⚠️ (write first, expect FAIL before schema load)
 
-- [X] T006 [P] [US1] Integration test in `tests/integration/test_device_design_rack.py` covering: (a) create `NetworkRackDeviceDesign` with role `leaf`, qty 2, a `device_template`; (b) second `leaf` design on the same rack is rejected by the `(rack, role)` uniqueness constraint; (c) deleting the rack cascade-deletes its designs while the `CoreObjectTemplate` survives (maps SC-003/SC-004/SC-005, US1 scenarios 2–4)
+- [X] T006 [P] [US1] Integration test in `tests/integration/test_device_design_schema.py` covering: (a) create `NetworkRackDeviceDesign` with role `leaf`, qty 2, a `device_template`; (b) second `leaf` design on the same rack is rejected by the `(rack, role)` uniqueness constraint; (c) deleting the rack cascade-deletes its designs while the `CoreObjectTemplate` survives (maps SC-003/SC-004/SC-005, US1 scenarios 2–4)
 
 ### Implementation for User Story 1
 
@@ -95,7 +103,7 @@ Infrahub reference-design repo (single project). Schema under `schemas/`, genera
 
 ### Tests for User Story 2 ⚠️
 
-- [X] T011 [P] [US2] Integration test in `tests/integration/test_device_design_pod_fabric.py` covering: create a `NetworkPodDeviceDesign` (role `spine`) on a pod and a `NetworkFabricDeviceDesign` (role `super_spine`) on a fabric, and assert both expose `role`/`device_quantity`/`device_template` and enforce `(container, role)` uniqueness (maps SC-006 additive part, US2 scenarios 1–3)
+- [X] T011 [P] [US2] Integration test in `tests/integration/test_device_design_schema.py` covering: create a `NetworkPodDeviceDesign` (role `spine`) on a pod and a `NetworkFabricDeviceDesign` (role `super_spine`) on a fabric, and assert both expose `role`/`device_quantity`/`device_template` and enforce `(container, role)` uniqueness (maps SC-006 additive part, US2 scenarios 1–3)
 
 ### Implementation for User Story 2
 
@@ -128,7 +136,7 @@ Infrahub reference-design repo (single project). Schema under `schemas/`, genera
 - [~] T018 **N/A — descoped**: no live populated instance to migrate (project is pre-production), so the one-time backfill helper is not needed. The Objects cycle (003) rewrote `objects/*.yml` instead.
 - [~] T019 **N/A — descoped**: no migration helper to test (see T018).
 - [X] T020 Removal of the 8 old fields — **superseded**: `state: absent` was unnecessary pre-production, so the field definitions were deleted outright from `schemas/logical_design.yml` (4), `schemas/location_extensions.yml` (2), and `schemas/l3ls_extensions.yml` (2, whole `LocationRack` extension block). Verified absent from the loaded schema, the regenerated `protocols.py`, and the exported `schema.graphql`.
-- [X] T021 Integration test in `tests/integration/test_device_design_migration.py` — rewritten for the completed migration: asserts `device_designs` exists (peer + cardinality) and all 8 legacy fields are gone, plus the design nodes' `role`/`device_quantity`/`device_template` surface. Every assertion cross-checked against the live loaded schema.
+- [X] T021 Integration test in `tests/integration/test_device_design_schema.py` — rewritten for the completed migration: asserts `device_designs` exists (peer + cardinality) and all 8 legacy fields are gone, plus the design nodes' `role`/`device_quantity`/`device_template` surface. Every assertion cross-checked against the live loaded schema.
 - [X] T022 [P] Update developer-guide docs describing the entity: `docs/docs/developer-guide/schemas.md` and `docs/docs/developer-guide/architecture.md` (device-design model, three-tier `device_designs`, `(container, role)` key, absence-means-none); update `docs/sidebars.ts` only if navigation changes
 - [X] T023 Full end-to-end run captured: `schema check` → `schema load` (24 schemas) → `protocols` regen → `graphql export-schema` → menu + object load → fabric/pod/rack generator chain, with `ruff`/`mypy`/`yamllint` clean and 417 unit tests passing. The Generator + Objects cycles (002/003) are implemented in the same tree, so the handoff is a merge, not a hand-off.
 
@@ -162,8 +170,8 @@ Infrahub reference-design repo (single project). Schema under `schemas/`, genera
 
 ```bash
 # Integration tests live in separate files — author in parallel:
-Task: "T006 integration test in tests/integration/test_device_design_rack.py"
-Task: "T011 integration test in tests/integration/test_device_design_pod_fabric.py"
+Task: "T006 integration test in tests/integration/test_device_design_schema.py"
+Task: "T011 integration test in tests/integration/test_device_design_schema.py"
 ```
 
 ---

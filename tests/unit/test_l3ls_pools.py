@@ -101,7 +101,9 @@ def _make_generator(prefix_map: dict[int, str | None]) -> GenerateAVDDeviceHostv
 async def test_extract_l3ls_pools_returns_all_pools() -> None:
     """Only pyAVD pools still required by hostvars resolve from the data model."""
     uplink, vtep, loopback, mlag_peer, mlag_l3 = (object() for _ in range(5))
-    fabric = SimpleNamespace(name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback)
+    fabric = SimpleNamespace(
+        name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback
+    )
     pod = SimpleNamespace(mlag_peer_pool=mlag_peer, mlag_l3_pool=mlag_l3)
     gen = _make_generator(
         {
@@ -125,7 +127,9 @@ async def test_extract_l3ls_pools_returns_all_pools() -> None:
 async def test_extract_l3ls_pools_no_hardcoded_fallback() -> None:
     """The removed literals never reappear as fallbacks."""
     uplink, vtep, loopback = (object() for _ in range(3))
-    fabric = SimpleNamespace(name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback)
+    fabric = SimpleNamespace(
+        name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback
+    )
     pod = SimpleNamespace(mlag_peer_pool=None, mlag_l3_pool=None)
     gen = _make_generator({id(uplink): "172.16.0.0/16", id(vtep): "172.17.0.0/24", id(loopback): "172.18.0.0/24"})
 
@@ -154,7 +158,9 @@ async def test_extract_l3ls_pools_raises_when_required_pool_empty(missing: str) 
 async def test_extract_l3ls_pools_mlag_optional() -> None:
     """MLAG pools remain optional: absent pods yield None, not an error."""
     uplink, vtep, loopback = (object() for _ in range(3))
-    fabric = SimpleNamespace(name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback)
+    fabric = SimpleNamespace(
+        name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback
+    )
     pod = SimpleNamespace(mlag_peer_pool=None, mlag_l3_pool=None)
     gen = _make_generator({id(uplink): "10.1.0.0/16", id(vtep): "10.2.0.0/24", id(loopback): "10.3.0.0/24"})
 
@@ -167,7 +173,9 @@ async def test_extract_l3ls_pools_mlag_optional() -> None:
 async def test_extract_l3ls_pools_uses_generated_mlag_l3_pool_alias() -> None:
     """The generated Pydantic field name resolves the optional MLAG L3 pool."""
     uplink, vtep, loopback, mlag_l3 = (object() for _ in range(4))
-    fabric = SimpleNamespace(name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback)
+    fabric = SimpleNamespace(
+        name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback
+    )
     pod = SimpleNamespace(mlag_peer_pool=None, mlag_l_3_pool=mlag_l3)
     gen = _make_generator(
         {
