@@ -289,6 +289,18 @@ class GeneratorMixin:
         Return (template_id, quantity) for one role's device design,
         or (None, 0) when the container has no design for that role.
         """
+
+    async def assign_mlag_peer_interfaces(
+        self, device, count=2, carvable_roles=frozenset({"server", "mlag_peer"})
+    ) -> None:
+        """
+        Repurpose a device's highest-numbered carvable ports as its MLAG
+        peer-link, for switch models that ship no dedicated mlag_peer
+        interfaces. Deterministic (ordered by the interface's computed
+        `index`) and idempotent, so a re-run converts nothing further.
+        Used by the rack generator for l2leaf pairs and the pod generator
+        for the l2spine pair.
+        """
 ```
 
 Usage in generator:
