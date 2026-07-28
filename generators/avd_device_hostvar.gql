@@ -572,6 +572,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                 role {
                   value
                 }
+                spanning_tree_portfast {
+                  value
+                }
                 tagged_vlan {
                   edges {
                     node {
@@ -732,6 +735,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                                       value
                                                     }
                                                     role {
+                                                      value
+                                                    }
+                                                    spanning_tree_portfast {
                                                       value
                                                     }
                                                     lag {

@@ -56,7 +56,7 @@ Infrahub reference-design repo: `schemas/`, `objects/`, `src/solution_arista_avd
 
 **Goal**: The schema + seed can represent the example's 2 MLAG `l2spine` switches and 4 `l2leaf` switches across 2 MLAG racks, with per-tier MSTP priorities (l2spine=4096, l2leaf=16384).
 
-**Independent Test**: `ihctl object load objects/13a_fabric_l2ls.yml` on the branch yields `Fabric-L2LS` with 2 spines, 2 MLAG racks (a LEAF pair each), and `Network.SpanningTreePriority` objects for l2spine=4096 and l2leaf=16384; contract test C1 passes.
+**Independent Test**: `ihctl object load objects/12_l2ls_fabric.yml` on the branch yields `Fabric-L2LS` with 2 spines, 2 MLAG racks (a LEAF pair each), and `Network.SpanningTreePriority` objects for l2spine=4096 and l2leaf=16384; contract test C1 passes.
 
 ### Tests for User Story 1
 
@@ -65,8 +65,8 @@ Infrahub reference-design repo: `schemas/`, `objects/`, `src/solution_arista_avd
 ### Implementation for User Story 1
 
 - [X] T005 [US1] Add `l2spine` and `l3spine` choices to the `role` dropdown of the `Network.SpanningTreePriority` node in `schemas/l3ls_extensions.yml` (preserve existing choices; additive only)
-- [X] T006 [US1] Reshape `objects/13a_fabric_l2ls.yml` to mirror the example topology: keep `underlay_routing_protocol: none` + `spanning_tree_mode: mstp`; set pod `amount_of_spines: 2` with an MLAG spine pair; add a second MLAG rack (`L2LS_RACK2`, `amount_of_leafs: 2`, `mlag: true`) alongside `L2LS_RACK1`; add `Network.SpanningTreePriority` objects (l2spine=4096, l2leaf=16384) linked to `Fabric-L2LS` (do NOT hardcode device hostnames — SPINE1-2/LEAF1-4 naming is the generator cycle)
-- [X] T007 [US1] Validate on the branch: `ihctl schema check schemas/ --branch l2ls-example-conformance`, `ihctl schema load schemas --branch l2ls-example-conformance`, `ihctl object load objects/13a_fabric_l2ls.yml --branch l2ls-example-conformance`; confirm 2 racks + 2 STP priority objects present
+- [X] T006 [US1] Reshape `objects/12_l2ls_fabric.yml` to mirror the example topology: keep `underlay_routing_protocol: none` + `spanning_tree_mode: mstp`; set pod `amount_of_spines: 2` with an MLAG spine pair; add a second MLAG rack (`L2LS_RACK2`, `amount_of_leafs: 2`, `mlag: true`) alongside `L2LS_RACK1`; add `Network.SpanningTreePriority` objects (l2spine=4096, l2leaf=16384) linked to `Fabric-L2LS` (do NOT hardcode device hostnames — SPINE1-2/LEAF1-4 naming is the generator cycle)
+- [X] T007 [US1] Validate on the branch: `ihctl schema check schemas/ --branch l2ls-example-conformance`, `ihctl schema load schemas --branch l2ls-example-conformance`, `ihctl object load objects/12_l2ls_fabric.yml --branch l2ls-example-conformance`; confirm 2 racks + 2 STP priority objects present
 
 **Checkpoint**: The L2LS topology (tiers, MLAG racks, per-tier STP priorities) is representable and loads clean.
 
@@ -76,7 +76,7 @@ Infrahub reference-design repo: `schemas/`, `objects/`, `src/solution_arista_avd
 
 **Goal**: An overlay-free tenant (`MY_FABRIC`, no VNI base) carrying VLANs BLUE-NET(10)/GREEN-NET(20)/ORANGE-NET(30), each scoped to the correct leaf pair by tag.
 
-**Independent Test**: `ihctl object load objects/13e_fabric_l2ls_services.yml` yields a tenant with no `mac_vrf_vni_base` and three `Evpn.L2Vlan` objects carrying rack/AVD tags; contract tests C2 and C3 pass.
+**Independent Test**: `ihctl object load objects/12_l2ls_fabric.yml` yields a tenant with no `mac_vrf_vni_base` and three `Evpn.L2Vlan` objects carrying rack/AVD tags; contract tests C2 and C3 pass.
 
 ### Tests for User Story 2
 
@@ -86,18 +86,19 @@ Infrahub reference-design repo: `schemas/`, `objects/`, `src/solution_arista_avd
 
 - [X] T009 [US2] In `schemas/evpn/evpn_services.yml`, make `Evpn.Tenant.mac_vrf_vni_base` `optional: true` (backward compatible — existing overlay tenants keep their value)
 - [X] T010 [US2] In `schemas/evpn/evpn_services.yml`, add `rack_tags` (peer `LocationRack`) and `avd_tags` (peer `AvdTag`) relationships to `Evpn.L2Vlan`, mirroring the shape on `Evpn.Svi` (cardinality many, optional, kind Attribute, unique identifiers)
-- [X] T011 [US2] Reshape `objects/13e_fabric_l2ls_services.yml`: tenant `MY_FABRIC` with NO `mac_vrf_vni_base`; VLANs `BLUE-NET`(10)/`GREEN-NET`(20)/`ORANGE-NET`(30) as `Evpn.L2Vlan` (+ underlying `Ipam.VLAN`); `Avd.Tag` zones `bluezone`/`greenzone`/`orangezone` linked to the correct racks; scope VLANs via `rack_tags`/`avd_tags` (RACK1 → blue+green, RACK2 → blue+orange); remove the VNI-based `L2LS-TENANT`/`mac_vrf_vni_base: 20000` modeling
-- [X] T012 [US2] Validate on the branch: schema check + load, `ihctl object load objects/13e_fabric_l2ls_services.yml`; confirm overlay-free tenant + per-rack VLAN tag scoping
+- [X] T011 [US2] Reshape `objects/12_l2ls_fabric.yml`: tenant `MY_FABRIC` with NO `mac_vrf_vni_base`; VLANs `BLUE-NET`(10)/`GREEN-NET`(20)/`ORANGE-NET`(30) as `Evpn.L2Vlan` (+ underlying `Ipam.VLAN`); `Avd.Tag` zones `bluezone`/`greenzone`/`orangezone` linked to the correct racks; scope VLANs via `rack_tags`/`avd_tags` (RACK1 → blue+green, RACK2 → blue+orange); remove the VNI-based `L2LS-TENANT`/`mac_vrf_vni_base: 20000` modeling
+- [X] T012 [US2] Validate on the branch: schema check + load, `ihctl object load objects/12_l2ls_fabric.yml`; confirm overlay-free tenant + per-rack VLAN tag scoping
 
 **Checkpoint**: Pure-L2, tag-scoped services are representable with no VNI/overlay modeling.
 
 ---
 
-## Phase 5: User Story 3 - Model connected endpoints and the firewall exactly (Priority: P3)
+## Phase 5: User Story 3 - Model connected endpoints (Priority: P3)
 
-**Goal**: Host access ports (per-color access VLAN + edge portfast) and a dual-homed `FIREWALL` trunk Port-Channel attached to both spines are representable.
+**Goal**: Host access ports (per-color access VLAN + edge portfast) are representable. The dual-homed
+`FIREWALL` trunk Port-Channel is out of scope — dropped in cycle 002 (T016/T017).
 
-**Independent Test**: `ihctl object load objects/13h_fabric_l2ls_servers.yml` yields host endpoints with access switchport intent and a firewall endpoint attachable to `l2spine` devices as a trunk port-channel; contract test C4 passes.
+**Independent Test**: `ihctl object load objects/12_l2ls_fabric.yml` yields host endpoints with access switchport intent; contract test C4 passes.
 
 ### Tests for User Story 3
 
@@ -106,9 +107,9 @@ Infrahub reference-design repo: `schemas/`, `objects/`, `src/solution_arista_avd
 ### Implementation for User Story 3
 
 - [X] T014 [US3] Add switchport intent to the connected-endpoint/adapter model in `schemas/objects/objects.yml` (or the endpoint schema per data-model §4): `mode` (access/trunk) dropdown, `access_vlan` (Number, optional), `trunk_vlans` (List/Text, optional), `portfast` (edge, optional); reuse the existing `Interface.Lag` + adapter `port_channel` for LACP
-- [ ] T015 [US3] Enable a connected endpoint to attach to `l2spine` devices (firewall dual-homed to both spines) per research Decision 4 — model natively if the spine-attach path is cheap, otherwise wire the documented `avd_custom_hostvars` fallback on the spines
-- [ ] T016 [US3] Reshape `objects/13h_fabric_l2ls_servers.yml`: named host endpoints on leaf access ports with per-color access profiles (access VLAN 10/20/30 + edge portfast) and a `FIREWALL` endpoint as a trunk Port-Channel (allowed VLANs 10/20/30) to both spines
-- [ ] T017 [US3] Validate on the branch: schema check + load, `ihctl object load objects/13h_fabric_l2ls_servers.yml`; confirm host access + firewall trunk-to-spine are representable
+- [~] T015 [US3] (DROPPED — firewall excluded per request; see 002 T016/T017) Enable a connected endpoint to attach to `l2spine` devices (firewall dual-homed to both spines) per research Decision 4
+- [X] T016 [US3] Reshape the connected endpoints in `objects/12_l2ls_fabric.yml`: named host endpoints on leaf access ports with per-color access profiles (access VLAN 10/20/30 + edge portfast). The `FIREWALL` trunk Port-Channel is dropped with T015.
+- [X] T017 [US3] Validate on the branch: schema check + load, `ihctl object load objects/12_l2ls_fabric.yml`; confirm host access ports are representable
 
 **Checkpoint**: Connected endpoints and the dual-homed firewall are representable.
 
@@ -127,7 +128,7 @@ Infrahub reference-design repo: `schemas/`, `objects/`, `src/solution_arista_avd
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [X] T021 [P] Update `docs/docs/supported-capabilities.md`: state the L2LS example is targeted at golden-config parity and record any documented exception (e.g. firewall via `avd_custom_hostvars`, if chosen in T015) — FR-019
-- [ ] T022 [P] Update `docs/docs/developer-guide/avd/role-mapping.md` and `docs/docs/developer-guide/avd/hostvars.md` where the STP-role additions and L2-VLAN tag scoping need documenting
+- [X] T022 [P] Update `docs/docs/developer-guide/avd/role-mapping.md` and `docs/docs/developer-guide/avd/hostvars.md` where the STP-role additions and L2-VLAN tag scoping need documenting
 - [X] T023 Run the full `quickstart.md` validation (Steps 1–6) on the branch and confirm all cycle validation-criteria checkboxes pass
 - [X] T024 Record hand-off markers for the next `/speckit-specify` cycles (Generator: device naming SPINE1-2/LEAF1-4, MLAG peer carving, `filter.tags` emission, host/firewall cabling; Transform/integration: `scripts/compare_avd_examples.py` parity + fabric-selectable `pytest tests/integration --fabric Fabric-L2LS` + `$infrahub-run-integration-tests`) so no deferred scope is lost
 

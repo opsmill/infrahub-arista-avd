@@ -103,6 +103,8 @@ class DciNetworkLinkIntent:
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
 PORT_CHANNEL_RE = re.compile(r"^Port-Channel(?P<channel_id>\d+)$")
 LEAF_FAMILY_ROLES = {"leaf", "border_leaf"}
+# Host-facing access ports are PortFast edge ports unless the interface says otherwise.
+PORTFAST_DEFAULT = "edge"
 FIELD_ALIASES = {
     "evpn_l2_enabled": "evpn_l_2_enabled",
     "evpn_l3_enabled": "evpn_l_3_enabled",
@@ -897,6 +899,16 @@ async def build_dci_l3_edge_p2p_links(
     return p2p_links
 
 
+def _portfast_setting(interface: object) -> str:
+    """Resolve the spanning-tree PortFast intent for a host-facing switch port.
+
+    Host/server-facing access ports are ``edge`` by AVD convention, so that stays
+    the default when the interface expresses no intent. An interface that sets
+    ``spanning_tree_portfast`` explicitly (``edge``/``network``) overrides it.
+    """
+    return str(_value(interface, "spanning_tree_portfast") or PORTFAST_DEFAULT)
+
+
 def _lag_member_adapter(
     *,
     lag_node: object,
@@ -950,7 +962,7 @@ def _lag_member_adapter(
         endpoint_lag_node=lag_node,
     )
     _apply_vlan_adapter_config(adapter, list(tagged_vlans), untagged_vlan)
-    adapter["spanning_tree_portfast"] = "edge"
+    adapter["spanning_tree_portfast"] = _portfast_setting(local_interface)
     return adapter
 
 
@@ -972,6 +984,7 @@ def _switch_lag_member_links(
                 "switch": hostname,
                 "switch_lag": fallback_switch_lag_node,
                 "vlan": _first_vlan_signature(server_lag_node, fallback_switch_lag_node, fallback_local_interface),
+                "portfast": _portfast_setting(fallback_local_interface),
             }
         ]
 
@@ -1004,6 +1017,7 @@ def _switch_lag_member_links(
                     "switch": switch_name,
                     "switch_lag": switch_lag_node,
                     "vlan": _first_vlan_signature(server_lag_node, switch_lag_node, endpoint),
+                    "portfast": _portfast_setting(endpoint),
                 }
             )
 
@@ -1089,7 +1103,11 @@ def _flush_switch_lag_groups(groups: dict[tuple[str, int], dict[str, Any]], *, m
                 "mode": LACP_MODE_MAP.get(group["lacp_mode"], "active"),
                 "channel_id": group["channel_id"],
             },
-            "spanning_tree_portfast": "edge",
+            # A Port-Channel carries one PortFast setting; take the first member
+            # that expresses an explicit intent, else the host-facing default.
+            "spanning_tree_portfast": next(
+                (link["portfast"] for link in links if link.get("portfast")), PORTFAST_DEFAULT
+            ),
         }
         if group["endpoint_port_channel"]:
             adapter["port_channel"]["endpoint_port_channel"] = group["endpoint_port_channel"]
@@ -1241,7 +1259,7 @@ def extract_connected_endpoints(  # noqa: C901
                     _apply_vlan_adapter_config(adapter, tagged_vlans, untagged_vlan)
 
                     # Add spanning tree portfast for server ports
-                    adapter["spanning_tree_portfast"] = "edge"
+                    adapter["spanning_tree_portfast"] = _portfast_setting(interface)
 
                     servers[server_name]["adapters"].append(adapter)
                     server_adapter_keys[server_name].add(adapter_key)

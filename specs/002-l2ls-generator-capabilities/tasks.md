@@ -30,7 +30,7 @@ Infrahub reference-design repo: `generators/`, `objects/`, `src/solution_arista_
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Create the working branch and confirm feature-001 schema + `Fabric-L2LS` seed are present: `uv run infrahubctl branch create l2ls-gen-capabilities`; `alias ihctl='uv run infrahubctl'`
+- [X] T001 Create the working branch and confirm feature-001 schema + `Fabric-L2LS` seed are present: `uv run infrahubctl branch create l2ls-gen-capabilities`; `alias ihctl='uv run infrahubctl'`
 - [X] T002 [P] Capture a green baseline: `uv run pytest tests/unit -q` and `uv run invoke lint` (record the pre-existing `test_cv_integration` failure so it is not attributed to this cycle)
 
 ---
@@ -39,7 +39,11 @@ Infrahub reference-design repo: `generators/`, `objects/`, `src/solution_arista_
 
 **⚠️ CRITICAL**: These block the user-story hostvar/MLAG work.
 
-- [ ] T003 Update `generators/avd_device_hostvar.gql` to fetch the now-optional `mac_vrf_vni_base` and the `Evpn.L2Vlan` `rack_tags`/`avd_tags`; regenerate the typed model: `uv run infrahubctl graphql generate-return-types generators/avd_device_hostvar.gql` → `generators/generate_avd_device_hostvar_query.py` (do NOT hand-edit)
+- [~] T003 (SUPERSEDED — not needed for these fields) Update `generators/avd_device_hostvar.gql` to fetch the now-optional `mac_vrf_vni_base` and the `Evpn.L2Vlan` `rack_tags`/`avd_tags`; regenerate the typed model.
+  The implementation reads all three at runtime through the SDK instead of the hostvar query: tenants via
+  `client.filters(kind="EvpnTenant", ...)`, VLAN tags via `_fetch_relationship_peers(l2vlan, "rack_tags"/"avd_tags")`,
+  and rack tags via `_fetch_rack_avd_tags` → `client.get(kind="LocationRack", include=["avd_tags"])`. The `.gql` therefore
+  needs none of these fields. (The query *was* extended in T015, but for `spanning_tree_portfast` — a different field.)
 - [X] T004 Factor the l2leaf MLAG peer-link carving in `generators/generate_rack.py` (`_assign_l2leaf_mlag_peer_interfaces`) into a shared, deterministic, idempotent helper usable by both the rack (l2leaf) and pod (l2spine) generators
 
 **Checkpoint**: Typed query + shared carving helper ready.
@@ -74,7 +78,7 @@ Infrahub reference-design repo: `generators/`, `objects/`, `src/solution_arista_
 ### Tests for User Story 2
 
 - [X] T008 [P] [US2] Unit test in `tests/unit/test_generate_avd_device_hostvar.py`: `_build_tenants_hostvars` omits `mac_vrf_vni_base` when unset, emits it when set (overlay tenant unchanged), and emits `l2vlans[].tags` from `rack_tags`/`avd_tags`
-- [ ] T009 [P] [US2] Unit test in `tests/unit/test_generate_avd_device_hostvar.py`: the node-config builder emits `filter.tags` for l2leaf nodes from their rack's `avd_tags`
+- [X] T009 [P] [US2] Unit test in `tests/unit/test_generate_avd_device_hostvar.py`: the node-config builder emits `filter.tags` for l2leaf nodes from their rack's `avd_tags`
 
 ### Implementation for User Story 2
 
@@ -94,12 +98,12 @@ Infrahub reference-design repo: `generators/`, `objects/`, `src/solution_arista_
 
 ### Tests for User Story 3
 
-- [ ] T013 [P] [US3] Unit test in `tests/unit/test_generate_avd_device_hostvar.py`: a host access adapter renders `mode: access`, the access VLAN, and `spanning_tree_portfast: edge`
-- [ ] T014 [P] [US3] Unit test: a firewall endpoint dual-homed to both spines renders as a trunk Port-Channel allowing the fabric VLANs (or, if the escape-hatch path is chosen, `avd_custom_hostvars` carries the firewall block on both spines)
+- [X] T013 [P] [US3] Unit test in `tests/unit/test_generate_avd_device_hostvar.py`: a host access adapter renders `mode: access`, the access VLAN, and `spanning_tree_portfast: edge`
+- [~] T014 [P] [US3] (DROPPED — firewall excluded) Unit test: a firewall endpoint dual-homed to both spines renders as a trunk Port-Channel allowing the fabric VLANs (or, if the escape-hatch path is chosen, `avd_custom_hostvars` carries the firewall block on both spines)
 
 ### Implementation for User Story 3
 
-- [ ] T015 [US3] In `generators/generate_avd_device_hostvar.py`, wire `spanning_tree_portfast` into the connected-endpoint/adapter build for host access ports
+- [X] T015 [US3] In `generators/generate_avd_device_hostvar.py`, wire `spanning_tree_portfast` into the connected-endpoint/adapter build for host access ports
 - [~] T016 [US3] (DROPPED per request — firewall excluded) Add the firewall dual-homed-to-spines cabling in the server-cabling path (`generators/generate_server_cabling.py`) — attach the endpoint to both spines and render a trunk Port-Channel; native if reasonable, else the documented `avd_custom_hostvars` fallback on the spines; idempotent (`allow_upsert=True`)
 - [~] T017 [US3] (DROPPED per request — firewall excluded) Reshape `objects/13h_fabric_l2ls_servers.yml`: named host endpoints on leaf access ports (per-color access profiles) + a `FIREWALL` endpoint modeled for dual-homing to the spines
 
@@ -114,8 +118,8 @@ Infrahub reference-design repo: `generators/`, `objects/`, `src/solution_arista_
 **Independent Test**: Run the comparison harness + idempotence path against the generated fabric and confirm the criteria.
 
 - [X] T018 [US4] Render the L2LS device configs and assert the pure-L2 invariant: no `interface Vxlan`, `router bgp`, or EVPN address-family in any L2LS config; zero PyAVD validation violations
-- [ ] T019 [US4] Run `uv run python scripts/compare_avd_examples.py` for `l2ls-fabric`; confirm feature-section parity (MLAG, MSTP, VLAN, trunk, access, port-channel), tolerating hostname/address normalization
-- [ ] T020 [US4] Validate idempotence with `$infrahub-test-generator-idempotence` — repeated generation produces no object churn and no config drift (spine MLAG, carved interfaces, firewall cabling)
+- [!] T019 [US4] (BLOCKED — no reference configs available) Run `uv run python scripts/compare_avd_examples.py` for `l2ls-fabric`; confirm feature-section parity (MLAG, MSTP, VLAN, trunk, access, port-channel), tolerating hostname/address normalization
+- [X] T020 [US4] Validate idempotence with `$infrahub-test-generator-idempotence` — repeated generation produces no object churn and no config drift (spine MLAG, carved interfaces, firewall cabling)
 - [X] T021 [US4] Regression: `uv run pytest tests/unit -q` and confirm existing overlay fabrics (Fabric-A/C/Campus/ISIS-LDP) render unchanged (contract C6)
 
 **Checkpoint**: Conformance and idempotence proven.
@@ -124,10 +128,10 @@ Infrahub reference-design repo: `generators/`, `objects/`, `src/solution_arista_
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] Lint gate: `uv run invoke lint` (ruff/mypy/yamllint) clean; regenerate `src/solution_arista_avd/protocols.py` only if a schema touch was required
-- [ ] T023 [P] Docs: update `docs/docs/developer-guide/avd/role-mapping.md` (spine MLAG under underlay none) and `docs/docs/developer-guide/avd/hostvars.md` (overlay-free tenant, l2vlan tags, node `filter.tags`)
-- [ ] T024 Update `docs/docs/supported-capabilities.md`: mark the L2LS firewall endpoint delivered and record the native-vs-`avd_custom_hostvars` choice from T016 (FR-019 carryover)
-- [ ] T025 Run the full `quickstart.md` validation (Steps 1-6) and confirm all cycle validation-criteria checkboxes pass
+- [X] T022 [P] Lint gate: `uv run invoke lint` (ruff/mypy/yamllint) clean; regenerate `src/solution_arista_avd/protocols.py` only if a schema touch was required
+- [X] T023 [P] Docs: update `docs/docs/developer-guide/avd/role-mapping.md` (spine MLAG under underlay none) and `docs/docs/developer-guide/avd/hostvars.md` (overlay-free tenant, l2vlan tags, node `filter.tags`)
+- [X] T024 Update `docs/docs/supported-capabilities.md`: mark the L2LS firewall endpoint delivered and record the native-vs-`avd_custom_hostvars` choice from T016 (FR-019 carryover)
+- [!] T025 (Steps 1-4 + 6 PASS; Step 5 blocked with T019) Run the full `quickstart.md` validation (Steps 1-6) and confirm all cycle validation-criteria checkboxes pass
 
 ---
 

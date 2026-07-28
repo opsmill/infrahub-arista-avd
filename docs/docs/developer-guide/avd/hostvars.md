@@ -172,6 +172,34 @@ For every interface on the device whose `role.value == "server"`, an entry is em
 - `mode: "access"` + a single `vlans: "100"` for access-only interfaces.
 - `native_vlan: 100` added if an untagged VLAN is configured alongside tagged VLANs.
 - For bonded servers, server `Bond1` is the primary VLAN source. Switch `Port-Channel<ID>` VLANs are used when the Bond has no VLAN relationships, and member Ethernet VLANs are only a compatibility fallback.
+- `spanning_tree_portfast` defaults to `edge` — the AVD convention for host-facing ports. Set `spanning_tree_portfast` on the **switch** interface (`edge` or `network`) to override it; the value is read from the leaf access port, not from the server side. In a Port-Channel the first member expressing an explicit intent wins, since a Port-Channel carries one setting.
+
+The switchport VLAN itself comes from the server side: `generate-server-cabling` reconciles the server interface's `tagged_vlan` / `untagged_vlan` — including values inherited from a `ProfileDcimInterface` — onto the leaf port it cables. So a host access profile that pins one untagged VLAN is what produces `mode: access` on that VLAN. PortFast is not propagated this way, because it is a property of the switch port.
+
+## Pure Layer-2 tenants and tag-scoped VLANs
+
+An `Evpn.Tenant` whose `mac_vrf_vni_base` is unset emits **no** `mac_vrf_vni_base`, so PyAVD derives no VNI, no VXLAN and no EVPN for it. That is what makes the standalone L2LS design pure Layer-2 (its `l2spine`/`l2leaf` devices are not VTEPs). Overlay tenants that do set a VNI base are unaffected.
+
+`Evpn.L2Vlan` carries `rack_tags` (→ `LocationRack`) and `avd_tags` (→ `AvdTag`), mirroring the shape already on `Evpn.Svi`. Both are emitted as the VLAN's `tags` list — rack names first, then AVD tag names, deduplicated:
+
+```yaml
+l2vlans:
+  - id: 10
+    name: BLUE-NET
+    tags: [bluezone]
+```
+
+AVD matches those against each node's `filter.tags`, which the generator emits on the leaf node-group from the rack's `avd_tags`:
+
+```yaml
+l2leaf:
+  node_groups:
+    - group: L2LS_RACK1
+      filter:
+        tags: [bluezone, greenzone]
+```
+
+The result is per-rack VLAN scoping without hand-listing VLANs per switch: tag a VLAN `bluezone`, tag the racks that should carry it, and only those leaf pairs render it.
 
 ## AVD custom hostvars escape hatch
 

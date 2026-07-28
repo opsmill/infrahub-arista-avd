@@ -67,12 +67,12 @@ unexplained feature-level differences.
 
 ## Validation criteria (this cycle)
 
-- [ ] Typed query regenerated; clean diff (III).
-- [ ] Unit tests for VNI omission, l2vlan tags, filter.tags, spine MLAG, firewall pass.
-- [ ] Spine + leaf MLAG generated; leaf uplinks aggregated.
-- [ ] No VXLAN/BGP/EVPN in L2LS configs; zero PyAVD violations.
-- [ ] Feature-level parity reported by the comparison harness.
-- [ ] Idempotent re-run; existing fabrics unchanged; lint clean.
+- [X] Typed query regenerated; clean diff (III) — +18 lines, only the two new `spanning_tree_portfast` selections.
+- [X] Unit tests for VNI omission, l2vlan tags, filter.tags, spine MLAG, host access ports pass (519 total). Firewall dropped from scope.
+- [X] Spine + leaf MLAG generated; leaf uplinks aggregated (peer-links Ethernet31/1+32/1 on spines, Ethernet47+48 on leaves).
+- [X] No VXLAN/BGP/EVPN in any of the 6 L2LS configs; zero PyAVD violations.
+- [!] Feature-level parity NOT reported — the harness needs AVD's upstream `intended/configs/*.cfg`, which are not vendored in this repo. Sections were verified by inspection instead (MLAG, MSTP priorities, per-rack VLANs, access ports, port-channels).
+- [X] Idempotent re-run (structured config: 0 updated / 6 unchanged; hostvar checksums stable); existing fabrics unchanged; lint clean.
 
 ## Downstream validation (next cycle)
 

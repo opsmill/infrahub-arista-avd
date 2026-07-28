@@ -269,27 +269,104 @@ spec:
         - orangezone
 ---
 # ============================================================================
-# Fabric-L2LS — connected endpoints (physical servers) for L2LS_RACK1.
-# Loaded after 13a so the fabric/pod/rack exist first. Each server declares
-# only its rack + object_template + servers-group membership; the
-# generate-server-cabling generator (targets the "servers" group) auto-cables
-# the server to the rack's leaf switches. member_of_groups is set atomically
-# in the same object so the generator trigger does not race group membership.
-#   - l2ls-server1: dual-homed (compute-server-dual) across the MLAG leaf pair
-#   - l2ls-server2: single-homed (compute-server-single)
+# Fabric-L2LS — host endpoints, one per colour zone, mirroring the AVD
+# "l2ls-fabric" example. Each host sits on a leaf ACCESS port carrying a single
+# untagged VLAN, so PyAVD renders `mode: access` on that VLAN.
+#
+# Colour placement follows the VLAN tag scoping above:
+#   RACK1 -> blue + green      RACK2 -> blue + orange
+#
+# Each host declares only its rack + object_template + servers-group membership;
+# the generate-server-cabling generator (targets the "servers" group) auto-cables
+# it to the rack's leaf switches and reconciles the profile's untagged VLAN onto
+# the leaf access port. member_of_groups is set atomically in the same object so
+# the generator trigger does not race group membership.
+#
+# PortFast is deliberately NOT set here: it is a property of the switch port, and
+# the hostvar generator already defaults host-facing access ports to PortFast
+# `edge`. To force `network` on a specific port, set `spanning_tree_portfast` on
+# that leaf interface instead.
 # ============================================================================
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: ProfileDcimInterface
+  data:
+    - profile_name: "profile-l2ls-host-blue"
+      role: "server"
+      untagged_vlan: BLUE-NET
+    - profile_name: "profile-l2ls-host-green"
+      role: "server"
+      untagged_vlan: GREEN-NET
+    - profile_name: "profile-l2ls-host-orange"
+      role: "server"
+      untagged_vlan: ORANGE-NET
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: TemplateComputePhysicalServer
+  parameters:
+    expand_range: true
+  data:
+    # Dual-homed hosts land across the rack's MLAG leaf pair; single-homed hosts
+    # take one access port.
+    - template_name: "l2ls-host-blue-dual"
+      role: "compute"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "L2lsHostBlueEthernet[1-2]"
+            name: "Ethernet[1-2]"
+            profiles: ["profile-l2ls-host-blue"]
+    - template_name: "l2ls-host-green-single"
+      role: "compute"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "L2lsHostGreenEthernet1"
+            name: "Ethernet1"
+            profiles: ["profile-l2ls-host-green"]
+    - template_name: "l2ls-host-orange-single"
+      role: "compute"
+      status: "provisioning"
+      interfaces:
+        kind: TemplateInterfacePhysical
+        parameters:
+          expand_range: true
+        data:
+          - template_name: "L2lsHostOrangeEthernet1"
+            name: "Ethernet1"
+            profiles: ["profile-l2ls-host-orange"]
+---
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
   kind: ComputePhysicalServer
   data:
-    - name: "l2ls-server1"
+    - name: "l2ls-host-blue1"
       status: "provisioning"
       rack: "L2LS_RACK1"
-      object_template: "compute-server-dual"
+      object_template: "l2ls-host-blue-dual"
       member_of_groups: ["servers"]
-    - name: "l2ls-server2"
+    - name: "l2ls-host-green1"
       status: "provisioning"
       rack: "L2LS_RACK1"
-      object_template: "compute-server-single"
+      object_template: "l2ls-host-green-single"
+      member_of_groups: ["servers"]
+    - name: "l2ls-host-blue2"
+      status: "provisioning"
+      rack: "L2LS_RACK2"
+      object_template: "l2ls-host-blue-dual"
+      member_of_groups: ["servers"]
+    - name: "l2ls-host-orange1"
+      status: "provisioning"
+      rack: "L2LS_RACK2"
+      object_template: "l2ls-host-orange-single"
       member_of_groups: ["servers"]
