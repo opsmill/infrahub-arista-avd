@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import sys
 from ipaddress import ip_network
+from pathlib import Path
 from typing import Any
 
 from infrahub_sdk.checks import InfrahubCheck
 
-from solution_arista_avd.pool_roles import (
+_REPO_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_REPO_SRC) not in sys.path:
+    sys.path.insert(0, str(_REPO_SRC))
+
+from solution_arista_avd.pool_roles import (  # noqa: E402
     FABRIC_SUPERNET_ALLOCATION_ORDER,
     FABRIC_SUPERNET_PREFIX_LENGTHS,
     PoolRoleResolutionError,
@@ -92,7 +98,7 @@ class FabricPoolValidationCheck(InfrahubCheck):
             overlay_routing_protocol=_value(fabric, "overlay_routing_protocol"),
             underlay_routing_protocol=_value(fabric, "underlay_routing_protocol"),
             has_dci_links=has_dci_links,
-        )
+)
         try:
             missing_roles = missing_fabric_roles(
                 required_roles=required_roles, available_roles=set(pool_roles.values())
