@@ -234,7 +234,7 @@ class FabricPoolValidationCheck(InfrahubCheck):
             overlay_routing_protocol=_value(fabric, "overlay_routing_protocol"),
             underlay_routing_protocol=_value(fabric, "underlay_routing_protocol"),
             has_dci_links=has_dci_links,
-)
+        )
         try:
             missing_roles = missing_fabric_roles(
                 required_roles=required_roles, available_roles=set(pool_roles.values())
