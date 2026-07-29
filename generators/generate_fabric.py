@@ -14,6 +14,7 @@ if (package := sys.modules.get("solution_arista_avd")) is not None and hasattr(p
     package.__path__ = [str(_PACKAGE_ROOT), *[path for path in package.__path__ if path != str(_PACKAGE_ROOT)]]
 for module_name in (
     "solution_arista_avd.generator",
+    "solution_arista_avd.pool_roles",
     "solution_arista_avd.protocols",
 ):
     sys.modules.pop(module_name, None)

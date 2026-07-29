@@ -48,7 +48,7 @@ _NO_POOL = object()
 
 
 def _pool(pool_id: str = "pool-1") -> SimpleNamespace:
-    return SimpleNamespace(id=pool_id, name=_attr("DCI-Pool"))
+    return SimpleNamespace(id=pool_id, name=_attr("DCI-Pool"), get_kind=lambda: "CoreIPPrefixPool")
 
 
 def _role_resource(role: str) -> dict:
@@ -1378,6 +1378,26 @@ def test_dci_allocation_helper_documents_repository_loaded_generator_exception()
     assert allocate_dci_p2p_prefix_from_pool.__doc__
     assert "repository-loaded generator" in allocate_dci_p2p_prefix_from_pool.__doc__
     assert "task-worker image" in allocate_dci_p2p_prefix_from_pool.__doc__
+
+
+@pytest.mark.anyio
+async def test_dci_allocation_hydrates_query_pool_object_before_sdk_allocation() -> None:
+    gen = _make_generator()
+    query_pool = SimpleNamespace(id="query-pool")
+    sdk_pool = _pool("query-pool")
+    gen.client.get = AsyncMock(return_value=sdk_pool)
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+
+    prefix = await allocate_dci_p2p_prefix_from_pool(
+        gen.client,
+        query_pool,
+        identifier="dci-link:dci-1",
+        prefix_length=31,
+    )
+
+    assert str(prefix) == "172.16.0.0/31"
+    gen.client.get.assert_awaited_once_with(kind="CoreIPPrefixPool", id="query-pool")
+    assert gen.client.allocate_next_ip_prefix.await_args.kwargs["resource_pool"] is sdk_pool
 
 
 @pytest.mark.anyio

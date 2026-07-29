@@ -835,6 +835,12 @@ async def allocate_dci_p2p_prefix_from_pool(
             msg = "DCI pool is missing an ID and cannot be used for prefix allocation"
             raise ValueError(msg)
         pool = await client.get(kind="CoreIPPrefixPool", id=pool_id)
+    elif not hasattr(pool, "get_kind"):
+        pool_id = _field(pool, "id")
+        if not pool_id:
+            msg = "DCI pool is missing an ID and cannot be used for prefix allocation"
+            raise ValueError(msg)
+        pool = await client.get(kind="CoreIPPrefixPool", id=str(pool_id))
 
     prefix = await client.allocate_next_ip_prefix(
         resource_pool=pool,

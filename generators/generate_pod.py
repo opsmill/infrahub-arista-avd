@@ -17,6 +17,7 @@ for module_name in (
     "solution_arista_avd.avd",
     "solution_arista_avd.cabling",
     "solution_arista_avd.generator",
+    "solution_arista_avd.pool_roles",
     "solution_arista_avd.protocols",
     "solution_arista_avd.sorting",
 ):
