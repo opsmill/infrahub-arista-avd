@@ -19,6 +19,16 @@ from netutils.vlan import vlanlist_to_config
 _REPO_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_REPO_SRC) not in sys.path:
     sys.path.insert(0, str(_REPO_SRC))
+_PACKAGE_ROOT = _REPO_SRC / "solution_arista_avd"
+if (package := sys.modules.get("solution_arista_avd")) is not None and hasattr(package, "__path__"):
+    package.__path__ = [str(_PACKAGE_ROOT), *[path for path in package.__path__ if path != str(_PACKAGE_ROOT)]]
+for module_name in (
+    "solution_arista_avd.avd",
+    "solution_arista_avd.generator",
+    "solution_arista_avd.pool_roles",
+    "solution_arista_avd.protocols",
+):
+    sys.modules.pop(module_name, None)
 
 from solution_arista_avd.avd import (  # noqa: E402
     MLAG_MAIN_TIER_ROLES,

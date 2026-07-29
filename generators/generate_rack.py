@@ -12,6 +12,17 @@ from infrahub_sdk.generator import InfrahubGenerator
 _REPO_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_REPO_SRC) not in sys.path:
     sys.path.insert(0, str(_REPO_SRC))
+_PACKAGE_ROOT = _REPO_SRC / "solution_arista_avd"
+if (package := sys.modules.get("solution_arista_avd")) is not None and hasattr(package, "__path__"):
+    package.__path__ = [str(_PACKAGE_ROOT), *[path for path in package.__path__ if path != str(_PACKAGE_ROOT)]]
+for module_name in (
+    "solution_arista_avd.avd",
+    "solution_arista_avd.cabling",
+    "solution_arista_avd.generator",
+    "solution_arista_avd.protocols",
+    "solution_arista_avd.sorting",
+):
+    sys.modules.pop(module_name, None)
 
 from solution_arista_avd import sorting as solution_arista_avd_sorting  # noqa: E402
 from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY  # noqa: E402
