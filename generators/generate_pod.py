@@ -1,18 +1,28 @@
 from __future__ import annotations
 
 import logging
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from infrahub_sdk.generator import InfrahubGenerator
 
-from solution_arista_avd import sorting as solution_arista_avd_sorting
-from solution_arista_avd.avd import SPINE_ROLE_BY_UNDERLAY
-from solution_arista_avd.cabling import build_pod_cabling_plan, connect_interface_maps
-from solution_arista_avd.generator import GeneratorMixin, set_fabric_avd_hostvars_ready, trigger_rack_generation
-from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod
+_REPO_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_REPO_SRC) not in sys.path:
+    sys.path.insert(0, str(_REPO_SRC))
 
-from .asn import ensure_shared_device_asn
-from .pod_generator_query import PodGeneratorQuery
+from solution_arista_avd import sorting as solution_arista_avd_sorting  # noqa: E402
+from solution_arista_avd.avd import SPINE_ROLE_BY_UNDERLAY  # noqa: E402
+from solution_arista_avd.cabling import build_pod_cabling_plan, connect_interface_maps  # noqa: E402
+from solution_arista_avd.generator import (  # noqa: E402
+    GeneratorMixin,
+    set_fabric_avd_hostvars_ready,
+    trigger_rack_generation,
+)
+from solution_arista_avd.protocols import DcimDevice, DcimInterface, LocationRack, NetworkPod  # noqa: E402
+
+from .asn import ensure_shared_device_asn  # noqa: E402
+from .pod_generator_query import PodGeneratorQuery  # noqa: E402
 
 if TYPE_CHECKING:
     from collections.abc import Callable

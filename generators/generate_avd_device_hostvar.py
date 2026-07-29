@@ -4,9 +4,11 @@ import hashlib
 import logging
 import operator
 import re
+import sys
 from copy import deepcopy
 from dataclasses import dataclass
 from ipaddress import IPv4Network
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import yaml
@@ -14,19 +16,23 @@ from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 
-from solution_arista_avd.avd import (
+_REPO_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_REPO_SRC) not in sys.path:
+    sys.path.insert(0, str(_REPO_SRC))
+
+from solution_arista_avd.avd import (  # noqa: E402
     MLAG_MAIN_TIER_ROLES,
     NON_EMITTED_UNDERLAYS,
     SPINE_UPLINK_LEAF_ROLES,
     SPINE_UPLINK_UNDERLAYS,
     SVI_RENDERING_ROLES,
 )
-from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
-from solution_arista_avd.generator import save_file_if_changed, set_fabric_avd_hostvars_ready
-from solution_arista_avd.pool_roles import MLAG_DEFAULT_POOLS, ResourceRole, map_prefix_role
-from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
+from solution_arista_avd.avd import get_avd_type as _get_package_avd_type  # noqa: E402
+from solution_arista_avd.generator import save_file_if_changed, set_fabric_avd_hostvars_ready  # noqa: E402
+from solution_arista_avd.pool_roles import MLAG_DEFAULT_POOLS, ResourceRole, map_prefix_role  # noqa: E402
+from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod  # noqa: E402
 
-from .generate_avd_device_inputs_query import (
+from .generate_avd_device_inputs_query import (  # noqa: E402
     GenerateAvdDeviceInputsQuery,
     GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges,
     GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical,

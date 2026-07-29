@@ -1,23 +1,29 @@
 from __future__ import annotations
 
 import logging
+import sys
 from inspect import signature
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.generator import InfrahubGenerator
 
-from solution_arista_avd import sorting as solution_arista_avd_sorting
-from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY
-from solution_arista_avd.cabling import build_rack_cabling_plan, connect_interface_maps
-from solution_arista_avd.generator import (
+_REPO_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_REPO_SRC) not in sys.path:
+    sys.path.insert(0, str(_REPO_SRC))
+
+from solution_arista_avd import sorting as solution_arista_avd_sorting  # noqa: E402
+from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY  # noqa: E402
+from solution_arista_avd.cabling import build_rack_cabling_plan, connect_interface_maps  # noqa: E402
+from solution_arista_avd.generator import (  # noqa: E402
     VTEP_LOOPBACK_ROLES,
     GeneratorMixin,
     check_all_racks_generated,
     set_fabric_avd_hostvars_ready,
     trigger_hostvar_generation,
 )
-from solution_arista_avd.protocols import (
+from solution_arista_avd.protocols import (  # noqa: E402
     AvdArtifact,
     DcimDevice,
     DcimInterface,
@@ -25,8 +31,8 @@ from solution_arista_avd.protocols import (
     NetworkPod,
 )
 
-from .asn import set_device_asn
-from .rack_generator_query import RackGeneratorQuery
+from .asn import set_device_asn  # noqa: E402
+from .rack_generator_query import RackGeneratorQuery  # noqa: E402
 
 if TYPE_CHECKING:
     from collections.abc import Callable
