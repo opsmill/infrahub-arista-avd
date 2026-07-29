@@ -312,3 +312,9 @@ Unit tests cover the hostvars builder and the role→type mapping:
 - [`tests/unit/test_avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/tests/unit/test_avd.py) — the `ROLE_TO_AVD_TYPE` / `get_avd_type()` mapping.
 
 Full hostvars generation is exercised by integration tests under `tests/integration/`.
+
+## Pool Inputs
+
+Hostvars prefer role-driven pool collections. Fabric Point-to-Point uplinks resolve from `NetworkPod.pod_ip_pools` first, then `NetworkFabric.fabric_ip_pools`, then the legacy `NetworkFabric.uplink_pool` relationship.
+
+MLAG peer and MLAG L3 peering pools resolve from `NetworkPod.pod_ip_pools` roles `mlag` and `mlag_peering`, then legacy `mlag_peer_pool` and `mlag_l3_pool`. When a required MLAG pool is absent, the generator creates or reuses deterministic default pools named `MLAG-Peer-Subnet` and `MLAG-L3-Peering-Subnet`.

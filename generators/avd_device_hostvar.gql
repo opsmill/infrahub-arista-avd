@@ -335,6 +335,48 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
             name {
               value
             }
+            pod_ip_pools {
+              edges {
+                node {
+                  __typename
+                  id
+                  ... on CoreIPAddressPool {
+                    name {
+                      value
+                    }
+                    resources {
+                      edges {
+                        node {
+                          __typename
+                          ... on IpamPrefix {
+                            role {
+                              value
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  ... on CoreIPPrefixPool {
+                    name {
+                      value
+                    }
+                    resources {
+                      edges {
+                        node {
+                          __typename
+                          ... on IpamPrefix {
+                            role {
+                              value
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
             mlag_peer_pool {
               node {
                 id
@@ -464,6 +506,48 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                       }
                       default_prefix_length {
                         value
+                      }
+                    }
+                  }
+                  fabric_ip_pools {
+                    edges {
+                      node {
+                        __typename
+                        id
+                        ... on CoreIPAddressPool {
+                          name {
+                            value
+                          }
+                          resources {
+                            edges {
+                              node {
+                                __typename
+                                ... on IpamPrefix {
+                                  role {
+                                    value
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                        ... on CoreIPPrefixPool {
+                          name {
+                            value
+                          }
+                          resources {
+                            edges {
+                              node {
+                                __typename
+                                ... on IpamPrefix {
+                                  role {
+                                    value
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
                       }
                     }
                   }
@@ -910,6 +994,31 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                     }
                                     default_prefix_length {
                                       value
+                                    }
+                                  }
+                                }
+                                fabric_ip_pools {
+                                  edges {
+                                    node {
+                                      __typename
+                                      id
+                                      ... on CoreIPPrefixPool {
+                                        name {
+                                          value
+                                        }
+                                        resources {
+                                          edges {
+                                            node {
+                                              __typename
+                                              ... on IpamPrefix {
+                                                role {
+                                                  value
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     }
                                   }
                                 }

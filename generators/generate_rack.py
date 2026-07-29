@@ -184,7 +184,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             self.mgmt_pool,
             self.loopback_pool,
             self.vtep_loopback_pool,
-        ) = await self.resolve_avd_pools(fabric_node)
+        ) = await self.resolve_avd_pools(fabric_node, pod_node)
 
         await self.create_leaf_switches()
 

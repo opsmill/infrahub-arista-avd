@@ -240,7 +240,15 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 
 **Pod role** (`NetworkPod.role`): `fabric`, `cpu`, `storage`.
 
-**Prefix role** (`IpamPrefix.role`): `supernet`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
+**Prefix role** (`IpamPrefix.role`): `fabric_supernet`, `fabric_point_to_point`, `dci`, `mlag`, `mlag_peering`, `supernet`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
+
+## Role-Driven Pool Collections
+
+`NetworkFabric.fabric_ip_pools` is the preferred fabric-scope IP pool collection. It accepts `CoreResourcePool` members so Management address pools and Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet prefix pools can be managed through one relationship. Legacy fabric relationships remain optional during migration and are used only as fallback inputs.
+
+`NetworkPod.pod_ip_pools` is the preferred pod-scope IP pool collection. It accepts pod-specific Loopback, Loopback VTEP, Fabric Point-to-Point, MLAG, and MLAG Peering pools. Management remains fabric-scoped.
+
+Pool purpose is resolved from the `IpamPrefix.role` values on each pool's resources. A pool with mixed authoritative roles, duplicate role coverage in one fabric or pod, a non-IP pool in these collections, or a pod prefix outside the matching fabric prefix is invalid.
 
 **Prefix status** (`IpamPrefix.status`): `active`, `deprecated`, `reserved`.
 

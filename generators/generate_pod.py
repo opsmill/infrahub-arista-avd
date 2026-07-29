@@ -118,7 +118,7 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
             self.mgmt_pool,
             self.loopback_pool,
             self.vtep_loopback_pool,
-        ) = await self.resolve_avd_pools(data.network_pod.edges[0].node.parent.node)
+        ) = await self.resolve_avd_pools(data.network_pod.edges[0].node.parent.node, data.network_pod.edges[0].node)
 
         await self.create_spine_switches()
 

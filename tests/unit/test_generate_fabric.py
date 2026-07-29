@@ -47,6 +47,7 @@ def _pod_query_data(*, amount_of_super_spines: int, underlay_routing_protocol: s
                         "index": {"value": 1},
                         "role": {"value": "cpu"},
                         "device_designs": {"edges": [_design_edge("spine", 2, "spine-template")]},
+                        "pod_ip_pools": {"edges": []},
                         "parent": {
                             "node": {
                                 "__typename": "NetworkFabric",
@@ -59,6 +60,7 @@ def _pod_query_data(*, amount_of_super_spines: int, underlay_routing_protocol: s
                                 "asn_pool": {"node": None},
                                 "node_id_pool": {"node": None},
                                 "mgmt_pool": {"node": None},
+                                "fabric_ip_pools": {"edges": []},
                                 "vtep_pool": {"node": None},
                                 "loopback_pool": {"node": None},
                             }
@@ -87,6 +89,7 @@ def _fabric_query_data(
                         "asn_pool": {"node": None},
                         "node_id_pool": {"node": None},
                         "mgmt_pool": {"node": None},
+                        "fabric_ip_pools": {"edges": []},
                         "vtep_pool": {"node": None},
                         "loopback_pool": {"node": None},
                     }

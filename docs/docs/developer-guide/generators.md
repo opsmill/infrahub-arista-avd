@@ -376,6 +376,14 @@ generator_definitions:
     query: generate_rack
 ```
 
+## Pool Resolution
+
+The fabric, pod, rack, and hostvars generators consume role-driven pool collections first. `NetworkFabric.fabric_ip_pools` supplies fabric Management, Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet roles. `NetworkPod.pod_ip_pools` can override pod-specific Loopback, Loopback VTEP, and Fabric Point-to-Point pools.
+
+If a required fabric prefix pool is missing and a Fabric Supernet pool exists, `GeneratorMixin` creates deterministic fallback prefix pools with stable names such as `<fabric>-Loopback-Pool`, then wraps Loopback and VTEP prefix pools in address pools for device allocation. Repeated runs upsert the same names.
+
+The hostvars generator resolves MLAG and MLAG Peering from `pod_ip_pools`, then legacy pod relationships, then deterministic default pools: `MLAG-Peer-Subnet` (`169.254.0.0/31`) and `MLAG-L3-Peering-Subnet` (`192.0.0.0/31`).
+
 ## File Structure
 
 ```

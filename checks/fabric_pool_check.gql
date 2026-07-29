@@ -1,0 +1,193 @@
+query FabricPoolCheckQuery($name: String!) {
+  NetworkFabric(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        underlay_routing_protocol {
+          value
+        }
+        overlay_routing_protocol {
+          value
+        }
+        fabric_ip_pools {
+          edges {
+            node {
+              __typename
+              id
+              display_label
+              ... on CoreIPPrefixPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              ... on CoreIPAddressPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  NetworkLink(role__value: "dci") {
+    edges {
+      node {
+        id
+      }
+    }
+  }
+  NetworkPod {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        parent {
+          node {
+            __typename
+            id
+            ... on NetworkFabric {
+              name {
+                value
+              }
+              fabric_ip_pools {
+                edges {
+                  node {
+                    __typename
+                    id
+                    display_label
+                    ... on CoreIPPrefixPool {
+                      name {
+                        value
+                      }
+                      resources {
+                        edges {
+                          node {
+                            __typename
+                            ... on IpamPrefix {
+                              prefix {
+                                value
+                              }
+                              role {
+                                value
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    ... on CoreIPAddressPool {
+                      name {
+                        value
+                      }
+                      resources {
+                        edges {
+                          node {
+                            __typename
+                            ... on IpamPrefix {
+                              prefix {
+                                value
+                              }
+                              role {
+                                value
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        pod_ip_pools {
+          edges {
+            node {
+              __typename
+              id
+              display_label
+              ... on CoreIPPrefixPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              ... on CoreIPAddressPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

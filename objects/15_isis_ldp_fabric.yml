@@ -18,7 +18,7 @@ spec:
     - prefix: 10.62.2.0/24
       role: loopback-vtep
     - prefix: 10.62.3.0/24
-      role: pod_leaf_spine
+      role: fabric_point_to_point
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -88,6 +88,11 @@ spec:
       asn_pool: "Fabric-ISIS-LDP-ASN-Pool"
       node_id_pool: "Fabric-ISIS-LDP-NodeID-Pool"
       mgmt_pool: "Fabric-ISIS-LDP-Mgmt-Pool"
+      fabric_ip_pools:
+        - "Fabric-ISIS-LDP-Mgmt-Pool"
+        - "Fabric-ISIS-LDP-Uplink-Pool"
+        - "Fabric-ISIS-LDP-VTEP-Pool"
+        - "Fabric-ISIS-LDP-Loopback-Pool"
       virtual_router_mac: "00:1c:73:00:00:62"
       underlay_routing_protocol: "isis-ldp"
       p2p_uplinks_mtu: 9214

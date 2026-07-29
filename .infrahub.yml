@@ -60,6 +60,8 @@ queries:
   # CloudVision proposed-change check query
   - name: cv_config_check
     file_path: "./checks/cv_config_check.gql"
+  - name: fabric_pool_check
+    file_path: "./checks/fabric_pool_check.gql"
   - name: cv_workspace_submission_webhook
     file_path: "./transforms/cv_workspace_submission_webhook.gql"
 
@@ -146,6 +148,12 @@ check_definitions:
   - name: cv-config-validation
     file_path: "./checks/cv_config_check.py"
     class_name: CVConfigValidationCheck
+    targets: fabrics
+    parameters:
+      name: name__value
+  - name: fabric-pool-validation
+    file_path: "./checks/fabric_pool_check.py"
+    class_name: FabricPoolValidationCheck
     targets: fabrics
     parameters:
       name: name__value

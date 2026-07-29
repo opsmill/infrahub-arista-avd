@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ipaddress import ip_network
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -7,6 +8,7 @@ import pytest
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 
 from solution_arista_avd.generator import GeneratorMixin, save_file_if_changed, trigger_hostvar_generation
+from solution_arista_avd.pool_roles import ResourceRole
 
 
 def _make_generator() -> GeneratorMixin:
@@ -69,6 +71,18 @@ def _interface(kind: str = "InterfacePhysical") -> SimpleNamespace:
 
 def _resource(resource_id: str) -> SimpleNamespace:
     return SimpleNamespace(node=SimpleNamespace(id=resource_id))
+
+
+def _role_resource(resource_id: str, role: str) -> SimpleNamespace:
+    return SimpleNamespace(node=SimpleNamespace(id=resource_id, role=SimpleNamespace(value=role)))
+
+
+def _prefix_resource(resource_id: str, prefix: str, role: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        node=SimpleNamespace(
+            id=resource_id, prefix=SimpleNamespace(value=ip_network(prefix)), role=SimpleNamespace(value=role)
+        )
+    )
 
 
 def test_relationship_node_id_detects_missing_and_populated_relationships() -> None:
@@ -565,6 +579,254 @@ async def test_resolve_avd_pools_creates_loopback_and_vtep_address_pools_from_fa
     assert gen.client.create.await_args_list[1].kwargs["resources"] == [{"id": "vtep-prefix"}]
     loopback_address_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
     vtep_address_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+
+
+@pytest.mark.asyncio
+async def test_resolve_avd_pools_prefers_fabric_ip_pools_over_legacy_relationships() -> None:
+    gen = _make_generator()
+    mgmt_pool = SimpleNamespace(id="collection-mgmt")
+    loopback_address_pool = SimpleNamespace(save=AsyncMock())
+    vtep_address_pool = SimpleNamespace(save=AsyncMock())
+    gen.client.get.return_value = mgmt_pool
+    gen.client.create.side_effect = [loopback_address_pool, vtep_address_pool]
+    collection_loopback = SimpleNamespace(
+        id="collection-loopback",
+        resources=SimpleNamespace(edges=[_role_resource("collection-loopback-prefix", "loopback")]),
+    )
+    collection_vtep = SimpleNamespace(
+        id="collection-vtep",
+        resources=SimpleNamespace(edges=[_role_resource("collection-vtep-prefix", "loopback-vtep")]),
+    )
+    collection_mgmt = SimpleNamespace(
+        id="collection-mgmt",
+        resources=SimpleNamespace(edges=[_role_resource("collection-mgmt-prefix", "management")]),
+    )
+    legacy_loopback = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("legacy-loopback-prefix")]))
+    legacy_vtep = SimpleNamespace(resources=SimpleNamespace(edges=[_resource("legacy-vtep-prefix")]))
+    fabric = SimpleNamespace(
+        name=SimpleNamespace(value="Fabric-A"),
+        asn_pool=SimpleNamespace(node=None),
+        node_id_pool=SimpleNamespace(node=None),
+        mgmt_pool=SimpleNamespace(node=SimpleNamespace(id="legacy-mgmt")),
+        loopback_pool=SimpleNamespace(node=legacy_loopback),
+        vtep_pool=SimpleNamespace(node=legacy_vtep),
+        fabric_ip_pools=SimpleNamespace(
+            edges=[
+                SimpleNamespace(node=collection_loopback),
+                SimpleNamespace(node=collection_vtep),
+                SimpleNamespace(node=collection_mgmt),
+            ]
+        ),
+    )
+
+    result = await gen.resolve_avd_pools(fabric)
+
+    assert result == (None, None, mgmt_pool, loopback_address_pool, vtep_address_pool)
+    gen.client.get.assert_awaited_once()
+    assert gen.client.get.await_args.kwargs["id"] == "collection-mgmt"
+    assert gen.client.create.await_args_list[0].kwargs["resources"] == [{"id": "collection-loopback-prefix"}]
+    assert gen.client.create.await_args_list[1].kwargs["resources"] == [{"id": "collection-vtep-prefix"}]
+
+
+@pytest.mark.asyncio
+async def test_resolve_avd_pools_prefers_pod_ip_pools_for_loopback_and_vtep() -> None:
+    gen = _make_generator()
+    pod_loopback_address_pool = SimpleNamespace(save=AsyncMock())
+    pod_vtep_address_pool = SimpleNamespace(save=AsyncMock())
+    gen.client.create.side_effect = [pod_loopback_address_pool, pod_vtep_address_pool]
+    fabric_loopback = SimpleNamespace(
+        id="fabric-loopback",
+        resources=SimpleNamespace(edges=[_role_resource("fabric-loopback-prefix", "loopback")]),
+    )
+    fabric_vtep = SimpleNamespace(
+        id="fabric-vtep",
+        resources=SimpleNamespace(edges=[_role_resource("fabric-vtep-prefix", "loopback-vtep")]),
+    )
+    pod_loopback = SimpleNamespace(
+        id="pod-loopback",
+        resources=SimpleNamespace(edges=[_role_resource("pod-loopback-prefix", "loopback")]),
+    )
+    pod_vtep = SimpleNamespace(
+        id="pod-vtep",
+        resources=SimpleNamespace(edges=[_role_resource("pod-vtep-prefix", "loopback-vtep")]),
+    )
+    fabric = SimpleNamespace(
+        name=SimpleNamespace(value="Fabric-A"),
+        asn_pool=SimpleNamespace(node=None),
+        node_id_pool=SimpleNamespace(node=None),
+        mgmt_pool=SimpleNamespace(node=None),
+        loopback_pool=SimpleNamespace(node=None),
+        vtep_pool=SimpleNamespace(node=None),
+        fabric_ip_pools=SimpleNamespace(
+            edges=[SimpleNamespace(node=fabric_loopback), SimpleNamespace(node=fabric_vtep)]
+        ),
+    )
+    pod = SimpleNamespace(
+        name=SimpleNamespace(value="Pod-A"),
+        pod_ip_pools=SimpleNamespace(edges=[SimpleNamespace(node=pod_loopback), SimpleNamespace(node=pod_vtep)]),
+    )
+
+    result = await gen.resolve_avd_pools(fabric, pod)
+
+    assert result == (None, None, None, pod_loopback_address_pool, pod_vtep_address_pool)
+    assert [call.kwargs["name"] for call in gen.client.create.await_args_list] == [
+        "pod-a-loopback-address-pool",
+        "pod-a-vtep-loopback-address-pool",
+    ]
+    assert gen.client.create.await_args_list[0].kwargs["resources"] == [{"id": "pod-loopback-prefix"}]
+    assert gen.client.create.await_args_list[1].kwargs["resources"] == [{"id": "pod-vtep-prefix"}]
+
+
+@pytest.mark.asyncio
+async def test_resolve_avd_pools_creates_missing_prefix_pools_from_fabric_supernet() -> None:
+    gen = _make_generator()
+    mgmt_pool = SimpleNamespace(id="collection-mgmt")
+    generated_loopback_prefix = SimpleNamespace(id="prefix-loopback", save=AsyncMock())
+    generated_vtep_prefix = SimpleNamespace(id="prefix-vtep", save=AsyncMock())
+    generated_loopback_pool = SimpleNamespace(id="pool-loopback", save=AsyncMock())
+    generated_vtep_pool = SimpleNamespace(id="pool-vtep", save=AsyncMock())
+    loopback_address_pool = SimpleNamespace(save=AsyncMock())
+    vtep_address_pool = SimpleNamespace(save=AsyncMock())
+    supernet_pool = SimpleNamespace(
+        id="supernet-pool",
+        name=SimpleNamespace(value="Fabric-A-Supernet-Pool"),
+        resources=SimpleNamespace(edges=[_prefix_resource("supernet-prefix", "10.0.0.0/24", "fabric_supernet")]),
+    )
+    gen.client.get.side_effect = [mgmt_pool, supernet_pool]
+    gen.client.create.side_effect = [
+        generated_loopback_prefix,
+        generated_loopback_pool,
+        loopback_address_pool,
+        generated_vtep_prefix,
+        generated_vtep_pool,
+        vtep_address_pool,
+    ]
+    collection_mgmt = SimpleNamespace(
+        id="collection-mgmt",
+        resources=SimpleNamespace(edges=[_role_resource("collection-mgmt-prefix", "management")]),
+    )
+    fabric = SimpleNamespace(
+        name=SimpleNamespace(value="Fabric-A"),
+        asn_pool=SimpleNamespace(node=None),
+        node_id_pool=SimpleNamespace(node=None),
+        mgmt_pool=SimpleNamespace(node=None),
+        loopback_pool=SimpleNamespace(node=None),
+        vtep_pool=SimpleNamespace(node=None),
+        fabric_ip_pools=SimpleNamespace(
+            edges=[
+                SimpleNamespace(node=collection_mgmt),
+                SimpleNamespace(
+                    node=SimpleNamespace(
+                        id="supernet-pool",
+                        resources=SimpleNamespace(edges=[_role_resource("supernet-prefix", "fabric_supernet")]),
+                    )
+                ),
+            ]
+        ),
+    )
+
+    result = await gen.resolve_avd_pools(fabric)
+
+    assert result == (None, None, mgmt_pool, loopback_address_pool, vtep_address_pool)
+    assert gen.client.create.await_args_list[0].kwargs == {
+        "kind": "IpamPrefix",
+        "prefix": "10.0.0.0/27",
+        "role": ResourceRole.LOOPBACK.value,
+        "ip_namespace": {"hfid": ["default"]},
+    }
+    assert gen.client.create.await_args_list[1].args[0].__name__ == "CoreIPPrefixPool"
+    assert gen.client.create.await_args_list[1].kwargs["name"] == "Fabric-A-Loopback-Pool"
+    assert gen.client.create.await_args_list[1].kwargs["resources"] == [{"id": "prefix-loopback"}]
+    assert gen.client.create.await_args_list[3].kwargs["prefix"] == "10.0.0.32/27"
+    assert gen.client.create.await_args_list[4].kwargs["name"] == "Fabric-A-Loopback-VTEP-Pool"
+    generated_loopback_prefix.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+    generated_vtep_prefix.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+    generated_loopback_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+    generated_vtep_pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+
+
+@pytest.mark.asyncio
+async def test_resolve_avd_pools_reuses_persisted_supernet_fallback_pools_by_stable_name() -> None:
+    gen = _make_generator()
+    existing_loopback_pool = SimpleNamespace(
+        id="existing-loopback-pool",
+        resources=SimpleNamespace(edges=[_resource("existing-loopback-prefix")]),
+    )
+    existing_vtep_pool = SimpleNamespace(
+        id="existing-vtep-pool",
+        resources=SimpleNamespace(edges=[_resource("existing-vtep-prefix")]),
+    )
+    loopback_address_pool = SimpleNamespace(save=AsyncMock())
+    vtep_address_pool = SimpleNamespace(save=AsyncMock())
+
+    async def filters_side_effect(*args: object, **kwargs: object) -> list[SimpleNamespace]:
+        if kwargs.get("name__value") == "Fabric-A-Loopback-Pool":
+            return [existing_loopback_pool]
+        if kwargs.get("name__value") == "Fabric-A-Loopback-VTEP-Pool":
+            return [existing_vtep_pool]
+        return []
+
+    gen.client.filters.side_effect = filters_side_effect
+    gen.client.create.side_effect = [loopback_address_pool, vtep_address_pool]
+    fabric = SimpleNamespace(
+        name=SimpleNamespace(value="Fabric-A"),
+        asn_pool=SimpleNamespace(node=None),
+        node_id_pool=SimpleNamespace(node=None),
+        mgmt_pool=SimpleNamespace(node=None),
+        loopback_pool=SimpleNamespace(node=None),
+        vtep_pool=SimpleNamespace(node=None),
+        fabric_ip_pools=SimpleNamespace(
+            edges=[
+                SimpleNamespace(
+                    node=SimpleNamespace(
+                        id="supernet-pool",
+                        resources=SimpleNamespace(edges=[_role_resource("supernet-prefix", "fabric_supernet")]),
+                    )
+                )
+            ]
+        ),
+    )
+
+    result = await gen.resolve_avd_pools(fabric)
+
+    assert result == (None, None, None, loopback_address_pool, vtep_address_pool)
+    assert gen.client.get.await_count == 0
+    assert [call.kwargs["resources"] for call in gen.client.create.await_args_list] == [
+        [{"id": "existing-loopback-prefix"}],
+        [{"id": "existing-vtep-prefix"}],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_resolve_avd_pools_raises_when_fabric_supernet_is_exhausted() -> None:
+    gen = _make_generator()
+    supernet_pool = SimpleNamespace(
+        id="supernet-pool",
+        name=SimpleNamespace(value="Tiny-Supernet"),
+        resources=SimpleNamespace(edges=[_prefix_resource("supernet-prefix", "10.0.0.0/30", "fabric_supernet")]),
+    )
+    gen.client.get.return_value = supernet_pool
+    fabric = SimpleNamespace(
+        name=SimpleNamespace(value="Fabric-A"),
+        asn_pool=SimpleNamespace(node=None),
+        node_id_pool=SimpleNamespace(node=None),
+        mgmt_pool=SimpleNamespace(node=None),
+        loopback_pool=SimpleNamespace(node=None),
+        vtep_pool=SimpleNamespace(node=None),
+        fabric_ip_pools=SimpleNamespace(
+            edges=[
+                SimpleNamespace(
+                    node=SimpleNamespace(
+                        id="supernet-pool",
+                        resources=SimpleNamespace(edges=[_role_resource("supernet-prefix", "fabric_supernet")]),
+                    )
+                )
+            ]
+        ),
+    )
+
+    with pytest.raises(ValueError, match=r"Fabric-A.*loopback.*\/27.*Tiny-Supernet"):
+        await gen.resolve_avd_pools(fabric)
 
 
 @pytest.mark.asyncio

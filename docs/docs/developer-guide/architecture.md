@@ -185,6 +185,14 @@ services:
 7. Run generators via UI
 ```
 
+## Pool Role Resolution
+
+Fabric and pod IP pool intent is role-driven. `NetworkFabric.fabric_ip_pools` is the authoritative fabric collection for Management, Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet roles. `NetworkPod.pod_ip_pools` is the authoritative pod collection for pod-scoped Loopback, Loopback VTEP, Fabric Point-to-Point, MLAG, and MLAG Peering roles.
+
+Validation resolves a pool's purpose from the roles on its backing `IpamPrefix` resources. The proposed-change check rejects duplicate authoritative roles, mixed-role pools, non-IP pool members, pod management pools, and pod prefixes that are not contained by the matching parent fabric pool.
+
+During migration, legacy fabric and pod pool relationships are still present and object data is dual-populated. Generators prefer collection relationships and fall back to legacy relationships only when needed.
+
 ## Source
 
 - Infrahub configuration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — the queries, generators, transforms, and artifact definitions registered with Infrahub.

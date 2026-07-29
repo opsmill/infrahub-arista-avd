@@ -102,3 +102,12 @@ Services are modeled **schema-first**: L2 VLANs (L2LS), anycast SVIs on the camp
 |------------|:------:|-------|
 | Self-serve brownfield import | 🟡 | Modeling an existing fabric and importing configs via Infrahub Sync is done today in a **guided engagement**, not as a download-and-try path. |
 | Every AVD feature | ⬜ | This reference design covers a defined set of AVD inputs and scenarios, implemented per customer; uncommon or highly custom options may not be modeled. |
+
+## Fabric Pool Management
+
+| Capability | Status | Notes |
+|------------|:------:|-------|
+| Role-driven fabric pool collection | ✅ | `NetworkFabric.fabric_ip_pools` covers Management, Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet roles. |
+| Pod-scoped pool collection and containment validation | ✅ | `NetworkPod.pod_ip_pools` supports pod Loopback, VTEP, Fabric Point-to-Point, MLAG, and MLAG Peering roles with parent-fabric containment checks. |
+| Legacy pool migration compatibility | ✅ | Legacy fabric and pod pool relationships remain optional and seed data is dual-populated during migration. |
+| Deterministic fallback/default pools | ✅ | Fabric Supernet fallback creates stable prefix pools; MLAG defaults use stable `/31` pool objects. |

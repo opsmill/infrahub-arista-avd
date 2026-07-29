@@ -34,6 +34,16 @@ extensions:
               label: Loopback
             - name: loopback-vtep
               label: Loopback VTEP
+            - name: fabric_point_to_point
+              label: Fabric Point-to-Point
+            - name: dci
+              label: DCI
+            - name: fabric_supernet
+              label: Fabric Supernet
+            - name: mlag
+              label: MLAG
+            - name: mlag_peering
+              label: MLAG Peering
             - name: technical
               label: Technical
             - name: management

@@ -45,6 +45,42 @@ query FabricGeneratorQuery($name: String!) {
             id
           }
         }
+        fabric_ip_pools {
+          edges {
+            node {
+              __typename
+              id
+              ... on CoreIPAddressPool {
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              ... on CoreIPPrefixPool {
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
         vtep_pool {
           node {
             id

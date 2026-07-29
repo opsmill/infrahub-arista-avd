@@ -99,6 +99,16 @@ nodes:
         optional: true
         identifier: "fabric__mgmt_pool"
         order_weight: 8000
+      - name: fabric_ip_pools
+        label: Fabric IP Pools
+        peer: CoreResourcePool
+        branch: aware
+        kind: Attribute
+        cardinality: many
+        optional: true
+        identifier: "fabric__ip_pools"
+        description: "Role-driven fabric-scope IP pool collection; legacy pool relationships remain as migration fallback."
+        order_weight: 8050
       - name: avd_evpn
         label: AVD EVPN Settings
         peer: AvdEvpn

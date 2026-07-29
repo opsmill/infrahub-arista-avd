@@ -865,6 +865,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePod(BaseModel):
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode(BaseModel):
     id: str
     name: Optional["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeName"]
+    pod_ip_pools: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPools"
     mlag_peer_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagPeerPool"
     mlag_l_3_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagL3Pool" = Field(
         alias="mlag_l3_pool"
@@ -876,6 +877,162 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode(BaseModel):
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeName(BaseModel):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPools(BaseModel):
+    edges: Optional[
+        list["GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdges"]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdges(BaseModel):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreResourcePool",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPool",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPool",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreResourcePool(
+    BaseModel
+):
+    typename__: Literal["CoreNumberPool", "CoreResourcePool"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPool(
+    BaseModel
+):
+    typename__: Literal["CoreIPAddressPool"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolName"
+    ]
+    resources: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResources"
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeBuiltinIPPrefix",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefix",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeBuiltinIPPrefix(
+    BaseModel
+):
+    typename__: Literal["BuiltinIPPrefix", "InternalIPPrefixAvailable"] = Field(
+        alias="__typename"
+    )
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefix(
+    BaseModel
+):
+    typename__: Literal["IpamPrefix"] = Field(alias="__typename")
+    role: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefixRole"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefixRole(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPool(
+    BaseModel
+):
+    typename__: Literal["CoreIPPrefixPool"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolName"
+    ]
+    resources: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResources"
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeBuiltinIPPrefix",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeBuiltinIPPrefix(
+    BaseModel
+):
+    typename__: Literal["BuiltinIPPrefix", "InternalIPPrefixAvailable"] = Field(
+        alias="__typename"
+    )
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix(
+    BaseModel
+):
+    typename__: Literal["IpamPrefix"] = Field(alias="__typename")
+    role: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefixRole"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefixRole(
+    BaseModel
+):
     value: Optional[str]
 
 
@@ -984,6 +1141,7 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricP2PUplinksMtu"
     ] = Field(alias="p2p_uplinks_mtu")
     uplink_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUplinkPool"
+    fabric_ip_pools: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPools"
     vtep_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPool"
     loopback_pool: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool"
     spanning_tree_mode: Optional[
@@ -1326,6 +1484,168 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     BaseModel
 ):
     value: Optional[Any]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPools(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreResourcePool",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPool",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPool",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreResourcePool(
+    BaseModel
+):
+    typename__: Literal["CoreNumberPool", "CoreResourcePool"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPool(
+    BaseModel
+):
+    typename__: Literal["CoreIPAddressPool"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolName"
+    ]
+    resources: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResources"
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeBuiltinIPPrefix",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefix",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeBuiltinIPPrefix(
+    BaseModel
+):
+    typename__: Literal["BuiltinIPPrefix", "InternalIPPrefixAvailable"] = Field(
+        alias="__typename"
+    )
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefix(
+    BaseModel
+):
+    typename__: Literal["IpamPrefix"] = Field(alias="__typename")
+    role: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefixRole"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefixRole(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPool(
+    BaseModel
+):
+    typename__: Literal["CoreIPPrefixPool"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolName"
+    ]
+    resources: "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResources"
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeBuiltinIPPrefix",
+                "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeBuiltinIPPrefix(
+    BaseModel
+):
+    typename__: Literal["BuiltinIPPrefix", "InternalIPPrefixAvailable"] = Field(
+        alias="__typename"
+    )
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix(
+    BaseModel
+):
+    typename__: Literal["IpamPrefix"] = Field(alias="__typename")
+    role: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefixRole"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefixRole(
+    BaseModel
+):
+    value: Optional[str]
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPool(
@@ -2803,6 +3123,7 @@ class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNod
         "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricName"
     ]
     dci_pool: "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPool"
+    fabric_ip_pools: "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPools"
 
 
 class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricName(
@@ -2841,6 +3162,103 @@ class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNod
     BaseModel
 ):
     value: Optional[Any]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPools(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreResourcePool",
+                "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPool",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreResourcePool(
+    BaseModel
+):
+    typename__: Literal["CoreIPAddressPool", "CoreNumberPool", "CoreResourcePool"] = (
+        Field(alias="__typename")
+    )
+    id: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPool(
+    BaseModel
+):
+    typename__: Literal["CoreIPPrefixPool"] = Field(alias="__typename")
+    id: str
+    name: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolName"
+    ]
+    resources: "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResources"
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolName(
+    BaseModel
+):
+    value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResources(
+    BaseModel
+):
+    edges: Optional[
+        list[
+            "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges"
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeBuiltinIPPrefix",
+                "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeBuiltinIPPrefix(
+    BaseModel
+):
+    typename__: Literal["BuiltinIPPrefix", "InternalIPPrefixAvailable"] = Field(
+        alias="__typename"
+    )
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix(
+    BaseModel
+):
+    typename__: Literal["IpamPrefix"] = Field(alias="__typename")
+    role: Optional[
+        "GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefixRole"
+    ]
+
+
+class GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefixRole(
+    BaseModel
+):
+    value: Optional[str]
 
 
 GenerateAvdDeviceInputsQuery.model_rebuild()
@@ -2912,6 +3330,16 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdges.model_rebuil
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeRackNodeDevicesEdgesNodeDcimDevice.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePod.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPools.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPool.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResources.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefix.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPool.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResources.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagPeerPool.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagPeerPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeMlagL3Pool.model_rebuild()
@@ -2937,6 +3365,16 @@ GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricChi
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricChildrenEdgesNodeNetworkPodDevicesEdgesNodeInterfacesEdgesNodeInterfacePhysicalConnectorNodeConnectedEndpointsEdgesNodeDcimInterfaceDeviceNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUplinkPool.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricUplinkPoolNode.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPools.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPool.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResources.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPAddressPoolResourcesEdgesNodeIpamPrefix.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPool.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResources.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPool.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricVtepPoolNode.model_rebuild()
 GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricLoopbackPool.model_rebuild()
@@ -3029,3 +3467,9 @@ GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInter
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabric.model_rebuild()
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPool.model_rebuild()
 GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricDciPoolNode.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPools.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPool.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResources.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges.model_rebuild()
+GenerateAvdDeviceInputsQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNodeNetworkFabricFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix.model_rebuild()

@@ -68,6 +68,7 @@ def _rack_query_data(
             "device_designs": {"edges": [_design_edge("spine", 2, "spine-template")]},
             "leaf_interface_sorting_method": {"value": "sort_interfaces"},
             "spine_interface_sorting_method": {"value": "sort_interfaces"},
+            "pod_ip_pools": {"edges": []},
             "parent": {
                 "node": {
                     "__typename": "NetworkFabric",
@@ -76,6 +77,7 @@ def _rack_query_data(
                     "asn_pool": {"node": None},
                     "node_id_pool": {"node": None},
                     "mgmt_pool": {"node": None},
+                    "fabric_ip_pools": {"edges": []},
                     "vtep_pool": {"node": None},
                     "loopback_pool": {"node": None},
                 }

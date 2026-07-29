@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from ipaddress import IPv4Network, IPv6Network, ip_network
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
+from .pool_roles import (
+    FABRIC_SUPERNET_PREFIX_LENGTHS,
+    FABRIC_SUPERNET_ROLE_LABELS,
+    ResourceRole,
+    map_prefix_role,
+)
 from .protocols import DcimDevice, DcimInterface, InterfacePhysical, InterfaceVirtual, RoutingAsn
 
 if TYPE_CHECKING:
@@ -165,7 +172,7 @@ class GeneratorMixin:
         return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
     async def resolve_avd_pools(
-        self, node: Any
+        self, node: Any, pod_node: Any | None = None
     ) -> tuple[
         CoreNumberPool | None,
         CoreNumberPool | None,
@@ -175,9 +182,9 @@ class GeneratorMixin:
     ]:
         """Resolve the (asn, node_id, mgmt, loopback, vtep) AVD pools referenced by a fabric node.
 
-        The fabric/pod/rack generators all read the same optional pool
-        relationships off the fabric (directly, or via the pod's parent). Each
-        is optional; a missing or unset relationship resolves to ``None``.
+        The fabric/pod/rack generators all read common pools off the fabric.
+        When a pod node is supplied, pod-scoped loopback and VTEP prefix pools
+        take precedence over matching fabric pools.
         """
         asn_pool: CoreNumberPool | None = None
         node_id_pool: CoreNumberPool | None = None
@@ -194,20 +201,53 @@ class GeneratorMixin:
             node_id_pool = await self.client.get(kind=CoreNumberPool, id=node_id_rel.node.id)  # type: ignore[type-abstract]
 
         mgmt_rel = getattr(node, "mgmt_pool", None)
-        if mgmt_rel and mgmt_rel.node:
+        fabric_pool_refs = self._pool_refs_by_role(getattr(node, "fabric_ip_pools", None))
+        pod_pool_refs = self._pool_refs_by_role(getattr(pod_node, "pod_ip_pools", None))
+        mgmt_ref = fabric_pool_refs.get(ResourceRole.MANAGEMENT)
+        mgmt_ref_id = getattr(mgmt_ref, "id", None)
+        if mgmt_ref_id:
+            mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=mgmt_ref_id)  # type: ignore[type-abstract]
+        elif mgmt_rel and mgmt_rel.node:
             mgmt_pool = await self.client.get(kind=CoreIPAddressPool, id=mgmt_rel.node.id)  # type: ignore[type-abstract]
 
         fabric_name = getattr(getattr(node, "name", None), "value", None)
+        pod_name = getattr(getattr(pod_node, "name", None), "value", None)
+        loopback_ref = pod_pool_refs.get(ResourceRole.LOOPBACK) or fabric_pool_refs.get(ResourceRole.LOOPBACK)
         loopback_rel = getattr(node, "loopback_pool", None)
-        if fabric_name and loopback_rel and loopback_rel.node:
+        if fabric_name and loopback_ref is None and not (loopback_rel and loopback_rel.node):
+            loopback_ref = await self._ensure_fabric_supernet_fallback_pool(
+                fabric_name=str(fabric_name),
+                role=ResourceRole.LOOPBACK,
+                fabric_pool_refs=fabric_pool_refs,
+            )
+        if fabric_name and loopback_ref is not None:
+            loopback_pool = await self._ensure_address_pool_from_prefix_pool(
+                fabric_name=str(pod_name or fabric_name).lower(),
+                pool_role="loopback",
+                prefix_pool_ref=loopback_ref,
+            )
+        elif fabric_name and loopback_rel and loopback_rel.node:
             loopback_pool = await self._ensure_address_pool_from_prefix_pool(
                 fabric_name=str(fabric_name).lower(),
                 pool_role="loopback",
                 prefix_pool_ref=loopback_rel.node,
             )
 
+        vtep_ref = pod_pool_refs.get(ResourceRole.LOOPBACK_VTEP) or fabric_pool_refs.get(ResourceRole.LOOPBACK_VTEP)
         vtep_rel = getattr(node, "vtep_pool", None)
-        if fabric_name and vtep_rel and vtep_rel.node:
+        if fabric_name and vtep_ref is None and not (vtep_rel and vtep_rel.node):
+            vtep_ref = await self._ensure_fabric_supernet_fallback_pool(
+                fabric_name=str(fabric_name),
+                role=ResourceRole.LOOPBACK_VTEP,
+                fabric_pool_refs=fabric_pool_refs | ({ResourceRole.LOOPBACK: loopback_ref} if loopback_ref else {}),
+            )
+        if fabric_name and vtep_ref is not None:
+            vtep_loopback_pool = await self._ensure_address_pool_from_prefix_pool(
+                fabric_name=str(pod_name or fabric_name).lower(),
+                pool_role="vtep-loopback",
+                prefix_pool_ref=vtep_ref,
+            )
+        elif fabric_name and vtep_rel and vtep_rel.node:
             vtep_loopback_pool = await self._ensure_address_pool_from_prefix_pool(
                 fabric_name=str(fabric_name).lower(),
                 pool_role="vtep-loopback",
@@ -246,6 +286,152 @@ class GeneratorMixin:
         await address_pool.save(allow_upsert=True, update_group_context=False)
         return address_pool
 
+    async def _ensure_fabric_supernet_fallback_pool(
+        self,
+        *,
+        fabric_name: str,
+        role: ResourceRole,
+        fabric_pool_refs: dict[ResourceRole, object],
+    ) -> CoreIPPrefixPool | None:
+        """Create or reuse a deterministic prefix pool carved from the Fabric Supernet."""
+        if role not in FABRIC_SUPERNET_PREFIX_LENGTHS:
+            return None
+
+        supernet_ref = fabric_pool_refs.get(ResourceRole.FABRIC_SUPERNET)
+        if supernet_ref is None:
+            return None
+
+        pool_name = f"{fabric_name}-{FABRIC_SUPERNET_ROLE_LABELS[role]}-Pool"
+        existing = await self._existing_prefix_pool_by_name(pool_name)
+        if existing is not None:
+            return existing
+
+        supernet_pool = await self._hydrated_prefix_pool(supernet_ref)
+        prefix_length = FABRIC_SUPERNET_PREFIX_LENGTHS[role]
+        reserved_prefixes = self._fabric_supernet_reserved_prefixes()
+        child_prefix = await self._next_fabric_supernet_child_prefix(
+            fabric_name=fabric_name,
+            role=role,
+            prefix_length=prefix_length,
+            supernet_pool=supernet_pool,
+            fabric_pool_refs=fabric_pool_refs,
+            reserved_prefixes=reserved_prefixes,
+        )
+        reserved_prefixes.append(child_prefix)
+
+        prefix = await self.client.create(
+            kind="IpamPrefix",
+            prefix=str(child_prefix),
+            role=role.value,
+            ip_namespace={"hfid": ["default"]},
+        )
+        await prefix.save(allow_upsert=True, update_group_context=False)
+
+        prefix_pool = await self.client.create(
+            CoreIPPrefixPool,  # type: ignore[type-abstract]
+            name=pool_name,
+            default_prefix_type="IpamPrefix",
+            default_prefix_length=prefix_length,
+            ip_namespace={"hfid": ["default"]},
+            resources=[{"id": prefix.id}],
+        )
+        await prefix_pool.save(allow_upsert=True, update_group_context=False)
+        pool_id = getattr(prefix_pool, "id", None)
+        prefix_id = getattr(prefix, "id", None)
+        if pool_id and prefix_id:
+            self._generated_prefix_pool_resource_ids()[str(pool_id)] = [str(prefix_id)]
+        return prefix_pool
+
+    async def _existing_prefix_pool_by_name(self, pool_name: str) -> CoreIPPrefixPool | None:
+        matches = await self.client.filters(CoreIPPrefixPool, name__value=pool_name)  # type: ignore[type-abstract]
+        if not matches:
+            return None
+
+        if self._resource_ids(getattr(matches[0], "resources", None)):
+            return cast("CoreIPPrefixPool", matches[0])
+
+        pool_id = getattr(matches[0], "id", None)
+        if not pool_id:
+            return cast("CoreIPPrefixPool", matches[0])
+        return await self.client.get(CoreIPPrefixPool, id=pool_id, include=["resources"])  # type: ignore[type-abstract]
+
+    async def _hydrated_prefix_pool(self, pool_ref: object) -> CoreIPPrefixPool:
+        if self._resource_prefixes(getattr(pool_ref, "resources", None)):
+            return cast("CoreIPPrefixPool", pool_ref)
+
+        pool_id = getattr(pool_ref, "id", None)
+        if not pool_id:
+            msg = "Fabric Supernet pool reference has no id and no prefetched prefix resources"
+            raise ValueError(msg)
+        hydrated_pools = self._hydrated_prefix_pools()
+        if str(pool_id) not in hydrated_pools:
+            hydrated_pools[str(pool_id)] = await self.client.get(  # type: ignore[type-abstract]
+                CoreIPPrefixPool, id=pool_id, include=["resources"]
+            )
+        return hydrated_pools[str(pool_id)]
+
+    async def _next_fabric_supernet_child_prefix(
+        self,
+        *,
+        fabric_name: str,
+        role: ResourceRole,
+        prefix_length: int,
+        supernet_pool: object,
+        fabric_pool_refs: dict[ResourceRole, object],
+        reserved_prefixes: list[Any],
+    ) -> Any:
+        supernets = self._resource_prefixes(getattr(supernet_pool, "resources", None))
+        if not supernets:
+            msg = f"Fabric '{fabric_name}': Fabric Supernet pool has no prefix resources"
+            raise ValueError(msg)
+
+        used_prefixes = [
+            prefix
+            for pool_ref in fabric_pool_refs.values()
+            for prefix in self._resource_prefixes(getattr(pool_ref, "resources", None))
+        ]
+        used_prefixes.extend(reserved_prefixes)
+        used_prefixes.extend(
+            self._resource_prefixes(getattr(supernet_pool, "resources", None), include_supernets=False)
+        )
+
+        for supernet in sorted(supernets):
+            if prefix_length < supernet.prefixlen:
+                continue
+            for child in supernet.subnets(new_prefix=prefix_length):
+                if not any(child.overlaps(used) for used in used_prefixes):
+                    return child
+
+        supernet_name = getattr(getattr(supernet_pool, "name", None), "value", None) or getattr(
+            supernet_pool, "id", "unknown"
+        )
+        msg = (
+            f"Fabric '{fabric_name}': unable to allocate {role.value} /{prefix_length} "
+            f"from Fabric Supernet pool {supernet_name}"
+        )
+        raise ValueError(msg)
+
+    def _fabric_supernet_reserved_prefixes(self) -> list[Any]:
+        reserved = getattr(self, "_fabric_supernet_reserved", None)
+        if reserved is None:
+            reserved = []
+            self._fabric_supernet_reserved = reserved
+        return reserved
+
+    def _generated_prefix_pool_resource_ids(self) -> dict[str, list[str]]:
+        resource_ids = getattr(self, "_generated_prefix_pool_resources", None)
+        if resource_ids is None:
+            resource_ids = {}
+            self._generated_prefix_pool_resources = resource_ids
+        return resource_ids
+
+    def _hydrated_prefix_pools(self) -> dict[str, CoreIPPrefixPool]:
+        hydrated_pools = getattr(self, "_hydrated_prefix_pool_cache", None)
+        if hydrated_pools is None:
+            hydrated_pools = {}
+            self._hydrated_prefix_pool_cache = hydrated_pools
+        return hydrated_pools
+
     async def _prefix_resource_ids(self, prefix_pool_ref: object) -> list[str]:
         resources = getattr(prefix_pool_ref, "resources", None)
         prefix_ids = self._resource_ids(resources)
@@ -255,6 +441,10 @@ class GeneratorMixin:
         prefix_pool_id = getattr(prefix_pool_ref, "id", None)
         if not prefix_pool_id:
             return []
+
+        generated_resource_ids = self._generated_prefix_pool_resource_ids().get(str(prefix_pool_id))
+        if generated_resource_ids is not None:
+            return generated_resource_ids
 
         prefix_pool = await self.client.get(  # type: ignore[type-abstract]
             CoreIPPrefixPool,
@@ -286,6 +476,75 @@ class GeneratorMixin:
             return prefix_ids
 
         return []
+
+    @staticmethod
+    def _resource_prefixes(resources: object, *, include_supernets: bool = True) -> list[IPv4Network | IPv6Network]:
+        prefixes: list[IPv4Network | IPv6Network] = []
+        for resource in GeneratorMixin._relationship_nodes(resources):
+            role = map_prefix_role(GeneratorMixin._attr_value(resource, "role"))
+            if not include_supernets and role is ResourceRole.FABRIC_SUPERNET:
+                continue
+            raw_prefix = getattr(getattr(resource, "prefix", None), "value", None)
+            if isinstance(raw_prefix, str):
+                prefixes.append(ip_network(raw_prefix))
+            elif raw_prefix is not None:
+                prefixes.append(ip_network(str(raw_prefix)))
+        return prefixes
+
+    @classmethod
+    def _pool_refs_by_role(cls, pool_relationship: object) -> dict[ResourceRole, object]:
+        """Resolve role-tagged pool collection members from prefetched resources."""
+        pools_by_role: dict[ResourceRole, object] = {}
+        for pool_ref in cls._relationship_nodes(pool_relationship):
+            resources = (
+                pool_ref.get("resources") if isinstance(pool_ref, dict) else getattr(pool_ref, "resources", None)
+            )
+            roles = {
+                role
+                for resource in cls._relationship_nodes(resources)
+                if (role := map_prefix_role(cls._attr_value(resource, "role"))) is not None
+            }
+            if len(roles) == 1:
+                pools_by_role[next(iter(roles))] = pool_ref
+        return pools_by_role
+
+    @staticmethod
+    def _relationship_nodes(relationship: object) -> list[object]:
+        if relationship is None:
+            return []
+
+        edges = relationship.get("edges") if isinstance(relationship, dict) else getattr(relationship, "edges", None)
+        if edges:
+            edge_nodes: list[object] = []
+            for edge in edges:
+                node = edge.get("node") if isinstance(edge, dict) else getattr(edge, "node", None)
+                if node is not None:
+                    edge_nodes.append(node)
+            return edge_nodes
+
+        peers = relationship.get("peers") if isinstance(relationship, dict) else getattr(relationship, "peers", None)
+        if peers:
+            peer_nodes: list[object] = []
+            for peer_ref in peers:
+                peer = getattr(peer_ref, "peer", None) or getattr(peer_ref, "node", None) or peer_ref
+                if peer is not None:
+                    peer_nodes.append(peer)
+            return peer_nodes
+
+        return []
+
+    @staticmethod
+    def _attr_value(obj: object, name: str) -> str | None:
+        attr = getattr(obj, name, None)
+        if attr is not None and hasattr(attr, "value"):
+            value = attr.value
+            return str(value) if value is not None else None
+        if isinstance(obj, dict):
+            raw = obj.get(name)
+            if isinstance(raw, dict):
+                value = raw.get("value")
+                return str(value) if value is not None else None
+        return None
 
     async def create_avd_device(
         self,

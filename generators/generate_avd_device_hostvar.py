@@ -23,6 +23,7 @@ from solution_arista_avd.avd import (
 )
 from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
 from solution_arista_avd.generator import save_file_if_changed, set_fabric_avd_hostvars_ready
+from solution_arista_avd.pool_roles import MLAG_DEFAULT_POOLS, ResourceRole, map_prefix_role
 from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
 
 from .generate_avd_device_inputs_query import (
@@ -670,7 +671,27 @@ def _endpoint_fabric_pool(interface: object) -> object | None:
     device = _node(_field(interface, "device"))
     pod = _node(_field(device, "pod")) if device else None
     fabric = _node(_field(pod, "parent")) if pod else None
-    return _node(_field(fabric, "dci_pool")) if fabric else None
+    if not fabric:
+        return None
+    role_pools = _pool_refs_by_role(fabric, "fabric_ip_pools")
+    return role_pools.get(ResourceRole.DCI) or _node(_field(fabric, "dci_pool"))
+
+
+def _relationship_nodes(value: object | None, relationship_name: str) -> list[object]:
+    return [node for edge in _edges(_field(value, relationship_name)) if (node := _node(edge)) is not None]
+
+
+def _pool_refs_by_role(value: object | None, relationship_name: str) -> dict[ResourceRole, object]:
+    pools_by_role: dict[ResourceRole, object] = {}
+    for pool in _relationship_nodes(value, relationship_name):
+        roles = {
+            role
+            for resource in _relationship_nodes(pool, "resources")
+            if (role := map_prefix_role(_value(resource, "role"))) is not None
+        }
+        if len(roles) == 1:
+            pools_by_role[next(iter(roles))] = pool
+    return pools_by_role
 
 
 def _extract_interface_speed(interface: object) -> str | None:
@@ -1452,10 +1473,14 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
     async def _extract_pool_prefix(self, pool_ref: object, pool_kind: str) -> str | None:
         """Extract the first resource prefix from a pool relationship reference."""
         pool_node = getattr(pool_ref, "node", None)
-        if pool_ref is None or pool_node is None:
+        if pool_ref is None:
+            return None
+        if pool_node is None and _field(pool_ref, "id"):
+            pool_node = pool_ref
+        if pool_node is None:
             return None
 
-        pool = await self.client.get(kind=pool_kind, id=pool_node.id, include=["resources"])
+        pool = await self.client.get(kind=pool_kind, id=_field(pool_node, "id"), include=["resources"])
         await pool.resources.fetch()
 
         for resource_peer in pool.resources.peers:
@@ -1468,6 +1493,33 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 return str(resource.address.value)
 
         return None
+
+    async def _ensure_default_mlag_pool_prefix(self, role: ResourceRole) -> str:
+        pool_name, prefix_value = MLAG_DEFAULT_POOLS[role]
+        existing_pools = await self.client.filters(kind="CoreIPAddressPool", name__value=pool_name)
+        if existing_pools:
+            prefix = await self._extract_pool_prefix(existing_pools[0], "CoreIPAddressPool")
+            if prefix:
+                return prefix
+
+        prefix = await self.client.create(
+            kind="IpamPrefix",
+            prefix=prefix_value,
+            role=role.value,
+            ip_namespace={"hfid": ["default"]},
+        )
+        await prefix.save(allow_upsert=True, update_group_context=False)
+
+        pool = await self.client.create(
+            kind="CoreIPAddressPool",
+            name=pool_name,
+            default_address_type="IpamIPAddress",
+            default_prefix_length=31,
+            ip_namespace={"hfid": ["default"]},
+            resources=[{"id": prefix.id}],
+        )
+        await pool.save(allow_upsert=True, update_group_context=False)
+        return prefix_value
 
     @staticmethod
     def _get_first_attr(obj: object, *names: str) -> object | None:
@@ -1519,14 +1571,26 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         emitted. The pod-level MLAG pools remain optional.
         """
         fabric_name = self._get_attr_value(fabric, "name")
-
-        uplink = await self._require_pool_prefix(
-            getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool", fabric_name, "uplink_pool"
+        fabric_role_pools = _pool_refs_by_role(fabric, "fabric_ip_pools")
+        pod_role_pools = _pool_refs_by_role(pod, "pod_ip_pools")
+        uplink_ref = (
+            pod_role_pools.get(ResourceRole.FABRIC_POINT_TO_POINT)
+            or fabric_role_pools.get(ResourceRole.FABRIC_POINT_TO_POINT)
+            or getattr(fabric, "uplink_pool", None)
         )
-        mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
+
+        uplink = await self._require_pool_prefix(uplink_ref, "CoreIPPrefixPool", fabric_name, "uplink_pool")
+        mlag_peer_ref = pod_role_pools.get(ResourceRole.MLAG) or getattr(pod, "mlag_peer_pool", None)
+        mlag_peer = await self._extract_pool_prefix(mlag_peer_ref, "CoreIPAddressPool")
+        if not mlag_peer:
+            mlag_peer = await self._ensure_default_mlag_pool_prefix(ResourceRole.MLAG)
         # Auto-generated Pydantic model renames mlag_l3_pool to mlag_l_3_pool
         mlag_l3_ref = self._get_first_attr(pod, "mlag_l_3_pool", "mlag_l3_pool")
+        mlag_l3_ref = pod_role_pools.get(ResourceRole.MLAG_PEERING) or mlag_l3_ref
         mlag_l3 = await self._extract_pool_prefix(mlag_l3_ref, "CoreIPAddressPool")
+        fabric_underlay = self._get_attr_value(fabric, "underlay_routing_protocol")
+        if not mlag_l3 and fabric_underlay and fabric_underlay != "none":
+            mlag_l3 = await self._ensure_default_mlag_pool_prefix(ResourceRole.MLAG_PEERING)
 
         return {
             "uplink_ipv4_pool": uplink,
@@ -2175,6 +2239,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 pools["mlag_peer_ipv4_pool"] = await self._extract_pool_prefix(
                     getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool"
                 )
+                if not pools["mlag_peer_ipv4_pool"]:
+                    pools["mlag_peer_ipv4_pool"] = await self._ensure_default_mlag_pool_prefix(ResourceRole.MLAG)
         else:
             pools = await self._extract_l3ls_pools(fabric, pod)
 

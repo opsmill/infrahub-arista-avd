@@ -17,9 +17,9 @@ spec:
     - prefix: 10.61.2.0/24
       role: loopback-vtep
     - prefix: 10.61.3.0/24
-      role: pod_leaf_spine
+      role: fabric_point_to_point
     - prefix: 10.61.4.0/24     # MLAG peer-link addressing (l2leaf access pair)
-      role: technical
+      role: mlag
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -97,6 +97,11 @@ spec:
       asn_pool: "Fabric-Campus-ASN-Pool"
       node_id_pool: "Fabric-Campus-NodeID-Pool"
       mgmt_pool: "Fabric-Campus-Mgmt-Pool"
+      fabric_ip_pools:
+        - "Fabric-Campus-Mgmt-Pool"
+        - "Fabric-Campus-Uplink-Pool"
+        - "Fabric-Campus-VTEP-Pool"
+        - "Fabric-Campus-Loopback-Pool"
       virtual_router_mac: "00:1c:73:00:00:61"
       underlay_routing_protocol: "ospf"
       p2p_uplinks_mtu: 9214
@@ -212,6 +217,8 @@ spec:
                   device_quantity: 2
                   device_template: arista-7050cx3-32c-spine-switch
             mlag_peer_pool: "Fabric-Campus-MLAG-Peer-Pool"
+            pod_ip_pools:
+              - "Fabric-Campus-MLAG-Peer-Pool"
             member_of_groups: ["pods"]
 ---
 apiVersion: infrahub.app/v1

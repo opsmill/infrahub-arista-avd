@@ -51,6 +51,10 @@ def _pool(pool_id: str = "pool-1") -> SimpleNamespace:
     return SimpleNamespace(id=pool_id, name=_attr("DCI-Pool"))
 
 
+def _role_resource(role: str) -> dict:
+    return {"node": {"__typename": "IpamPrefix", "role": {"value": role}}}
+
+
 def _dci_endpoint(
     *,
     endpoint_id: str,
@@ -1040,6 +1044,26 @@ async def test_dci_pool_falls_back_to_peer_endpoint_when_first_fabric_has_none()
 
     assert len(p2p_links) == 1
     assert gen.client.allocate_next_ip_prefix.await_args.kwargs["resource_pool"] is pool_dc2
+
+
+def test_endpoint_fabric_pool_prefers_fabric_ip_pools_dci_role() -> None:
+    legacy_pool = _pool("legacy-dci")
+    collection_pool = {
+        "__typename": "CoreIPPrefixPool",
+        "id": "collection-dci",
+        "resources": {"edges": [_role_resource("dci")]},
+    }
+    endpoint = _dci_endpoint(
+        endpoint_id="dc1-eth5",
+        device_id="dc1-leaf1",
+        device_name="leaf1",
+        interface_name="Ethernet5",
+        pool=legacy_pool,
+    )
+    fabric = endpoint["device"]["node"]["pod"]["node"]["parent"]["node"]
+    fabric["fabric_ip_pools"] = {"edges": [{"node": collection_pool}]}
+
+    assert hostvar_module._endpoint_fabric_pool(endpoint) is collection_pool
 
 
 @pytest.mark.anyio
