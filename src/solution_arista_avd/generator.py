@@ -481,7 +481,7 @@ class GeneratorMixin:
     def _resource_prefixes(resources: object, *, include_supernets: bool = True) -> list[IPv4Network | IPv6Network]:
         prefixes: list[IPv4Network | IPv6Network] = []
         for resource in GeneratorMixin._relationship_nodes(resources):
-            role = map_prefix_role(GeneratorMixin._attr_value(resource, "role"))
+            role = map_prefix_role(GeneratorMixin._pool_attr_value(resource, "role"))
             if not include_supernets and role is ResourceRole.FABRIC_SUPERNET:
                 continue
             raw_prefix = getattr(getattr(resource, "prefix", None), "value", None)
@@ -502,7 +502,7 @@ class GeneratorMixin:
             roles = {
                 role
                 for resource in cls._relationship_nodes(resources)
-                if (role := map_prefix_role(cls._attr_value(resource, "role"))) is not None
+                if (role := map_prefix_role(GeneratorMixin._pool_attr_value(resource, "role"))) is not None
             }
             if len(roles) == 1:
                 pools_by_role[next(iter(roles))] = pool_ref
@@ -534,7 +534,7 @@ class GeneratorMixin:
         return []
 
     @staticmethod
-    def _attr_value(obj: object, name: str) -> str | None:
+    def _pool_attr_value(obj: object, name: str) -> str | None:
         attr = getattr(obj, name, None)
         if attr is not None and hasattr(attr, "value"):
             value = attr.value
