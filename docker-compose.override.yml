@@ -80,6 +80,10 @@ services:
       - "3000:3000"
     volumes:
       - ./ansible:/opt/semaphore/playbooks
+      # deploy_clab.yml copies the committed ContainerLab bind sources
+      # (configs/eos-intf-mapping/*.json, configs/servers/*-netplan.yaml) from
+      # here onto the ContainerLab host. Read-only: the playbook only reads them.
+      - ./lab:/opt/semaphore/lab:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/ping"]
       interval: 10s
