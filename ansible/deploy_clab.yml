@@ -295,6 +295,26 @@
       ansible.builtin.set_fact:
         topology_data: "{{ topology_raw.content | b64decode | from_yaml }}"
 
+    - name: Assert the staged topology declares at least one node
+      # A ContainerLab Topology artifact can render structurally valid YAML with
+      # an empty `nodes:` mapping - for example when the transform excluded every
+      # device, or when the artifact was generated against a branch whose schema
+      # or data was incomplete. That yields `nodes: null`, which reaches the loops
+      # below as None and fails with an opaque "dict2items requires a dictionary"
+      # templating error. Fail here instead, pointing at the cause.
+      ansible.builtin.assert:
+        that:
+          - topology_data.topology.nodes is mapping
+          - topology_data.topology.nodes | length > 0
+        quiet: true
+        fail_msg: >-
+          The ContainerLab Topology artifact for '{{ fabric }}' contains no nodes,
+          so there is nothing to deploy. Regenerate it in Infrahub and check the
+          transform log for excluded devices - a device is skipped when its role
+          has no ContainerLab representation, or when its platform has no
+          containerlab_os. Staged topology is at {{ topology_file }} on
+          {{ inventory_hostname }}.
+
     - name: Collect every bind source the staged topology needs
       # Bind paths are relative to the topology file, i.e. to the staging
       # directory. Kind-level binds apply to every node of that kind and may
@@ -302,12 +322,12 @@
       ansible.builtin.set_fact:
         topology_bind_sources: "{{ (topology_bind_sources | default([])) + node_bind_sources }}"
       vars:
-        node_kind: "{{ (topology_data.topology.kinds | default({}))[item.value.kind | default('')] | default({}, true) }}"
+        node_kind: "{{ (topology_data.topology.kinds | default({}, true))[item.value.kind | default('')] | default({}, true) }}"
         node_binds: "{{ (item.value.binds | default([])) + (node_kind.binds | default([])) }}"
         node_bind_sources: >-
           {{ node_binds | map('replace', '__clabNodeName__', item.key) | map('split', ':') | map('first')
              | map('regex_replace', '^(?!/)', clab_staging_dir ~ '/') | list }}
-      loop: "{{ topology_data.topology.nodes | default({}) | dict2items }}"
+      loop: "{{ topology_data.topology.nodes | default({}, true) | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
 
@@ -317,12 +337,12 @@
       ansible.builtin.set_fact:
         topology_startup_configs: "{{ (topology_startup_configs | default([])) + [startup_path] }}"
       vars:
-        node_kind: "{{ (topology_data.topology.kinds | default({}))[item.value.kind | default('')] | default({}, true) }}"
+        node_kind: "{{ (topology_data.topology.kinds | default({}, true))[item.value.kind | default('')] | default({}, true) }}"
         startup_template: "{{ item.value['startup-config'] | default(node_kind['startup-config'] | default('')) }}"
         startup_relative: "{{ startup_template | replace('__clabNodeName__', item.key) }}"
         startup_path: "{{ startup_relative | regex_replace('^(?!/)', clab_staging_dir ~ '/') }}"
       when: startup_template | length > 0
-      loop: "{{ topology_data.topology.nodes | default({}) | dict2items }}"
+      loop: "{{ topology_data.topology.nodes | default({}, true) | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
 
