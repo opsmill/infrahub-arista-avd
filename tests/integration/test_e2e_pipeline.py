@@ -21,9 +21,8 @@ tests share it. Each downstream test simply waits (bounded) for the stage's
 output to appear — it does not run that generator itself. All methods share one
 class-scoped event loop so the single ``client`` is reused safely.
 
-Heavy: excluded from the per-PR fast path and run in CI's
-``integration-tests-full`` job (nightly / workflow_dispatch). Select locally with
-``-m e2e``; exclude with ``-m "not e2e"``.
+Heavy: run in CI's ``integration-tests-full`` job, which is manual-dispatch only.
+Select locally with ``-m e2e``; exclude with ``-m "not e2e"``.
 """
 
 from __future__ import annotations
