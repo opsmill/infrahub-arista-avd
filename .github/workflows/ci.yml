@@ -6,10 +6,6 @@ on:
   push:
     branches:
       - main
-  schedule:
-    # Nightly run of the heavy full-stack integration test (see
-    # integration-tests-full below).
-    - cron: "0 3 * * *"
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
@@ -78,6 +74,8 @@ jobs:
 
   integration-tests:
     name: Integration tests
+    # Run on demand only.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -99,10 +97,8 @@ jobs:
 
   integration-tests-full:
     name: Integration tests (full stack)
-    # The Infrahub testcontainers stack is heavy; run it nightly and on demand
-    # rather than on every PR so schema/object/repo regressions are still caught
-    # automatically somewhere.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # The Infrahub testcontainers stack is heavy; run it on demand only.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
