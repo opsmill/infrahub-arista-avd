@@ -70,7 +70,7 @@ class TestAvdPipelineFunctions:
 
     # NOTE: the full fabric pipeline (generators → structured config → EOS) is
     # exercised end-to-end by tests/integration/test_infrahub.py, which spins up
-    # a real Infrahub stack (run nightly / on-demand in CI), rather than by an
+    # a real Infrahub stack (manual-dispatch only in CI), rather than by an
     # empty placeholder here.
 
 
