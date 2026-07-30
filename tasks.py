@@ -25,6 +25,9 @@ SEMAPHORE_URL = "http://localhost:3000"
 SEMAPHORE_ADMIN = "admin"
 SEMAPHORE_ADMIN_PASSWORD = "semaphore"  # noqa: S105
 SEMAPHORE_PLAYBOOK_PATH = "/opt/semaphore/playbooks"
+# Host path bind-mounted into the Semaphore container as the ContainerLab
+# staging directory, so files deploy_clab.yml pulls are reachable from the host.
+CLAB_STAGING_DIR = "lab/clab-staging"
 
 
 @task
@@ -110,6 +113,17 @@ def init_semaphore(
     Safe to run multiple times; existing resources are reused.
     """
     print("=== Semaphore Init ===")
+
+    # deploy_clab.yml stages the fetched topology and device configs here, and
+    # docker-compose.override.yml bind-mounts it so they land on the host rather
+    # than in the container's writable layer. The Semaphore container runs as a
+    # different uid than the host user, so the directory has to be writable by
+    # both — 0755 leaves the staging write failing with EACCES.
+    staging_dir = Path(__file__).parent / CLAB_STAGING_DIR
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    staging_dir.chmod(0o777)
+    print(f"Staging directory {CLAB_STAGING_DIR} ready (mode 0777, shared with the container).")
+
     api = _SemaphoreClient(url)
     api.wait_until_ready()
     api.login(admin, password)
