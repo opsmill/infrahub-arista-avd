@@ -238,13 +238,34 @@ docker ps --format '{{.Names}}' | grep clab- | wc -l
 
 ### Running it from Semaphore
 
-`docker-compose.override.yml` mounts `ansible/` into the Semaphore container, and
-`invoke init-semaphore` registers a **Deploy ContainerLab** template that prompts for `fabric`.
+`invoke init-semaphore` registers a **Fetch ContainerLab Files** template. It runs the same playbook
+with `--skip-tags deploy`, so it fetches the artifacts, stages every file the topology references,
+and validates them — but does not deploy. That is deliberate: the Semaphore container has no
+`containerlab` binary and no Docker socket, so an unskipped run can only ever fail on the
+containerlab check.
 
-One limitation to know before relying on it: the Semaphore container has no `containerlab` binary,
-no Docker socket, and no mount of `lab/`. So it can fetch artifacts, but it cannot supply the
-committed bind sources or deploy the lab itself. Point `clab_hosts` at a real ContainerLab host over
-SSH, and pass `-e clab_dir=<path>` if the bind sources are not already staged on that host.
+The pulled files land on the Docker host, in `lab/clab-staging`:
+
+```text
+lab/clab-staging/
+├── topology.clab.yml
+└── configs/
+    ├── <device-name>.cfg         # one per device
+    ├── eos-intf-mapping/
+    └── servers/
+```
+
+Every run ends by printing both the in-container and on-host paths, so there is no need to work them
+out. The directory is created by `invoke start` with mode 0777, because the container writes as a
+different uid than the host user; files it writes are owned by that uid, so they are readable but not
+writable from the host.
+
+`fabric` and `clab_staging_dir` come from the template's **ContainerLab** environment, not from a
+survey prompt — a declared survey variable is recorded on the task but never reaches
+`ansible-playbook` in Semaphore v2.17. Override them per run in the task's Environment field.
+
+To deploy rather than just fetch, point `clab_hosts` in `ansible/inventory_clab.yml` at a
+ContainerLab host reachable over SSH and clear the template's `--skip-tags deploy` argument.
 
 ## How the generated lab differs from the committed lab
 
