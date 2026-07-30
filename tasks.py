@@ -230,12 +230,21 @@ def init_semaphore(
     )
 
     print("ContainerLab task template...")
+    # Runs with --skip-tags deploy, so Semaphore fetches the artifacts, stages
+    # every file the topology references, and validates them - but does not run
+    # `containerlab deploy`. That step cannot work from here: this container has
+    # no containerlab binary and no Docker socket, so an unskipped run always
+    # ends on the "containerlab is not on PATH" assertion.
+    #
+    # To deploy, point clab_hosts (ansible/inventory_clab.yml) at a ContainerLab
+    # host reachable over SSH and clear the arguments below, or run
+    # `make -C lab deploy-from-infrahub FABRIC=<name>` from a checkout.
     api.find_or_create(
         f"/api/project/{project_id}/templates",
         f"/api/project/{project_id}/templates",
-        "Deploy ContainerLab",
+        "Fetch ContainerLab Files",
         {
-            "name": "Deploy ContainerLab",
+            "name": "Fetch ContainerLab Files",
             "project_id": project_id,
             "repository_id": repo_id,
             "inventory_id": clab_inv_id,
@@ -243,6 +252,8 @@ def init_semaphore(
             "playbook": "deploy_clab.yml",
             "type": "task",
             "app": "ansible",
+            "arguments": json.dumps(["--skip-tags", "deploy"]),
+            "allow_override_args_in_task": True,
         },
     )
 
