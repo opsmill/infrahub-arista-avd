@@ -1,0 +1,49 @@
+---
+# =============================================================================
+# Management
+# =============================================================================
+mgmt_gateway: 10.0.6.1
+dns_settings:
+  servers:
+    - ip_address: 8.8.8.8
+
+ntp_settings:
+  servers:
+    - name: time.google.com
+timezone: Europe/Paris
+
+custom_structured_configuration_management_interfaces:
+  - name: Management1
+    lldp:
+      transmit: false
+      receive: false
+
+# =============================================================================
+# AAA
+# =============================================================================
+aaa_settings:
+  local_users:
+    - name: admin
+      privilege: 15
+      role: network-admin
+      no_password: true
+    - name: mtache
+      privilege: 15
+      role: network-admin
+      no_password: true
+  authentication:
+    policies:
+      local:
+        allow_nopassword: true
+
+# =============================================================================
+# CLI Aliases
+# =============================================================================
+custom_structured_configuration_aliases: |
+  alias cc clear counters
+  alias sa show active
+  alias senz show interface counter error | nz
+  alias shmc show int | awk '/^[A-Z]/ { intf = $1 } /, address is/ { print intf, $6 }'
+  alias snz show interface counter | nz
+  alias sqnz show interface counter queue | nz
+  alias srnz show interface counter rate | nz

@@ -1,0 +1,9 @@
+---
+- name: Deploy Configs via eAPI
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: Deploy configurations using eAPI
+      ansible.builtin.import_role:
+        name: arista.avd.eos_config_deploy_eapi

@@ -1,0 +1,81 @@
+---
+# =============================================================================
+# DC2 — 2 spines + 2 border leaves + 2 access leaves
+# =============================================================================
+
+spine:
+  defaults:
+    platform: cEOSLab
+    bgp_as: 65200
+    loopback_ipv4_pool: 10.251.1.0/24
+  nodes:
+    - name: ih-dc2-spine1
+      id: 1
+      mgmt_ip: 10.0.6.21/24
+    - name: ih-dc2-spine2
+      id: 2
+      mgmt_ip: 10.0.6.22/24
+
+l3leaf:
+  defaults:
+    platform: cEOSLab
+    virtual_router_mac_address: 00:1c:73:00:00:99
+    spanning_tree_priority: 4096
+    spanning_tree_mode: mstp
+    uplink_switches: [ih-dc2-spine1, ih-dc2-spine2]
+    uplink_ipv4_pool: 10.251.3.0/24
+    loopback_ipv4_pool: 10.251.1.0/24
+    loopback_ipv4_offset: 2
+    vtep_loopback_ipv4_pool: 10.251.2.0/24
+  node_groups:
+    # =========================================================================
+    # Border Leaves — EVPN Multi-Domain Gateways (DCI to DC1)
+    # =========================================================================
+    - group: DC2_BORDER
+      mlag: false
+      filter:
+        tags: [DC2]
+      evpn_gateway:
+        evpn_l2:
+          enabled: true
+        evpn_l3:
+          enabled: true
+          inter_domain: true
+        d_path:
+          enabled: true
+          local_domain_id: "65200:100"
+          remote_domain_id: "65100:1"
+        all_active_multihoming:
+          enabled: true
+          evpn_ethernet_segment:
+            identifier: "0000:0002:0002:0000:0002"
+            rt_import: "00:02:00:00:00:02"
+        remote_peers:
+          - hostname: ih-dc1-leaf1a
+          - hostname: ih-dc1-leaf1b
+      nodes:
+        - name: ih-dc2-leaf1a
+          id: 1
+          bgp_as: 65201
+          mgmt_ip: 10.0.6.23/24
+        - name: ih-dc2-leaf1b
+          id: 2
+          bgp_as: 65202
+          mgmt_ip: 10.0.6.24/24
+
+    # =========================================================================
+    # Access Leaves
+    # =========================================================================
+    - group: DC2_ACCESS
+      mlag: false
+      filter:
+        tags: [DC2]
+      nodes:
+        - name: ih-dc2-leaf2a
+          id: 3
+          bgp_as: 65203
+          mgmt_ip: 10.0.6.25/24
+        - name: ih-dc2-leaf2b
+          id: 4
+          bgp_as: 65204
+          mgmt_ip: 10.0.6.26/24

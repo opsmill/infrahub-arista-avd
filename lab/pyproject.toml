@@ -1,0 +1,18 @@
+[project]
+name = "labs"
+version = "0"
+description = "Arista network lab environments (containerlab + AVD)"
+requires-python = "==3.12.*"
+dependencies = [
+    # AVD pipeline
+    "ansible",
+    "ansible-pylibssh",
+    "pyavd[ansible]",
+    "anta[cli]",
+    "eos-downloader",
+]
+
+[tool.uv]
+# Force uv-managed Python interpreters so the venv doesn't bind to a
+# user-installed Python (pyenv, Homebrew, etc.) that could be removed.
+python-preference = "only-managed"

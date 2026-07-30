@@ -1,0 +1,30 @@
+---
+# =============================================================================
+# CloudVision (CVaaS)
+# =============================================================================
+cv_settings:
+  cvaas:
+    enabled: false
+    clusters:
+      - name: cvaas
+        token_file: /mnt/flash/cv-onboarding-token
+  terminattr:
+    smashexcludes: ale,flexCounter,kni,pulse,strata
+    disable_aaa: true
+
+generate_cv_tags:
+  topology_hints: true
+  device_tags:
+    - name: Lab
+      value: Infrahub AVD
+
+management_eapi:
+  enabled: true
+
+# =============================================================================
+# ANTA — skip cosmetic cEOS tests
+# =============================================================================
+avd_catalogs_filters:
+  - skip_tests:
+      - VerifyInterfaceDiscards
+      - VerifyLoggingErrors

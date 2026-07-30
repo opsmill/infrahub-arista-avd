@@ -1,0 +1,29 @@
+---
+network:
+  ethernets:
+    eth1:
+      optional: true
+    eth2:
+      optional: true
+  bonds:
+    bond0:
+      interfaces: [eth1, eth2]
+      mtu: 9000
+      parameters:
+        mode: 802.3ad
+  vlans:
+    vlan12:
+      id: 12
+      link: bond0
+      macaddress: "02:00:00:00:12:02"
+      dhcp4: false
+      addresses: [10.10.12.10/24]
+      routes:
+        - to: 10.10.11.0/24
+          via: 10.10.12.1
+    vlan19:
+      id: 19
+      link: bond0
+      macaddress: "02:00:00:00:19:02"
+      dhcp4: false
+      addresses: [10.10.19.102/24]

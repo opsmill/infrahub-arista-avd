@@ -1,0 +1,26 @@
+---
+tenants:
+  # =====================================================================
+  # Arista Tenant — VRF10 routed + stretched services
+  # =====================================================================
+  - name: Arista
+    mac_vrf_vni_base: 10000
+    vrfs:
+      - name: VRF10
+        vrf_id: 10
+        svis:
+          - id: 11
+            name: VRF10_DC1
+            enabled: true
+            ip_address_virtual: 10.10.11.1/24
+            tags: [DC1]
+          - id: 12
+            name: VRF10_DC2
+            enabled: true
+            ip_address_virtual: 10.10.12.1/24
+            tags: [DC2]
+          - id: 19
+            name: VRF10_STRETCHED
+            enabled: true
+            ip_address_virtual: 10.10.19.1/24
+            tags: [DC1, DC2]
