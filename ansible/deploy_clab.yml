@@ -367,6 +367,19 @@
       vars:
         missing: "{{ topology_path_stats.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
 
+    - name: Report where the files were staged
+      # Deliberately untagged, so it still runs under --skip-tags deploy — which
+      # is how Semaphore invokes this playbook. Without it a stage-only run says
+      # nothing about where anything landed, and the path is easy to guess wrong
+      # when the host directory is a bind mount from elsewhere.
+      ansible.builtin.debug:
+        msg:
+          - "Staged {{ fabric }} on {{ inventory_hostname }} at {{ clab_staging_dir }}"
+          - "  topology:       {{ topology_file }}"
+          - "  device configs: {{ controller.device_config_texts | length }} in {{ staging_config_dir }}"
+          - "  bind sources:   {{ topology_bind_sources | default([]) | unique | length }} verified present"
+          - "{{ 'Deploy with: cd ' ~ clab_staging_dir ~ ' && containerlab deploy --reconfigure --topo topology.clab.yml' }}"
+
     - name: Probe for the containerlab binary on the lab host
       ansible.builtin.command: which containerlab
       register: clab_binary
