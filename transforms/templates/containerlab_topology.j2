@@ -9,9 +9,15 @@ mgmt:
 {% endif %}
 topology:
   kinds:
-    {{ kind }}:
-      image: {{ image }}
-      startup-config: configs/{{ '__clabNodeName__' }}.cfg
+{% for kind in kinds %}
+    {{ kind.name }}:
+{% if kind.image %}
+      image: {{ kind.image }}
+{% endif %}
+{% if kind.startup_config %}
+      startup-config: {{ startup_config_dir }}/{{ '__clabNodeName__' }}.cfg
+{% endif %}
+{% endfor %}
 
   nodes:
 {% for node in nodes %}
@@ -19,6 +25,12 @@ topology:
       kind: {{ node.kind }}
 {% if node.mgmt_ipv4 %}
       mgmt-ipv4: {{ node.mgmt_ipv4 }}
+{% endif %}
+{% if node.binds %}
+      binds:
+{% for bind in node.binds %}
+        - {{ bind }}
+{% endfor %}
 {% endif %}
 {% endfor %}
 

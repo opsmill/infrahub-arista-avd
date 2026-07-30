@@ -10,6 +10,12 @@ dependencies = [
     "pyavd[ansible]",
     "anta[cli]",
     "eos-downloader",
+    # Infrahub flow (../ansible/deploy_clab.yml). The opsmill.infrahub modules are
+    # action plugins that import infrahub_sdk in the Ansible controller's
+    # interpreter, so without this they fail with "infrahub_sdk must be installed
+    # to use this plugin". The collection itself is installed separately with
+    # `ansible-galaxy collection install -r ../ansible/requirements.yml`.
+    "infrahub-sdk",
 ]
 
 [tool.uv]

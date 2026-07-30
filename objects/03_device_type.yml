@@ -9,6 +9,13 @@ spec:
       description: Arista EOS
       ansible_network_os: arista.eos.eos
       containerlab_os: arista_ceos
+      containerlab_image: arista/ceos:4.36.0.1F
+    # Platform for the ContainerLab Linux host nodes (servers). The image is
+    # built from lab/Dockerfile; see lab/README.md.
+    - name: Linux
+      description: Generic Linux host
+      containerlab_os: linux
+      containerlab_image: lab-server
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -19,6 +26,9 @@ spec:
       manufacturer: ["Dell"]
     - name: "PowerSwitch S5232F-ON"
       manufacturer: ["Dell"]
+    # containerlab_interface_mapping is the filename as shipped in
+    # lab/configs/eos-intf-mapping/. It intentionally differs from part_number:
+    # the mapping files are named ...-32S.json / ...-48YC8.json.
     - name: "Arista 7050CX3-32C"
       manufacturer: Arista
       platform: EOS
@@ -27,6 +37,7 @@ spec:
       height: 1
       full_depth: true
       weight: 9
+      containerlab_interface_mapping: DCS-7050CX3-32S.json
     - name: "Arista 7050SX3-48YC8C"
       manufacturer: Arista
       platform: EOS
@@ -35,3 +46,4 @@ spec:
       height: 1
       full_depth: true
       weight: 9
+      containerlab_interface_mapping: DCS-7050SX3-48YC8.json

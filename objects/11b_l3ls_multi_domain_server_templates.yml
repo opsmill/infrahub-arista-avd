@@ -24,9 +24,13 @@ spec:
   parameters:
     expand_range: true
   data:
+    # platform supplies the ContainerLab kind and image (linux / lab-server) for
+    # servers rendered into the ContainerLab topology artifact. Set on the
+    # template so servers created from it inherit it.
     - template_name: "compute-server-dual-dc1"
       role: "compute"
       status: "provisioning"
+      platform: Linux
       interfaces:
         kind: TemplateInterfacePhysical
         parameters:
@@ -38,6 +42,7 @@ spec:
     - template_name: "compute-server-dual-dc2"
       role: "compute"
       status: "provisioning"
+      platform: Linux
       interfaces:
         kind: TemplateInterfacePhysical
         parameters:

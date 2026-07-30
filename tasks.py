@@ -182,6 +182,50 @@ def init_semaphore(
         },
     )
 
+    print("ContainerLab inventory...")
+    # deploy_clab.yml targets localhost plus the `clab_hosts` group, not the
+    # Infrahub dynamic inventory of DcimDevice objects.
+    clab_inv_id = api.find_or_create(
+        f"/api/project/{project_id}/inventory",
+        f"/api/project/{project_id}/inventory",
+        "ContainerLab",
+        {
+            "name": "ContainerLab",
+            "project_id": project_id,
+            "inventory": "inventory_clab.yml",
+            "type": "file",
+            "ssh_key_id": key_id,
+        },
+    )
+
+    print("ContainerLab task template...")
+    # `fabric` is a required survey variable, so Semaphore prompts for it and
+    # passes it to ansible-playbook as an extra var.
+    api.find_or_create(
+        f"/api/project/{project_id}/templates",
+        f"/api/project/{project_id}/templates",
+        "Deploy ContainerLab",
+        {
+            "name": "Deploy ContainerLab",
+            "project_id": project_id,
+            "repository_id": repo_id,
+            "inventory_id": clab_inv_id,
+            "environment_id": env_id,
+            "playbook": "deploy_clab.yml",
+            "type": "task",
+            "app": "ansible",
+            "survey_vars": [
+                {
+                    "name": "fabric",
+                    "title": "Fabric",
+                    "required": True,
+                    "type": "",
+                    "description": "Name of the NetworkFabric to deploy, e.g. Fabric-L3LS-Multi-Domain",
+                },
+            ],
+        },
+    )
+
     print("=== Semaphore init complete ===")
 
 

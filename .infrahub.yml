@@ -51,6 +51,12 @@ queries:
   - name: containerlab_topology
     file_path: "./transforms/containerlab_topology.gql"
 
+  # Second query used by the containerlab_topology transform to resolve link
+  # endpoints in batches; registered so a malformed query is caught at repo
+  # sync instead of failing silently at render time.
+  - name: containerlab_link_endpoints
+    file_path: "./transforms/containerlab_link_endpoints.gql"
+
   # CloudVision proposed-change check query
   - name: cv_config_check
     file_path: "./checks/cv_config_check.gql"

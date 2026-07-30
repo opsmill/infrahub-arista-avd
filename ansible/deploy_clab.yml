@@ -1,0 +1,381 @@
+---
+# Pull a fabric's ContainerLab topology (and every file it references) from
+# Infrahub, stage it onto a ContainerLab host, then deploy the lab there.
+#
+# The file is two plays so the Infrahub-facing work is separated from the
+# ContainerLab-facing work:
+#
+#   Play 1 (localhost, connection: local) — resolve the fabric name to a UUID,
+#     fetch the ContainerLab Topology artifact and every device's AVD EOS
+#     Configuration artifact, assert each returned a body, and stash the results
+#     as facts for play 2.
+#   Play 2 ({{ clab_host_group }}) — stage the fetched artifacts and the
+#     repository's committed bind sources onto the lab host, validate what
+#     landed there, then run `containerlab deploy` on that host.
+#
+# Nothing is assumed to be shared between the controller and the lab host: every
+# file crosses the connection through ansible.builtin.copy, and every existence
+# check runs on the lab host, which is where ContainerLab actually resolves the
+# bind paths. A bind source missing there is silently turned into a directory by
+# ContainerLab and the node fails at boot, so those checks are the point.
+#
+# This playbook lives in ansible/ because that directory is the Semaphore
+# playbook repository (docker-compose.override.yml mounts ./ansible to
+# /opt/semaphore/playbooks).
+#
+# Inventory: ansible/ansible.cfg points `inventory` at inventory.yml, the
+# opsmill.infrahub dynamic plugin listing DcimDevice objects. That is the wrong
+# inventory for this playbook, so pass the static one explicitly:
+#
+#   ansible-playbook -i inventory_clab.yml deploy_clab.yml -e fabric=<name>
+#
+# Usage from a git checkout:
+#   make -C lab deploy-from-infrahub FABRIC=Fabric-L3LS-Multi-Domain
+#
+# Usage from Semaphore: run the "Deploy ContainerLab" task template and supply
+# the `fabric` survey variable.
+#
+# Variables:
+#   fabric            (required) name of the NetworkFabric to deploy.
+#   clab_host_group   (default "clab_hosts") inventory group play 2 targets.
+#   clab_dir          (default "{{ playbook_dir }}/../lab") controller-side
+#                     source of the committed bind files. The default is correct
+#                     for a git checkout, where this playbook sits in
+#                     <repo>/ansible/. Semaphore does not mount lab/, so pass
+#                     -e clab_dir=<path> there if the lab host needs the binds
+#                     copied from the controller.
+#   clab_staging_dir  (default "/opt/containerlab/{{ fabric }}") directory on
+#                     the lab host to stage into and deploy from. The invoking
+#                     user must be able to create it.
+#
+# Tags: the deployment half is tagged `deploy`. Add `--skip-tags deploy` to
+# stage and validate without touching the lab.
+#
+# Requirements:
+#   - INFRAHUB_ADDRESS / INFRAHUB_API_TOKEN in the environment.
+#   - infrahub-sdk importable by the Ansible *controller's* Python. Both
+#     opsmill.infrahub modules used in play 1 are action plugins that execute
+#     controller-side; without the SDK they raise
+#     "infrahub_sdk must be installed to use this plugin".
+#   - the opsmill.infrahub collection. Outside Semaphore, install it from the
+#     repo root with `ansible-galaxy collection install -r ansible/galaxy-requirements.yml`;
+#     lab/pyproject.toml pins the community `ansible` bundle, which does not
+#     ship opsmill.infrahub, so `uv sync` alone is not enough.
+#   - containerlab (https://containerlab.dev) on every host in the target group.
+#
+# Module contract, verified against opsmill.infrahub 1.8.3:
+#   - artifact_fetch.target_id takes a node UUID; a node name fails with
+#     "Unable to find '<artifact>' for '<name>'".
+#   - artifact_fetch returns only `json` and `text`. There is no `content` key;
+#     both artifacts used here (application/yaml, text/plain) land in `text`.
+#   - query_graphql takes `graph_variables:` (a `variables:` key is silently
+#     ignored) and registers its payload under `.response`, not `.data`
+#     or `.results`.
+
+- name: Fetch a fabric's ContainerLab artifacts from Infrahub
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Mandatory: the play fails with the hint below if -e fabric=... is not set.
+    fabric: "{{ undef(hint='Set the fabric name, e.g. -e fabric=Fabric-L3LS-Multi-Domain') }}"
+    clab_dir: "{{ playbook_dir }}/../lab"
+  tasks:
+    - name: Resolve the fabric name to its node ID
+      opsmill.infrahub.query_graphql:
+        query: |
+          query($name: String!) {
+            NetworkFabric(name__value: $name) { edges { node { id } } }
+          }
+        graph_variables:
+          name: "{{ fabric }}"
+      register: fabric_lookup
+
+    - name: Assert exactly one fabric matched the requested name
+      ansible.builtin.assert:
+        that:
+          - fabric_lookup.response.NetworkFabric.edges | length == 1
+        quiet: true
+        fail_msg: >-
+          Expected exactly one NetworkFabric named '{{ fabric }}', found
+          {{ fabric_lookup.response.NetworkFabric.edges | length }}. Check the -e fabric=... value
+          against `infrahubctl object get NetworkFabric`.
+
+    - name: Record the fabric's node ID
+      ansible.builtin.set_fact:
+        fabric_id: "{{ fabric_lookup.response.NetworkFabric.edges[0].node.id }}"
+        fabric_name: "{{ fabric }}"
+        cacheable: true
+
+    - name: Fetch the ContainerLab Topology artifact from Infrahub
+      opsmill.infrahub.artifact_fetch:
+        artifact_name: "ContainerLab Topology"
+        target_id: "{{ fabric_id }}"
+      register: clab_topology
+
+    - name: Assert the topology artifact returned a body
+      ansible.builtin.assert:
+        that:
+          - clab_topology.text is defined
+          - clab_topology.text is not none
+          - clab_topology.text | trim | length > 0
+        quiet: true
+        fail_msg: >-
+          The 'ContainerLab Topology' artifact for fabric '{{ fabric }}' ({{ fabric_id }}) is empty
+          or missing. Generate it in Infrahub before deploying.
+
+    - name: Discover the fabric's devices
+      opsmill.infrahub.query_graphql:
+        query: |
+          query($name: String!) {
+            NetworkFabric(name__value: $name) { edges { node {
+              children { edges { node { ... on NetworkPod {
+                devices { edges { node { ... on DcimDevice { id name { value } } } } }
+                racks { edges { node { devices { edges { node { ... on DcimDevice { id name { value } } } } } } } }
+              } } } }
+            } } }
+          }
+        graph_variables:
+          name: "{{ fabric }}"
+      register: fabric_devices
+
+    - name: Map every discovered device name to its node ID
+      ansible.builtin.set_fact:
+        # artifact_fetch needs the UUID; the config filename needs the name, so keep both.
+        device_ids: >-
+          {{ dict(discovered | map(attribute='name.value') | zip(discovered | map(attribute='id'))) }}
+        cacheable: true
+      vars:
+        pods: "{{ fabric_devices.response.NetworkFabric.edges[0].node.children.edges | map(attribute='node') | list }}"
+        pod_devices: "{{ pods | map(attribute='devices.edges', default=[]) | flatten | map(attribute='node') | list }}"
+        rack_devices: >-
+          {{ pods | map(attribute='racks.edges', default=[]) | flatten | map(attribute='node')
+             | map(attribute='devices.edges', default=[]) | flatten | map(attribute='node') | list }}
+        discovered: "{{ pod_devices + rack_devices }}"
+
+    - name: Assert the fabric contains at least one device
+      ansible.builtin.assert:
+        that:
+          - device_ids | length > 0
+        quiet: true
+        fail_msg: >-
+          Fabric '{{ fabric }}' ({{ fabric_id }}) reported no devices under any pod or rack, so there
+          is nothing to configure. Run the fabric generators before deploying.
+
+    - name: Fetch each device's AVD EOS Configuration artifact (startup-config)
+      opsmill.infrahub.artifact_fetch:
+        artifact_name: "AVD EOS Configuration"
+        target_id: "{{ item.value }}"
+      loop: "{{ device_ids | dict2items | sort(attribute='key') }}"
+      loop_control:
+        label: "{{ item.key }}"
+      register: device_configs
+
+    - name: Assert every device returned a startup-config body
+      ansible.builtin.assert:
+        that:
+          - item.text is defined
+          - item.text is not none
+          - item.text | trim | length > 0
+        quiet: true
+        fail_msg: >-
+          The 'AVD EOS Configuration' artifact for device '{{ item.item.key }}'
+          ({{ item.item.value }}) is empty or missing. Generate it in Infrahub before deploying.
+      loop: "{{ device_configs.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+
+    - name: Check whether the committed bind sources are available on the controller
+      # Recorded so play 2 can say why a bind source is absent on the lab host
+      # instead of failing with no explanation. Semaphore mounts only ansible/,
+      # so lab/ is not there and this comes back false.
+      ansible.builtin.stat:
+        path: "{{ clab_dir }}/configs"
+      register: controller_configs_stat
+
+    - name: Stash the fetched artifacts for the ContainerLab play
+      # Play 2 reads these through hostvars['localhost']; nothing is written to
+      # the controller's filesystem.
+      ansible.builtin.set_fact:
+        clab_topology_text: "{{ clab_topology.text }}"
+        device_config_texts: >-
+          {{ dict(device_configs.results | map(attribute='item.key')
+             | zip(device_configs.results | map(attribute='text'))) }}
+        controller_configs_dir: "{{ clab_dir }}/configs"
+        controller_configs_present: "{{ controller_configs_stat.stat.isdir | default(false) }}"
+        cacheable: true
+
+- name: Stage and deploy the fabric's ContainerLab topology
+  hosts: "{{ clab_host_group | default('clab_hosts') }}"
+  gather_facts: false
+  vars:
+    controller: "{{ hostvars['localhost'] }}"
+    clab_staging_dir: "/opt/containerlab/{{ controller.fabric_name }}"
+    staging_config_dir: "{{ clab_staging_dir }}/configs"
+    topology_file: "{{ clab_staging_dir }}/topology.clab.yml"
+    # Bind sources that are committed to the repository rather than fetched.
+    # Checked at their post-copy location on the lab host.
+    staged_bind_sources:
+      - "{{ staging_config_dir }}/eos-intf-mapping/DCS-7050CX3-32S.json"
+      - "{{ staging_config_dir }}/eos-intf-mapping/DCS-7050SX3-48YC8.json"
+      - "{{ staging_config_dir }}/servers/dc1-server-netplan.yaml"
+      - "{{ staging_config_dir }}/servers/dc2-server-netplan.yaml"
+  tasks:
+    - name: Ensure the staging directory exists on the lab host
+      ansible.builtin.file:
+        path: "{{ staging_config_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Report that the committed bind sources could not be copied
+      # Not a silent pass: the assertions below still run against the lab host,
+      # so this explains in advance why they may fail.
+      ansible.builtin.debug:
+        msg: >-
+          '{{ controller.controller_configs_dir }}' does not exist on the Ansible controller, so the
+          repository's committed bind sources (interface mappings, netplan files) were NOT copied to
+          {{ inventory_hostname }}. They must already be present under '{{ staging_config_dir }}' or
+          the assertions below will fail. Run from a git checkout, or pass
+          -e clab_dir=<path to the repo's lab directory>.
+      when: not controller.controller_configs_present
+
+    - name: Copy the repository's committed bind sources to the lab host
+      # Copied before the fetched configs are written so a freshly fetched
+      # startup-config always wins over a stale one in the checkout.
+      ansible.builtin.copy:
+        src: "{{ controller.controller_configs_dir }}/"
+        dest: "{{ staging_config_dir }}/"
+        mode: "0644"
+        directory_mode: "0755"
+      when: controller.controller_configs_present
+
+    - name: Write the topology file to the lab host
+      ansible.builtin.copy:
+        content: "{{ controller.clab_topology_text }}"
+        dest: "{{ topology_file }}"
+        mode: "0644"
+
+    - name: Write per-device startup configs to the lab host
+      # Named by device, fetched by UUID: the topology's kind-level
+      # startup-config is configs/__clabNodeName__.cfg.
+      ansible.builtin.copy:
+        content: "{{ item.value }}"
+        dest: "{{ staging_config_dir }}/{{ item.key }}.cfg"
+        mode: "0644"
+      loop: "{{ controller.device_config_texts | dict2items | sort(attribute='key') }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Stat the committed bind sources on the lab host
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ staged_bind_sources }}"
+      loop_control:
+        label: "{{ item | basename }}"
+      register: staged_bind_stats
+
+    - name: Assert the committed bind sources are staged on the lab host
+      ansible.builtin.assert:
+        that:
+          - missing | length == 0
+        quiet: true
+        fail_msg: >-
+          These bind sources are missing on {{ inventory_hostname }}: {{ missing | join(', ') }}.
+          They are committed to the repository under lab/configs/, so restore them in the checkout
+          on the controller ('{{ controller.controller_configs_dir }}') and re-run.
+      vars:
+        missing: "{{ staged_bind_stats.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
+
+    - name: Read the staged topology back for bind validation
+      ansible.builtin.slurp:
+        src: "{{ topology_file }}"
+      register: topology_raw
+
+    - name: Parse the staged topology
+      ansible.builtin.set_fact:
+        topology_data: "{{ topology_raw.content | b64decode | from_yaml }}"
+
+    - name: Collect every bind source the staged topology needs
+      # Bind paths are relative to the topology file, i.e. to the staging
+      # directory. Kind-level binds apply to every node of that kind and may
+      # template the node name.
+      ansible.builtin.set_fact:
+        topology_bind_sources: "{{ (topology_bind_sources | default([])) + node_bind_sources }}"
+      vars:
+        node_kind: "{{ (topology_data.topology.kinds | default({}))[item.value.kind | default('')] | default({}, true) }}"
+        node_binds: "{{ (item.value.binds | default([])) + (node_kind.binds | default([])) }}"
+        node_bind_sources: >-
+          {{ node_binds | map('replace', '__clabNodeName__', item.key) | map('split', ':') | map('first')
+             | map('regex_replace', '^(?!/)', clab_staging_dir ~ '/') | list }}
+      loop: "{{ topology_data.topology.nodes | default({}) | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Collect every startup-config the staged topology boots from
+      # Catches a node present in the topology but missed by device discovery,
+      # whose kind-level configs/__clabNodeName__.cfg would otherwise be absent.
+      ansible.builtin.set_fact:
+        topology_startup_configs: "{{ (topology_startup_configs | default([])) + [startup_path] }}"
+      vars:
+        node_kind: "{{ (topology_data.topology.kinds | default({}))[item.value.kind | default('')] | default({}, true) }}"
+        startup_template: "{{ item.value['startup-config'] | default(node_kind['startup-config'] | default('')) }}"
+        startup_relative: "{{ startup_template | replace('__clabNodeName__', item.key) }}"
+        startup_path: "{{ startup_relative | regex_replace('^(?!/)', clab_staging_dir ~ '/') }}"
+      when: startup_template | length > 0
+      loop: "{{ topology_data.topology.nodes | default({}) | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Stat every path the staged topology references on the lab host
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ (topology_bind_sources | default([])) + (topology_startup_configs | default([])) | unique }}"
+      loop_control:
+        label: "{{ item | relpath(clab_staging_dir) }}"
+      register: topology_path_stats
+
+    - name: Assert every path the staged topology references exists on the lab host
+      ansible.builtin.assert:
+        that:
+          - missing | length == 0
+        quiet: true
+        fail_msg: >-
+          The staged topology references paths that are not on {{ inventory_hostname }}:
+          {{ missing | join(', ') }}. ContainerLab would create a directory at each bind source and
+          the node would fail at boot; a missing startup-config means no 'AVD EOS Configuration'
+          artifact was fetched for that device. Stage the files or drop the references.
+      vars:
+        missing: "{{ topology_path_stats.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
+
+    - name: Probe for the containerlab binary on the lab host
+      ansible.builtin.command: which containerlab
+      register: clab_binary
+      failed_when: false
+      changed_when: false
+      check_mode: false
+      tags: [deploy]
+
+    - name: Assert containerlab is installed on the lab host
+      ansible.builtin.assert:
+        that:
+          - clab_binary.rc == 0
+        quiet: true
+        fail_msg: >-
+          containerlab is not on PATH on {{ inventory_hostname }}, so the lab cannot be deployed
+          there. Install it (https://containerlab.dev/install/), point {{ clab_host_group | default('clab_hosts') }}
+          at a host that has it, or re-run with --skip-tags deploy to stage only.
+      tags: [deploy]
+
+    - name: Deploy the lab with ContainerLab
+      # chdir into the staging directory so relative bind paths resolve.
+      ansible.builtin.command:
+        cmd: containerlab deploy --reconfigure --topo topology.clab.yml
+        chdir: "{{ clab_staging_dir }}"
+      register: clab_deploy_result
+      changed_when: true
+      tags: [deploy]
+
+    - name: Report deployment result
+      ansible.builtin.debug:
+        msg: "{{ clab_deploy_result.stdout_lines | default([]) }}"
+      tags: [deploy]

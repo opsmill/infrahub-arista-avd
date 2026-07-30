@@ -1,0 +1,18 @@
+---
+# Ansible collections needed by the playbooks in this directory.
+#
+# Deliberately NOT named requirements.yml. Semaphore auto-detects a
+# `requirements.yml` in its playbook repository, runs a galaxy install, and then
+# writes a `requirements.yml_collection.md5` cache marker next to it. This
+# directory is bind-mounted from the host (docker-compose.override.yml mounts
+# ./ansible to /opt/semaphore/playbooks) and the container runs as a different
+# uid, so that write fails with EACCES and takes the whole task down:
+#
+#   Failed to run task: open /opt/semaphore/playbooks/requirements.yml_collection.md5:
+#   permission denied
+#
+# The install is redundant there anyway — semaphore/Dockerfile already installs
+# opsmill.infrahub into /opt/semaphore/collections, which ansible.cfg puts on
+# collections_path.
+collections:
+  - name: opsmill.infrahub

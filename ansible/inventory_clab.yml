@@ -1,0 +1,34 @@
+---
+# Static inventory for deploy_clab.yml — the ContainerLab host(s) the lab is
+# deployed onto.
+#
+# ansible.cfg points `inventory` at inventory.yml, the opsmill.infrahub dynamic
+# plugin listing DcimDevice objects. That is the wrong inventory for this
+# playbook, so pass this file explicitly:
+#
+#   ansible-playbook -i inventory_clab.yml deploy_clab.yml -e fabric=<name>
+#
+# Out of the box `clab_hosts` is localhost with a local connection, which covers
+# ContainerLab running on the same machine as the Ansible controller. To drive a
+# remote host instead, remove `localhost:` from the `clab_hosts` group below and
+# uncomment the example host, editing its address and user.
+#
+# Keep the `localhost` entry under `all.hosts` either way: deploy_clab.yml's
+# first play runs there and its second play reads the fetched artifacts back out
+# of hostvars['localhost'].
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+  children:
+    clab_hosts:
+      hosts:
+        # ContainerLab on the same box as the controller (the default).
+        localhost:
+        # A remote ContainerLab host, reached over SSH. The user needs docker
+        # access and write access to clab_staging_dir.
+        # lab01.example.net:
+        #   ansible_host: 192.0.2.10
+        #   ansible_user: clab
+        #   ansible_connection: ssh
+        #   ansible_python_interpreter: /usr/bin/python3

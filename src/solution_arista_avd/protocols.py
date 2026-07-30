@@ -176,6 +176,7 @@ class DcimDevice(CoreArtifactTarget, DcimGenericDevice, DcimPhysicalDevice):
 
 
 class DcimDeviceType(CoreNode):
+    containerlab_interface_mapping: StringOptional
     description: StringOptional
     full_depth: Boolean
     height: Integer
@@ -329,6 +330,7 @@ class ComputePhysicalServer(ComputeGenericUnit, DcimGenericDevice, GeneratorTarg
 
 class DcimPlatform(CoreNode):
     ansible_network_os: StringOptional
+    containerlab_image: StringOptional
     containerlab_os: StringOptional
     description: StringOptional
     name: String

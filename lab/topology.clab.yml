@@ -93,13 +93,15 @@ topology:
     dc1-server1:
       kind: linux
       binds:
-        - configs/servers/dc1-server1-netplan.yaml:/etc/netplan/netplan.yaml
+        # Filename tracks the Infrahub device name (dc1-server) so the
+        # generated topology can derive this bind by convention.
+        - configs/servers/dc1-server-netplan.yaml:/etc/netplan/netplan.yaml
       mgmt-ipv4: 10.0.6.100
 
     dc2-server1:
       kind: linux
       binds:
-        - configs/servers/dc2-server1-netplan.yaml:/etc/netplan/netplan.yaml
+        - configs/servers/dc2-server-netplan.yaml:/etc/netplan/netplan.yaml
       mgmt-ipv4: 10.0.6.101
 
   links:

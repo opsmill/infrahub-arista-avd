@@ -30,8 +30,34 @@ class AddressRelation(BaseModel):
     node: AddressNode | None = None
 
 
+class PlatformNode(BaseModel):
+    """``DcimPlatform`` — supplies the ContainerLab node kind and image."""
+
+    containerlab_os: Value | None = None
+    containerlab_image: Value | None = None
+
+
+class PlatformRelation(BaseModel):
+    node: PlatformNode | None = None
+
+
+class DeviceTypeNode(BaseModel):
+    """``DcimDeviceType`` — supplies the interface-mapping filename."""
+
+    name: Value | None = None
+    containerlab_interface_mapping: Value | None = None
+    platform: PlatformRelation | None = None
+
+
+class DeviceTypeRelation(BaseModel):
+    node: DeviceTypeNode | None = None
+
+
 class ConnectorNode(BaseModel):
     id: str | None = None
+    # Present only on NetworkLink (via inline fragment); ``dci`` marks
+    # inter-domain links.
+    role: Value | None = None
 
 
 class Connector(BaseModel):
@@ -55,7 +81,8 @@ class DeviceNode(BaseModel):
     id: str | None = None
     name: Value | None = None
     role: Value | None = None
-    device_type: NameRelation | None = None
+    device_type: DeviceTypeRelation | None = None
+    platform: PlatformRelation | None = None
     mgmt_ip: AddressRelation | None = None
     interfaces: Interfaces | None = None
 
@@ -69,6 +96,7 @@ class Devices(BaseModel):
 
 
 class RackNode(BaseModel):
+    name: Value | None = None
     devices: Devices | None = None
 
 
@@ -107,7 +135,34 @@ class Fabric(BaseModel):
     edges: list[FabricEdge] = Field(default_factory=list)
 
 
+class ServerNode(BaseModel):
+    """``ComputePhysicalServer`` — rendered as a Linux-kind ContainerLab node.
+
+    Servers have no ``mgmt_ip``: that relationship is a ``DcimDevice``-only
+    extension, so the inherited ``primary_address`` is used instead.
+    """
+
+    typename: str | None = Field(default=None, alias="__typename")
+    id: str | None = None
+    name: Value | None = None
+    rack: NameRelation | None = None
+    platform: PlatformRelation | None = None
+    primary_address: AddressRelation | None = None
+    interfaces: Interfaces | None = None
+
+
+class ServerEdge(BaseModel):
+    node: ServerNode | None = None
+
+
+class Servers(BaseModel):
+    edges: list[ServerEdge] = Field(default_factory=list)
+
+
 class ContainerLabTopologyQuery(BaseModel):
     """Root model for the ``containerlab_topology`` query response."""
 
     network_fabric: Fabric = Field(alias="NetworkFabric")
+    # Unfiltered: LocationRack declares no inverse to ComputePhysicalServer, so
+    # servers are filtered to the fabric's racks in Python.
+    compute_physical_server: Servers = Field(default_factory=Servers, alias="ComputePhysicalServer")

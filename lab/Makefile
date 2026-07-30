@@ -76,6 +76,38 @@ eapi-deploy:
 test:
 	${ANSIBLE_PLAYBOOK} playbooks/test.yml
 
+# =============================================================================
+# Ansible - ContainerLab from Infrahub
+# =============================================================================
+# Fetches a fabric's ContainerLab Topology artifact and its devices' AVD EOS
+# Configuration artifacts from Infrahub, stages them plus every committed bind
+# source onto the ContainerLab host, then deploys there.
+# Needs INFRAHUB_ADDRESS / INFRAHUB_API_TOKEN in the environment and the
+# opsmill.infrahub collection, installed from the repo root with
+# `ansible-galaxy collection install -r ansible/galaxy-requirements.yml`.
+#
+# The playbook lives in ../ansible/ because that directory is also the Semaphore
+# playbook repository. It targets localhost and the `clab_hosts` group from
+# ../ansible/inventory_clab.yml, not the AVD inventory, so ${ANSIBLE_PLAYBOOK}
+# (which injects -i ${ANSIBLE_INVENTORY}) is deliberately not used here.
+#
+# UV is forced to `uv run` here, unlike the AVD targets: the opsmill.infrahub
+# action plugins import infrahub_sdk in the controller's interpreter, and only
+# this directory's uv environment provides it (the repository root's uv project
+# ships no ansible at all). That is also why the command stays in lab/ and
+# reaches the playbook by relative path rather than cd-ing to ../ansible.
+CLAB_PLAYBOOK ?= ../ansible/deploy_clab.yml
+CLAB_INVENTORY ?= ../ansible/inventory_clab.yml
+.PHONY: deploy-from-infrahub
+deploy-from-infrahub: UV = uv run
+deploy-from-infrahub:
+	@if [ -z "${FABRIC}" ]; then\
+		echo "Set FABRIC, e.g. make deploy-from-infrahub FABRIC=Fabric-L3LS-Multi-Domain";\
+		exit 1;\
+	fi
+	ANSIBLE_CONFIG=${ANSIBLE_CONFIG} ${EXTRA_ANSIBLE_ARGS} ${UV} ansible-playbook \
+		-i ${CLAB_INVENTORY} ${CLAB_PLAYBOOK} -e fabric=${FABRIC}
+
 .PHONY: clean
 clean:
 	rm -rf avd/documentation avd/intended/structured_configs

@@ -27,6 +27,29 @@ query ContainerLabTopology($name: String!) {
                             name {
                               value
                             }
+                            containerlab_interface_mapping {
+                              value
+                            }
+                            platform {
+                              node {
+                                containerlab_os {
+                                  value
+                                }
+                                containerlab_image {
+                                  value
+                                }
+                              }
+                            }
+                          }
+                        }
+                        platform {
+                          node {
+                            containerlab_os {
+                              value
+                            }
+                            containerlab_image {
+                              value
+                            }
                           }
                         }
                         mgmt_ip {
@@ -46,6 +69,11 @@ query ContainerLabTopology($name: String!) {
                                 connector {
                                   node {
                                     id
+                                    ... on NetworkLink {
+                                      role {
+                                        value
+                                      }
+                                    }
                                   }
                                 }
                               }
@@ -59,6 +87,9 @@ query ContainerLabTopology($name: String!) {
                 racks {
                   edges {
                     node {
+                      name {
+                        value
+                      }
                       devices {
                         edges {
                           node {
@@ -74,6 +105,29 @@ query ContainerLabTopology($name: String!) {
                               device_type {
                                 node {
                                   name {
+                                    value
+                                  }
+                                  containerlab_interface_mapping {
+                                    value
+                                  }
+                                  platform {
+                                    node {
+                                      containerlab_os {
+                                        value
+                                      }
+                                      containerlab_image {
+                                        value
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                              platform {
+                                node {
+                                  containerlab_os {
+                                    value
+                                  }
+                                  containerlab_image {
                                     value
                                   }
                                 }
@@ -95,6 +149,11 @@ query ContainerLabTopology($name: String!) {
                                       connector {
                                         node {
                                           id
+                                          ... on NetworkLink {
+                                            role {
+                                              value
+                                            }
+                                          }
                                         }
                                       }
                                     }
@@ -104,6 +163,62 @@ query ContainerLabTopology($name: String!) {
                             }
                           }
                         }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  ComputePhysicalServer {
+    edges {
+      node {
+        __typename
+        id
+        name {
+          value
+        }
+        rack {
+          node {
+            name {
+              value
+            }
+          }
+        }
+        platform {
+          node {
+            containerlab_os {
+              value
+            }
+            containerlab_image {
+              value
+            }
+          }
+        }
+        primary_address {
+          node {
+            ... on IpamIPAddress {
+              address {
+                value
+              }
+            }
+          }
+        }
+        interfaces {
+          edges {
+            node {
+              __typename
+              ... on DcimEndpoint {
+                connector {
+                  node {
+                    id
+                    ... on NetworkLink {
+                      role {
+                        value
                       }
                     }
                   }

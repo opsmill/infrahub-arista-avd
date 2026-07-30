@@ -1,0 +1,45 @@
+query ContainerlabLinkEndpointsQuery($ids: [ID!]) {
+  NetworkLink(ids: $ids) {
+    edges {
+      node {
+        id
+        connected_endpoints {
+          edges {
+            node {
+              __typename
+              # `device` peers the DcimGenericDevice generic, so `name` is
+              # selected on the generic rather than through an `... on
+              # DcimDevice` fragment. Narrowing to DcimDevice silently returns
+              # no name for a ComputePhysicalServer endpoint, which drops every
+              # server-facing link.
+              ... on DcimInterface {
+                name {
+                  value
+                }
+                device {
+                  node {
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
+              ... on InterfacePhysical {
+                name {
+                  value
+                }
+                device {
+                  node {
+                    name {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

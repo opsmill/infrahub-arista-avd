@@ -362,6 +362,14 @@ nodes:
         optional: true
         kind: Number
         order_weight: 1600
+      - name: containerlab_interface_mapping
+        label: ContainerLab Interface Mapping
+        description: >-
+          Filename only of the cEOS EosIntfMapping.json bound into ContainerLab
+          nodes of this device type.
+        kind: Text
+        optional: true
+        order_weight: 1700
     relationships:
       - name: platform
         peer: DcimPlatform
@@ -424,6 +432,14 @@ nodes:
         kind: Text
         optional: true
         order_weight: 1900
+      - name: containerlab_image
+        label: ContainerLab Image
+        description: >-
+          Container image for ContainerLab nodes on this platform, e.g.
+          arista/ceos:4.36.0.1F.
+        kind: Text
+        optional: true
+        order_weight: 1950
     relationships:
       - name: devices
         peer: DcimGenericDevice
