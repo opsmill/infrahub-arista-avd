@@ -1,3 +1,4 @@
+import json
 import os
 import shlex
 import sys
@@ -198,9 +199,37 @@ def init_semaphore(
         },
     )
 
+    print("ContainerLab environment...")
+    # The variables deploy_clab.yml needs must live in the environment, NOT in
+    # survey_vars. Verified against Semaphore v2.17.12: a declared survey var is
+    # recorded on the task's `params` but is never forwarded to ansible-playbook
+    # as an extra var, so the playbook fails with "fabric is undefined" — with or
+    # without an explicit `type` on the survey var. Only the environment's JSON
+    # reaches the playbook. Override per run in the task's Environment field.
+    #
+    # clab_staging_dir is deliberately not the playbook's /opt/containerlab
+    # default: with clab_hosts resolving to localhost, that localhost is this
+    # container, which cannot write to /opt. This path is owned by the semaphore
+    # user. A real deployment points clab_hosts at a ContainerLab host and
+    # overrides this.
+    clab_env_id = api.find_or_create(
+        f"/api/project/{project_id}/environment",
+        f"/api/project/{project_id}/environment",
+        "ContainerLab",
+        {
+            "name": "ContainerLab",
+            "project_id": project_id,
+            "json": json.dumps(
+                {
+                    "fabric": "Fabric-L3LS-Multi-Domain",
+                    "clab_staging_dir": f"{SEMAPHORE_PLAYBOOK_PATH.rsplit('/', 1)[0]}/clab-staging",
+                }
+            ),
+            "env": "{}",
+        },
+    )
+
     print("ContainerLab task template...")
-    # `fabric` is a required survey variable, so Semaphore prompts for it and
-    # passes it to ansible-playbook as an extra var.
     api.find_or_create(
         f"/api/project/{project_id}/templates",
         f"/api/project/{project_id}/templates",
@@ -210,19 +239,10 @@ def init_semaphore(
             "project_id": project_id,
             "repository_id": repo_id,
             "inventory_id": clab_inv_id,
-            "environment_id": env_id,
+            "environment_id": clab_env_id,
             "playbook": "deploy_clab.yml",
             "type": "task",
             "app": "ansible",
-            "survey_vars": [
-                {
-                    "name": "fabric",
-                    "title": "Fabric",
-                    "required": True,
-                    "type": "",
-                    "description": "Name of the NetworkFabric to deploy, e.g. Fabric-L3LS-Multi-Domain",
-                },
-            ],
         },
     )
 
