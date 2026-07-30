@@ -1,0 +1,144 @@
+---
+name: infrahub-avd
+
+mgmt:
+  network: clab-infrahub-avd-mgmt
+  ipv4-subnet: 10.0.6.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: arista/ceos:4.36.0.1F
+      startup-config: avd/intended/configs/__clabNodeName__.cfg
+      binds:
+        - configs/ceos-config/__clabNodeName__.cfg:/mnt/flash/ceos-config:ro
+        # - ${CV_TOKEN_BIND}
+    linux:
+      image: lab-server
+
+  nodes:
+    # =========================================================================
+    # DC1 — 2 spines + 4 leaves (2 border + 2 access)
+    # =========================================================================
+    ih-dc1-spine1:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050CX3-32S.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.11
+    ih-dc1-spine2:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050CX3-32S.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.12
+
+    ih-dc1-leaf1a:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.13
+    ih-dc1-leaf1b:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.14
+    ih-dc1-leaf2a:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.15
+    ih-dc1-leaf2b:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.16
+
+    # =========================================================================
+    # DC2 — 2 spines + 4 leaves (2 border + 2 access)
+    # =========================================================================
+    ih-dc2-spine1:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050CX3-32S.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.21
+    ih-dc2-spine2:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050CX3-32S.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.22
+
+    ih-dc2-leaf1a:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.23
+    ih-dc2-leaf1b:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.24
+    ih-dc2-leaf2a:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.25
+    ih-dc2-leaf2b:
+      kind: arista_ceos
+      binds:
+        - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
+      mgmt-ipv4: 10.0.6.26
+
+    # =========================================================================
+    # Servers
+    # =========================================================================
+    dc1-server1:
+      kind: linux
+      binds:
+        - configs/servers/dc1-server1-netplan.yaml:/etc/netplan/netplan.yaml
+      mgmt-ipv4: 10.0.6.100
+
+    dc2-server1:
+      kind: linux
+      binds:
+        - configs/servers/dc2-server1-netplan.yaml:/etc/netplan/netplan.yaml
+      mgmt-ipv4: 10.0.6.101
+
+  links:
+    # =========================================================================
+    # DC1 Spine ↔ Leaf (full mesh)
+    # =========================================================================
+    - endpoints: ["ih-dc1-spine1:eth1_1", "ih-dc1-leaf1a:eth49_1"]
+    - endpoints: ["ih-dc1-spine1:eth2_1", "ih-dc1-leaf1b:eth49_1"]
+    - endpoints: ["ih-dc1-spine1:eth3_1", "ih-dc1-leaf2a:eth49_1"]
+    - endpoints: ["ih-dc1-spine1:eth4_1", "ih-dc1-leaf2b:eth49_1"]
+    - endpoints: ["ih-dc1-spine2:eth1_1", "ih-dc1-leaf1a:eth50_1"]
+    - endpoints: ["ih-dc1-spine2:eth2_1", "ih-dc1-leaf1b:eth50_1"]
+    - endpoints: ["ih-dc1-spine2:eth3_1", "ih-dc1-leaf2a:eth50_1"]
+    - endpoints: ["ih-dc1-spine2:eth4_1", "ih-dc1-leaf2b:eth50_1"]
+
+    # =========================================================================
+    # DC2 Spine ↔ Leaf (full mesh)
+    # =========================================================================
+    - endpoints: ["ih-dc2-spine1:eth1_1", "ih-dc2-leaf1a:eth49_1"]
+    - endpoints: ["ih-dc2-spine1:eth2_1", "ih-dc2-leaf1b:eth49_1"]
+    - endpoints: ["ih-dc2-spine1:eth3_1", "ih-dc2-leaf2a:eth49_1"]
+    - endpoints: ["ih-dc2-spine1:eth4_1", "ih-dc2-leaf2b:eth49_1"]
+    - endpoints: ["ih-dc2-spine2:eth1_1", "ih-dc2-leaf1a:eth50_1"]
+    - endpoints: ["ih-dc2-spine2:eth2_1", "ih-dc2-leaf1b:eth50_1"]
+    - endpoints: ["ih-dc2-spine2:eth3_1", "ih-dc2-leaf2a:eth50_1"]
+    - endpoints: ["ih-dc2-spine2:eth4_1", "ih-dc2-leaf2b:eth50_1"]
+
+    # =========================================================================
+    # DCI — Border leaves DC1 ↔ DC2 (full mesh)
+    # =========================================================================
+    - endpoints: ["ih-dc1-leaf1a:eth5", "ih-dc2-leaf1a:eth5"]
+    - endpoints: ["ih-dc1-leaf1a:eth6", "ih-dc2-leaf1b:eth6"]
+    - endpoints: ["ih-dc1-leaf1b:eth5", "ih-dc2-leaf1b:eth5"]
+    - endpoints: ["ih-dc1-leaf1b:eth6", "ih-dc2-leaf1a:eth6"]
+
+    # =========================================================================
+    # Servers → Access leaves
+    # =========================================================================
+    - endpoints: ["dc1-server1:eth1", "ih-dc1-leaf2a:eth1"]
+    - endpoints: ["dc1-server1:eth2", "ih-dc1-leaf2b:eth1"]
+    - endpoints: ["dc2-server1:eth1", "ih-dc2-leaf2a:eth1"]
+    - endpoints: ["dc2-server1:eth2", "ih-dc2-leaf2b:eth1"]

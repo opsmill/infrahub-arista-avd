@@ -1,5 +1,6 @@
 # Runtime artifacts fetched/rendered at deploy time
-/topology.clab.yml
 /configs/*.cfg
-clab-*/
+
+# ContainerLab runtime directories and state
+clab-*
 .clab.*

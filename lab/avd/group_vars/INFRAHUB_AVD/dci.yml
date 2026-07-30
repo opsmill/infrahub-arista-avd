@@ -1,0 +1,32 @@
+---
+# =============================================================================
+# DCI — Data Center Interconnect between DC1 and DC2 border leaves
+# =============================================================================
+l3_edge:
+  p2p_links_ip_pools:
+    - name: POOL_DCI
+      ipv4_pool: 172.16.0.0/28
+  p2p_links_profiles:
+    - name: DCI
+      ip_pool: POOL_DCI
+  p2p_links:
+    - id: 1
+      nodes: [ih-dc1-leaf1a, ih-dc2-leaf1a]
+      interfaces: [Ethernet5, Ethernet5]
+      as: [65101, 65201]
+      profile: DCI
+    - id: 2
+      nodes: [ih-dc1-leaf1a, ih-dc2-leaf1b]
+      interfaces: [Ethernet6, Ethernet6]
+      as: [65101, 65202]
+      profile: DCI
+    - id: 3
+      nodes: [ih-dc1-leaf1b, ih-dc2-leaf1b]
+      interfaces: [Ethernet5, Ethernet5]
+      as: [65102, 65202]
+      profile: DCI
+    - id: 4
+      nodes: [ih-dc1-leaf1b, ih-dc2-leaf1a]
+      interfaces: [Ethernet6, Ethernet6]
+      as: [65102, 65201]
+      profile: DCI

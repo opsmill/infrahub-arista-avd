@@ -8,6 +8,10 @@ ignore: |
   /.specify
   /node_modules
   /docs/node_modules
+  # Rendered by arista.avd.eos_designs; AVD's emitter does not indent sequences.
+  /lab/avd/intended
+  # ContainerLab runtime state; generated on deploy and git-ignored.
+  /lab/clab-*
 
 rules:
   new-lines: disable

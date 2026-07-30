@@ -1,0 +1,9 @@
+---
+- name: Configuration and tags deployment using CloudVision
+  hosts: all
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Deploy configurations and tags to CloudVision
+      ansible.builtin.import_role:
+        name: arista.avd.cv_deploy

@@ -1,0 +1,34 @@
+---
+port_profiles:
+  - profile: evpn_multihoming
+    ethernet_segment:
+      short_esi: auto
+    port_channel:
+      mode: active
+
+  - profile: server
+    parent_profile: evpn_multihoming
+    native_vlan: 4092
+    mode: trunk
+    spanning_tree_portfast: edge
+
+servers:
+  - name: dc1-server1
+    adapters:
+      - endpoint_ports: [eth1, eth2]
+        switches: [ih-dc1-leaf2a, ih-dc1-leaf2b]
+        switch_ports: [Ethernet1, Ethernet1]
+        profile: server
+        vlans: 11,19
+        port_channel:
+          description: dc1-server1
+
+  - name: dc2-server1
+    adapters:
+      - endpoint_ports: [eth1, eth2]
+        switches: [ih-dc2-leaf2a, ih-dc2-leaf2b]
+        switch_ports: [Ethernet1, Ethernet1]
+        profile: server
+        vlans: 12,19
+        port_channel:
+          description: dc2-server1
