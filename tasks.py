@@ -99,9 +99,30 @@ class _SemaphoreClient:
         return rid
 
 
+def _semaphore_staging_host_path(context: Context, container_path: str) -> str:
+    """Host path backing the Semaphore container's staging directory.
+
+    Asks Docker for the real bind source rather than assuming it matches this
+    checkout. They diverge whenever the stack was started from a different
+    directory — a git worktree being the obvious case — and a wrong path here is
+    worse than none, because it sends people to an empty directory that looks
+    like a failed run.
+    """
+    fallback = str((Path(__file__).parent / CLAB_STAGING_DIR).resolve())
+    fmt = "{{range .Mounts}}{{if eq .Destination " + f'"{container_path}"' + "}}{{.Source}}{{end}}{{end}}"
+    result = context.run(
+        f"docker inspect $(docker ps -q --filter name=semaphore | head -1) --format '{fmt}'",
+        hide=True,
+        warn=True,
+    )
+    if result and result.ok and result.stdout.strip():
+        return str(result.stdout.strip())
+    return fallback
+
+
 @task(name="init-semaphore")
 def init_semaphore(
-    context: Context,  # noqa: ARG001
+    context: Context,
     url: str = SEMAPHORE_URL,
     admin: str = SEMAPHORE_ADMIN,
     password: str = SEMAPHORE_ADMIN_PASSWORD,
@@ -214,6 +235,7 @@ def init_semaphore(
     )
 
     print("ContainerLab environment...")
+    clab_container_staging = f"{SEMAPHORE_PLAYBOOK_PATH.rsplit('/', 1)[0]}/clab-staging"
     # The variables deploy_clab.yml needs must live in the environment, NOT in
     # survey_vars. Verified against Semaphore v2.17.12: a declared survey var is
     # recorded on the task's `params` but is never forwarded to ansible-playbook
@@ -236,7 +258,10 @@ def init_semaphore(
             "json": json.dumps(
                 {
                     "fabric": "Fabric-L3LS-Multi-Domain",
-                    "clab_staging_dir": f"{SEMAPHORE_PLAYBOOK_PATH.rsplit('/', 1)[0]}/clab-staging",
+                    "clab_staging_dir": clab_container_staging,
+                    # Reported back by the playbook so a run tells you where the
+                    # files are on the Docker host, not just inside the container.
+                    "clab_staging_host_dir": _semaphore_staging_host_path(context, clab_container_staging),
                 }
             ),
             "env": "{}",
