@@ -25,13 +25,9 @@ SEMAPHORE_URL = "http://localhost:3000"
 SEMAPHORE_ADMIN = "admin"
 SEMAPHORE_ADMIN_PASSWORD = "semaphore"  # noqa: S105
 SEMAPHORE_PLAYBOOK_PATH = "/opt/semaphore/playbooks"
-# lab/ is bind-mounted here (docker-compose.override.yml). deploy_clab.yml reads
-# the committed ContainerLab bind sources from it and stages the artifacts it
-# pulls into the subdirectory below, so they land on the host. The playbook
-# creates that subdirectory itself; nothing needs to pre-exist.
-SEMAPHORE_LAB_PATH = "/opt/semaphore/lab"
-CLAB_STAGING_SUBDIR = "clab-staging"
-CLAB_STAGING_DIR = f"lab/{CLAB_STAGING_SUBDIR}"
+# Host path bind-mounted into the Semaphore container as the ContainerLab
+# staging directory, so files deploy_clab.yml pulls are reachable from the host.
+CLAB_STAGING_DIR = "lab/clab-staging"
 
 
 @task
@@ -103,7 +99,37 @@ class _SemaphoreClient:
         return rid
 
 
-def _semaphore_staging_host_path(context: Context) -> str:
+def ensure_clab_staging_dir() -> Path:
+    """Create the ContainerLab staging directory the Semaphore container writes to.
+
+    docker-compose.override.yml bind-mounts this into the container, so the files
+    deploy_clab.yml pulls land on the host instead of a container layer that is
+    discarded on recreate.
+
+    It must exist *before* the container is created, and must be writable by both
+    the container's uid and the host user's, which differ. Getting either wrong
+    fails without naming the cause:
+
+      - absent at container start: Docker creates it owned by root, and the
+        staging write fails with EACCES.
+      - mode 0755: the same EACCES, because the container's uid is not the owner.
+      - deleted while the container runs: the container keeps a stale mountpoint
+        and every path under it fails with ENOENT, which takes a container
+        recreate to fix - and that discards Semaphore's sqlite state.
+
+    Called from both `start` and `init-semaphore` so the ordering holds either
+    way. Staging inside the lab/ mount instead was tried and does not work: a
+    writable bind mount still obeys POSIX permissions, so the container cannot
+    mkdir inside a host directory it does not own.
+    """
+    staging_dir = Path(__file__).parent / CLAB_STAGING_DIR
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    staging_dir.chmod(0o777)
+    print(f"Staging directory {CLAB_STAGING_DIR} ready (mode 0777, shared with the Semaphore container).")
+    return staging_dir
+
+
+def _semaphore_staging_host_path(context: Context, container_path: str) -> str:
     """Host path backing the Semaphore container's staging directory.
 
     Asks Docker for the real bind source rather than assuming it matches this
@@ -113,14 +139,14 @@ def _semaphore_staging_host_path(context: Context) -> str:
     like a failed run.
     """
     fallback = str((Path(__file__).parent / CLAB_STAGING_DIR).resolve())
-    fmt = "{{range .Mounts}}{{if eq .Destination " + f'"{SEMAPHORE_LAB_PATH}"' + "}}{{.Source}}{{end}}{{end}}"
+    fmt = "{{range .Mounts}}{{if eq .Destination " + f'"{container_path}"' + "}}{{.Source}}{{end}}{{end}}"
     result = context.run(
         f"docker inspect $(docker ps -q --filter name=semaphore | head -1) --format '{fmt}'",
         hide=True,
         warn=True,
     )
     if result and result.ok and result.stdout.strip():
-        return f"{result.stdout.strip()}/{CLAB_STAGING_SUBDIR}"
+        return str(result.stdout.strip())
     return fallback
 
 
@@ -138,6 +164,7 @@ def init_semaphore(
     Safe to run multiple times; existing resources are reused.
     """
     print("=== Semaphore Init ===")
+    ensure_clab_staging_dir()
 
     api = _SemaphoreClient(url)
     api.wait_until_ready()
@@ -229,7 +256,7 @@ def init_semaphore(
     )
 
     print("ContainerLab environment...")
-    clab_container_staging = f"{SEMAPHORE_LAB_PATH}/{CLAB_STAGING_SUBDIR}"
+    clab_container_staging = f"{SEMAPHORE_PLAYBOOK_PATH.rsplit('/', 1)[0]}/clab-staging"
     # The variables deploy_clab.yml needs must live in the environment, NOT in
     # survey_vars. Verified against Semaphore v2.17.12: a declared survey var is
     # recorded on the task's `params` but is never forwarded to ansible-playbook
@@ -239,9 +266,9 @@ def init_semaphore(
     #
     # clab_staging_dir is deliberately not the playbook's /opt/containerlab
     # default: with clab_hosts resolving to localhost, that localhost is this
-    # container, which cannot write to /opt. Staging under the bind-mounted lab/
-    # instead means the pulled files are readable on the Docker host. A real
-    # deployment points clab_hosts at a ContainerLab host and overrides this.
+    # container, which cannot write to /opt. This path is owned by the semaphore
+    # user. A real deployment points clab_hosts at a ContainerLab host and
+    # overrides this.
     clab_env_id = api.find_or_create(
         f"/api/project/{project_id}/environment",
         f"/api/project/{project_id}/environment",
@@ -255,7 +282,7 @@ def init_semaphore(
                     "clab_staging_dir": clab_container_staging,
                     # Reported back by the playbook so a run tells you where the
                     # files are on the Docker host, not just inside the container.
-                    "clab_staging_host_dir": _semaphore_staging_host_path(context),
+                    "clab_staging_host_dir": _semaphore_staging_host_path(context, clab_container_staging),
                 }
             ),
             "env": "{}",
@@ -479,4 +506,8 @@ def start(ctx: Context) -> None:
     """
     Start the services using docker-compose in detached mode.
     """
+    # Before compose creates the containers: a bind-mount source that does not
+    # exist yet is created by Docker as root, which the Semaphore container then
+    # cannot write to.
+    ensure_clab_staging_dir()
     ctx.run(f"docker compose {COMPOSE_FILES} up -d", pty=True)

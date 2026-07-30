@@ -80,21 +80,19 @@ services:
       - "3000:3000"
     volumes:
       - ./ansible:/opt/semaphore/playbooks
-      # Serves two purposes for deploy_clab.yml: it reads the committed
-      # ContainerLab bind sources from configs/, and it stages the artifacts it
-      # pulls into clab-staging/ (gitignored via lab/.gitignore's `clab-*`), so
-      # the pulled files land on the host rather than in the container's
-      # writable layer.
+      # deploy_clab.yml copies the committed ContainerLab bind sources
+      # (configs/eos-intf-mapping/*.json, configs/servers/*-netplan.yaml) from
+      # here onto the ContainerLab host. Read-only: the playbook only reads them.
+      - ./lab:/opt/semaphore/lab:ro
+      # Where deploy_clab.yml stages the fetched topology and device configs.
+      # A bind mount rather than a container path, so the pulled files land on
+      # the host and survive the container being recreated.
       #
-      # Writable, and deliberately a single mount rather than a read-only lab/
-      # plus a separate staging bind. A separate bind has to exist on the host
-      # before the container starts: if it is missing Docker creates it as root
-      # and the staging write fails with EACCES, and if it is deleted afterwards
-      # the container keeps a stale mountpoint that fails with a far more
-      # confusing ENOENT until the container is recreated. Letting the playbook
-      # mkdir the directory under an existing mount removes both failure modes
-      # and the pre-creation step they needed.
-      - ./lab:/opt/semaphore/lab
+      # Must be world-writable: this container runs as uid 1001 while the host
+      # directory is owned by the invoking user, so a default 0755 leaves the
+      # staging write failing with EACCES. `invoke init-semaphore` creates it
+      # with the right mode. Gitignored via lab/.gitignore's `clab-*`.
+      - ./lab/clab-staging:/opt/semaphore/clab-staging
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/ping"]
       interval: 10s
