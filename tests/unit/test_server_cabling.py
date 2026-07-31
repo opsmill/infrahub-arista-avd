@@ -388,6 +388,8 @@ class TestVlanAssignment:
         target.tagged_vlan.extend = MagicMock()
         target.tagged_vlan.clear = MagicMock()
         target.untagged_vlan = MagicMock()
+        target.untagged_vlan.id = None
+        target.untagged_vlan.node = None
         target.untagged_vlan.fetch = AsyncMock()
         target.untagged_vlan.add = MagicMock()
         target.untagged_vlan.clear = MagicMock()
@@ -960,6 +962,53 @@ class TestAvdCascadeTrigger:
         # Verify hostvars set to False
         mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)
         mock_trigger.assert_awaited_once_with(gen.client, node_ids=["leaf-1", "leaf-2"])
+
+    @pytest.mark.asyncio
+    @patch("generators.generate_server_cabling.set_fabric_avd_hostvars_ready", new_callable=AsyncMock)
+    async def test_trigger_avd_cascade_uses_timeout_tolerant_hostvar_helper(
+        self,
+        mock_set_ready: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """_trigger_avd_cascade uses bounded, timeout-tolerant hostvar triggering when supported."""
+        gen = _make_generator(mock_cascade=False)
+        mock_fabric = MagicMock()
+        mock_fabric.id = "fabric-1"
+        mock_fabric.name.value = "Fabric-A"
+        mock_pod = MagicMock()
+        mock_pod.parent.fetch = AsyncMock()
+        mock_pod.parent.peer = mock_fabric
+        mock_rack = MagicMock()
+        mock_rack.pod.fetch = AsyncMock()
+        mock_rack.pod.peer.id = "pod-1"
+        trigger = AsyncMock()
+
+        async def timeout_capable_trigger(
+            client: object,
+            node_ids: list[str] | None = None,
+            *,
+            timeout: int | None = None,  # noqa: ASYNC109 - mirrors trigger_hostvar_generation signature
+            tolerate_timeout: bool = False,
+        ) -> None:
+            await trigger(
+                client,
+                node_ids=node_ids,
+                timeout=timeout,
+                tolerate_timeout=tolerate_timeout,
+            )
+
+        gen.client.get = AsyncMock(side_effect=[mock_rack, mock_pod])
+        monkeypatch.setattr("generators.generate_server_cabling.trigger_hostvar_generation", timeout_capable_trigger)
+
+        await gen._trigger_avd_cascade("rack-1", "server-1", ["leaf-1", "leaf-2"])
+
+        mock_set_ready.assert_awaited_once_with(gen.client, "fabric-1", False)
+        trigger.assert_awaited_once_with(
+            gen.client,
+            node_ids=["leaf-1", "leaf-2"],
+            timeout=300,
+            tolerate_timeout=True,
+        )
 
     @pytest.mark.asyncio
     @patch("generators.generate_server_cabling.trigger_hostvar_generation", new_callable=AsyncMock)

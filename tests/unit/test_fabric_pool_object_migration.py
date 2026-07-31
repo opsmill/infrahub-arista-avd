@@ -6,25 +6,11 @@ from typing import Any
 import yaml
 
 REPO_ROOT = Path(__file__).parents[2]
-OBJECT_FILES = [
-    "objects/04_ipam.yml",
-    "objects/04a_l3ls_pools.yml",
-    "objects/04c_fabric_l3ls_multi_domain_pools.yml",
-    "objects/10_fabric.yml",
-    "objects/10a_fabric_l3ls_multi_domain_fabric.yml",
-    "objects/13a_fabric_l2ls.yml",
-    "objects/13b_fabric_campus.yml",
-    "objects/13c_fabric_isis_ldp.yml",
-    "objects/14_fabric_single_dc_l3ls.yml",
-]
+OBJECT_FILES = sorted((REPO_ROOT / "objects").glob("*.yml"))
 
 
-def _documents(path: str) -> list[dict[str, Any]]:
-    return [
-        document
-        for document in yaml.safe_load_all((REPO_ROOT / path).read_text(encoding="utf-8"))
-        if isinstance(document, dict)
-    ]
+def _documents(path: Path) -> list[dict[str, Any]]:
+    return [document for document in yaml.safe_load_all(path.read_text(encoding="utf-8")) if isinstance(document, dict)]
 
 
 def _object_rows(kind: str) -> list[dict[str, Any]]:

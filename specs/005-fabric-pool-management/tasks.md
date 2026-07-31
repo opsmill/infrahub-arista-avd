@@ -300,3 +300,18 @@ Task: "T070 [P] [US4] Add object compatibility smoke-test documentation assertio
 - Story-local schema checks and regeneration tasks are incremental gates for each independently testable story. Phase 7 repeats them as final whole-feature verification after all schema, query, generator, object, and documentation changes are complete.
 - Keep legacy relationships present and load-compatible in this feature; later removal must use the approved schema migration pattern after all code and object data no longer rely on them.
 - Because this task list includes generator code and generator GraphQL changes, $infrahub-test-generator-idempotence is required before merge when live validation is allowed.
+
+## Phase 8: Convergence
+
+- [X] T099 Extend deterministic Fabric Supernet fallback allocation to missing Fabric Point-to-Point and DCI required prefix-pool roles, including stable persisted pool creation, exhaustion errors, and regression tests per Fabric Supernet Allocation Contract / FR-034 (partial)
+- [X] T100 Scope DCI required-pool validation to DCI links whose endpoint devices belong to the fabric under validation by expanding checks/fabric_pool_check.gql and updating checks/fabric_pool_check.py tests per FR-033 (partial)
+- [X] T101 Enforce required MLAG Peer and MLAG Peering validation from parent underlay and rack MLAG state, including check query fields and proposed-change check tests per FR-037 / FR-038 (missing)
+- [X] T102 Gate MLAG default pool creation and hostvar emission on required MLAG-role rules so defaults are only created when the pod requires MLAG Peer or MLAG Peering pools per FR-037 / FR-040 / FR-041 (contradicts)
+
+## Phase 9: Convergence
+
+- [X] T103 Update DCI pool documentation in docs/docs/developer-guide/schemas.md, docs/docs/developer-guide/avd/hostvars.md, and docs/docs/supported-capabilities.md so DCI resolution is described as fabric_ip_pools role dci first, legacy dci_pool fallback second, and Fabric Supernet fallback for missing required DCI prefix-pool roles per FR-026 / FR-033 / FR-034 (partial)
+
+## Phase 10: Convergence
+
+- [X] T104 Update docs/docs/developer-guide/avd/overview.md DCI pipeline wording so DCI l3_edge allocation is described as fabric_ip_pools role dci first, legacy dci_pool fallback second, and Fabric Supernet fallback per FR-026 / FR-033 / FR-034 (partial)

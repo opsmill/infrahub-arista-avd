@@ -64,13 +64,6 @@ query FabricPoolCheckQuery($name: String!) {
       }
     }
   }
-  NetworkLink(role__value: "dci") {
-    edges {
-      node {
-        id
-      }
-    }
-  }
   NetworkPod {
     edges {
       node {
@@ -81,12 +74,15 @@ query FabricPoolCheckQuery($name: String!) {
         parent {
           node {
             __typename
-            id
-            ... on NetworkFabric {
-              name {
-                value
-              }
-              fabric_ip_pools {
+              id
+              ... on NetworkFabric {
+                name {
+                  value
+                }
+                underlay_routing_protocol {
+                  value
+                }
+                fabric_ip_pools {
                 edges {
                   node {
                     __typename
@@ -178,6 +174,48 @@ query FabricPoolCheckQuery($name: String!) {
                         }
                         role {
                           value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        racks {
+          edges {
+            node {
+              id
+              mlag {
+                value
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  NetworkLink(role__value: "dci") {
+    edges {
+      node {
+        id
+        connected_endpoints {
+          edges {
+            node {
+              __typename
+              ... on InterfacePhysical {
+                device {
+                  node {
+                    id
+                    ... on DcimDevice {
+                      pod {
+                        node {
+                          parent {
+                            node {
+                              id
+                            }
+                          }
                         }
                       }
                     }

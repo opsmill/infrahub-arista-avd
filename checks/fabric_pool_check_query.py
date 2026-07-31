@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 
 class FabricPoolCheckQuery(BaseModel):
     network_fabric: "FabricPoolCheckQueryNetworkFabric" = Field(alias="NetworkFabric")
-    network_link: "FabricPoolCheckQueryNetworkLink" = Field(alias="NetworkLink")
     network_pod: "FabricPoolCheckQueryNetworkPod" = Field(alias="NetworkPod")
+    network_link: "FabricPoolCheckQueryNetworkLink" = Field(alias="NetworkLink")
 
 
 class FabricPoolCheckQueryNetworkFabric(BaseModel):
@@ -220,18 +220,6 @@ class FabricPoolCheckQueryNetworkFabricEdgesNodeFabricIpPoolsEdgesNodeCoreIPPref
     value: Optional[str]
 
 
-class FabricPoolCheckQueryNetworkLink(BaseModel):
-    edges: list["FabricPoolCheckQueryNetworkLinkEdges"]
-
-
-class FabricPoolCheckQueryNetworkLinkEdges(BaseModel):
-    node: Optional["FabricPoolCheckQueryNetworkLinkEdgesNode"]
-
-
-class FabricPoolCheckQueryNetworkLinkEdgesNode(BaseModel):
-    id: str
-
-
 class FabricPoolCheckQueryNetworkPod(BaseModel):
     edges: list["FabricPoolCheckQueryNetworkPodEdges"]
 
@@ -245,6 +233,7 @@ class FabricPoolCheckQueryNetworkPodEdgesNode(BaseModel):
     name: Optional["FabricPoolCheckQueryNetworkPodEdgesNodeName"]
     parent: "FabricPoolCheckQueryNetworkPodEdgesNodeParent"
     pod_ip_pools: "FabricPoolCheckQueryNetworkPodEdgesNodePodIpPools"
+    racks: "FabricPoolCheckQueryNetworkPodEdgesNodeRacks"
 
 
 class FabricPoolCheckQueryNetworkPodEdgesNodeName(BaseModel):
@@ -274,12 +263,21 @@ class FabricPoolCheckQueryNetworkPodEdgesNodeParentNodeNetworkFabric(BaseModel):
     typename__: Literal["NetworkFabric"] = Field(alias="__typename")
     id: str
     name: Optional["FabricPoolCheckQueryNetworkPodEdgesNodeParentNodeNetworkFabricName"]
+    underlay_routing_protocol: Optional[
+        "FabricPoolCheckQueryNetworkPodEdgesNodeParentNodeNetworkFabricUnderlayRoutingProtocol"
+    ]
     fabric_ip_pools: (
         "FabricPoolCheckQueryNetworkPodEdgesNodeParentNodeNetworkFabricFabricIpPools"
     )
 
 
 class FabricPoolCheckQueryNetworkPodEdgesNodeParentNodeNetworkFabricName(BaseModel):
+    value: Optional[str]
+
+
+class FabricPoolCheckQueryNetworkPodEdgesNodeParentNodeNetworkFabricUnderlayRoutingProtocol(
+    BaseModel
+):
     value: Optional[str]
 
 
@@ -641,6 +639,129 @@ class FabricPoolCheckQueryNetworkPodEdgesNodePodIpPoolsEdgesNodeCoreIPPrefixPool
     value: Optional[str]
 
 
+class FabricPoolCheckQueryNetworkPodEdgesNodeRacks(BaseModel):
+    edges: list["FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdges"]
+
+
+class FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdges(BaseModel):
+    node: Optional["FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdgesNode"]
+
+
+class FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdgesNode(BaseModel):
+    id: str
+    mlag: Optional["FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdgesNodeMlag"]
+
+
+class FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdgesNodeMlag(BaseModel):
+    value: Optional[bool]
+
+
+class FabricPoolCheckQueryNetworkLink(BaseModel):
+    edges: list["FabricPoolCheckQueryNetworkLinkEdges"]
+
+
+class FabricPoolCheckQueryNetworkLinkEdges(BaseModel):
+    node: Optional["FabricPoolCheckQueryNetworkLinkEdgesNode"]
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNode(BaseModel):
+    id: str
+    connected_endpoints: "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpoints"
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpoints(BaseModel):
+    edges: Optional[
+        list["FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdges"]
+    ]
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdges(BaseModel):
+    node: Optional[
+        Annotated[
+            Union[
+                "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeDcimEndpoint",
+                "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysical",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeDcimEndpoint(
+    BaseModel
+):
+    typename__: Literal["DcimEndpoint"] = Field(alias="__typename")
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysical(
+    BaseModel
+):
+    typename__: Literal["InterfacePhysical"] = Field(alias="__typename")
+    device: "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice"
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice(
+    BaseModel
+):
+    node: Optional[
+        Annotated[
+            Union[
+                "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDevice",
+                "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice",
+            ],
+            Field(discriminator="typename__"),
+        ]
+    ]
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimGenericDevice(
+    BaseModel
+):
+    typename__: Literal["ComputePhysicalServer", "DcimGenericDevice"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice(
+    BaseModel
+):
+    typename__: Literal["DcimDevice"] = Field(alias="__typename")
+    id: str
+    pod: "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod"
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod(
+    BaseModel
+):
+    node: Optional[
+        "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNode"
+    ]
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNode(
+    BaseModel
+):
+    parent: "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParent"
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParent(
+    BaseModel
+):
+    node: Optional[
+        "FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNode"
+    ]
+
+
+class FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParentNode(
+    BaseModel
+):
+    typename__: Literal["NetworkBuildingBlock", "NetworkFabric", "NetworkPod"] = Field(
+        alias="__typename"
+    )
+    id: Optional[str]
+
+
 FabricPoolCheckQuery.model_rebuild()
 FabricPoolCheckQueryNetworkFabric.model_rebuild()
 FabricPoolCheckQueryNetworkFabricEdges.model_rebuild()
@@ -655,8 +776,6 @@ FabricPoolCheckQueryNetworkFabricEdgesNodeFabricIpPoolsEdgesNodeCoreIPPrefixPool
 FabricPoolCheckQueryNetworkFabricEdgesNodeFabricIpPoolsEdgesNodeCoreIPPrefixPoolResources.model_rebuild()
 FabricPoolCheckQueryNetworkFabricEdgesNodeFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges.model_rebuild()
 FabricPoolCheckQueryNetworkFabricEdgesNodeFabricIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix.model_rebuild()
-FabricPoolCheckQueryNetworkLink.model_rebuild()
-FabricPoolCheckQueryNetworkLinkEdges.model_rebuild()
 FabricPoolCheckQueryNetworkPod.model_rebuild()
 FabricPoolCheckQueryNetworkPodEdges.model_rebuild()
 FabricPoolCheckQueryNetworkPodEdgesNode.model_rebuild()
@@ -682,3 +801,17 @@ FabricPoolCheckQueryNetworkPodEdgesNodePodIpPoolsEdgesNodeCoreIPPrefixPool.model
 FabricPoolCheckQueryNetworkPodEdgesNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResources.model_rebuild()
 FabricPoolCheckQueryNetworkPodEdgesNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdges.model_rebuild()
 FabricPoolCheckQueryNetworkPodEdgesNodePodIpPoolsEdgesNodeCoreIPPrefixPoolResourcesEdgesNodeIpamPrefix.model_rebuild()
+FabricPoolCheckQueryNetworkPodEdgesNodeRacks.model_rebuild()
+FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdges.model_rebuild()
+FabricPoolCheckQueryNetworkPodEdgesNodeRacksEdgesNode.model_rebuild()
+FabricPoolCheckQueryNetworkLink.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdges.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNode.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpoints.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdges.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysical.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDevice.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevice.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePod.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNode.model_rebuild()
+FabricPoolCheckQueryNetworkLinkEdgesNodeConnectedEndpointsEdgesNodeInterfacePhysicalDeviceNodeDcimDevicePodNodeParent.model_rebuild()

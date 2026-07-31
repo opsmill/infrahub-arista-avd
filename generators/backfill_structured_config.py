@@ -223,7 +223,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             ip_namespace=_namespace_ref(namespace),
         )
         self._set_source(prefix, avd_source)
-        await prefix.save(allow_upsert=True)
+        await prefix.save(allow_upsert=True, update_group_context=False)
         self.logger.info(f"[{hostname}] Ensured prefix {prefix_str}")
 
         ip_address = await self.client.create(
@@ -233,7 +233,7 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             ip_namespace=_namespace_ref(namespace),
         )
         self._set_source(ip_address, avd_source)
-        await ip_address.save(allow_upsert=True)
+        await ip_address.save(allow_upsert=True, update_group_context=False)
         self.logger.info(f"[{hostname}] Ensured IP address {ip_iface}")
 
         iface_kind = INTERFACE_KIND_MAP.get(interface_node.typename__, DcimInterface)

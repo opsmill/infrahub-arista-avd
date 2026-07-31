@@ -73,6 +73,16 @@ FABRIC_SUPERNET_PREFIX_LENGTHS = {
 }
 
 
+def pod_required_mlag_roles(*, underlay_routing_protocol: str | None, has_mlag_enabled_rack: bool) -> set[ResourceRole]:
+    underlay_defined = bool(underlay_routing_protocol and underlay_routing_protocol != "none")
+    roles: set[ResourceRole] = set()
+    if not underlay_defined or has_mlag_enabled_rack:
+        roles.add(ResourceRole.MLAG)
+    if underlay_defined and has_mlag_enabled_rack:
+        roles.add(ResourceRole.MLAG_PEERING)
+    return roles
+
+
 def map_prefix_role(prefix_role: str | None) -> ResourceRole | None:
     if prefix_role is None:
         return None
@@ -193,12 +203,12 @@ class FabricPoolValidationCheck(InfrahubCheck):
             self.log_info(message="No fabric found")
             return
 
-        has_dci_links = bool(_edges(data.get("NetworkLink")))
+        dci_fabric_ids = self._dci_fabric_ids(data)
         for fabric_edge in fabric_edges:
             fabric = _node(fabric_edge)
             if fabric is None:
                 continue
-            self._validate_fabric(fabric, has_dci_links=has_dci_links)
+            self._validate_fabric(fabric, has_dci_links=str(fabric.get("id")) in dci_fabric_ids)
 
         for pod_edge in _edges(data.get("NetworkPod")):
             pod = _node(pod_edge)
@@ -285,6 +295,15 @@ class FabricPoolValidationCheck(InfrahubCheck):
             validate_unique_roles(pool_roles, scope="pod")
         except PoolRoleResolutionError as exc:
             self.log_error(message=f"Pod {pod_name}: {exc}")
+
+        required_mlag_roles = pod_required_mlag_roles(
+            underlay_routing_protocol=_value(parent, "underlay_routing_protocol"),
+            has_mlag_enabled_rack=self._has_mlag_enabled_rack(pod),
+        )
+        missing_mlag_roles = required_mlag_roles - set(pool_roles.values())
+        if missing_mlag_roles:
+            missing = ", ".join(sorted(role.value for role in missing_mlag_roles))
+            self.log_error(message=f"Pod {pod_name}: missing required MLAG pool roles: {missing}")
 
         fabric_role_prefixes = self._role_prefixes(parent, "fabric_ip_pools")
         try:
@@ -376,6 +395,31 @@ class FabricPoolValidationCheck(InfrahubCheck):
             if raw_prefix:
                 prefixes.append(ip_network(str(raw_prefix)))
         return prefixes
+
+    @staticmethod
+    def _has_mlag_enabled_rack(pod: dict[str, Any]) -> bool:
+        for rack_edge in _edges(pod.get("racks")):
+            rack = _node(rack_edge)
+            if rack is not None and _value(rack, "mlag") is True:
+                return True
+        return False
+
+    @staticmethod
+    def _dci_fabric_ids(data: dict[str, Any]) -> set[str]:
+        fabric_ids: set[str] = set()
+        for link_edge in _edges(data.get("NetworkLink")):
+            link = _node(link_edge)
+            if link is None:
+                continue
+            for endpoint_edge in _edges(link.get("connected_endpoints")):
+                endpoint = _node(endpoint_edge)
+                device = _node(endpoint.get("device")) if endpoint else None
+                pod = _node(device.get("pod")) if device else None
+                fabric = _node(pod.get("parent")) if pod else None
+                fabric_id = fabric.get("id") if fabric else None
+                if fabric_id:
+                    fabric_ids.add(str(fabric_id))
+        return fabric_ids
 
     @classmethod
     def _role_prefixes(cls, owner: dict[str, Any], relationship_name: str) -> dict[ResourceRole, list[str]]:

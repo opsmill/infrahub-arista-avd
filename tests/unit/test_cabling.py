@@ -25,8 +25,14 @@ def _iface(iface_id: str) -> MagicMock:
 def _device(index: int | None = None) -> MagicMock:
     """A mock device; build_rack_cabling_plan reads device.index.value."""
     device = MagicMock()
-    if index is not None:
-        device.index.value = index
+    device.index.value = index
+    return device
+
+
+def _device_without_hydrated_index(name: str) -> MagicMock:
+    device = MagicMock()
+    device.index.value = None
+    device.name.value = name
     return device
 
 
@@ -131,6 +137,24 @@ class TestBuildRackCablingPlan:
             ("l1-i1", "sp2-2"),
             ("l2-i0", "sp1-3"),
             ("l2-i1", "sp2-3"),
+        ]
+
+    def test_missing_hydrated_device_index_uses_generated_name_suffix(self) -> None:
+        l2leaf = _device_without_hydrated_index("l2leaf-pod-a2-1-1")
+        leaf1, leaf2 = _device(), _device()
+        src_map = {
+            l2leaf: [_iface("l2leaf-i0"), _iface("l2leaf-i1")],
+        }
+        dst_map = {
+            leaf1: [_iface("leaf1-0"), _iface("leaf1-1"), _iface("leaf1-2"), _iface("leaf1-3")],
+            leaf2: [_iface("leaf2-0"), _iface("leaf2-1"), _iface("leaf2-2"), _iface("leaf2-3")],
+        }
+
+        plan = build_rack_cabling_plan(rack_index=2, src_interface_map=src_map, dst_interface_map=dst_map)
+
+        assert _ids(plan) == [
+            ("l2leaf-i0", "leaf1-2"),
+            ("l2leaf-i1", "leaf2-2"),
         ]
 
 

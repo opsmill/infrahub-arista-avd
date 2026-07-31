@@ -349,6 +349,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                         node {
                           __typename
                           ... on IpamPrefix {
+                            prefix {
+                              value
+                            }
                             role {
                               value
                             }
@@ -366,6 +369,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                         node {
                           __typename
                           ... on IpamPrefix {
+                            prefix {
+                              value
+                            }
                             role {
                               value
                             }
@@ -390,6 +396,16 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                 id
                 name {
                   value
+                }
+              }
+            }
+            racks {
+              edges {
+                node {
+                  id
+                  mlag {
+                    value
+                  }
                 }
               }
             }
@@ -523,6 +539,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                               node {
                                 __typename
                                 ... on IpamPrefix {
+                                  prefix {
+                                    value
+                                  }
                                   role {
                                     value
                                   }
@@ -540,6 +559,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                               node {
                                 __typename
                                 ... on IpamPrefix {
+                                  prefix {
+                                    value
+                                  }
                                   role {
                                     value
                                   }
@@ -1011,6 +1033,9 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                                             node {
                                               __typename
                                               ... on IpamPrefix {
+                                                prefix {
+                                                  value
+                                                }
                                                 role {
                                                   value
                                                 }

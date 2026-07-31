@@ -199,7 +199,11 @@ async def test_extract_l3ls_pools_no_hardcoded_fallback() -> None:
     fabric = SimpleNamespace(
         name=_attr("Fabric-L3LS-MultiPod-A"), uplink_pool=uplink, vtep_pool=vtep, loopback_pool=loopback
     )
-    pod = SimpleNamespace(mlag_peer_pool=None, mlag_l3_pool=None)
+    pod = SimpleNamespace(
+        mlag_peer_pool=None,
+        mlag_l3_pool=None,
+        racks=SimpleNamespace(edges=[SimpleNamespace(node=SimpleNamespace(mlag=_attr(True)))]),
+    )
     gen = _make_generator({id(uplink): "172.16.0.0/16", id(vtep): "172.17.0.0/24", id(loopback): "172.18.0.0/24"})
 
     pools = await gen._extract_l3ls_pools(fabric, pod)
@@ -214,7 +218,11 @@ async def test_extract_l3ls_pools_raises_when_required_pool_empty(missing: str) 
     """A linked-but-empty (or unset) mandatory pool fails loudly, naming the pool."""
     refs = {"uplink_pool": object(), "vtep_pool": object(), "loopback_pool": object()}
     fabric = SimpleNamespace(name=_attr("Fabric-L3LS-MultiPod-A"), **refs)
-    pod = SimpleNamespace(mlag_peer_pool=None, mlag_l3_pool=None)
+    pod = SimpleNamespace(
+        mlag_peer_pool=None,
+        mlag_l3_pool=None,
+        racks=SimpleNamespace(edges=[SimpleNamespace(node=SimpleNamespace(mlag=_attr(True)))]),
+    )
     prefix_map = {id(ref): "10.0.0.0/24" for ref in refs.values()}
     prefix_map[id(refs[missing])] = None  # simulate empty/unset pool
 
@@ -234,13 +242,77 @@ async def test_extract_l3ls_pools_uses_default_mlag_pools_when_missing() -> None
         vtep_pool=vtep,
         loopback_pool=loopback,
     )
-    pod = SimpleNamespace(mlag_peer_pool=None, mlag_l3_pool=None)
+    pod = SimpleNamespace(
+        mlag_peer_pool=None,
+        mlag_l3_pool=None,
+        racks=SimpleNamespace(edges=[SimpleNamespace(node=SimpleNamespace(mlag=_attr(True)))]),
+    )
     gen = _make_generator({id(uplink): "10.1.0.0/16", id(vtep): "10.2.0.0/24", id(loopback): "10.3.0.0/24"})
 
     pools = await gen._extract_l3ls_pools(fabric, pod)
 
     assert pools["mlag_peer_ipv4_pool"] == "169.254.0.0/31"
     assert pools["mlag_peer_l3_ipv4_pool"] == "192.0.0.0/31"
+
+
+async def test_extract_l3ls_pools_does_not_create_mlag_defaults_when_not_required() -> None:
+    uplink = object()
+    fabric = SimpleNamespace(
+        name=_attr("Fabric-A"),
+        underlay_routing_protocol=_attr("ebgp"),
+        uplink_pool=uplink,
+    )
+    pod = SimpleNamespace(mlag_peer_pool=None, mlag_l3_pool=None, racks=SimpleNamespace(edges=[]))
+    gen = _make_generator({id(uplink): "10.1.0.0/16"})
+    gen._ensure_default_mlag_pool_prefix = AsyncMock(side_effect=AssertionError("MLAG default not required"))  # type: ignore[method-assign]
+
+    pools = await gen._extract_l3ls_pools(fabric, pod)
+
+    assert pools["mlag_peer_ipv4_pool"] is None
+    assert pools["mlag_peer_l3_ipv4_pool"] is None
+
+
+async def test_extract_l3ls_pools_creates_required_mlag_defaults_for_mlag_rack() -> None:
+    uplink = object()
+    fabric = SimpleNamespace(
+        name=_attr("Fabric-A"),
+        underlay_routing_protocol=_attr("ebgp"),
+        uplink_pool=uplink,
+    )
+    pod = SimpleNamespace(
+        mlag_peer_pool=None,
+        mlag_l3_pool=None,
+        racks=SimpleNamespace(edges=[SimpleNamespace(node=SimpleNamespace(mlag=_attr(True)))]),
+    )
+    gen = _make_generator({id(uplink): "10.1.0.0/16"})
+
+    pools = await gen._extract_l3ls_pools(fabric, pod)
+
+    assert pools["mlag_peer_ipv4_pool"] == "169.254.0.0/31"
+    assert pools["mlag_peer_l3_ipv4_pool"] == "192.0.0.0/31"
+
+
+async def test_extract_l3ls_pools_uses_fabric_supernet_fallback_for_missing_uplink_pool() -> None:
+    supernet_pool = _pool_node("supernet", "fabric_supernet")
+    fallback_pool = object()
+    fabric = SimpleNamespace(
+        name=_attr("Fabric-A"),
+        underlay_routing_protocol=_attr("ebgp"),
+        uplink_pool=None,
+        fabric_ip_pools=SimpleNamespace(edges=[SimpleNamespace(node=supernet_pool)]),
+    )
+    pod = SimpleNamespace(mlag_peer_pool=None, mlag_l3_pool=None, racks=SimpleNamespace(edges=[]))
+    gen = _make_generator({id(fallback_pool): "10.0.0.0/24"})
+    gen._ensure_fabric_supernet_fallback_pool = AsyncMock(return_value=fallback_pool)  # type: ignore[method-assign]
+
+    pools = await gen._extract_l3ls_pools(fabric, pod)
+
+    assert pools["uplink_ipv4_pool"] == "10.0.0.0/24"
+    gen._ensure_fabric_supernet_fallback_pool.assert_awaited_once_with(  # type: ignore[attr-defined]
+        fabric=fabric,
+        role=ResourceRole.FABRIC_POINT_TO_POINT,
+        fabric_pool_refs={ResourceRole.FABRIC_SUPERNET: supernet_pool},
+    )
 
 
 async def test_extract_l3ls_pools_uses_generated_mlag_l3_pool_alias() -> None:

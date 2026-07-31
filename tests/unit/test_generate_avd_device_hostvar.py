@@ -967,7 +967,7 @@ async def test_dci_l3_edge_hydrates_graphql_pool_before_allocation() -> None:
     allocation_kwargs = gen.client.allocate_next_ip_prefix.await_args.kwargs
     assert allocation_kwargs["resource_pool"] is hydrated_pool
     assert allocation_kwargs["member_type"] == "prefix"
-    assert allocation_kwargs["data"] == {"role": "technical"}
+    assert allocation_kwargs["data"] == {"role": "dci"}
     assert p2p_links[0]["ip"] == ["172.16.0.0/31", "172.16.0.1/31"]
 
 
@@ -1044,6 +1044,48 @@ async def test_dci_pool_falls_back_to_peer_endpoint_when_first_fabric_has_none()
 
     assert len(p2p_links) == 1
     assert gen.client.allocate_next_ip_prefix.await_args.kwargs["resource_pool"] is pool_dc2
+
+
+@pytest.mark.anyio
+async def test_dci_pool_uses_fabric_supernet_fallback_when_explicit_dci_pool_missing() -> None:
+    gen = _make_generator()
+    fallback_pool = _pool("fabric-a-dci-fallback")
+    gen.client.filters = AsyncMock(return_value=[fallback_pool])
+    gen.client.allocate_next_ip_prefix = AsyncMock(return_value=_mock_prefix("172.16.0.0/31"))
+    supernet_pool = {
+        "__typename": "CoreIPPrefixPool",
+        "id": "supernet",
+        "name": {"value": "Fabric-A-Supernet"},
+        "resources": {"edges": [_role_resource("fabric_supernet")]},
+    }
+    link = _dci_link(
+        endpoint_1=_dci_endpoint(
+            endpoint_id="dc1-eth5",
+            device_id="dc1-leaf1",
+            device_name="ih-dc1-leaf1a",
+            interface_name="Ethernet5",
+            device_asn=65101,
+            pool=None,
+            fabric_name="Fabric-A",
+        ),
+        endpoint_2=_dci_endpoint(
+            endpoint_id="dc2-eth5",
+            device_id="dc2-leaf1",
+            device_name="ih-dc2-leaf1a",
+            interface_name="Ethernet5",
+            device_asn=65201,
+            pool=None,
+            fabric_name="Fabric-B",
+        ),
+    )
+    fabric = link["connected_endpoints"]["edges"][0]["node"]["device"]["node"]["pod"]["node"]["parent"]["node"]
+    fabric["fabric_ip_pools"] = {"edges": [{"node": supernet_pool}]}
+
+    p2p_links = await build_dci_l3_edge_p2p_links(gen.client, dci_links=[link], hostname="ih-dc1-leaf1a")
+
+    assert len(p2p_links) == 1
+    gen.client.filters.assert_awaited_once_with(kind="CoreIPPrefixPool", name__value="Fabric-A-DCI-Pool")
+    assert gen.client.allocate_next_ip_prefix.await_args.kwargs["resource_pool"] is fallback_pool
 
 
 def test_endpoint_fabric_pool_prefers_fabric_ip_pools_dci_role() -> None:
@@ -1314,7 +1356,7 @@ async def test_dci_link_requires_fabric_dci_pool(caplog: pytest.LogCaptureFixtur
     )
 
     assert p2p_links == []
-    assert "neither endpoint fabric defines a dci_pool" in caplog.text
+    assert "neither endpoint fabric defines a DCI pool or Fabric Supernet fallback" in caplog.text
 
 
 @pytest.mark.anyio

@@ -280,6 +280,31 @@ class TestExtractDevicesFromFabric:
         result = gen._extract_devices_from_fabric(data)
         assert len(result) == 2
 
+    def test_devices_are_returned_in_hostname_order(self):
+        gen = _make_generator()
+        data = _make_fabric_query(
+            pods=[
+                _make_pod(
+                    pod_devices=[
+                        _make_pod_device("spine-2", "dev-2"),
+                        _make_pod_device("spine-1", "dev-1"),
+                    ],
+                    racks=[
+                        _make_rack(
+                            devices=[
+                                _make_rack_device("leaf-2", "dev-12"),
+                                _make_rack_device("leaf-1", "dev-11"),
+                            ]
+                        )
+                    ],
+                )
+            ]
+        )
+
+        result = gen._extract_devices_from_fabric(data)
+
+        assert [device["hostname"] for device in result] == ["leaf-1", "leaf-2", "spine-1", "spine-2"]
+
 
 # --- Tests for _fetch_hostvars_from_storage ---
 
@@ -311,6 +336,29 @@ class TestFetchHostvarsFromStorage:
         result = await gen._fetch_hostvars_from_storage(devices)
         assert "spine-1" in result
         assert result["spine-1"] == hostvars_data
+
+    @pytest.mark.anyio
+    async def test_fetches_hostvars_in_hostname_order(self):
+        gen = _make_generator()
+        artifacts = {
+            "leaf-1": json.dumps({"hostname": "leaf-1"}),
+            "spine-2": json.dumps({"hostname": "spine-2"}),
+        }
+
+        async def get_artifact(_kind: object, *, name__value: str, include: list[str]) -> AsyncMock:
+            artifact = AsyncMock()
+            artifact.hostvar_file.peer.download_file = AsyncMock(return_value=artifacts[name__value])
+            return artifact
+
+        gen.client.get = AsyncMock(side_effect=get_artifact)
+        devices = [
+            {"hostname": "spine-2", "id": "dev-2", "has_hostvar": True},
+            {"hostname": "leaf-1", "id": "dev-1", "has_hostvar": True},
+        ]
+
+        result = await gen._fetch_hostvars_from_storage(devices)
+
+        assert list(result) == ["leaf-1", "spine-2"]
 
     @pytest.mark.anyio
     async def test_handles_fetch_failure_gracefully(self):

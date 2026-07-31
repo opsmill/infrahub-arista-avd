@@ -45,18 +45,44 @@ def _fabric(pools: list[dict], *, underlay: str = "ebgp", overlay: str = "ebgp")
     }
 
 
-def _pod_data(*, pod_pools: list[dict], fabric_pools: list[dict]) -> dict:
+def _dci_link_for_fabric(fabric_id: str) -> dict:
+    return _edge(
+        {
+            "id": f"dci-{fabric_id}",
+            "connected_endpoints": {
+                "edges": [
+                    _edge(
+                        {
+                            "__typename": "InterfacePhysical",
+                            "device": {
+                                "node": {"id": "device-a", "pod": {"node": {"parent": {"node": {"id": fabric_id}}}}}
+                            },
+                        }
+                    )
+                ]
+            },
+        }
+    )
+
+
+def _pod_data(
+    *,
+    pod_pools: list[dict],
+    fabric_pools: list[dict],
+    underlay: str | None = "ebgp",
+    rack_mlag: bool | None = None,
+) -> dict:
     fabric = {
         "id": "fabric-a",
         "name": _attr("Fabric-A"),
+        "underlay_routing_protocol": _attr(underlay),
         "fabric_ip_pools": {"edges": [_edge(pool) for pool in fabric_pools]},
     }
+    racks = []
+    if rack_mlag is not None:
+        racks.append(_edge({"id": "rack-a", "mlag": _attr(rack_mlag)}))
     return {
-        "NetworkFabric": {
-            "edges": [
-                _edge({**fabric, "underlay_routing_protocol": _attr("ebgp"), "overlay_routing_protocol": _attr("ebgp")})
-            ]
-        },
+        "NetworkFabric": {"edges": [_edge({**fabric, "overlay_routing_protocol": _attr("ebgp")})]},
         "NetworkPod": {
             "edges": [
                 _edge(
@@ -65,6 +91,7 @@ def _pod_data(*, pod_pools: list[dict], fabric_pools: list[dict]) -> dict:
                         "name": _attr("Pod-A"),
                         "parent": {"node": fabric},
                         "pod_ip_pools": {"edges": [_edge(pool) for pool in pod_pools]},
+                        "racks": {"edges": racks},
                     }
                 )
             ]
@@ -92,6 +119,49 @@ async def test_fabric_pool_check_accepts_complete_fabric_pool_roles() -> None:
                 _pool("uplink", "CoreIPPrefixPool", ["fabric_point_to_point"]),
             ]
         )
+    )
+
+    check.log_error.assert_not_called()
+
+
+async def test_fabric_pool_check_scopes_dci_requirement_to_endpoint_fabric() -> None:
+    check = _check()
+    fabric_a = {
+        "id": "fabric-a",
+        "name": _attr("Fabric-A"),
+        "underlay_routing_protocol": _attr("ebgp"),
+        "overlay_routing_protocol": _attr("ebgp"),
+        "fabric_ip_pools": {
+            "edges": [
+                _edge(_pool("mgmt-a", "CoreIPAddressPool", ["management"])),
+                _edge(_pool("loopback-a", "CoreIPPrefixPool", ["loopback"])),
+                _edge(_pool("vtep-a", "CoreIPPrefixPool", ["loopback-vtep"])),
+                _edge(_pool("uplink-a", "CoreIPPrefixPool", ["fabric_point_to_point"])),
+                _edge(_pool("dci-a", "CoreIPPrefixPool", ["dci"])),
+            ]
+        },
+    }
+    fabric_b = {
+        "id": "fabric-b",
+        "name": _attr("Fabric-B"),
+        "underlay_routing_protocol": _attr("ebgp"),
+        "overlay_routing_protocol": _attr("ebgp"),
+        "fabric_ip_pools": {
+            "edges": [
+                _edge(_pool("mgmt-b", "CoreIPAddressPool", ["management"])),
+                _edge(_pool("loopback-b", "CoreIPPrefixPool", ["loopback"])),
+                _edge(_pool("vtep-b", "CoreIPPrefixPool", ["loopback-vtep"])),
+                _edge(_pool("uplink-b", "CoreIPPrefixPool", ["fabric_point_to_point"])),
+            ]
+        },
+    }
+
+    await check.validate(
+        {
+            "NetworkFabric": {"edges": [_edge(fabric_a), _edge(fabric_b)]},
+            "NetworkLink": {"edges": [_dci_link_for_fabric("fabric-a")]},
+            "NetworkPod": {"edges": []},
+        }
     )
 
     check.log_error.assert_not_called()
@@ -254,3 +324,34 @@ async def test_fabric_pool_check_rejects_mlag_prefix_pool_kind() -> None:
     )
 
     assert "must be CoreIPAddressPool" in str(check.log_error.call_args_list)
+
+
+async def test_fabric_pool_check_requires_mlag_and_mlag_peering_for_mlag_rack_with_underlay() -> None:
+    check = _check()
+
+    await check.validate(
+        _pod_data(
+            pod_pools=[_pool("pod-mlag", "CoreIPAddressPool", ["mlag"], prefix="169.254.0.0/31")],
+            fabric_pools=[_pool("mgmt", "CoreIPAddressPool", ["management"], prefix="192.0.2.0/24")],
+            underlay="ebgp",
+            rack_mlag=True,
+        )
+    )
+
+    assert "missing required MLAG pool roles: mlag_peering" in str(check.log_error.call_args_list)
+
+
+async def test_fabric_pool_check_requires_only_mlag_when_parent_underlay_is_none() -> None:
+    check = _check()
+
+    await check.validate(
+        _pod_data(
+            pod_pools=[],
+            fabric_pools=[_pool("mgmt", "CoreIPAddressPool", ["management"], prefix="192.0.2.0/24")],
+            underlay="none",
+            rack_mlag=False,
+        )
+    )
+
+    assert "missing required MLAG pool roles: mlag" in str(check.log_error.call_args_list)
+    assert "mlag_peering" not in str(check.log_error.call_args_list)

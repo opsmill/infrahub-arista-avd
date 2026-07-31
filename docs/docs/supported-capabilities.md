@@ -47,7 +47,7 @@ Services are modeled **schema-first**: L2 VLANs (L2LS), anycast SVIs on the camp
 | Capability | Status | Notes |
 |------------|:------:|-------|
 | Allocate loopback, interconnect, and management prefixes/IPs from pools | ✅ | Drawn from branch-aware pools so parallel work does not collide. |
-| Allocate DCI point-to-point /31 prefixes from a fabric DCI pool | ✅ | `NetworkFabric.dci_pool` is the authoritative source for generated DCI `l3_edge` addressing. |
+| Allocate DCI point-to-point /31 prefixes from fabric DCI pool roles | ✅ | Generated DCI `l3_edge` addressing resolves from `NetworkFabric.fabric_ip_pools` role `dci` first, legacy `NetworkFabric.dci_pool` second, and deterministic Fabric Supernet fallback when the required DCI prefix-pool role is missing. |
 | Allocate BGP ASNs and node IDs from pools | ✅ | Assigned automatically during generation. |
 
 ## Services (VLAN / EVPN / VRF / MLAG / LAG / routing)
