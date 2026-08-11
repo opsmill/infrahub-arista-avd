@@ -30,8 +30,8 @@ Scenario: you want to support a new Infrahub role (e.g. `border-leaf`) that maps
 2. **Reload the schema and regenerate generated files** — none of these files should be hand-edited:
    ```bash
    uv run invoke load-schema                                             # push schema to Infrahub
-   uv run infrahubctl graphql export-schema --out schema.graphql         # refresh the local GraphQL SDL
-   uv run infrahubctl protocols --out src/solution_arista_avd/protocols.py    # refresh typed protocol classes
+   uv run infrahubctl graphql export-schema --destination schema.graphql         # refresh the local GraphQL SDL
+   uv run infrahubctl protocols --schemas schemas --out src/solution_arista_avd/protocols.py    # refresh typed protocol classes
    ```
 3. **Role map** — add the mapping in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py):
    ```python
@@ -97,8 +97,8 @@ Scenario: you want PyAVD to receive an additional input field (e.g. a per-device
 2. **Reload the schema and regenerate generated files**:
    ```bash
    uv run invoke load-schema                                             # push schema to Infrahub
-   uv run infrahubctl graphql export-schema --out schema.graphql         # refresh the local GraphQL SDL
-   uv run infrahubctl protocols --out src/solution_arista_avd/protocols.py    # refresh typed protocol classes
+   uv run infrahubctl graphql export-schema --destination schema.graphql         # refresh the local GraphQL SDL
+   uv run infrahubctl protocols --schemas schemas --out src/solution_arista_avd/protocols.py    # refresh typed protocol classes
    ```
 3. **GraphQL query** — update [`generators/avd_device_hostvar.gql`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/avd_device_hostvar.gql) to pull the new field.
 4. **Pydantic query model** — regenerate, don't hand-edit:

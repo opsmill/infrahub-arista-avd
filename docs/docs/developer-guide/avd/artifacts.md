@@ -146,13 +146,14 @@ The checksum is computed **in-memory per run** — it is not a custom attribute 
 
 ## Artifact definitions
 
-Three artifact definitions (in [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml)) turn the stored data into user-visible artifacts:
+Four artifact definitions (in [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml)) turn the stored data into user-visible artifacts:
 
 | Artifact | Target group | Transform | Content type |
 |----------|-------------|-----------|--------------|
 | `avd_eos_configuration` | `avd_devices` | `avd_eos_config` | `text/plain` |
 | `avd_device_documentation` | `avd_devices` | `avd_device_doc` | `text/markdown` |
 | `avd_fabric_documentation` | `fabrics` | `avd_fabric_doc` | `text/markdown` |
+| `avd_anta_catalog` | `avd_devices` | `avd_anta_catalog` | `application/yaml` |
 
 ```yaml
 artifact_definitions:
@@ -165,7 +166,14 @@ artifact_definitions:
   - name: avd_device_documentation
     targets: avd_devices
     transformation: avd_device_doc
+  - name: avd_anta_catalog
+    targets: avd_devices
+    transformation: avd_anta_catalog
 ```
+
+The repository defines two further artifacts from the same data that are not part of the AVD
+pipeline: `cabling_plan` and `containerlab_topology`, both fabric-scoped. See
+[Transforms](../transforms.md).
 
 When an operator opens one of these artifacts in the UI, Infrahub runs the transform against the target node, which fetches the relevant file(s) from the `AvdArtifact` tree.
 

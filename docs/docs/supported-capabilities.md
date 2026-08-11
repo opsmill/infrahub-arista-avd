@@ -82,6 +82,23 @@ Services are modeled **schema-first**: L2 VLANs (L2LS), anycast SVIs on the camp
 | ANTA test-catalog generation | ✅ | The `avd_anta_catalog` transform, gated by `anta_enabled`. |
 | ANTA execution / block-merge-on-failure | ⬜ | Running the tests and blocking merges on failure is on the roadmap. |
 
+## Validation (CloudVision)
+
+| Capability | Status | Notes |
+|------------|:------:|-------|
+| CloudVision config validation in a proposed change | ✅ | The `cv-config-validation` check deploys the rendered configs to a CloudVision workspace and blocks the proposed change on a failed build. Opt in per fabric with `cloudvision_managed`. See [CloudVision Validation](/cloudvision). |
+| Workspace tracking and review link | ✅ | Each workspace is recorded as a `CloudvisionWorkspace` object and its URL posted to the proposed change. |
+| Workspace submission | 🟡 | Submission runs from a `CoreCustomWebhook` on proposed-change merge, or manually via `invoke submit-cv-workspace`. The shipped webhook target is a placeholder URL, not a production receiver. |
+| CloudVision change-control management | ⬜ | Out of scope for this phase. |
+
+## Lab
+
+| Capability | Status | Notes |
+|------------|:------:|-------|
+| ContainerLab topology per fabric | ✅ | The `containerlab_topology` artifact renders every device and link the fabric owns; kinds, images, and interface mappings come from schema attributes. See [ContainerLab](/containerlab). |
+| Deploying the generated topology | ✅ | `ansible/deploy_clab.yml` stages the topology, EOS configs, and bind sources on a ContainerLab host and deploys them. The Semaphore template fetches and stages only — it does not deploy. |
+| ISIS-LDP devices in the generated topology | ⬜ | The `p`, `pe`, and `rr` roles are excluded; their interface naming is not validated against ContainerLab. |
+
 ## Deployment
 
 | Capability | Status | Notes |

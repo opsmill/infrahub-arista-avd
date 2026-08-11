@@ -59,7 +59,7 @@ uv run invoke load
 
 **Cause**
 
-Triggers connect the generators into a chain: `generate-fabric` → `generate-pod` → `generate-rack` → `generate-avd-device-hostvar` → `generate-avd-device-structured-config`. If triggers didn't load (step 6 of `invoke load`), the chain is broken.
+Triggers connect the generators into a chain: `generate-fabric` → `generate-pod` → `generate-rack` → `generate-avd-device-hostvar` → `generate-avd-device-structured-config`. If triggers didn't load — the last step of `invoke load` — the chain is broken.
 
 **Diagnose**
 
@@ -135,6 +135,51 @@ Once the task completes, the artifact will render on the next open.
 
 Alternatively, in the artifact preview panel, click **Regenerate**.
 
+## The ANTA catalog artifact contains only a comment
+
+**Symptoms**
+
+The **AVD ANTA Catalog** artifact renders successfully but holds a single line:
+
+```text
+# ANTA disabled for fabric Fabric-L3LS-MultiPod-A
+```
+
+**Cause**
+
+Catalog generation is opt-in per fabric. The transform checks `NetworkFabric.anta_enabled` and
+returns a marker comment rather than failing, so the artifact always renders and states why it is
+empty.
+
+**Fix**
+
+Set `anta_enabled` on the fabric — on a branch, as with any data change — and regenerate. Two other
+markers point elsewhere:
+
+| Marker | Meaning |
+|--------|---------|
+| `# No structured config for <device>` | The structured-config generator hasn't produced a config for that device — see the section above |
+| `# ANTA catalog: no fabric for <device>` | The device has no pod, or its pod has no parent fabric |
+
+## CloudVision validation is skipped or fails
+
+**Symptoms**
+
+- The `cv-config-validation` check reports an informational skip on a proposed change.
+- The check fails with a CloudVision connection or authentication error.
+
+**Diagnose and fix**
+
+| What you see | Cause | Fix |
+|---|---|---|
+| Check skips everything | The fabric has `cloudvision_managed` set to `false` | Set it on the fabric; unmanaged fabrics skip credentials, serial, inventory, and workspace checks by design |
+| Connection or auth failure | `CLOUDVISION_SERVERS` / `CLOUDVISION_TOKEN` not reaching the task worker | `docker-compose.override.yml` forwards them from your shell (or a `.env` file) into the Infrahub containers, so set them and re-run `uv run invoke start` — `restart` reuses the existing containers and their old environment |
+| "device has no serial number" or an inventory error | A confirmed device in the fabric is missing a serial, or isn't in CloudVision inventory | Fix the device data, or remove it from the fabric before validating |
+| Informational skip, workspace never created | No device in the fabric has a generated structured config yet | Run the structured-config generator first |
+
+See [CloudVision Validation](./cloudvision.md) for the full behaviour and
+[Checks](./developer-guide/checks.md) for how to run the check directly.
+
 ## Service portal is down but Infrahub is up
 
 **Symptoms**
@@ -147,7 +192,14 @@ Alternatively, in the artifact preview panel, click **Regenerate**.
 Restart the service portal container:
 
 ```bash
-uv run invoke restart --component=service-portal
+uv run invoke restart --component=service-catalog
+```
+
+The compose service is named `service-catalog`; `--component` takes a compose service name, which
+you can list with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml config --services
 ```
 
 If the portal is unavailable and you need to complete a workflow, you can do most operations directly in the Infrahub UI:

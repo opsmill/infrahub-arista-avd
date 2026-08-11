@@ -111,6 +111,13 @@ Generators run in sequence to build infrastructure:
 └─────────────────────────┘
 ```
 
+Two further generators sit outside this chain:
+
+- **`ServerCablingGenerator`** (on `ComputePhysicalServer`) cables a server to the leaves in its rack, then reconciles its LAGs and VLANs and re-triggers hostvar generation for those leaves.
+- **`BackfillStructuredConfigGenerator`** (on `AvdStructuredConfigFile`) runs in the opposite direction, reading AVD's structured-config output back into IPAM, interface, BGP, and routing objects.
+
+See [Generators](./generators.md).
+
 ## Transform Pipeline
 
 Transforms convert data to artifacts:
@@ -126,7 +133,13 @@ Examples:
 - NetworkFabric → CablingPlan → CSV cabling matrix
 - DcimDevice → AvdEosConfig → EOS CLI configuration
 - NetworkFabric → AvdFabricDoc → Markdown documentation
+- DcimDevice → AvdAntaCatalog → ANTA test catalog (YAML)
+- NetworkFabric → ContainerLabTopology → ContainerLab topology (YAML)
 ```
+
+## Validation Pipeline
+
+Alongside transforms, proposed-change validation runs **checks** — Python routines that report pass, information, or error rather than producing an artifact. The repository ships one, `cv-config-validation`, which deploys the rendered EOS configs into a CloudVision workspace and blocks the proposed change on a failed build. See [Checks](./checks.md).
 
 ## Checksum-Based Change Detection
 
@@ -190,6 +203,8 @@ services:
 - Infrahub configuration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — the queries, generators, transforms, and artifact definitions registered with Infrahub.
 - Schemas: [`schemas/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/schemas) — the data model.
 - Generators: [`generators/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/generators) — Python generator classes.
-- Transforms: [`transforms/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/transforms) — Python and Jinja2 transforms.
+- Transforms: [`transforms/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/transforms) — Python transform classes and templates.
+- Checks: [`checks/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/checks) — proposed-change validation, currently CloudVision.
+- Playbooks: [`ansible/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/ansible) — the tree Semaphore runs, including EOS config deployment and ContainerLab staging.
 - Core library: [`src/solution_arista_avd/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/src/solution_arista_avd) — shared protocols, AVD utilities, sorting, addressing.
 - Service portal: [`service_catalog/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/service_catalog) — Streamlit UI that orchestrates the portal workflows.

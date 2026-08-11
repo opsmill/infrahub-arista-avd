@@ -65,10 +65,13 @@ latest configs and requesting a build.
 When the tracking schema is loaded, validation also creates or updates a
 `CloudvisionWorkspace` object in Infrahub. The object tracks:
 
+- `name`: workspace display name
 - `workspace_id`: deterministic CloudVision workspace ID
 - `proposed_change_id`: proposed change that created the workspace
 - `workspace_url`: exact CloudVision workspace URL shown to reviewers
 - `thread_id`: proposed-change overview thread used for workspace comments
+- `change_control_id` / `change_control_url`: CloudVision change control created
+  during submission, when one exists
 - `last_submission_error` / `last_submission_attempt_at`: latest failed
   CustomWebhook submission attempt
 - `submitted_at`: successful submission timestamp
@@ -159,3 +162,10 @@ is handled by CustomWebhook processing or the manual retry task, not
 by the pre-merge validation check.
 
 CloudVision change-control management and Semaphore Ansible playbooks are out of scope for this phase. The CustomWebhook is only the handoff point for future deployment automation after linked workspace submission.
+
+## Related
+
+- [Checks](/developer-guide/checks) — how the check is wired, its query and supporting modules, and
+  how to run or extend it.
+- [Schemas → CloudvisionWorkspace](/developer-guide/schemas#cloudvisionworkspace--cloudvisionworkspace)
+  — the tracking node's attributes and relationships.
