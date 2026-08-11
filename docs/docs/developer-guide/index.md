@@ -19,6 +19,7 @@ This guide is for **contributors** who want to extend, debug, or maintain the AV
 - **[Schemas](./schemas.md)** — every YAML schema file and the kinds it defines.
 - **[Generators](./generators.md)** — the generator framework, file structure, and per-generator behaviour.
 - **[Transforms](./transforms.md)** — Python and Jinja2 transforms, queries, and content types.
+- **[Checks](./checks.md)** — proposed-change validation checks, including CloudVision configuration validation.
 
 ## AVD Pipeline
 

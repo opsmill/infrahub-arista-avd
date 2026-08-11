@@ -32,6 +32,7 @@ const sidebars: SidebarsConfig = {
         'developer-guide/schemas',
         'developer-guide/generators',
         'developer-guide/transforms',
+        'developer-guide/checks',
         'developer-guide/concepts',
         {
           type: 'category',

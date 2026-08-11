@@ -19,11 +19,12 @@ Regenerate the typed protocol classes after any schema change (see [the command 
 
 | File | Defines |
 |------|---------|
-| `base/dcim.yml` | `Dcim.GenericDevice`, `Dcim.PhysicalDevice`, `Dcim.Device`, interface generics/nodes, `Dcim.DeviceType`, `Dcim.Platform` |
+| `base/dcim.yml` | `Dcim.GenericDevice`, `Dcim.PhysicalDevice`, `Dcim.Device`, interface generics/nodes, `Dcim.DeviceType` (incl. `containerlab_interface_mapping`), `Dcim.Platform` (incl. `containerlab_os`, `containerlab_image`) |
 | `base/ipam.yml` | `Ipam.IPAddress`, `Ipam.Prefix` base definitions |
 | `base/location.yml` | `Location.Generic`, `Location.Hosting` base definitions |
 | `base/organization.yml` | `Organization.Generic`, `Organization.Manufacturer`, `Organization.Provider` |
-| `logical_design.yml` | `Network.Fabric`, `Network.Pod`, `Network.BuildingBlock` |
+| `logical_design.yml` | `Network.Fabric` (incl. `cloudvision_managed`), `Network.Pod`, `Network.BuildingBlock` |
+| `device_design.yml` | `Network.DeviceDesign` generic plus the fabric/pod/rack device-design nodes |
 | `dcim_extensions.yml` | `Network.Link`, including `role=dci` and DCI link fields, plus device extensions (`role`, BGP ASN relationship, `node_id`, loopback/mgmt, pod/rack relations) and the interface `role`/`description`/`ip_address` extensions |
 | `dci.yml` | `NetworkFabric.dci_pool` DCI addressing source |
 | `l3ls_extensions.yml` | L3LS fabric attributes (routing protocols, MTU, spanning-tree, EVPN overlay) and pod/rack/VRF/MLAG extensions |
@@ -40,6 +41,7 @@ Regenerate the typed protocol classes after any schema change (see [the command 
 | `routing/routing.yml` | `Routing.BGPPeerGroup`, `Routing.BGPNeighbor`, prefix lists, route maps, static routes |
 | `compute/compute.yml` | `Compute.GenericUnit`, `Compute.PhysicalServer`, virtualization hosts |
 | `avd/avd.yml` | `Avd.Evpn` |
+| `cv/cv.yml` | `Cloudvision.Workspace` — CloudVision workspace tracking for proposed-change validation |
 | `objects/objects.yml` | `Avd.Artifact`, `Avd.HostvarFile`, `Avd.StructuredConfigFile` |
 
 The device and interface `role` dropdowns that the fabric uses are defined in `dcim_extensions.yml`, not in the base `dcim.yml` — the extension redefines the base lists.
@@ -77,7 +79,7 @@ Normalized description of the devices a container should produce, defined in `de
 - **Identity**: a design is unique per `(container, role)`; `human_friendly_id` is `"<container-name>__<role>"`. "None of a role" is the **absence** of a design (replacing `amount_of_*: 0`).
 
 In seed data, designs are nested under their container. A rack with an MLAG leaf
-pair and a single L2 leaf looks like this (from `objects/11_rack.yml`):
+pair and a single L2 leaf looks like this (from `objects/10a_l3ls_multipod_rack.yml`):
 
 ```yaml
 - name: "Rack-A2-1"
@@ -226,6 +228,19 @@ AVD EVPN fabric-wide settings. Attributes include `ebgp_multihop` and `overlay_b
 
 AVD-specific fabric tag object. Attributes: `name`, `description`. Relationships: `racks` → `LocationRack`; reciprocal rack assignments emit pyAVD node-group `filter.tags`, and SVI `avd_tags` emit pyAVD SVI `tags`.
 
+## CloudVision
+
+### `CloudvisionWorkspace` — `Cloudvision.Workspace`
+
+Tracks one CloudVision workspace created by the `cv-config-validation` check for a proposed change and fabric, defined in `cv/cv.yml`. Excluded from the UI menu (`include_in_menu: false`); identified by `workspace_id`.
+
+- **Attributes**: `name` (display name), `workspace_id` (unique — the CloudVision workspace UUID), `proposed_change_id`, `workspace_url`, `thread_id` (the `CoreChangeThread` used for lifecycle comments), `change_control_id` and `change_control_url` (set when a change control exists), `last_submission_error`, `last_submission_attempt_at`, `submitted_at`, and `status`.
+- **Relationships**: `fabric` → `NetworkFabric` (cardinality one).
+
+The workspace ID is derived deterministically from the proposed-change ID and the fabric name, so re-running validation updates the same workspace rather than creating another. See [Checks](./checks.md) and [CloudVision Validation](/cloudvision).
+
+Fabrics opt in through `NetworkFabric.cloudvision_managed` (Boolean, default `false`) in `logical_design.yml`; the check skips everything else when it is false.
+
 ## Generator target
 
 ### `GeneratorTarget` — `Generator.Target` (generic)
@@ -234,11 +249,21 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 
 ## Dropdown reference
 
-**Device role** (`DcimDevice.role`): `super_spine`, `spine`, `leaf`, `border_leaf`, `l2leaf`.
+**Device role** (`DcimDevice.role`): `super_spine`, `spine`, `leaf`, `border_leaf`, `l2leaf`, `l2spine`, `l3spine`, `p`, `pe`, `rr`.
 
-**Interface role** (`DcimInterface.role`): `uplink`, `access`, `spine`, `super_spine`, `leaf`, `loopback`, `server`, `peering`, `storage`, `mlag_peer`.
+**Interface role** (`DcimInterface.role`): `uplink`, `access`, `spine`, `super_spine`, `leaf`, `loopback`, `vtep_loopback`, `server`, `peering`, `storage`, `mlag_peer`.
 
 **Pod role** (`NetworkPod.role`): `fabric`, `cpu`, `storage`.
+
+**Rack type** (`LocationRack.rack_type`): `compute`, `storage`.
+
+**Underlay routing protocol** (`NetworkFabric.underlay_routing_protocol`): `ebgp`, `ospf`, `none`, `isis-ldp`.
+
+**Overlay routing protocol** (`NetworkFabric.overlay_routing_protocol`): `ebgp`, `ibgp`.
+
+**Spanning-tree mode** (`NetworkFabric.spanning_tree_mode`): `mstp`, `rstp`, `rapid-pvst`, `none`.
+
+**CloudVision workspace status** (`CloudvisionWorkspace.status`): `pending`, `built`, `submitted`, `abandoned`, `submit_failed`.
 
 **Prefix role** (`IpamPrefix.role`): `supernet`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
 
@@ -253,8 +278,10 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 - [`schemas/base/ipam.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/base/ipam.yml) + [`schemas/ipam_extensions.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/ipam_extensions.yml) — IPAM nodes (the `Prefix` `role`/`status` dropdowns live in the extension).
 - [`schemas/avd/avd.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/avd/avd.yml) — `Avd.Evpn`, `Avd.Tag`.
 - [`schemas/objects/objects.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/objects/objects.yml) — `Avd.Artifact`, `Avd.HostvarFile`, `Avd.StructuredConfigFile` (see [AvdArtifact & File Storage](./avd/artifacts.md) for the full reference).
+- [`schemas/cv/cv.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/cv/cv.yml) — `Cloudvision.Workspace`.
+- [`schemas/device_design.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/device_design.yml) — `Network.DeviceDesign` and the per-container design nodes.
 - Generated protocols: [`src/solution_arista_avd/protocols.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/protocols.py) — regenerate after any schema change with:
   ```bash
-  uv run infrahubctl protocols --out src/solution_arista_avd/protocols.py
+  uv run infrahubctl protocols --schemas schemas --out src/solution_arista_avd/protocols.py
   ```
   Note the `--out` flag (not `--output`) and the explicit path — the default would drop `schema_protocols.py` in the current directory instead of overwriting the checked-in file.

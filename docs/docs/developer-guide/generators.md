@@ -214,6 +214,53 @@ For EVPN Multi-Domain Gateway hostvars, the query fetches `EvpnGatewayGroup.loca
 
 **Query**: `generate_avd.gql`
 
+### ServerCablingGenerator
+
+**File**: `generators/generate_server_cabling.py`
+
+**Target**: `ComputePhysicalServer` (group `servers`)
+
+**Purpose**: Cable a server to the leaf switches in its rack, then reconcile its LAGs and VLANs
+
+**Actions**:
+
+1. Resolve the server's rack and find the `leaf` / `l2leaf` switches in it
+2. Build sorted interface maps for the server and for the leaves' `role=server` interfaces
+3. On first run, pick the next free port index across those leaves and create the links; on a
+   re-run, rebuild the existing cabling plan instead of cabling again
+4. For a dual-homed server, create the server-side `Bond1` and the switch-side
+   `Port-Channel<ID>` LAGs, assign members, and set `evpn_ethernet_segment` when the pair is not
+   MLAG-backed
+5. Assign VLANs from server intent — on a single-homed server they stay on the physical interface,
+   on a dual-homed server they are assigned to the LAG
+6. Trigger AVD hostvar regeneration for the leaves the server connects to
+
+**Query**: `generate_server_cabling.gql`
+
+Because steps 3–5 run on every invocation, the generator is the reconciliation path as well as the
+creation path: re-running it after a VLAN or LAG change updates an already-cabled server without
+producing duplicate links. The operator-facing walkthrough is
+[Add a Server](/how-to/add-server).
+
+### BackfillStructuredConfigGenerator
+
+**File**: `generators/backfill_structured_config.py`
+
+**Target**: `AvdStructuredConfigFile` (group `avd_structured_configs`)
+
+**Purpose**: Read AVD's structured-config output back into the Infrahub data model
+
+**Actions**: Parse each device's stored structured config and upsert the objects it implies —
+`IpamPrefix` and `IpamIPAddress` entries, `DcimInterface.mtu`, BGP peer groups and neighbors,
+prefix lists, route maps, and static routes.
+
+**Query**: `backfill_structured_config.gql`
+
+This generator runs in the opposite direction to the rest of the chain: everything else turns intent
+into AVD inputs, while the backfill turns AVD's derived output into queryable objects. Those objects
+are reconciled *from* AVD, not authored as inputs — see
+[Supported Capabilities](/supported-capabilities).
+
 ## Generator Execution Order
 
 Run generators in this order for a new fabric:
@@ -261,12 +308,22 @@ VTEP loopback IP, and ASN. Existing non-empty operator values, including
 
 ### Via infrahubctl CLI
 
+The CLI takes the generator name followed by `key=value` variables — the parameters declared for
+that generator in `.infrahub.yml`. Every generator here is parameterised by `name`, so the value is
+the target object's name, not its ID:
+
 ```bash
-# Run generator on a specific target
-infrahubctl generator run generate-fabric --target <fabric-id>
-infrahubctl generator run generate-pod --target <pod-id>
-infrahubctl generator run generate-rack --target <rack-id>
+uv run infrahubctl generator generate-fabric name=Fabric-L3LS-MultiPod-A --branch <branch-name>
+uv run infrahubctl generator generate-pod name=Pod-A2 --branch <branch-name>
+uv run infrahubctl generator generate-rack name=Rack-A2-1 --branch <branch-name>
+uv run infrahubctl generator generate-avd-device-hostvar name=leaf-pod-a2-1-1 --branch <branch-name>
+
+# List the generators the repository defines
+uv run infrahubctl generator --list
 ```
+
+`backfill-structured-config` is the exception: its parameter is the artifact name
+(`artifact__name__value`), still passed as `name=`.
 
 ## GeneratorMixin
 
@@ -332,7 +389,7 @@ Each generator has a corresponding query class for type-safe parsing. **These `*
 uv run infrahubctl graphql generate-return-types generators/generate_fabric.gql
 ```
 
-This reads `schema.graphql` at the repo root (refresh with `uv run infrahubctl graphql export-schema --out schema.graphql` when needed) and emits the matching `*_query.py` next to the query file.
+This reads `schema.graphql` at the repo root (refresh with `uv run infrahubctl graphql export-schema --destination schema.graphql` when needed) and emits the matching `*_query.py` next to the query file.
 
 Shape of a typical generated class:
 
@@ -374,7 +431,21 @@ generator_definitions:
     class_name: RackGenerator
     targets: racks
     query: generate_rack
+
+  - name: generate-server-cabling
+    file_path: "./generators/generate_server_cabling.py"
+    class_name: ServerCablingGenerator
+    targets: servers
+    query: generate_server_cabling
+
+  - name: backfill-structured-config
+    file_path: "./generators/backfill_structured_config.py"
+    class_name: BackfillStructuredConfigGenerator
+    targets: avd_structured_configs
+    query: backfill_structured_config
 ```
+
+The AVD generators are registered in the same block; the file is the authoritative list of all seven.
 
 ## File Structure
 
@@ -394,7 +465,13 @@ generators/
 ├── generate_avd_device_structured_config.py  # AVD structured config
 ├── generate_avd.gql                # AVD fabric query
 ├── generate_avd_inputs_query.py    # AVD fabric Pydantic models
-└── generate_avd_device_inputs_query.py  # AVD device Pydantic models
+├── generate_avd_device_inputs_query.py  # AVD device Pydantic models
+├── generate_server_cabling.py      # Server cabling generator
+├── generate_server_cabling.gql     # Server cabling query
+├── server_cabling_query.py         # Server cabling Pydantic models
+├── backfill_structured_config.py   # Structured-config backfill generator
+├── backfill_structured_config.gql  # Backfill query
+└── backfill_structured_config_query.py  # Backfill Pydantic models
 ```
 
 ## Source
@@ -404,6 +481,8 @@ generators/
   - [`generators/generate_fabric.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_fabric.py) — `FabricGenerator`.
   - [`generators/generate_pod.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_pod.py) — `PodGenerator`.
   - [`generators/generate_rack.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_rack.py) — `RackGenerator`.
+  - [`generators/generate_server_cabling.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_server_cabling.py) — `ServerCablingGenerator`.
+  - [`generators/backfill_structured_config.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/backfill_structured_config.py) — `BackfillStructuredConfigGenerator`.
 - AVD generators (documented in detail in the [AVD Pipeline sub-section](./avd/overview.md)):
   - [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) — `GenerateAVDDeviceHostvar`.
   - [`generators/generate_avd_device_structured_config.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_structured_config.py) — `AvdDeviceStructuredConfigGenerator`.

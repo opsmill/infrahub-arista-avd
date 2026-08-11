@@ -27,6 +27,9 @@ Key docs to read before larger changes:
   query models.
 - `transforms/` - Python transforms, GraphQL queries, generated query models,
   and templates.
+- `checks/` - proposed-change checks (CloudVision validation and its workspace
+  lifecycle helpers).
+- `ansible/` - playbooks Semaphore runs, including ContainerLab deployment.
 - `schemas/` - Infrahub schema definitions, split between base schemas and
   project/feature extensions.
 - `objects/` - seed data loaded in filename order.
@@ -61,8 +64,12 @@ Current generator definitions are registered in `.infrahub.yml`:
 `backfill-structured-config`.
 
 Current Python transforms are: `computed_interface_description`, `cabling_plan`,
-`avd_eos_config`, `avd_fabric_doc`, `avd_device_doc`, `avd_anta_catalog`, and
-`containerlab_topology`.
+`avd_eos_config`, `avd_fabric_doc`, `avd_device_doc`, `avd_anta_catalog`,
+`containerlab_topology`, and `cv_workspace_submission_webhook_payload`.
+
+The only check definition is `cv-config-validation` (`checks/cv_config_check.py`),
+with its workspace lifecycle and helpers in `checks/cv_workspace_lifecycle.py` and
+`checks/cv_helpers.py`.
 
 ## Development workflow
 
@@ -139,7 +146,7 @@ uv run invoke stop
 uv run invoke destroy
 uv run invoke restart
 uv run invoke restart --component=infrahub-server
-uv run invoke restart --component=service-portal
+uv run invoke restart --component=service-catalog
 uv run invoke load
 uv run invoke load-schema
 uv run invoke load-menu

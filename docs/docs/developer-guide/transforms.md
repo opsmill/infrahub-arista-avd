@@ -20,6 +20,10 @@ Transforms convert Infrahub data into usable outputs (configs, documentation, co
 1. **Python Transforms** - Complex logic, external library calls (PyAVD)
 2. **Jinja2 Transforms** - Template-based text generation
 
+Every transform this repository registers is a Python transform. One of them,
+`containerlab_topology`, renders its output through a Jinja2 template it loads itself; the
+`jinja2_transforms:` block of `.infrahub.yml` is unused here.
+
 ## Transform Architecture
 
 ```
@@ -129,6 +133,61 @@ class AvdFabricDocTransform(InfrahubTransform):
 **Input**: DcimDevice
 **Output**: Markdown documentation for single device
 
+### AvdAntaCatalogTransform
+
+**File**: `transforms/avd_anta_catalog.py`
+
+**Purpose**: Render a per-device [ANTA](https://anta.arista.com) test catalog from the stored
+structured config
+
+**Input**: DcimDevice
+**Output**: YAML catalog, or a one-line marker comment
+
+Unlike EOS config rendering, catalog generation needs fabric-wide data, so the transform gathers
+every sibling device's structured config in the same fabric into one `AVDFabricData` before calling
+`pyavd.get_device_test_catalog()`.
+
+It is gated by the fabric's `anta_enabled` flag. When ANTA is disabled — or the device has no
+fabric, or no structured config — the transform returns a marker comment instead of a catalog, so
+the artifact renders successfully and says why it is empty:
+
+```text
+# ANTA disabled for fabric Fabric-L3LS-Multi-Domain
+```
+
+### ContainerLabTopology
+
+**File**: `transforms/containerlab_topology.py`
+
+**Purpose**: Render a [ContainerLab](https://containerlab.dev) topology file for a whole fabric
+
+**Input**: NetworkFabric
+**Output**: YAML topology (`topology.clab.yml` shape)
+
+The transform uses two queries — `containerlab_topology` for the fabric's devices and
+`containerlab_link_endpoints` to resolve link endpoints in batches — and renders through the
+`transforms/templates/containerlab_topology.j2` template. Node kinds, container images, and the
+interface-mapping bind come from schema attributes (`DcimPlatform.containerlab_os`,
+`DcimPlatform.containerlab_image`, `DcimDeviceType.containerlab_interface_mapping`), so changing the
+cEOS version is a data change rather than a code change.
+
+Nodes and links are emitted in a stable sorted order, so two renders of unchanged data are
+byte-identical. See the [ContainerLab page](/containerlab) for the full artifact shape, the
+role-selection rules, and how to deploy the topology.
+
+### CVWorkspaceSubmissionWebhookPayload
+
+**File**: `transforms/cv_workspace_submission_webhook.py`
+
+**Purpose**: Build the JSON body for the CloudVision workspace-submission `CoreCustomWebhook`
+
+**Input**: CloudvisionWorkspace
+**Output**: JSON object — check name, proposed-change ID, and one entry per linked workspace with
+its ID, status, URL, and fabric name
+
+This transform has no artifact definition: it is referenced by the webhook rather than rendered to
+the object store. See [Checks](./checks.md) for how it fits the CloudVision validation pipeline.
+
 ## Query Classes
 
 Each transform has Pydantic models for type-safe query parsing. **These `*_query.py` files are generated, not hand-written** — regenerate them whenever the `.gql` query or the schema changes:
@@ -137,7 +196,7 @@ Each transform has Pydantic models for type-safe query parsing. **These `*_query
 uv run infrahubctl graphql generate-return-types transforms/computed_interface_description.gql
 ```
 
-This reads `schema.graphql` at the repo root (refresh with `uv run infrahubctl graphql export-schema --out schema.graphql` when needed) and emits the matching `*_query.py` next to the query file.
+This reads `schema.graphql` at the repo root (refresh with `uv run infrahubctl graphql export-schema --destination schema.graphql` when needed) and emits the matching `*_query.py` next to the query file.
 
 Shape of a typical generated class:
 
@@ -184,7 +243,20 @@ artifact_definitions:
     targets: avd_devices
     transformation: avd_device_doc
     content_type: text/markdown
+
+  - name: avd_anta_catalog
+    targets: avd_devices
+    transformation: avd_anta_catalog
+    content_type: application/yaml
+
+  - name: containerlab_topology
+    targets: fabrics
+    transformation: containerlab_topology
+    content_type: application/yaml
 ```
+
+`cv_workspace_submission_webhook_payload` is deliberately absent from this block — it renders a
+webhook body, not an artifact.
 
 ### Viewing Artifacts
 
@@ -224,6 +296,19 @@ python_transforms:
   - name: avd_device_doc
     class_name: AvdDeviceDocTransform
     file_path: "./transforms/avd_device_doc.py"
+
+  - name: avd_anta_catalog
+    class_name: AvdAntaCatalogTransform
+    file_path: "./transforms/avd_anta_catalog.py"
+
+  - name: containerlab_topology
+    class_name: ContainerLabTopology
+    file_path: "./transforms/containerlab_topology.py"
+
+  - name: cv_workspace_submission_webhook_payload
+    class_name: CVWorkspaceSubmissionWebhookPayload
+    file_path: "./transforms/cv_workspace_submission_webhook.py"
+    convert_query_response: false
 ```
 
 ## File Structure
@@ -242,7 +327,20 @@ transforms/
 ├── avd_fabric_doc.py                      # Fabric documentation
 ├── avd_device_doc.py                      # Device documentation
 ├── avd_fabric_devices.gql                 # Fabric devices query
-└── avd_fabric_devices_query.py            # Pydantic models
+├── avd_fabric_devices_query.py            # Pydantic models
+├── avd_anta_catalog.py                    # ANTA catalog transform
+├── avd_anta_catalog.gql                   # ANTA catalog query
+├── avd_anta_catalog_query.py              # Pydantic models
+├── containerlab_topology.py               # ContainerLab topology transform
+├── containerlab_topology.gql              # Fabric device/link query
+├── containerlab_topology_query.py         # Pydantic models
+├── containerlab_link_endpoints.gql        # Batched link-endpoint query
+├── containerlab_link_endpoints_query.py   # Pydantic models
+├── cv_workspace_submission_webhook.py     # CloudVision webhook payload
+├── cv_workspace_submission_webhook.gql    # Workspace query
+├── cv_workspace_submission_webhook_query.py  # Pydantic models
+└── templates/
+    └── containerlab_topology.j2           # ContainerLab topology template
 ```
 
 ## Creating New Transforms
@@ -322,6 +420,10 @@ jinja2_transforms:
   - [`transforms/avd_device_doc.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/avd_device_doc.py) — `AvdDeviceDocTransform`.
   - [`transforms/computed_interface_description.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/computed_interface_description.py) — `ComputedInterfaceDescription`.
   - [`transforms/cabling_plan.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/cabling_plan.py) — `CablingPlan`.
-- Jinja2 transforms: [`transforms/templates/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/transforms/templates).
-- Registration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — `python_transforms:`, `jinja2_transforms:`, and `artifact_definitions:` blocks.
+  - [`transforms/avd_anta_catalog.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/avd_anta_catalog.py) — `AvdAntaCatalogTransform`.
+  - [`transforms/containerlab_topology.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/containerlab_topology.py) — `ContainerLabTopology`.
+  - [`transforms/cv_workspace_submission_webhook.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/transforms/cv_workspace_submission_webhook.py) — `CVWorkspaceSubmissionWebhookPayload`.
+- Templates: [`transforms/templates/`](https://github.com/opsmill/infrahub-arista-avd/tree/main/transforms/templates).
+- Registration: [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml) — `python_transforms:` and `artifact_definitions:` blocks.
 - The AVD transforms are documented in detail on the [AVD Transforms](./avd/transforms.md) page.
+- The CloudVision webhook payload transform is documented alongside the [Checks](./checks.md) it serves.

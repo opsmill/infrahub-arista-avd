@@ -32,11 +32,19 @@ This creates a virtualenv under `.venv/` and installs the project and its depend
 The project extends the base Infrahub image with `pyavd` and project code. Build the image once:
 
 ```bash
-export INFRAHUB_BASE_VERSION=1.10.1
 uv run invoke build
 ```
 
-Re-run this only after changes to `Dockerfile` or the Python dependencies.
+To build against a different Infrahub release, set `INFRAHUB_BASE_VERSION` first — the compose files
+default to `1.10.1`:
+
+```bash
+export INFRAHUB_BASE_VERSION=1.10.3
+uv run invoke build
+```
+
+Re-run this only after changes to `Dockerfile` or the Python dependencies. `invoke build --no-cache`
+forces a clean rebuild.
 
 ## 3. Start the stack
 
@@ -52,6 +60,10 @@ This brings up, in the background:
 | Service Portal | `http://localhost:8501` | Streamlit self-service portal |
 | Semaphore | `http://localhost:3000` | Ansible automation runner |
 | Neo4j Browser | `http://localhost:7474` | Graph database browser |
+| Prefect | `http://localhost:4200` | Task-manager UI — where generator, transform, and check runs show up |
+
+`invoke start` also creates `lab/clab-staging/` before compose runs, so the Semaphore container has a
+writable bind-mount source for [ContainerLab](./containerlab.md) files.
 
 Wait for services to become healthy. You can check with:
 
@@ -76,7 +88,12 @@ This runs, in order:
 3. Load the UI menu from `menus/`.
 4. Load seed data from `objects/` — manufacturers, device types, IP pools, profiles, device templates, fabrics, racks, VLANs.
 5. Register this repository with Infrahub and wait for it to reach `in-sync`.
-6. Load event triggers and rules from `triggers.yml`.
+6. Load the check queries from `repository_checks.yml`, which depend on the repository being synced.
+7. Load event triggers and rules from `triggers.yml`.
+
+Seed data loads in filename order, and the numeric prefixes encode that order: shared data first
+(`00`–`06` — groups, manufacturers, device types, IPAM, management, profiles, device templates),
+then the example fabrics (`10`–`15`), each with its own fabric, rack, service, and server files.
 
 ## 5. Confirm everything loaded
 
@@ -105,3 +122,9 @@ The stack is up but no devices exist yet — fabrics, pods, and racks are define
 | `uv run invoke load` | Re-run the full load sequence |
 | `uv run invoke load-schema` | Reload schemas only |
 | `uv run invoke load-menu` | Reload UI menus only |
+| `uv run invoke init-semaphore` | Re-register the Semaphore project and templates (idempotent) |
+| `uv run invoke test` | Run the test suite, then Ruff and mypy |
+| `uv run invoke lint` | Ruff, yamllint, and mypy |
+| `uv run invoke format` | Apply Ruff formatting |
+
+`uv run invoke --list` shows the full set.

@@ -267,6 +267,27 @@ survey prompt — a declared survey variable is recorded on the task but never r
 To deploy rather than just fetch, point `clab_hosts` in `ansible/inventory_clab.yml` at a
 ContainerLab host reachable over SSH and clear the template's `--skip-tags deploy` argument.
 
+## Pinning the lab's data with `manual_objects/`
+
+`invoke load` loads `objects/` only. A second, opt-in set in `manual_objects/` is loaded manually:
+
+```bash
+uv run infrahubctl object load manual_objects/ --branch <branch-name>
+```
+
+It exists to make the multi-domain fabric line up with the committed lab rather than with whatever
+the pools happen to allocate:
+
+| File | Sets |
+|---|---|
+| `00_lab_l3ls_multi_domain.yml` | Fixed management addresses `10.0.6.11`–`.16` and `.21`–`.26` with matching serials across the 12 switches; `Ethernet5`/`Ethernet6` as `peering` interfaces on the two DCI leaves in each DC; the four `role=dci` `NetworkLink` objects between them; and one `EvpnGatewayGroup` per DC |
+| `15a_servers_l3ls_multi_domain.yml` | The two `ComputePhysicalServer` nodes the topology renders as Linux nodes |
+
+Without it, the generator allocates management addresses from
+`Fabric-L3LS-Multi-Domain-Mgmt-Pool` in allocation order, so the rendered `mgmt-ipv4` values are
+valid but won't match the committed topology's. Load it before running the generator chain, on the
+same branch.
+
 ## How the generated lab differs from the committed lab
 
 The generated topology is a structural replica, not a byte-identical copy of
