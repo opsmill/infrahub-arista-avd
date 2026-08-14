@@ -15,6 +15,9 @@ concurrency:
 
 permissions:
   contents: read
+  # paths-filter reads the pull request's file list through the API rather than
+  # diffing locally, so the token needs this on top of contents: read.
+  pull-requests: read
 
 env:
   UV_FROZEN: "true"
