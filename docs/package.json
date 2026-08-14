@@ -2,6 +2,7 @@
   "name": "docs",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
@@ -29,9 +30,6 @@
     "@docusaurus/tsconfig": "^3.10.0",
     "@docusaurus/types": "^3.10.0",
     "typescript": "~5.5.2"
-  },
-  "overrides": {
-    "webpack": "~5.96.1"
   },
   "browserslist": {
     "production": [
