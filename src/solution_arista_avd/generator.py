@@ -9,15 +9,17 @@ from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.protocols import CoreIPAddressPool, CoreIPPrefixPool, CoreNumberPool
 
 from .pool_roles import (
+    ALLOCATED_PREFIX_ROLE_VALUES,
     FABRIC_SUPERNET_PREFIX_LENGTHS,
     FABRIC_SUPERNET_ROLE_LABELS,
     ResourceRole,
     map_prefix_role,
+    next_available_prefix,
 )
 from .protocols import DcimDevice, DcimInterface, InterfacePhysical, InterfaceVirtual, RoutingAsn
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Sequence
 
     from infrahub_sdk import InfrahubClient
 
@@ -49,6 +51,32 @@ async def save_file_if_changed(
     file_node.upload_from_bytes(content=new_content, name=filename)
     await file_node.save(allow_upsert=True, update_group_context=False)
     return True
+
+
+async def fetch_allocated_prefixes(
+    client: InfrahubClient, supernets: Sequence[IPv4Network | IPv6Network]
+) -> list[IPv4Network | IPv6Network]:
+    """Return persisted IPAM prefixes that already sit inside ``supernets``.
+
+    Prefixes carved out of a Fabric Supernet are saved as standalone IpamPrefix
+    nodes; they are never pushed back onto the fabric's pool collection. A query
+    snapshot of that collection therefore cannot see what an earlier role in this
+    run, or an earlier generator in the chain, already allocated. Reading the
+    prefixes back from IPAM is what keeps successive carve-outs off each other.
+    """
+    if not supernets:
+        return []
+
+    nodes = await client.filters(kind="IpamPrefix", role__values=list(ALLOCATED_PREFIX_ROLE_VALUES))
+    allocated: list[IPv4Network | IPv6Network] = []
+    for node in nodes:
+        raw_prefix = getattr(getattr(node, "prefix", None), "value", None)
+        if not raw_prefix:
+            continue
+        prefix = ip_network(str(raw_prefix))
+        if any(prefix.version == supernet.version and prefix.overlaps(supernet) for supernet in supernets):
+            allocated.append(prefix)
+    return allocated
 
 
 async def set_fabric_avd_hostvars_ready(client: InfrahubClient, fabric_id: str, ready: bool) -> None:
@@ -222,7 +250,12 @@ class GeneratorMixin:
             )
         if fabric_name and loopback_ref is not None:
             loopback_pool = await self._ensure_address_pool_from_prefix_pool(
-                fabric_name=str(pod_name or fabric_name).lower(),
+                fabric_name=self._address_pool_scope(
+                    prefix_pool_ref=loopback_ref,
+                    pod_pool_refs=pod_pool_refs,
+                    fabric_name=fabric_name,
+                    pod_name=pod_name,
+                ),
                 pool_role="loopback",
                 prefix_pool_ref=loopback_ref,
             )
@@ -243,7 +276,12 @@ class GeneratorMixin:
             )
         if fabric_name and vtep_ref is not None:
             vtep_loopback_pool = await self._ensure_address_pool_from_prefix_pool(
-                fabric_name=str(pod_name or fabric_name).lower(),
+                fabric_name=self._address_pool_scope(
+                    prefix_pool_ref=vtep_ref,
+                    pod_pool_refs=pod_pool_refs,
+                    fabric_name=fabric_name,
+                    pod_name=pod_name,
+                ),
                 pool_role="vtep-loopback",
                 prefix_pool_ref=vtep_ref,
             )
@@ -255,6 +293,24 @@ class GeneratorMixin:
             )
 
         return asn_pool, node_id_pool, mgmt_pool, loopback_pool, vtep_loopback_pool
+
+    @staticmethod
+    def _address_pool_scope(
+        *,
+        prefix_pool_ref: object,
+        pod_pool_refs: dict[ResourceRole, object],
+        fabric_name: object,
+        pod_name: object,
+    ) -> str:
+        """Name the wrapper address pool after the scope that owns its prefix pool.
+
+        A fabric-level prefix pool has to keep a fabric-level wrapper: naming it
+        after the pod would mint one wrapper per pod around the same prefixes and
+        make a device's pool identity depend on which generator got there first.
+        """
+        if pod_name and any(pool_ref is prefix_pool_ref for pool_ref in pod_pool_refs.values()):
+            return str(pod_name).lower()
+        return str(fabric_name).lower()
 
     async def _ensure_vtep_loopback_address_pool(
         self, *, fabric_name: str, vtep_prefix_pool_ref: object
@@ -385,22 +441,22 @@ class GeneratorMixin:
             msg = f"Fabric '{fabric_name}': Fabric Supernet pool has no prefix resources"
             raise ValueError(msg)
 
+        # The supernet is the container being carved, so its own prefix is never
+        # "used" — only the allocations sitting inside it are.
         used_prefixes = [
             prefix
             for pool_ref in fabric_pool_refs.values()
-            for prefix in self._resource_prefixes(getattr(pool_ref, "resources", None))
+            for prefix in self._resource_prefixes(getattr(pool_ref, "resources", None), include_supernets=False)
         ]
         used_prefixes.extend(reserved_prefixes)
-        used_prefixes.extend(
-            self._resource_prefixes(getattr(supernet_pool, "resources", None), include_supernets=False)
-        )
+        # Pools carved by an earlier role, or by an earlier generator in the
+        # chain, are not attached to fabric_ip_pools and so are invisible in the
+        # query snapshot above.
+        used_prefixes.extend(await fetch_allocated_prefixes(self.client, supernets))
 
-        for supernet in sorted(supernets):
-            if prefix_length < supernet.prefixlen:
-                continue
-            for child in supernet.subnets(new_prefix=prefix_length):
-                if not any(child.overlaps(used) for used in used_prefixes):
-                    return child
+        child = next_available_prefix(supernets, used_prefixes, prefix_length)
+        if child is not None:
+            return child
 
         supernet_name = getattr(getattr(supernet_pool, "name", None), "value", None) or getattr(
             supernet_pool, "id", "unknown"
@@ -506,6 +562,19 @@ class GeneratorMixin:
             }
             if len(roles) == 1:
                 pools_by_role[next(iter(roles))] = pool_ref
+                continue
+            # A pool that does not resolve to exactly one role is indistinguishable
+            # from an absent pool here, and the generator would silently carve a
+            # replacement out of the Fabric Supernet instead. Say so, because the
+            # generator can run ahead of the check that reports it properly.
+            pool_id = pool_ref.get("id") if isinstance(pool_ref, dict) else getattr(pool_ref, "id", None)
+            pool_name = cls._pool_attr_value(pool_ref, "name") or pool_id or "unknown"
+            logger.warning(
+                "Ignoring pool %s: backing prefixes resolve to %s roles (%s), expected exactly one",
+                pool_name,
+                len(roles),
+                ", ".join(sorted(role.value for role in roles)) or "none",
+            )
         return pools_by_role
 
     @staticmethod

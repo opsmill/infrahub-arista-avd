@@ -12,11 +12,21 @@ if str(_REPO_SRC) not in sys.path:
 _PACKAGE_ROOT = _REPO_SRC / "solution_arista_avd"
 if (package := sys.modules.get("solution_arista_avd")) is not None and hasattr(package, "__path__"):
     package.__path__ = [str(_PACKAGE_ROOT), *[path for path in package.__path__ if path != str(_PACKAGE_ROOT)]]
-for module_name in (
+# Infrahub workers may already have solution_arista_avd imported from the
+# installed image. Extend the package path so this branch's repository-local src
+# wins, then evict the cached submodules so the next import rebuilds them from
+# here. Evict the whole set, not just the modules this entrypoint uses: a
+# survivor keeps its references to the previous copies of whatever it imported,
+# which leaves two live versions of the same class in one process.
+_RELOADED_MODULES = (
+    "solution_arista_avd.avd",
+    "solution_arista_avd.cabling",
     "solution_arista_avd.generator",
     "solution_arista_avd.pool_roles",
     "solution_arista_avd.protocols",
-):
+    "solution_arista_avd.sorting",
+)
+for module_name in _RELOADED_MODULES:
     sys.modules.pop(module_name, None)
 
 from solution_arista_avd.generator import (  # noqa: E402

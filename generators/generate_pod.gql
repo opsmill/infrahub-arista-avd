@@ -44,6 +44,10 @@ query PodGeneratorQuery($name: String!) {
                     node {
                       __typename
                       ... on IpamPrefix {
+                        id
+                        prefix {
+                          value
+                        }
                         role {
                           value
                         }
@@ -58,6 +62,10 @@ query PodGeneratorQuery($name: String!) {
                     node {
                       __typename
                       ... on IpamPrefix {
+                        id
+                        prefix {
+                          value
+                        }
                         role {
                           value
                         }
@@ -130,6 +138,10 @@ query PodGeneratorQuery($name: String!) {
                           node {
                             __typename
                             ... on IpamPrefix {
+                              id
+                              prefix {
+                                value
+                              }
                               role {
                                 value
                               }
@@ -144,6 +156,10 @@ query PodGeneratorQuery($name: String!) {
                           node {
                             __typename
                             ... on IpamPrefix {
+                              id
+                              prefix {
+                                value
+                              }
                               role {
                                 value
                               }

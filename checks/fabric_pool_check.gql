@@ -61,10 +61,125 @@ query FabricPoolCheckQuery($name: String!) {
             }
           }
         }
+        mgmt_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        loopback_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        vtep_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        uplink_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        dci_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
-  NetworkPod {
+  NetworkPod(parent__name__value: $name) {
     edges {
       node {
         id
@@ -131,6 +246,121 @@ query FabricPoolCheckQuery($name: String!) {
                   }
                 }
               }
+              mgmt_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              loopback_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              vtep_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              uplink_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              dci_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -176,6 +406,52 @@ query FabricPoolCheckQuery($name: String!) {
                           value
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        mlag_peer_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        mlag_l3_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
                     }
                   }
                 }

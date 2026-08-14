@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import Mock
 
 from checks.fabric_pool_check import FabricPoolValidationCheck
@@ -355,3 +356,81 @@ async def test_fabric_pool_check_requires_only_mlag_when_parent_underlay_is_none
 
     assert "missing required MLAG pool roles: mlag" in str(check.log_error.call_args_list)
     assert "mlag_peering" not in str(check.log_error.call_args_list)
+
+
+def test_fabric_pool_check_query_scopes_pods_to_the_target_fabric() -> None:
+    """An unfiltered NetworkPod would make every fabric report every other fabric's pods."""
+    query = (Path(__file__).parents[2] / "checks" / "fabric_pool_check.gql").read_text(encoding="utf-8")
+
+    assert "NetworkPod(parent__name__value: $name)" in query
+
+
+async def test_fabric_pool_check_accepts_unmigrated_fabric_using_legacy_relationships() -> None:
+    """A fabric that has not moved its pools into fabric_ip_pools still generates, so it must still pass."""
+    check = _check()
+    fabric = {
+        "id": "fabric-a",
+        "name": _attr("Fabric-A"),
+        "underlay_routing_protocol": _attr("ebgp"),
+        "overlay_routing_protocol": _attr("ebgp"),
+        "fabric_ip_pools": {"edges": []},
+        "mgmt_pool": {"node": _pool("mgmt", "CoreIPAddressPool", ["management"], prefix="192.0.2.0/24")},
+        "loopback_pool": {"node": _pool("loopback", "CoreIPPrefixPool", ["loopback"], prefix="10.0.0.0/24")},
+        "vtep_pool": {"node": _pool("vtep", "CoreIPPrefixPool", ["loopback-vtep"], prefix="10.0.1.0/24")},
+        "uplink_pool": {"node": _pool("uplink", "CoreIPPrefixPool", ["fabric_point_to_point"], prefix="10.0.2.0/24")},
+    }
+
+    await check.validate({"NetworkFabric": {"edges": [_edge(fabric)]}, "NetworkLink": {"edges": []}})
+
+    check.log_error.assert_not_called()
+    assert "legacy" in str(check.log_info.call_args_list)
+
+
+async def test_fabric_pool_check_accepts_legacy_pod_mlag_relationships() -> None:
+    check = _check()
+    data = _pod_data(
+        pod_pools=[],
+        fabric_pools=[_pool("mgmt", "CoreIPAddressPool", ["management"], prefix="192.0.2.0/24")],
+        underlay="ebgp",
+        rack_mlag=True,
+    )
+    pod = data["NetworkPod"]["edges"][0]["node"]
+    pod["mlag_peer_pool"] = {"node": _pool("mlag", "CoreIPAddressPool", ["mlag"], prefix="169.254.0.0/24")}
+    pod["mlag_l3_pool"] = {"node": _pool("mlag-l3", "CoreIPAddressPool", ["mlag_peering"], prefix="10.0.9.0/24")}
+
+    await check.validate(data)
+
+    assert "missing required MLAG pool roles" not in str(check.log_error.call_args_list)
+
+
+async def test_fabric_pool_check_allows_pod_pool_when_fabric_defers_to_its_supernet() -> None:
+    """The fabric carves this role on demand, so there is no fabric pool to contain against yet."""
+    check = _check()
+
+    await check.validate(
+        _pod_data(
+            pod_pools=[_pool("pod-loopback", "CoreIPPrefixPool", ["loopback"], prefix="10.0.0.0/25")],
+            fabric_pools=[
+                _pool("mgmt", "CoreIPAddressPool", ["management"], prefix="192.0.2.0/24"),
+                _pool("supernet", "CoreIPPrefixPool", ["fabric_supernet"], prefix="10.0.0.0/16"),
+            ],
+        )
+    )
+
+    check.log_error.assert_not_called()
+
+
+async def test_fabric_pool_check_still_rejects_pod_pool_when_fabric_has_no_supernet() -> None:
+    check = _check()
+
+    await check.validate(
+        _pod_data(
+            pod_pools=[_pool("pod-loopback", "CoreIPPrefixPool", ["loopback"], prefix="10.0.0.0/25")],
+            fabric_pools=[
+                _pool("mgmt", "CoreIPAddressPool", ["management"], prefix="192.0.2.0/24"),
+                _pool("uplink", "CoreIPPrefixPool", ["fabric_point_to_point"], prefix="10.0.2.0/24"),
+            ],
+        )
+    )
+
+    assert "no matching fabric pool for containment" in str(check.log_error.call_args_list)

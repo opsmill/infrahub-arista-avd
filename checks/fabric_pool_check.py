@@ -71,6 +71,20 @@ FABRIC_SUPERNET_PREFIX_LENGTHS = {
     ResourceRole.FABRIC_POINT_TO_POINT: 24,
     ResourceRole.DCI: 24,
 }
+# Relationships that predate fabric_ip_pools / pod_ip_pools. They stay optional in
+# the schema and the generators still honour them, so a fabric that has not been
+# migrated yet generates correctly and must not be failed by this check.
+LEGACY_FABRIC_POOL_ROLES = {
+    "mgmt_pool": ResourceRole.MANAGEMENT,
+    "loopback_pool": ResourceRole.LOOPBACK,
+    "vtep_pool": ResourceRole.LOOPBACK_VTEP,
+    "uplink_pool": ResourceRole.FABRIC_POINT_TO_POINT,
+    "dci_pool": ResourceRole.DCI,
+}
+LEGACY_POD_POOL_ROLES = {
+    "mlag_peer_pool": ResourceRole.MLAG,
+    "mlag_l3_pool": ResourceRole.MLAG_PEERING,
+}
 
 
 def pod_required_mlag_roles(*, underlay_routing_protocol: str | None, has_mlag_enabled_rack: bool) -> set[ResourceRole]:
@@ -151,6 +165,7 @@ def validate_pod_pool_containment(
     *,
     pod_role_prefixes: dict[ResourceRole, list[str]],
     fabric_role_prefixes: dict[ResourceRole, list[str]],
+    unconstrained_roles: frozenset[ResourceRole] | set[ResourceRole] = frozenset(),
 ) -> None:
     for role in (ResourceRole.LOOPBACK, ResourceRole.LOOPBACK_VTEP, ResourceRole.FABRIC_POINT_TO_POINT):
         pod_prefixes = [ip_network(prefix) for prefix in pod_role_prefixes.get(role, [])]
@@ -159,6 +174,11 @@ def validate_pod_pool_containment(
 
         fabric_prefixes = [ip_network(prefix) for prefix in fabric_role_prefixes.get(role, [])]
         if not fabric_prefixes:
+            # A fabric that carves this role out of its Fabric Supernet on demand
+            # has nothing to contain against yet, which is a valid design rather
+            # than a missing pool.
+            if role in unconstrained_roles:
+                continue
             msg = f"Pod pool role {role.value!r} has no matching fabric pool for containment"
             raise PoolRoleResolutionError(msg)
 
@@ -245,9 +265,19 @@ class FabricPoolValidationCheck(InfrahubCheck):
             underlay_routing_protocol=_value(fabric, "underlay_routing_protocol"),
             has_dci_links=has_dci_links,
         )
+        legacy_pools = self._legacy_pools(fabric, LEGACY_FABRIC_POOL_ROLES)
+        for role in sorted((set(legacy_pools) - set(pool_roles.values())) & required_roles):
+            relationship = next(name for name, mapped in LEGACY_FABRIC_POOL_ROLES.items() if mapped is role)
+            self.log_info(
+                message=(
+                    f"Fabric {fabric_name}: role {role.value!r} is satisfied by the legacy "
+                    f"{relationship} relationship; move the pool into fabric_ip_pools to complete the migration"
+                )
+            )
         try:
             missing_roles = missing_fabric_roles(
-                required_roles=required_roles, available_roles=set(pool_roles.values())
+                required_roles=required_roles,
+                available_roles=set(pool_roles.values()) | set(legacy_pools),
             )
         except PoolRoleResolutionError as exc:
             self.log_error(message=f"Fabric {fabric_name}: {exc}")
@@ -300,19 +330,49 @@ class FabricPoolValidationCheck(InfrahubCheck):
             underlay_routing_protocol=_value(parent, "underlay_routing_protocol"),
             has_mlag_enabled_rack=self._has_mlag_enabled_rack(pod),
         )
-        missing_mlag_roles = required_mlag_roles - set(pool_roles.values())
+        legacy_pod_pools = self._legacy_pools(pod, LEGACY_POD_POOL_ROLES)
+        missing_mlag_roles = required_mlag_roles - set(pool_roles.values()) - set(legacy_pod_pools)
         if missing_mlag_roles:
             missing = ", ".join(sorted(role.value for role in missing_mlag_roles))
             self.log_error(message=f"Pod {pod_name}: missing required MLAG pool roles: {missing}")
 
         fabric_role_prefixes = self._role_prefixes(parent, "fabric_ip_pools")
+        for role, pool in self._legacy_pools(parent, LEGACY_FABRIC_POOL_ROLES).items():
+            fabric_role_prefixes.setdefault(role, []).extend(str(prefix) for prefix in self._pool_prefixes(pool))
         try:
             validate_pod_pool_containment(
                 pod_role_prefixes=pod_role_prefixes,
                 fabric_role_prefixes=fabric_role_prefixes,
+                unconstrained_roles=self._supernet_fallback_roles(parent, fabric_role_prefixes),
             )
         except PoolRoleResolutionError as exc:
             self.log_error(message=f"Pod {pod_name}: {exc}")
+
+    @staticmethod
+    def _legacy_pools(owner: dict[str, Any], relationships: dict[str, ResourceRole]) -> dict[ResourceRole, Any]:
+        """Return the pools attached through pre-migration relationships, keyed by role."""
+        pools: dict[ResourceRole, Any] = {}
+        for relationship_name, role in relationships.items():
+            pool = _node(owner.get(relationship_name))
+            if pool is not None:
+                pools[role] = pool
+        return pools
+
+    @classmethod
+    def _supernet_fallback_roles(
+        cls, fabric: dict[str, Any], fabric_role_prefixes: dict[ResourceRole, list[str]]
+    ) -> set[ResourceRole]:
+        """Return roles this fabric leaves to its Fabric Supernet to carve on demand."""
+        fabric_roles = {
+            role
+            for pool_edge in _edges(fabric.get("fabric_ip_pools"))
+            if (pool := _node(pool_edge)) is not None
+            for role in cls._pool_roles(pool)
+            if role is not None
+        }
+        if ResourceRole.FABRIC_SUPERNET not in fabric_roles:
+            return set()
+        return {role for role in FABRIC_SUPERNET_ALLOCATION_ORDER if not fabric_role_prefixes.get(role)}
 
     @staticmethod
     def _pool_name(pool: dict[str, Any]) -> str:
@@ -356,6 +416,11 @@ class FabricPoolValidationCheck(InfrahubCheck):
             for prefix in self._pool_prefixes(pool)
             if ResourceRole.FABRIC_SUPERNET not in {role for role in self._pool_roles(pool) if role is not None}
         ]
+        used_prefixes.extend(
+            prefix
+            for pool in self._legacy_pools(fabric, LEGACY_FABRIC_POOL_ROLES).values()
+            for prefix in self._pool_prefixes(pool)
+        )
         allocated = []
         for role in missing_prefix_roles:
             prefix_length = FABRIC_SUPERNET_PREFIX_LENGTHS[role]
@@ -437,10 +502,18 @@ class FabricPoolValidationCheck(InfrahubCheck):
 
     @staticmethod
     def _next_available_prefix(supernets: list[Any], used_prefixes: list[Any], prefix_length: int) -> Any | None:
-        for supernet in sorted(supernets):
-            if prefix_length < supernet.prefixlen:
-                continue
-            for child in supernet.subnets(new_prefix=prefix_length):
-                if not any(child.overlaps(used) for used in used_prefixes):
-                    return child
+        # Group by IP version before sorting: ipaddress refuses to order networks
+        # of different families, so a dual-stack pool would raise TypeError here
+        # instead of skipping the mismatched family.
+        by_version: dict[int, list[Any]] = {}
+        for supernet in supernets:
+            by_version.setdefault(supernet.version, []).append(supernet)
+
+        for version in sorted(by_version):
+            for supernet in sorted(by_version[version]):
+                if prefix_length < supernet.prefixlen:
+                    continue
+                for child in supernet.subnets(new_prefix=prefix_length):
+                    if not any(child.overlaps(used) for used in used_prefixes if used.version == version):
+                        return child
         return None

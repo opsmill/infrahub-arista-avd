@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from ipaddress import ip_network
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from ipaddress import IPv4Network, IPv6Network
 
 
 class ResourceRole(StrEnum):
@@ -45,6 +49,18 @@ POOL_ROLE_BY_PREFIX_ROLE: dict[str, ResourceRole] = {
     "mlag_peering": ResourceRole.MLAG_PEERING,
     **LEGACY_ROLE_ALIASES,
 }
+
+# IpamPrefix.role values that can occupy space inside a Fabric Supernet. Used to
+# read back what has already been carved out, so successive allocations do not
+# land on top of each other. The supernet's own role is excluded: it is the
+# container being carved, not an allocation within it.
+ALLOCATED_PREFIX_ROLE_VALUES: tuple[str, ...] = tuple(
+    sorted(
+        prefix_role
+        for prefix_role, role in POOL_ROLE_BY_PREFIX_ROLE.items()
+        if role is not ResourceRole.FABRIC_SUPERNET
+    )
+)
 
 FABRIC_POOL_ROLES: frozenset[ResourceRole] = frozenset(
     {
@@ -95,10 +111,72 @@ FABRIC_SUPERNET_ROLE_LABELS: dict[ResourceRole, str] = {
     ResourceRole.FABRIC_POINT_TO_POINT: "Fabric-Point-to-Point",
     ResourceRole.DCI: "DCI",
 }
-MLAG_DEFAULT_POOLS: dict[ResourceRole, tuple[str, str]] = {
-    ResourceRole.MLAG: ("MLAG-Peer-Subnet", "169.254.0.0/31"),
-    ResourceRole.MLAG_PEERING: ("MLAG-L3-Peering-Subnet", "192.0.0.0/31"),
+
+
+@dataclass(frozen=True)
+class MlagDefaultPool:
+    """Fallback MLAG pool definition, carved per pod from a shared supernet.
+
+    The pools are named per pod and each pod is allocated its own child prefix:
+    a single shared prefix would cap the deployment at one MLAG pair (PyAVD
+    carves a /31 per pair out of the pool) and would put every pod's MLAG L3
+    peering addresses on the same subnet, which the underlay then advertises
+    from several places at once.
+    """
+
+    name_suffix: str
+    supernet: str
+    prefix_length: int
+
+
+MLAG_DEFAULT_POOLS: dict[ResourceRole, MlagDefaultPool] = {
+    # RFC 3927 link-local: the MLAG peer-link is a back-to-back L2 connection,
+    # so its addresses never leave the pair and the block is safe to reuse.
+    ResourceRole.MLAG: MlagDefaultPool(
+        name_suffix="MLAG-Peer-Subnet",
+        supernet="169.254.0.0/16",
+        prefix_length=24,
+    ),
+    # MLAG L3 peering addresses are advertised into the underlay, so there is no
+    # universally safe default. This block only exists so generation does not
+    # fail outright; the fabric pool check requires an explicit mlag_peering pool.
+    ResourceRole.MLAG_PEERING: MlagDefaultPool(
+        name_suffix="MLAG-L3-Peering-Subnet",
+        supernet="192.0.0.0/24",
+        prefix_length=28,
+    ),
 }
+
+
+def mlag_default_pool_name(*, pod_name: str, role: ResourceRole) -> str:
+    """Return the pod-scoped name of a fallback MLAG pool."""
+    return f"{pod_name}-{MLAG_DEFAULT_POOLS[role].name_suffix}"
+
+
+def next_available_prefix(
+    supernets: Iterable[IPv4Network | IPv6Network],
+    used_prefixes: Iterable[IPv4Network | IPv6Network],
+    prefix_length: int,
+) -> IPv4Network | IPv6Network | None:
+    """Return the first child prefix of ``supernets`` that no used prefix overlaps.
+
+    Supernets are grouped by IP version before sorting: ``ipaddress`` refuses to
+    order networks of different families, so a dual-stack pool would otherwise
+    raise ``TypeError`` instead of skipping the mismatched family.
+    """
+    used = list(used_prefixes)
+    by_version: dict[int, list[IPv4Network | IPv6Network]] = {}
+    for supernet in supernets:
+        by_version.setdefault(supernet.version, []).append(supernet)
+
+    for version in sorted(by_version):
+        for supernet in sorted(by_version[version]):
+            if prefix_length < supernet.prefixlen:
+                continue
+            for child in supernet.subnets(new_prefix=prefix_length):
+                if not any(child.overlaps(prefix) for prefix in used if prefix.version == version):
+                    return child
+    return None
 
 
 def map_prefix_role(prefix_role: str | None) -> ResourceRole | None:
@@ -174,8 +252,14 @@ def validate_pod_pool_containment(
     *,
     pod_role_prefixes: dict[ResourceRole, list[str]],
     fabric_role_prefixes: dict[ResourceRole, list[str]],
+    unconstrained_roles: frozenset[ResourceRole] | set[ResourceRole] = frozenset(),
 ) -> None:
-    """Validate pod prefix pools are subnets of matching fabric prefix pools."""
+    """Validate pod prefix pools are subnets of matching fabric prefix pools.
+
+    ``unconstrained_roles`` are roles the fabric carves out of its Fabric Supernet
+    on demand: there is no fabric pool to contain them yet, and that is a valid
+    design rather than a missing pool.
+    """
     for role in (ResourceRole.LOOPBACK, ResourceRole.LOOPBACK_VTEP, ResourceRole.FABRIC_POINT_TO_POINT):
         pod_prefixes = [ip_network(prefix) for prefix in pod_role_prefixes.get(role, [])]
         if not pod_prefixes:
@@ -183,6 +267,8 @@ def validate_pod_pool_containment(
 
         fabric_prefixes = [ip_network(prefix) for prefix in fabric_role_prefixes.get(role, [])]
         if not fabric_prefixes:
+            if role in unconstrained_roles:
+                continue
             msg = f"Pod pool role {role.value!r} has no matching fabric pool for containment"
             raise PoolRoleResolutionError(msg)
 

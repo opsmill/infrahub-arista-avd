@@ -104,10 +104,10 @@ def _make_generator(prefix_map: dict[int, str | None]) -> GenerateAVDDeviceHostv
     async def fake_extract(pool_ref: object, pool_kind: str) -> str | None:
         return prefix_map.get(id(pool_ref)) if pool_ref is not None else None
 
-    async def fake_default(role: ResourceRole) -> str:
+    async def fake_default(role: ResourceRole, pod: object) -> str:
         return {
-            ResourceRole.MLAG: "169.254.0.0/31",
-            ResourceRole.MLAG_PEERING: "192.0.0.0/31",
+            ResourceRole.MLAG: "169.254.0.0/24",
+            ResourceRole.MLAG_PEERING: "192.0.0.0/28",
         }[role]
 
     gen._extract_pool_prefix = fake_extract  # type: ignore[method-assign]
@@ -233,7 +233,7 @@ async def test_extract_l3ls_pools_raises_when_required_pool_empty(missing: str) 
 
 
 async def test_extract_l3ls_pools_uses_default_mlag_pools_when_missing() -> None:
-    """Missing MLAG pools resolve to deterministic default /31 pool intents."""
+    """Missing MLAG pools resolve to deterministic pod-scoped default pool intents."""
     uplink, vtep, loopback = (object() for _ in range(3))
     fabric = SimpleNamespace(
         name=_attr("Fabric-L3LS-MultiPod-A"),
@@ -251,8 +251,8 @@ async def test_extract_l3ls_pools_uses_default_mlag_pools_when_missing() -> None
 
     pools = await gen._extract_l3ls_pools(fabric, pod)
 
-    assert pools["mlag_peer_ipv4_pool"] == "169.254.0.0/31"
-    assert pools["mlag_peer_l3_ipv4_pool"] == "192.0.0.0/31"
+    assert pools["mlag_peer_ipv4_pool"] == "169.254.0.0/24"
+    assert pools["mlag_peer_l3_ipv4_pool"] == "192.0.0.0/28"
 
 
 async def test_extract_l3ls_pools_does_not_create_mlag_defaults_when_not_required() -> None:
@@ -288,8 +288,8 @@ async def test_extract_l3ls_pools_creates_required_mlag_defaults_for_mlag_rack()
 
     pools = await gen._extract_l3ls_pools(fabric, pod)
 
-    assert pools["mlag_peer_ipv4_pool"] == "169.254.0.0/31"
-    assert pools["mlag_peer_l3_ipv4_pool"] == "192.0.0.0/31"
+    assert pools["mlag_peer_ipv4_pool"] == "169.254.0.0/24"
+    assert pools["mlag_peer_l3_ipv4_pool"] == "192.0.0.0/28"
 
 
 async def test_extract_l3ls_pools_uses_fabric_supernet_fallback_for_missing_uplink_pool() -> None:
@@ -336,7 +336,7 @@ async def test_extract_l3ls_pools_uses_generated_mlag_l3_pool_alias() -> None:
     assert pools["mlag_peer_l3_ipv4_pool"] == "10.5.0.0/24"
 
 
-async def test_default_mlag_pool_creation_uses_stable_pool_name_and_prefix() -> None:
+async def test_default_mlag_pool_creation_uses_pod_scoped_pool_name_and_prefix() -> None:
     gen = GenerateAVDDeviceHostvar.__new__(GenerateAVDDeviceHostvar)
     prefix = SimpleNamespace(id="prefix-mlag", save=AsyncMock())
     pool = SimpleNamespace(save=AsyncMock())
@@ -344,18 +344,18 @@ async def test_default_mlag_pool_creation_uses_stable_pool_name_and_prefix() -> 
     gen.client.filters = AsyncMock(return_value=[])
     gen.client.create = AsyncMock(side_effect=[prefix, pool])
 
-    result = await gen._ensure_default_mlag_pool_prefix(ResourceRole.MLAG)
+    result = await gen._ensure_default_mlag_pool_prefix(ResourceRole.MLAG, SimpleNamespace(name=_attr("Pod-A")))
 
-    assert result == "169.254.0.0/31"
+    assert result == "169.254.0.0/24"
     gen.client.create.assert_any_await(
         kind="IpamPrefix",
-        prefix="169.254.0.0/31",
+        prefix="169.254.0.0/24",
         role="mlag",
         ip_namespace={"hfid": ["default"]},
     )
     gen.client.create.assert_any_await(
         kind="CoreIPAddressPool",
-        name="MLAG-Peer-Subnet",
+        name="Pod-A-MLAG-Peer-Subnet",
         default_address_type="IpamIPAddress",
         default_prefix_length=31,
         ip_namespace={"hfid": ["default"]},
@@ -365,7 +365,33 @@ async def test_default_mlag_pool_creation_uses_stable_pool_name_and_prefix() -> 
     pool.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
 
-async def test_default_mlag_pool_reuses_existing_pool_by_stable_name() -> None:
+async def test_default_mlag_pool_skips_prefixes_already_allocated_to_another_pod() -> None:
+    """A second pod must not land on the prefix the first pod's fallback took."""
+    gen = GenerateAVDDeviceHostvar.__new__(GenerateAVDDeviceHostvar)
+    prefix = SimpleNamespace(id="prefix-mlag-b", save=AsyncMock())
+    pool = SimpleNamespace(save=AsyncMock())
+    gen.client = MagicMock()
+    gen.client.create = AsyncMock(side_effect=[prefix, pool])
+
+    async def fake_filters(**kwargs: object) -> list[object]:
+        if kwargs.get("kind") == "IpamPrefix":
+            return [SimpleNamespace(prefix=_attr("169.254.0.0/24"))]
+        return []
+
+    gen.client.filters = fake_filters
+
+    result = await gen._ensure_default_mlag_pool_prefix(ResourceRole.MLAG, SimpleNamespace(name=_attr("Pod-B")))
+
+    assert result == "169.254.1.0/24"
+    gen.client.create.assert_any_await(
+        kind="IpamPrefix",
+        prefix="169.254.1.0/24",
+        role="mlag",
+        ip_namespace={"hfid": ["default"]},
+    )
+
+
+async def test_default_mlag_pool_reuses_existing_pool_by_pod_scoped_name() -> None:
     gen = GenerateAVDDeviceHostvar.__new__(GenerateAVDDeviceHostvar)
     existing_pool = SimpleNamespace(id="existing-mlag")
     gen.client = MagicMock()
@@ -375,13 +401,14 @@ async def test_default_mlag_pool_reuses_existing_pool_by_stable_name() -> None:
     async def fake_extract(pool_ref: object, pool_kind: str) -> str | None:
         assert pool_ref is existing_pool
         assert pool_kind == "CoreIPAddressPool"
-        return "169.254.0.0/31"
+        return "169.254.0.0/24"
 
     gen._extract_pool_prefix = fake_extract  # type: ignore[method-assign]
 
-    result = await gen._ensure_default_mlag_pool_prefix(ResourceRole.MLAG)
+    result = await gen._ensure_default_mlag_pool_prefix(ResourceRole.MLAG, SimpleNamespace(name=_attr("Pod-A")))
 
-    assert result == "169.254.0.0/31"
+    assert result == "169.254.0.0/24"
+    gen.client.filters.assert_awaited_once_with(kind="CoreIPAddressPool", name__value="Pod-A-MLAG-Peer-Subnet")
     gen.client.create.assert_not_awaited()
 
 

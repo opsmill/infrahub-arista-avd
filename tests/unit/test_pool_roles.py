@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from ipaddress import ip_network
+
 import pytest
 
 from solution_arista_avd.pool_roles import (
     FABRIC_POOL_ROLES,
     LEGACY_ROLE_ALIASES,
+    MLAG_DEFAULT_POOLS,
     POOL_ROLE_BY_PREFIX_ROLE,
     PoolRoleResolutionError,
     ResourceRole,
     fabric_required_roles,
     missing_fabric_roles,
+    mlag_default_pool_name,
+    next_available_prefix,
     pod_required_mlag_roles,
     resolve_resource_role,
     validate_pod_pool_containment,
@@ -131,3 +136,39 @@ def test_pod_required_mlag_roles_require_peer_and_l3_peering_for_l3_mlag_pod() -
         ResourceRole.MLAG,
         ResourceRole.MLAG_PEERING,
     }
+
+
+def test_validate_pod_pool_containment_skips_roles_the_fabric_carves_on_demand() -> None:
+    validate_pod_pool_containment(
+        pod_role_prefixes={ResourceRole.LOOPBACK: ["10.0.0.0/25"]},
+        fabric_role_prefixes={},
+        unconstrained_roles={ResourceRole.LOOPBACK},
+    )
+
+
+def test_next_available_prefix_returns_first_free_child() -> None:
+    assert next_available_prefix([ip_network("10.0.0.0/24")], [ip_network("10.0.0.0/27")], 27) == ip_network(
+        "10.0.0.32/27"
+    )
+
+
+def test_next_available_prefix_skips_mismatched_address_family_instead_of_raising() -> None:
+    """ipaddress refuses to order mixed families, so a dual-stack pool must not crash the scan."""
+    assert next_available_prefix(
+        [ip_network("2001:db8::/32"), ip_network("10.0.0.0/24")],
+        [ip_network("10.0.0.0/27"), ip_network("2001:db8::/48")],
+        27,
+    ) == ip_network("10.0.0.32/27")
+
+
+def test_mlag_default_pool_names_are_scoped_per_pod() -> None:
+    assert mlag_default_pool_name(pod_name="Pod-A", role=ResourceRole.MLAG) != mlag_default_pool_name(
+        pod_name="Pod-B", role=ResourceRole.MLAG
+    )
+
+
+def test_mlag_default_pools_hold_more_than_one_mlag_pair() -> None:
+    """PyAVD carves a /31 per pair, so a /31 pool would cap the pod at one pair."""
+    for definition in MLAG_DEFAULT_POOLS.values():
+        assert definition.prefix_length < 31
+        assert ip_network(definition.supernet).prefixlen < definition.prefix_length

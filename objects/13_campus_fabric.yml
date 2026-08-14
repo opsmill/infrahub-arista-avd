@@ -20,6 +20,8 @@ spec:
       role: fabric_point_to_point
     - prefix: 10.61.4.0/24     # MLAG peer-link addressing (l2leaf access pair)
       role: mlag
+    - prefix: 10.61.5.0/24     # MLAG L3 peering, advertised into the OSPF underlay
+      role: mlag_peering
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -67,6 +69,16 @@ spec:
       ip_namespace: default
       resources:
         - 10.61.4.0/24
+    # MLAG L3 peering pool. Required alongside the peer-link pool because the
+    # fabric defines an underlay routing protocol (ospf) and CAMPUS_IDF1 is an
+    # MLAG rack; without it the fabric pool check fails and the generator falls
+    # back to a shared default subnet.
+    - name: Fabric-Campus-MLAG-L3-Peering-Pool
+      default_address_type: IpamIPAddress
+      default_prefix_length: 31
+      ip_namespace: default
+      resources:
+        - 10.61.5.0/24
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -217,8 +229,10 @@ spec:
                   device_quantity: 2
                   device_template: arista-7050cx3-32c-spine-switch
             mlag_peer_pool: "Fabric-Campus-MLAG-Peer-Pool"
+            mlag_l3_pool: "Fabric-Campus-MLAG-L3-Peering-Pool"
             pod_ip_pools:
               - "Fabric-Campus-MLAG-Peer-Pool"
+              - "Fabric-Campus-MLAG-L3-Peering-Pool"
             member_of_groups: ["pods"]
 ---
 apiVersion: infrahub.app/v1
