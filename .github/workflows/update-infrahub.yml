@@ -1,0 +1,143 @@
+---
+# yamllint disable rule:truthy rule:line-length
+name: "Update Infrahub Version"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Infrahub version to test"
+        required: true
+      run:
+        description: "Whether to run integration tests"
+        required: false
+        type: boolean
+        default: true
+
+  repository_dispatch:
+    types: [trigger-infrahub-update]
+
+permissions:
+  contents: read
+
+jobs:
+  update-dependencies:
+    strategy:
+      matrix:
+        branch-name:
+          - main
+
+    runs-on: ubuntu-22.04
+    concurrency:
+      # The ternary matters: client_payload.version is empty on workflow_dispatch,
+      # so without it every manual run would serialise on the same group key.
+      group: update-infrahub-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.event.inputs.version }}-${{ matrix.branch-name }}
+      cancel-in-progress: false
+
+    env:
+      INFRAHUB_VERSION: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.event.inputs.version }}
+      BRANCH_NAME: ${{ matrix.branch-name }}-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.event.inputs.version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv sync
+
+      - name: Fail early when the bot credential is missing
+        # Without this the workflow would push nothing and still report success.
+        env:
+          GH_TOKEN: ${{ secrets.GH_UPDATE_PACKAGE_OTTO }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::GH_UPDATE_PACKAGE_OTTO is not available to this repository."
+            exit 1
+          fi
+
+      - name: Update testcontainers to version ${{ env.INFRAHUB_VERSION }}
+        run: |
+          uv add --group dev infrahub-testcontainers==${INFRAHUB_VERSION}
+
+      # Every place the Infrahub version is pinned must move together, or the
+      # drift this workflow exists to prevent reappears:
+      #   1. compose image tags and the ${VERSION:-X.Y.Z} shell-style defaults
+      #   2. the Dockerfile ARG default, used when no build arg is passed
+      #   3. the CI build arg, image tag, and INFRAHUB_TESTING_IMAGE_VER
+      #   4. the documented `export INFRAHUB_BASE_VERSION` lines
+      # The image tags here are shell-expansion defaults, not literals, e.g.
+      #   image: "${INFRAHUB_DOCKER_IMAGE:-.../infrahub}:${VERSION:-1.10.6}"
+      # so the tag must only be rewritten when it starts with a digit. A broader
+      # `[^"}[:space:]]+` tag pattern swallows the `${VERSION:-` prefix and
+      # leaves a stray brace, silently breaking the VERSION override.
+      - name: Update docker-compose image tags and defaults
+        run: |
+          find . -type f \( -name 'docker-compose*.yml' -o -name 'docker-compose*.yaml' \) -print0 \
+            | xargs -0 sed -i -E \
+              -e 's|(opsmill/infrahub[a-z-]*:)[0-9][^"}[:space:]]*|\1'"${INFRAHUB_VERSION}"'|g' \
+              -e 's|(\$\{VERSION:-)[0-9][^}]*(\})|\1'"${INFRAHUB_VERSION}"'\2|g' \
+              -e 's|(\$\{INFRAHUB_BASE_VERSION:-)[0-9][^}]*(\})|\1'"${INFRAHUB_VERSION}"'\2|g'
+
+      - name: Update Dockerfile ARG default
+        run: |
+          sed -i -E 's|^(ARG INFRAHUB_BASE_VERSION=).*$|\1'"${INFRAHUB_VERSION}"'|' Dockerfile
+
+      - name: Update CI workflow pins
+        run: |
+          sed -i -E \
+            -e 's|(INFRAHUB_BASE_VERSION=)[0-9][^ ]*|\1'"${INFRAHUB_VERSION}"'|g' \
+            -e 's|(opsmill/infrahub-solution-arista-avd:)[0-9][^ ]*|\1'"${INFRAHUB_VERSION}"'|g' \
+            -e 's|(INFRAHUB_TESTING_IMAGE_VER: ")[^"]*(")|\1'"${INFRAHUB_VERSION}"'\2|g' \
+            .github/workflows/ci.yml
+
+      - name: Update documented version references
+        run: |
+          sed -i -E 's|(INFRAHUB_BASE_VERSION=)[0-9]+\.[0-9]+\.[0-9]+|\1'"${INFRAHUB_VERSION}"'|g' \
+            README.md docs/docs/quick-start.md
+          sed -i -E 's|(extending Infrahub )[0-9]+\.[0-9]+\.[0-9]+|\1'"${INFRAHUB_VERSION}"'|g' README.md
+
+      - name: Prepare the branch for the update
+        id: prepare-branch
+        run: |
+          echo "Checking if branch ${{ env.BRANCH_NAME }} exists..."
+          BRANCH_EXISTS=$(git ls-remote --heads origin ${{ env.BRANCH_NAME }} | wc -l)
+          echo "BRANCH_EXISTS=$BRANCH_EXISTS" >> $GITHUB_ENV
+
+      - name: Commit and push changes
+        uses: github-actions-x/commit@v2.9
+        with:
+          github-token: ${{ secrets.GH_UPDATE_PACKAGE_OTTO }}
+          push-branch: ${{ env.BRANCH_NAME }}
+          commit-message: "chore: update Infrahub to version ${{ env.INFRAHUB_VERSION }}"
+          files: |
+            pyproject.toml
+            uv.lock
+            docker-compose.yml
+            docker-compose.override.yml
+            Dockerfile
+            .github/workflows/ci.yml
+            README.md
+            docs/docs/quick-start.md
+          name: opsmill-bot
+          email: github-bot@opsmill.com
+          rebase: ${{ env.BRANCH_EXISTS == 1 }}
+
+      - name: Create a pull request
+        run: |
+          echo ${{ secrets.GH_UPDATE_PACKAGE_OTTO }} | gh auth login --with-token
+          # Re-runs against the same version must not stack up duplicate PRs.
+          if [ -n "$(gh pr list --head "${{ env.BRANCH_NAME }}" --state open --json number --jq '.[0].number')" ]; then
+            echo "PR for ${{ env.BRANCH_NAME }} already open, skipping create"
+            exit 0
+          fi
+          gh pr create \
+            --title "update Infrahub to version ${{ env.INFRAHUB_VERSION }} against ${{ matrix.branch-name }}" \
+            --body "This PR updates Infrahub to version ${{ env.INFRAHUB_VERSION }}." \
+            --base ${{ matrix.branch-name }} \
+            --head ${{ env.BRANCH_NAME }}
