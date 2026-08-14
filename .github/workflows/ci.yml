@@ -112,8 +112,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The site is not at the repository root, so the action has to be pointed
+      # at its package.json to read the `packageManager` version from it.
       - name: Install pnpm
         uses: pnpm/action-setup@v6
+        with:
+          package_json_file: docs/package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
