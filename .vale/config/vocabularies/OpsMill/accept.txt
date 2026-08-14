@@ -1,0 +1,132 @@
+# Terms this project uses that Vale's dictionary does not know: Infrahub and
+# Arista domain vocabulary, tool names, and networking abbreviations.
+#
+# This is a terminology list, not a suppression list - a genuine misspelling
+# belongs fixed in the prose, not added here.
+#
+# Entries are lowercase wherever the word is an ordinary noun, so that both
+# `config` and a sentence-initial `Config` are accepted. Acronyms are listed in
+# their uppercase form because that is the only way they appear.
+#
+# Vale.Terms, which would enforce one exact casing per entry, is switched off in
+# .vale.ini: it cannot tell a sentence-initial capital from a casing error, so it
+# reported every heading that opened with `Hostvars` or `Config`.
+
+# Products, projects, and tools
+Ansible
+Arista
+Infrahub
+Makefile
+Pydantic
+Streamlit
+containerlab
+infrahubctl
+mypy
+netplan
+pyavd
+uv
+yamllint
+
+# Acronyms and initialisms
+ASNs
+CSVs
+IPs
+SDK
+SVIs
+UI
+VLAN
+VLANs
+VNIs
+VRFs
+VTEPs
+
+# Networking and modelling vocabulary
+anycast
+datacenter
+hostname
+hostnames
+loopback
+loopbacks
+mgmt
+misrouted
+multihoming
+reachability
+subnet
+supernet
+switchport
+unmanaged
+uplink
+uplinks
+
+# Infrahub and AVD data-model vocabulary
+host_var
+host_vars
+hostvar
+hostvar_file
+hostvars
+deduplicated
+denormalized
+idempotence
+idempotency
+idempotently
+upsert
+upserted
+
+# General technical usage
+checksumming
+config
+configs
+dev
+enablement
+enum
+hardcoded
+lookups
+mixin
+navbar
+queryable
+repo
+rollout
+stringified
+uid
+unskipped
+virtualenv
+walkthrough
+
+# Class, generator, and transform names that appear in headings and prose. Vale
+# also treats vocabulary entries as exceptions for its capitalisation checks, so
+# listing them stops Google.Headings reporting an already-sentence-cased heading
+# such as 'GeneratorMixin' or 'CloudVision validation'.
+AvdArtifact
+AvdDeviceDocTransform
+AvdDeviceStructuredConfigGenerator
+AvdEosConfigTransform
+AvdFabricDocTransform
+CablingPlan
+CloudVision
+CustomWebhook
+FabricGenerator
+GenerateAVDDeviceHostvar
+GeneratorMixin
+PodGenerator
+RackGenerator
+Semaphore
+
+# Domain acronyms used in headings.
+ANTA
+AVD
+EOS
+EVPN
+L2LS
+L3LS
+MLAG
+VXLAN
+
+# Canonical-cased forms of entries listed lowercase above. Vale's capitalisation
+# exceptions match case-sensitively, so both spellings are needed for headings.
+# This is safe because Vale.Terms (which would enforce one casing) is disabled.
+ContainerLab
+Hostvars
+PyAVD
+
+# The reference design's own name, used as the landing-page heading.
+Arista AVD Reference Design
