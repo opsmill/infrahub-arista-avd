@@ -15,20 +15,47 @@ concurrency:
 
 permissions:
   contents: read
+  # paths-filter reads the pull request's file list through the API rather than
+  # diffing locally, so the token needs this on top of contents: read.
+  pull-requests: read
 
 env:
   UV_FROZEN: "true"
 
 jobs:
+  # Classifies the changed files so each job below runs only when it can be
+  # affected. Outputs read the `_all` aliases from .github/file-filters.yml.
+  files-changed:
+    name: Detect which files have changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      documentation: ${{ steps.changes.outputs.documentation_all }}
+      python: ${{ steps.changes.outputs.python_all }}
+      yaml: ${{ steps.changes.outputs.yaml_all }}
+      markdown: ${{ steps.changes.outputs.markdown_all }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check for file changes
+        uses: opsmill/paths-filter@v3.0.2
+        id: changes
+        with:
+          token: ${{ github.token }}
+          filters: .github/file-filters.yml
+
   lint:
     name: Lint (ruff, yamllint, mypy)
+    # yamllint covers YAML too, so this job runs when either category changed.
+    if: needs.files-changed.outputs.python == 'true' || needs.files-changed.outputs.yaml == 'true'
+    needs: ["files-changed"]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
 
@@ -54,15 +81,99 @@ jobs:
         run: uv run mypy --show-error-codes generators transforms
         continue-on-error: true
 
+  markdown-lint:
+    name: Markdown lint (rumdl)
+    if: needs.files-changed.outputs.markdown == 'true'
+    needs: ["files-changed"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Rumdl
+        run: uv run invoke lint-markdown
+
+  documentation:
+    name: Documentation build
+    # Docusaurus is configured with onBrokenLinks: 'throw', so this job also
+    # serves as the internal link checker.
+    if: needs.files-changed.outputs.documentation == 'true'
+    needs: ["files-changed"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      # The site is not at the repository root, so the action has to be pointed
+      # at its package.json to read the `packageManager` version from it.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: docs/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+          cache: "pnpm"
+          cache-dependency-path: docs/pnpm-lock.yaml
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Build docs website
+        run: uv run invoke docs
+
+  validate-documentation-style:
+    name: Documentation prose (Vale)
+    if: needs.files-changed.outputs.documentation == 'true'
+    needs: ["files-changed"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Keep in step with VALE_VERSION in tasks.py.
+      VALE_VERSION: "3.17.1"
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installed by hand: Vale is a Go binary with no PyPI distribution, and the
+      # official GitHub Action is unmaintained. The Google and write-good style
+      # packages are fetched by `vale sync` rather than vendored.
+      - name: Download Vale
+        run: |
+          curl -sL "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" -o vale.tar.gz
+          tar -xzf vale.tar.gz vale
+          sudo install -m 0755 vale /usr/local/bin/vale
+
+      - name: Validate documentation style
+        run: |
+          vale sync
+          vale docs/docs
+
   unit-tests:
     name: Unit tests
+    if: needs.files-changed.outputs.python == 'true'
+    needs: ["files-changed"]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
 
@@ -79,10 +190,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
 
@@ -102,10 +213,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
 
@@ -113,13 +224,13 @@ jobs:
         run: uv sync --all-packages
 
       - name: Build custom Infrahub image
-        run: docker build --build-arg INFRAHUB_BASE_VERSION=1.10.3 -t opsmill/infrahub-solution-arista-avd:1.10.3 .
+        run: docker build --build-arg INFRAHUB_BASE_VERSION=1.10.6 -t opsmill/infrahub-solution-arista-avd:1.10.6 .
 
       # Pin the image so local and CI runs match; tune resources for the ~7GB runner.
       - name: Run full integration tests
         env:
           INFRAHUB_TESTING_DOCKER_IMAGE: "opsmill/infrahub-solution-arista-avd"
-          INFRAHUB_TESTING_IMAGE_VER: "1.10.3"
+          INFRAHUB_TESTING_IMAGE_VER: "1.10.6"
           INFRAHUB_TESTING_DOCKER_PULL: "false"
           INFRAHUB_TESTING_WEB_CONCURRENCY: "2"
           INFRAHUB_TESTING_API_SERVER_COUNT: "1"

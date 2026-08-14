@@ -1,15 +1,16 @@
 ---
-title: Add a Network Segment
+title: Add a network segment
 description: Create a VRF, VLAN, and SVI on a fabric using the service portal.
 audience: user
 sidebar_position: 1
 ---
 
-# Add a Network Segment
+# Add a network segment
 
 Creates a new EVPN network segment — a VRF, a VLAN, and an SVI — on a target fabric. The workflow runs on its own branch, regenerates hostvars and structured configs, and opens a proposed change for review.
 
 Prerequisites:
+
 - A running stack with seed data loaded ([Quick Start](../quick-start.md)).
 - A provisioned fabric with devices and artifacts ([Provision Your First Fabric](../provision-first-fabric.md)).
 - At least one EVPN tenant. If none exist, create one using [Create a Tenant](./create-tenant.md) first.
@@ -24,10 +25,10 @@ The form has two columns:
 
 | Left column | Right column |
 |-------------|--------------|
-| **Segment Name** — free text, e.g. `web-services` | **VRF Name** — free text; leave blank to reuse an existing VRF |
+| **Segment Name** — free text, for example, `web-services` | **VRF Name** — free text; leave blank to reuse an existing VRF |
 | **Tenant** — dropdown of existing EVPN tenants | **VRF VNI** — number (1–16777215), default `100` |
 | **VLAN ID** — number (1–4094), default `100` | **L2 Domain** — dropdown of available L2 domains |
-| **Gateway IP (CIDR)** — e.g. `10.10.100.1/24` | **Target Fabric** — dropdown of fabrics |
+| **Gateway IP (CIDR)** — for example, `10.10.100.1/24` | **Target Fabric** — dropdown of fabrics |
 
 All fields are required except VRF Name (blank = use existing VRF, see below).
 

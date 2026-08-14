@@ -1,10 +1,10 @@
 ---
-title: Upgrade AVD Version
+title: Upgrade AVD version
 description: Move to a newer PyAVD version and validate the result on a branch before production.
 audience: user
 ---
 
-# Upgrade AVD Version
+# Upgrade AVD version
 
 PyAVD (Arista's Python engine) is what renders your device configurations. When a new PyAVD release is available, you move to it and **validate the result on a branch** before anything reaches production. Because both Infrahub and AVD evolve, you confirm compatibility on both sides rather than upgrading in place.
 
@@ -44,6 +44,6 @@ The branch-first upgrade flow is a maintainer/operator task — you rebuild the 
 
 ## If something looks wrong
 
-- A large or surprising diff usually means a PyAVD default or schema changed between versions — cross-check the release notes.
+- A large or surprising diff points to a PyAVD default or schema change between versions — cross-check the release notes.
 - Roll back by discarding the branch (nothing merged, nothing deployed) and pinning the previous PyAVD version.
 - For pipeline-level failures, see [Debugging the Pipeline](/developer-guide/avd/debugging).

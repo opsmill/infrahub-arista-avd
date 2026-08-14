@@ -1,22 +1,22 @@
 ---
-title: Regenerate a Fabric
+title: Regenerate a fabric
 description: Use the Fabric Design page to inspect and re-run the generator chain for a fabric.
 audience: user
 sidebar_position: 4
 ---
 
-# Regenerate a Fabric
+# Regenerate a fabric
 
 The Fabric Design page in the service portal is the interactive view of a fabric. From it you can inspect the topology and cabling, see fabric settings and EVPN tenants, and trigger a full regeneration of the fabric — devices, cabling, hostvars, and structured configs — from a single button.
 
-## Open the Fabric Design page
+## Open the fabric design page
 
 Navigate to **`http://localhost:8501`**. From the sidebar, open **Fabric View** (the page title is **Fabric Design View**).
 
 ## Pick branch and fabric
 
 - **Select Branch** (sidebar dropdown) — choose which Infrahub branch to view. For inspection, any branch is fine. For regeneration, use a non-default branch so the change is isolated and reviewable.
-- **Select Fabric** (main area) — choose the fabric to view, e.g. `Fabric-L3LS-MultiPod-A`.
+- **Select Fabric** (main area) — choose the fabric to view, for example, `Fabric-L3LS-MultiPod-A`.
 
 ## Tabs
 

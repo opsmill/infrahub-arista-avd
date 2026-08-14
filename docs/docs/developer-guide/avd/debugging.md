@@ -1,11 +1,11 @@
 ---
-title: Debugging the Pipeline
+title: Debugging the pipeline
 description: Inspect intermediate files, force regeneration, and isolate a single generator or transform.
 audience: developer
 sidebar_position: 7
 ---
 
-# Debugging the Pipeline
+# Debugging the pipeline
 
 :::info Developer Guide
 For operator-facing issues (stack health, generator order, "no structured config available"), see the [Troubleshooting page](/troubleshooting).
@@ -17,7 +17,7 @@ Both files live on the `AvdArtifact` for each device (see [AvdArtifact & File St
 
 ### Via the Infrahub UI
 
-1. Navigate to the device's `AvdArtifact` (e.g. search for the artifact named after the device).
+1. Navigate to the device's `AvdArtifact` (for example, search for the artifact named after the device).
 2. Open the `hostvar_file` or `structured_config_file` relationship — the child node is an `AvdHostvarFile` / `AvdStructuredConfigFile`.
 3. Download or view the `content` attribute (JSON).
 
@@ -53,21 +53,21 @@ Both generators skip writes when content is unchanged. The flow is:
 
 ### Forcing a regeneration
 
-If you need to force a fresh write (e.g. you suspect the checksum is stale or want to test the generator path end-to-end), delete the child file node:
+If you need to force a fresh write (for example, you suspect the checksum is stale or want to test the generator path end-to-end), delete the child file node:
 
 ```python
 hostvars_node = artifact.hostvar_file.peer
 await hostvars_node.delete()
 ```
 
-The next generator run will write a new `AvdHostvarFile` unconditionally.
+The next generator run writes a new `AvdHostvarFile` unconditionally.
 
 ## Re-running a single generator
 
 ### From the UI
 
 1. On a branch, open **Actions → Generator definitions**.
-2. Pick the generator (e.g. `generate-avd-device-hostvar`).
+2. Pick the generator (for example, `generate-avd-device-hostvar`).
 3. Click **Run** and select the target device (or fabric for Phase 2).
 
 ### Via the SDK
@@ -92,7 +92,7 @@ See the service portal implementation in [`service_catalog/utils/api.py`](https:
 
 ## Missing structured config
 
-**Symptoms**: `avd_eos_config` transform returns "No structured config available".
+**Symptoms**: `avd_eos_config` transform returns `No structured config available`.
 
 **Diagnostic flow**:
 
@@ -111,7 +111,7 @@ See the service portal implementation in [`service_catalog/utils/api.py`](https:
 pyavd.j2lint.utils.ValidationError: Invalid type for ... in ...
 ```
 
-The error usually names a field and a device. Fetch that device's hostvars (above) and look for:
+The error names a field and a device. Fetch that device's hostvars (above) and look for:
 
 - Missing required fields for the role (`id`, `bgp_as`, `loopback_ipv4_address` for L3 roles).
 - Mismatched list lengths in the uplink block (`uplink_interfaces` vs `uplink_switches`).
@@ -126,7 +126,7 @@ Cross-reference [Hostvars Reference](./hostvars.md) for the expected types.
 | Phase 2 fails "Missing hostvar_file for device X" | Phase 1 didn't complete for device X | Re-run Phase 1 for that device |
 | `get_avd_type` raises `ValueError` | New role added to schema without adding to `ROLE_TO_AVD_TYPE` | Update [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py) |
 | Fabric documentation empty or partial | One or more devices missing hostvars | Complete Phase 1 for all devices |
-| Artifact regenerates every run even when nothing changed | Hostvars dict has a non-deterministic field (e.g. iteration order of a set) | Sort lists/dicts before JSON-serialising |
+| Artifact regenerates every run even when nothing changed | Hostvars dict has a non-deterministic field (for example, iteration order of a set) | Sort lists/dicts before JSON-serialising |
 | Transform returns stale output | `CoreFileObject.content` cached somewhere; rare | Force-regenerate the artifact from the UI preview panel |
 
 ## Pre-seeded device reconciliation
@@ -163,9 +163,9 @@ uv run invoke restart --component=infrahub-server
 
 ## Comparing a render against AVD's own examples
 
-`scripts/compare_avd_examples.py` answers "does our render produce the same EOS features as the AVD
-example this design is based on?" — use it when a new fabric design is added and you want evidence
-beyond "it renders".
+`scripts/compare_avd_examples.py` answers whether this design's render produces the same EOS
+features as the AVD example it is based on — use it when a new fabric design is added and you want
+evidence beyond a successful render.
 
 ```bash
 # one rendered config against one AVD example config
@@ -181,8 +181,8 @@ uv run python scripts/compare_avd_examples.py --self-test
 Byte-for-byte identity is deliberately not the goal. Infrahub allocates its own addressing,
 hostnames, ASNs, and node IDs, so the script masks IP, MAC, IPv6, and ASN tokens before comparing,
 then reports top-level EOS feature sections (`router bgp`, `vlan`, `mlag configuration`,
-`router isis`, `mpls ldp`, …) as present in both, only in ours, or only in the example. A section
-present in the example but missing from our render is the difference to investigate.
+`router isis`, `mpls ldp`, …) as present in both, only in the render, or only in the example. A
+section present in the example but missing from the render is the difference to investigate.
 
 The reference configs come from the AVD repository, under
 `ansible_collections/arista/avd/examples/<example>/intended/configs/*.cfg`.

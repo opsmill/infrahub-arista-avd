@@ -1,11 +1,11 @@
 ---
-title: Quick Start
+title: Quick start
 description: Install dependencies, bring the stack up, and load seed data.
 audience: user
 sidebar_position: 1
 ---
 
-# Quick Start
+# Quick start
 
 The steps below take you from a fresh clone to a running Infrahub instance with seed data loaded. After this, see [Provision Your First Fabric](./provision-first-fabric.md) to generate devices, configurations, and AVD artifacts.
 
@@ -36,10 +36,10 @@ uv run invoke build
 ```
 
 To build against a different Infrahub release, set `INFRAHUB_BASE_VERSION` first — the compose files
-default to `1.10.1`:
+default to `1.10.6`:
 
 ```bash
-export INFRAHUB_BASE_VERSION=1.10.3
+export INFRAHUB_BASE_VERSION=<infrahub-version>
 uv run invoke build
 ```
 

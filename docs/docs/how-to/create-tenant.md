@@ -1,15 +1,16 @@
 ---
-title: Create a Tenant
+title: Create a tenant
 description: Create an EVPN tenant with a MAC VRF VNI base allocation for one or more fabrics.
 audience: user
 sidebar_position: 3
 ---
 
-# Create a Tenant
+# Create a tenant
 
 Creates a new EVPN tenant. A tenant is a logical container that network segments (VLANs, VRFs, SVIs) are attached to. Each tenant has a **MAC VRF VNI base** — VLAN VNIs are then computed as `base + VLAN ID`, giving every segment a unique VNI without manual allocation.
 
 Prerequisites:
+
 - A running stack with seed data loaded ([Quick Start](../quick-start.md)).
 - At least one provisioned fabric ([Provision Your First Fabric](../provision-first-fabric.md)).
 
@@ -21,9 +22,9 @@ Navigate to **`http://localhost:8501`**. From the sidebar, open **Create Tenant*
 
 | Field | Description |
 |-------|-------------|
-| **Tenant Name** | Free text, e.g. `ACME-Corp`. |
+| **Tenant Name** | Free text, for example, `ACME-Corp`. |
 | **MAC VRF VNI Base** | Number (1–16,777,000), default `20000`. VLAN VNI = base + VLAN ID, so pick a base that leaves enough headroom. `20000` supports VLANs 1–4094 without overlapping another base of `25000`, for example. |
-| **Target Fabrics** | Multi-select of existing fabrics. The tenant will be associated with every fabric you select; network segments can then be created on any of them. Defaults to the first fabric. |
+| **Target Fabrics** | Multi-select of existing fabrics. The tenant is associated with every fabric you select; network segments can then be created on any of them. Defaults to the first fabric. |
 
 ## Submit
 

@@ -1,6 +1,6 @@
 ---
 x-infrahub-custom-build: &infrahub_custom_build
-  image: opsmill/infrahub-solution-arista-avd:${INFRAHUB_BASE_VERSION:-1.10.1}
+  image: opsmill/infrahub-solution-arista-avd:${INFRAHUB_BASE_VERSION:-1.10.6}
   environment:
     INFRAHUB_GIT_USER_NAME: "infrahub"
     INFRAHUB_GIT_EMAIL: "no-reply@opsmill.com"
@@ -19,7 +19,7 @@ x-infrahub-custom-build: &infrahub_custom_build
     context: .
     dockerfile: Dockerfile
     args:
-      INFRAHUB_BASE_VERSION: "${INFRAHUB_BASE_VERSION:-1.10.1}"
+      INFRAHUB_BASE_VERSION: "${INFRAHUB_BASE_VERSION:-1.10.6}"
 
 services:
   infrahub-server:

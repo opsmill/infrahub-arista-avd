@@ -18,7 +18,7 @@ Two flows exist, and they are separate on purpose:
 - **The generated topology** — the `ContainerLab Topology` artifact described here, rendered per
   fabric from Infrahub data. Use this for fabrics the committed lab does not cover.
 
-## The ContainerLab Topology artifact
+## The ContainerLab topology artifact
 
 | Property | Value |
 |----------|-------|
@@ -108,10 +108,10 @@ Nothing about node identity is hardcoded in the transform. Three schema attribut
 | `DcimDeviceType.containerlab_interface_mapping` | the `EosIntfMapping.json` bind | `DCS-7050CX3-32S.json` |
 
 All three are optional `Text` attributes. A device whose platform has no `containerlab_os` cannot
-be rendered as a node; a device type with no `containerlab_interface_mapping` simply gets no
+be rendered as a node; a device type with no `containerlab_interface_mapping` gets no
 mapping bind (the `binds` key is omitted entirely when a node has nothing to bind).
 
-`containerlab_interface_mapping` holds a **filename only**, not a path and not the file contents.
+`containerlab_interface_mapping` holds a **filename only**, not a path, and not the file contents.
 The file itself lives in `lab/configs/eos-intf-mapping/` and is resolved relative to the topology
 file at deploy time. Note the filenames intentionally differ from the device type's `part_number`
 (`DCS-7050CX3-32S.json` for part number `DCS-7050CX3-32C`) — the attribute exists precisely so the
@@ -134,7 +134,7 @@ The rule is `Ethernet<N>[/<M>]` → `eth<N>[_<M>]`: strip the `Ethernet` prefix 
 `_`.
 
 For plain `Ethernet<N>` interfaces that is all cEOS needs — it maps `ethN` to `EthernetN` by
-default. Breakout names are the problem. A generated config that says `interface Ethernet1/1` will
+default. Breakout names are the problem. A generated config that says `interface Ethernet1/1` does
 not attach to anything if cEOS has decided that `eth1_1` is `Ethernet1_1`, or has not created the
 interface at all. `EosIntfMapping.json` is the file that tells cEOS which container interface
 corresponds to which EOS interface name, per device type. It is mounted read-only:
@@ -144,7 +144,7 @@ binds:
   - configs/eos-intf-mapping/DCS-7050SX3-48YC8.json:/mnt/flash/EosIntfMapping.json:ro
 ```
 
-So on a fabric whose spines use `Ethernet<N>/1` uplinks and whose leaves use `Ethernet49-50/1`, the
+On a fabric whose spines use `Ethernet<N>/1` uplinks and whose leaves use `Ethernet49-50/1`, the
 mapping bind is what makes the AVD-rendered config match the interfaces that actually exist. To
 confirm it took effect after a deploy:
 
@@ -264,7 +264,7 @@ writable from the host.
 survey prompt — a declared survey variable is recorded on the task but never reaches
 `ansible-playbook` in Semaphore v2.17. Override them per run in the task's Environment field.
 
-To deploy rather than just fetch, point `clab_hosts` in `ansible/inventory_clab.yml` at a
+To deploy rather than only fetch, point `clab_hosts` in `ansible/inventory_clab.yml` at a
 ContainerLab host reachable over SSH and clear the template's `--skip-tags deploy` argument.
 
 ## Pinning the lab's data with `manual_objects/`
@@ -285,8 +285,8 @@ the pools happen to allocate:
 
 Without it, the generator allocates management addresses from
 `Fabric-L3LS-Multi-Domain-Mgmt-Pool` in allocation order, so the rendered `mgmt-ipv4` values are
-valid but won't match the committed topology's. Load it before running the generator chain, on the
-same branch.
+valid but won't match the values in the committed topology. Load it before running the generator
+chain, on the same branch.
 
 ## How the generated lab differs from the committed lab
 
