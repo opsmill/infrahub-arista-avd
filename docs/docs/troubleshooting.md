@@ -141,7 +141,7 @@ Alternatively, in the artifact preview panel, click **Regenerate**.
 
 ## The ANTA catalog artifact contains only a comment
 
-**Symptoms**
+### Symptoms
 
 The **AVD ANTA Catalog** artifact renders successfully but holds a single line:
 
@@ -149,13 +149,13 @@ The **AVD ANTA Catalog** artifact renders successfully but holds a single line:
 # ANTA disabled for fabric Fabric-L3LS-MultiPod-A
 ```
 
-**Cause**
+### Cause
 
 Catalog generation is opt-in per fabric. The transform checks `NetworkFabric.anta_enabled` and
 returns a marker comment rather than failing, so the artifact always renders and states why it is
 empty.
 
-**Fix**
+### Fix
 
 Set `anta_enabled` on the fabric — on a branch, as with any data change — and regenerate. Two other
 markers point elsewhere:
@@ -167,12 +167,12 @@ markers point elsewhere:
 
 ## CloudVision validation is skipped or fails
 
-**Symptoms**
+### Symptoms
 
 - The `cv-config-validation` check reports an informational skip on a proposed change.
 - The check fails with a CloudVision connection or authentication error.
 
-**Diagnose and fix**
+### Diagnose and fix
 
 | What you see | Cause | Fix |
 |---|---|---|

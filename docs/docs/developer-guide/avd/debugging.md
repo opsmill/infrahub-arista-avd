@@ -163,9 +163,9 @@ uv run invoke restart --component=infrahub-server
 
 ## Comparing a render against AVD's own examples
 
-`scripts/compare_avd_examples.py` answers "does our render produce the same EOS features as the AVD
-example this design is based on?" — use it when a new fabric design is added and you want evidence
-beyond "it renders".
+`scripts/compare_avd_examples.py` answers whether this design's render produces the same EOS
+features as the AVD example it is based on — use it when a new fabric design is added and you want
+evidence beyond a successful render.
 
 ```bash
 # one rendered config against one AVD example config
@@ -181,8 +181,8 @@ uv run python scripts/compare_avd_examples.py --self-test
 Byte-for-byte identity is deliberately not the goal. Infrahub allocates its own addressing,
 hostnames, ASNs, and node IDs, so the script masks IP, MAC, IPv6, and ASN tokens before comparing,
 then reports top-level EOS feature sections (`router bgp`, `vlan`, `mlag configuration`,
-`router isis`, `mpls ldp`, …) as present in both, only in ours, or only in the example. A section
-present in the example but missing from our render is the difference to investigate.
+`router isis`, `mpls ldp`, …) as present in both, only in the render, or only in the example. A
+section present in the example but missing from the render is the difference to investigate.
 
 The reference configs come from the AVD repository, under
 `ansible_collections/arista/avd/examples/<example>/intended/configs/*.cfg`.

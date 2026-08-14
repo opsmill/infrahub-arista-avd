@@ -36,10 +36,10 @@ uv run invoke build
 ```
 
 To build against a different Infrahub release, set `INFRAHUB_BASE_VERSION` first — the compose files
-default to `1.10.1`:
+default to `1.10.6`:
 
 ```bash
-export INFRAHUB_BASE_VERSION=1.10.3
+export INFRAHUB_BASE_VERSION=<infrahub-version>
 uv run invoke build
 ```
 

@@ -83,6 +83,7 @@ hardcoded
 lookups
 mixin
 navbar
+nullable
 queryable
 repo
 rollout
@@ -96,11 +97,14 @@ walkthrough
 # also treats vocabulary entries as exceptions for its capitalisation checks, so
 # listing them stops Google.Headings reporting an already-sentence-cased heading
 # such as 'GeneratorMixin' or 'CloudVision validation'.
+AvdAntaCatalogTransform
 AvdArtifact
 AvdDeviceDocTransform
 AvdDeviceStructuredConfigGenerator
 AvdEosConfigTransform
 AvdFabricDocTransform
+BackfillStructuredConfigGenerator
+CVWorkspaceSubmissionWebhookPayload
 CablingPlan
 CloudVision
 CustomWebhook
@@ -110,6 +114,7 @@ GeneratorMixin
 PodGenerator
 RackGenerator
 Semaphore
+ServerCablingGenerator
 
 # Domain acronyms used in headings.
 ANTA

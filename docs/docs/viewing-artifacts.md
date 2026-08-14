@@ -15,7 +15,7 @@ Once generators have run on a branch and you've opened a proposed change (see [P
 | **AVD Device Documentation** | Each `DcimDevice` | `text/markdown` | Human-readable documentation describing the device. |
 | **AVD Fabric Documentation** | Each `NetworkFabric` | `text/markdown` | Fabric-wide topology and design documentation. |
 | **ContainerLab Topology** | Each `NetworkFabric` | `application/yaml` | A [ContainerLab](https://containerlab.dev) topology file for running the fabric as containers. |
-| **Cabling Plan** | Each `NetworkFabric` | `text/csv` | One row per connection, for the field and cabling teams. |
+| **Cabling Plan** | Each `NetworkFabric` | `text/csv` | One row per connection for the field and cabling teams. |
 | **AVD ANTA Catalog** | Each `DcimDevice` | `application/yaml` | The device's [ANTA](https://anta.arista.com) test catalog. Rendered only when the fabric has `anta_enabled` set; otherwise the artifact holds a one-line comment saying so. |
 
 Per-device artifacts (`AVD EOS Configuration`, `AVD Device Documentation`) are rendered as part of the proposed-change CI. If you want to view them outside a proposed change, open them on a device's **Artifacts** tab and click **Regenerate**.

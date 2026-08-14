@@ -285,8 +285,8 @@ the pools happen to allocate:
 
 Without it, the generator allocates management addresses from
 `Fabric-L3LS-Multi-Domain-Mgmt-Pool` in allocation order, so the rendered `mgmt-ipv4` values are
-valid but won't match the committed topology's. Load it before running the generator chain, on the
-same branch.
+valid but won't match the values in the committed topology. Load it before running the generator
+chain, on the same branch.
 
 ## How the generated lab differs from the committed lab
 
