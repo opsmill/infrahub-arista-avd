@@ -1,11 +1,11 @@
 ---
-title: AVD Transforms
+title: AVD transforms
 description: The three Python transforms that render EOS configs and AVD documentation from stored data.
 audience: developer
 sidebar_position: 3
 ---
 
-# AVD Transforms
+# AVD transforms
 
 :::info Developer Guide
 Documents the transform implementations. To *view* artifacts as an operator, see [Viewing Artifacts](/viewing-artifacts).
@@ -74,7 +74,7 @@ Flow:
 4. Calls `pyavd.get_fabric_documentation(avd_facts, structured_configs, fabric_name)`.
 5. Returns markdown.
 
-Fabric documentation requires hostvars to be present for *every* device in the fabric. If any device has no hostvars, the transform fails the artifact generation with a message naming the missing device(s).
+Fabric documentation requires hostvars to be present for *every* device in the fabric. If any device has no hostvars, the transform fails the artifact generation with a message naming the missing devices.
 
 ## `avd_anta_catalog`
 

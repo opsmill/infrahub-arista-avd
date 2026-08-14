@@ -1,11 +1,11 @@
 ---
-title: Architecture Overview
+title: Architecture overview
 description: System architecture and data flow for the Infrahub Arista AVD solution.
 audience: developer
 sidebar_position: 1
 ---
 
-# Architecture Overview
+# Architecture overview
 
 :::info Developer Guide
 Assumes familiarity with Infrahub and Python. If you only want to *use* the system, start with [Quick Start](/quick-start).
@@ -13,9 +13,9 @@ Assumes familiarity with Infrahub and Python. If you only want to *use* the syst
 
 The solution is a repository of schemas, generators, and transforms loaded on top of the Infrahub platform. The sections below cover its components, data model, and the generator and transform pipelines.
 
-## System Components
+## System components
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Infrahub Platform                              │
 ├─────────────────────────────────────────────────────────────────────────┤
@@ -45,11 +45,11 @@ The solution is a repository of schemas, generators, and transforms loaded on to
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Data Model Hierarchy
+## Data model hierarchy
 
 The system models a 3-tier datacenter network fabric:
 
-```
+```text
 NetworkFabric (e.g., "Fabric-L3LS-MultiPod-A")
 ├── NetworkPod (e.g., "Pod-A1", "Pod-A2")
 │   ├── LocationRack (e.g., "Rack-A1-01", "Rack-A1-02")
@@ -61,11 +61,11 @@ NetworkFabric (e.g., "Fabric-L3LS-MultiPod-A")
 └── DcimDevice [super_spine] (e.g., "ss-A-1")
 ```
 
-## IP Address Management
+## IP address management
 
 Fabric-level pool allocation:
 
-```
+```text
 NetworkFabric
 ├── loopback_pool: CoreIPPrefixPool
 │   └── Internal CoreIPAddressPool wrapper: Loopback0 addresses
@@ -81,11 +81,11 @@ NetworkFabric
     └── Per-device unique identifier
 ```
 
-## Generator Pipeline
+## Generator pipeline
 
 Generators run in sequence to build infrastructure:
 
-```
+```text
 ┌─────────────────────────┐
 │  1. FabricGenerator     │  Triggered on: NetworkFabric
 │  - Resolve fabric pools │  Creates: Super-spine devices
@@ -118,11 +118,11 @@ Two further generators sit outside this chain:
 
 See [Generators](./generators.md).
 
-## Transform Pipeline
+## Transform pipeline
 
 Transforms convert data to artifacts:
 
-```
+```text
 ┌──────────────────┐     ┌────────────────────┐     ┌─────────────────┐
 │  GraphQL Query   │ ──▶ │  Transform Logic   │ ──▶ │  Output Artifact│
 │  (Data Fetch)    │     │  (Python/Jinja2)   │     │  (Config/Doc)   │
@@ -137,11 +137,11 @@ Examples:
 - NetworkFabric → ContainerLabTopology → ContainerLab topology (YAML)
 ```
 
-## Validation Pipeline
+## Validation pipeline
 
 Alongside transforms, proposed-change validation runs **checks** — Python routines that report pass, information, or error rather than producing an artifact. The repository ships one, `cv-config-validation`, which deploys the rendered EOS configs into a CloudVision workspace and blocks the proposed change on a failed build. See [Checks](./checks.md).
 
-## Checksum-Based Change Detection
+## Checksum-based change detection
 
 Generators use checksums to avoid redundant regeneration:
 
@@ -158,7 +158,7 @@ if new_checksum != target.checksum:
     target.checksum = new_checksum
 ```
 
-## Configuration Files
+## Configuration files
 
 | File | Role |
 |------|------|
@@ -167,7 +167,7 @@ if new_checksum != target.checksum:
 | `docker-compose.yml` | Orchestrate Infrahub services |
 | `pyproject.toml` | Python dependencies and tool configuration |
 
-## Docker Service Stack
+## Docker service stack
 
 ```yaml
 services:
@@ -180,9 +180,9 @@ services:
   rabbitmq:           # Message queue
 ```
 
-## Development Workflow
+## Development workflow
 
-```
+```text
 1. Edit schema (schemas/*.yml)
         ↓
 2. Load schema: inv load-schema

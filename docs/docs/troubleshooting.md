@@ -1,23 +1,27 @@
 ---
-title: Common Issues
+title: Common issues
 description: Diagnose and fix the most frequent failures — stack health, generator order, seed data, artifacts.
 audience: user
 sidebar_position: 6
+# Every issue below repeats the same Symptoms/Diagnose/Fix subheadings, so
+# listing them would fill the page TOC with duplicates. Keep it at the issue
+# level.
+toc_max_heading_level: 2
 ---
 
-# Common Issues
+# Common issues
 
 The failure modes below are the ones you'll hit most often. If your problem isn't here, the [developer guide](/developer-guide/) has deeper debugging material for contributors.
 
 ## Stack is not healthy
 
-**Symptoms**
+### Symptoms
 
 - `http://localhost:8000` doesn't respond.
 - `uv run invoke load` fails with connection errors.
-- Service portal at `http://localhost:8501` loads but shows "Unable to fetch data from Infrahub".
+- Service portal at `http://localhost:8501` loads but shows `Unable to fetch data from Infrahub`.
 
-**Diagnose**
+### Diagnose
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.override.yml ps
@@ -35,7 +39,7 @@ Check logs for a failing service:
 docker compose -f docker-compose.yml -f docker-compose.override.yml logs --tail 100 <service-name>
 ```
 
-**Fix**
+### Fix
 
 If restarting doesn't help, tear down and rebuild:
 
@@ -51,23 +55,23 @@ uv run invoke load
 
 ## Generators ran out of order
 
-**Symptoms**
+### Symptoms
 
 - `generate-fabric` finishes but no pod, rack, or device tasks appear afterwards.
 - A leaf device is created but has no BGP ASN, node ID, or IP address.
-- Hostvars generation fails with "parent not found".
+- Hostvars generation fails with `parent not found`.
 
-**Cause**
+### Cause
 
 Triggers connect the generators into a chain: `generate-fabric` → `generate-pod` → `generate-rack` → `generate-avd-device-hostvar` → `generate-avd-device-structured-config`. If triggers didn't load — the last step of `invoke load` — the chain is broken.
 
-**Diagnose**
+### Diagnose
 
 In the Infrahub UI, open **Governance → Triggers**. You should see trigger entries covering each generator.
 
 If the Triggers page is empty, the trigger load step didn't run.
 
-**Fix**
+### Fix
 
 Re-run the trigger load step:
 
@@ -81,13 +85,13 @@ If the generators already ran out of order and left partial data, the cleanest f
 
 ## Missing seed data
 
-**Symptoms**
+### Symptoms
 
 - Running the fabric generator returns an error about missing IP pools, ASN pools, or device templates.
 - The fabrics list is empty.
 - Manufacturer or device-type lookups fail.
 
-**Diagnose**
+### Diagnose
 
 Open the Infrahub UI and check each of these lists is populated:
 
@@ -100,7 +104,7 @@ Open the Infrahub UI and check each of these lists is populated:
 
 If any are empty, seed data did not load.
 
-**Fix**
+### Fix
 
 Re-run seed data load. From the repository root:
 
@@ -114,24 +118,24 @@ If `invoke load` fails on the `infrahubctl object load` step, the most common ca
 
 ## "No structured config available" when viewing an artifact
 
-**Symptoms**
+### Symptoms
 
 - The device's **AVD EOS Configuration** artifact opens but shows "No structured config available" or similar.
 - The device has hostvars (you can see `AvdHostvarFile` listed for it) but no `AvdStructuredConfigFile`.
 
-**Cause**
+### Cause
 
 The structured-config generator (Phase 2 of the AVD pipeline) runs per fabric, not per device. It reads all device hostvars and generates structured configs for all devices at once. If that generator hasn't run, or ran before the hostvars for this device were ready, the structured config is missing.
 
-**Fix**
+### Fix
 
 Re-run the structured-config generator for the fabric:
 
 1. In the Infrahub UI, on the correct branch, open **Actions → Generator definitions**.
 2. Click **`generate-avd-device-structured-config`**.
-3. Click **Run** and select the fabric (e.g. `Fabric-L3LS-MultiPod-A`).
+3. Click **Run** and select the fabric (for example, `Fabric-L3LS-MultiPod-A`).
 
-Once the task completes, the artifact will render on the next open.
+Once the task completes, the artifact renders on the next open.
 
 Alternatively, in the artifact preview panel, click **Regenerate**.
 
@@ -182,12 +186,12 @@ See [CloudVision Validation](./cloudvision.md) for the full behaviour and
 
 ## Service portal is down but Infrahub is up
 
-**Symptoms**
+### Symptoms
 
 - `http://localhost:8000` works.
 - `http://localhost:8501` returns connection refused or a blank page.
 
-**Fix**
+### Fix
 
 Restart the service portal container:
 
@@ -220,9 +224,9 @@ Normal durations on a typical laptop:
 | `generate-avd-device-hostvar` | one device | 20–45 s |
 | `generate-avd-device-structured-config` | one fabric | 1–3 min for a small fabric; longer for many devices |
 
-If a task has been in **Running** state for more than 10 minutes, check the task's log in **Actions → Tasks → [task]** and look for errors. Most long-running tasks are waiting on a missing dependency (an IP pool, a parent object). The log will name the missing item.
+If a task has been in **Running** state for more than 10 minutes, check the task's log in **Actions → Tasks → [task]** and look for errors. Most long-running tasks are waiting on a missing dependency (an IP pool, a parent object). The log names the missing item.
 
-## Starting over completely
+## Starting over {#starting-over-completely}
 
 ```bash
 uv run invoke destroy     # wipes everything

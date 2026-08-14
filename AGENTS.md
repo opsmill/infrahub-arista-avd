@@ -156,7 +156,10 @@ uv run invoke lint
 uv run invoke lint-ruff
 uv run invoke lint-yaml
 uv run invoke lint-mypy
+uv run invoke lint-markdown
+uv run invoke lint-prose
 uv run invoke format
+uv run invoke docs
 ```
 
 Local tests and linters:
@@ -170,6 +173,20 @@ uv run ruff format --check .
 uv run ruff format .
 uv run mypy --show-error-codes src/solution_arista_avd
 uv run yamllint .
+uv run rumdl check README.md AGENTS.md docs/ lab/README.md schemas/
+uv run rumdl fmt README.md AGENTS.md docs/ lab/README.md schemas/
+```
+
+Markdown linting covers authored files only; vendored agent content, `specs/`, and
+PyAVD-rendered output under `lab/avd/` are excluded in `[tool.rumdl]`.
+
+Prose linting uses Vale, which is a Go binary rather than a `uv` dependency. Install the
+pinned version before running `invoke lint-prose`:
+
+```bash
+curl -sL "https://github.com/errata-ai/vale/releases/download/v3.17.1/vale_3.17.1_Linux_64-bit.tar.gz" \
+  -o /tmp/vale.tar.gz && tar -xzf /tmp/vale.tar.gz -C ~/.local/bin vale
+vale sync
 ```
 
 Use local `uv run pytest tests/integration` only for ad-hoc local/lab debugging when explicitly
@@ -198,9 +215,14 @@ For repeated `infrahubctl` calls, define a temporary shell alias in the current 
 alias ihctl='uv run infrahubctl'
 ```
 
-Docs commands are not `uv run`; use them from `docs/` when documentation changes:
+The documentation site uses pnpm, not npm. Prefer `uv run invoke docs`, which runs the same
+commands CI runs. To work inside `docs/` directly:
 
 ```bash
-npm run typecheck
-npm run build
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run build
 ```
+
+pnpm settings for the site live in `docs/pnpm-workspace.yaml`, not in `docs/package.json` -
+pnpm no longer reads the `pnpm` field there, so overrides placed in it are ignored.

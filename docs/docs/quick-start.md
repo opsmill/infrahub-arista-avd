@@ -1,11 +1,11 @@
 ---
-title: Quick Start
+title: Quick start
 description: Install dependencies, bring the stack up, and load seed data.
 audience: user
 sidebar_position: 1
 ---
 
-# Quick Start
+# Quick start
 
 The steps below take you from a fresh clone to a running Infrahub instance with seed data loaded. After this, see [Provision Your First Fabric](./provision-first-fabric.md) to generate devices, configurations, and AVD artifacts.
 

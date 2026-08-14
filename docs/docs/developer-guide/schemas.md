@@ -106,7 +106,7 @@ Adding a new device design for a supported role is data, not a schema change. De
 
 ### `NetworkLink` — `Network.Link`
 
-A cabled connection between interfaces. Inherits `Dcim.Connector`, so it carries `name` and `medium` (`mmf`, `smf`, `copper`) and relates to `connected_endpoints` → `DcimEndpoint`. A DCI connection is a normal `NetworkLink` with `role=dci`, not a separate schema node.
+A cabled connection between interfaces. Inherits `Dcim.Connector`, so it has `name` and `medium` (`mmf`, `smf`, `copper`) and relates to `connected_endpoints` → `DcimEndpoint`. A DCI connection is a normal `NetworkLink` with `role=dci`, not a separate schema node.
 
 - **DCI attributes**: `role` (`dci`) and `include_in_underlay_protocol` (Boolean, default `true`). BGP ASNs are taken from each endpoint device's own `asn`, not stored on the link.
 - **Relationships**: inherited `connected_endpoints`; no DCI-specific endpoint, pool, subnet, endpoint IP, speed, BFD, MTU, external-network, or EVPN Gateway fields are added.
@@ -226,7 +226,7 @@ AVD EVPN fabric-wide settings. Attributes include `ebgp_multihop` and `overlay_b
 
 ### `AvdTag` — `Avd.Tag`
 
-AVD-specific fabric tag object. Attributes: `name`, `description`. Relationships: `racks` → `LocationRack`; reciprocal rack assignments emit pyAVD node-group `filter.tags`, and SVI `avd_tags` emit pyAVD SVI `tags`.
+AVD-specific fabric tag object. Attributes: `name`, `description`. Relationships: `racks` → `LocationRack`; reciprocal rack assignments emit PyAVD node-group `filter.tags`, and SVI `avd_tags` emit PyAVD SVI `tags`.
 
 ## CloudVision
 
@@ -281,7 +281,9 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 - [`schemas/cv/cv.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/cv/cv.yml) — `Cloudvision.Workspace`.
 - [`schemas/device_design.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/schemas/device_design.yml) — `Network.DeviceDesign` and the per-container design nodes.
 - Generated protocols: [`src/solution_arista_avd/protocols.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/protocols.py) — regenerate after any schema change with:
+
   ```bash
   uv run infrahubctl protocols --schemas schemas --out src/solution_arista_avd/protocols.py
   ```
+
   Note the `--out` flag (not `--output`) and the explicit path — the default would drop `schema_protocols.py` in the current directory instead of overwriting the checked-in file.

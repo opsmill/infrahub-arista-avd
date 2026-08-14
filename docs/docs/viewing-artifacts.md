@@ -1,11 +1,11 @@
 ---
-title: Viewing Artifacts
+title: Viewing artifacts
 description: Find, preview, and download the AVD EOS configs and fabric/device documentation.
 audience: user
 sidebar_position: 5
 ---
 
-# Viewing Artifacts
+# Viewing artifacts
 
 Once generators have run on a branch and you've opened a proposed change (see [Provision Your First Fabric](./provision-first-fabric.md) or any of the day-2 how-to pages), the proposed-change CI pipeline renders these artifact types:
 
@@ -94,7 +94,7 @@ Artifacts regenerate automatically when the underlying data changes, but you can
 - You edited a device attribute directly in the UI and want to see the config update.
 - A previous generator run was interrupted and the artifact is stale.
 
-## What if an artifact is empty or says "no structured config available"?
+## What if an artifact is empty or says `no structured config available`?
 
 This means the structured-config generator hasn't run for the fabric yet. See the [troubleshooting page](./troubleshooting.md) for the fix.
 

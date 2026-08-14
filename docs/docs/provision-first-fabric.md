@@ -1,11 +1,11 @@
 ---
-title: Provision Your First Fabric
+title: Provision your first fabric
 description: Run the generator chain end-to-end on Fabric-L3LS-MultiPod-A and reach rendered AVD artifacts.
 audience: user
 sidebar_position: 2
 ---
 
-# Provision Your First Fabric
+# Provision your first fabric
 
 Prerequisites: [Quick Start](./quick-start.md) complete — Infrahub is running at `http://localhost:8000`, and seed data (fabrics, pods, racks, device types, IP pools) is loaded.
 
@@ -59,7 +59,7 @@ Infrahub queues the generator and shows progress. The fabric generator itself ta
 You don't need to manually trigger the pod, rack, and AVD generators — they are chained via event triggers. In the UI:
 
 1. Open **Actions → Tasks** (or watch the running-task indicator in the navbar).
-2. Tasks will appear in this order:
+2. Tasks appear in this order:
    - `generate-fabric` (1 task, per fabric)
    - `generate-pod` (one per pod in the fabric)
    - `generate-rack` (one per rack in the fabric)
@@ -116,4 +116,4 @@ The most common failures are documented in [Common Issues](./troubleshooting.md)
 
 - The fabric generator completes but no spines or leaves appear.
 - A task hangs in "running" state.
-- An artifact shows "no structured config available".
+- An artifact shows `no structured config available`.

@@ -1,15 +1,16 @@
 ---
-title: Add a Server
+title: Add a server
 description: Provision a physical server into a compute rack and trigger the AVD cascade.
 audience: user
 sidebar_position: 2
 ---
 
-# Add a Server
+# Add a server
 
 Provisions a new physical server into a compute rack. The workflow runs on a branch, cables the server to the adjacent leaf switches, cascades through the AVD pipeline to update affected device configs, and opens a proposed change.
 
 Prerequisites:
+
 - A running stack with seed data loaded ([Quick Start](../quick-start.md)).
 - A provisioned fabric with at least one **compute** rack ([Provision Your First Fabric](../provision-first-fabric.md)).
 - At least one `TemplateComputePhysicalServer` template defined (seeded with the project).
@@ -22,7 +23,7 @@ Navigate to **`http://localhost:8501`**. From the sidebar, open **Add Server**.
 
 | Field | Description |
 |-------|-------------|
-| **Server Name** | Hostname for the new server, e.g. `compute-pod-a2-3-1`. |
+| **Server Name** | Hostname for the new server, for example, `compute-pod-a2-3-1`. |
 | **Rack** | Dropdown of compute racks only (racks with `rack_type = "compute"`). Shown as `<rack-name> (<pod-name>)`. |
 | **Server Template** | Dropdown of available `TemplateComputePhysicalServer` templates. Determines the server's interface count, role, and other defaults. |
 
@@ -39,6 +40,7 @@ Click **Add Server**. The portal performs:
 5. **Create a proposed change** summarising the new server.
 
 You'll see two buttons:
+
 - **View Server** — opens the new `ComputePhysicalServer` object in Infrahub.
 - **View Proposed Change** — opens the proposed change.
 
@@ -68,7 +70,7 @@ For a newly added server, the generator:
 10. Sets EVPN Ethernet Segment on switch-side LAGs when the server is attached across non-MLAG leaves.
 11. Marks AVD hostvars as not ready for the fabric and triggers hostvar generation, which cascades into structured config generation.
 
-The resulting hostvars include `port_channel.channel_id` for switch-side server LAGs, so pyAVD receives the explicit Port-Channel ID from Infrahub. For bonded servers, VLAN mode and VLAN lists are derived from the logical Bond or Port-Channel VLAN relationships, not from member Ethernet ports.
+The resulting hostvars include `port_channel.channel_id` for switch-side server LAGs, so PyAVD receives the explicit Port-Channel ID from Infrahub. For bonded servers, VLAN mode and VLAN lists are derived from the logical Bond or Port-Channel VLAN relationships, not from member Ethernet ports.
 
 ## If the wait times out
 
