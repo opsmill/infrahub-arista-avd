@@ -1,15 +1,15 @@
 ---
-title: CloudVision Validation
+title: CloudVision validation
 ---
 
-# CloudVision Validation
+# CloudVision validation
 
 The repository validates generated EOS configurations in CloudVision during
 Infrahub proposed-change validation. It also records the CloudVision workspace
 URL in the proposed change and registers a placeholder CustomWebhook handoff for
 submitting the linked workspace when the proposed change is submitted.
 
-## Runtime Configuration
+## Runtime configuration
 
 CloudVision credentials are read from task-worker environment variables:
 
@@ -26,7 +26,7 @@ the `CLOUDVISION_PROXY_*` variables.
 `docker-compose.override.yml` passes these variables into the Infrahub task
 worker so proposed-change checks can access them.
 
-## Proposed-Change Validation
+## Proposed-change validation
 
 The `cv-config-validation` check uses the `cv_config_check` GraphQL query to
 collect the target fabric and related devices. The fabric must have
@@ -55,7 +55,7 @@ device-specific error. CloudVision connection, deployment, or workspace build
 failures also block the proposed change and include the fabric and workspace
 context when available.
 
-## Workspace Tracking
+## Workspace tracking
 
 Successful validation creates or updates a deterministic CloudVision workspace
 for the proposed change and target fabric. If the workspace already exists and
@@ -65,10 +65,13 @@ latest configs and requesting a build.
 When the tracking schema is loaded, validation also creates or updates a
 `CloudvisionWorkspace` object in Infrahub. The object tracks:
 
+- `name`: workspace display name
 - `workspace_id`: deterministic CloudVision workspace ID
 - `proposed_change_id`: proposed change that created the workspace
 - `workspace_url`: exact CloudVision workspace URL shown to reviewers
 - `thread_id`: proposed-change overview thread used for workspace comments
+- `change_control_id` / `change_control_url`: CloudVision change control created
+  during submission, when one exists
 - `last_submission_error` / `last_submission_attempt_at`: latest failed
   CustomWebhook submission attempt
 - `submitted_at`: successful submission timestamp
@@ -96,7 +99,7 @@ branch name for `feat/` branches.
 If the `CloudvisionWorkspace` schema is unavailable during rollout, tracking is
 skipped without masking CloudVision validation success or failure.
 
-## CustomWebhook Submission
+## CustomWebhook submission
 
 The repository loads exactly one placeholder `CoreCustomWebhook` named
 `cloudvision-workspace-submission`. It is associated with proposed-change
@@ -143,7 +146,7 @@ Manual retry uses the invoke task:
 uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main
 ```
 
-## Operational Notes
+## Operational notes
 
 CloudVision validation depends on the AVD generator chain having already
 produced structured-config artifacts. Missing artifacts do not exempt devices
@@ -159,3 +162,10 @@ is handled by CustomWebhook processing or the manual retry task, not
 by the pre-merge validation check.
 
 CloudVision change-control management and Semaphore Ansible playbooks are out of scope for this phase. The CustomWebhook is only the handoff point for future deployment automation after linked workspace submission.
+
+## Related
+
+- [Checks](/developer-guide/checks) — how the check is wired, its query and supporting modules, and
+  how to run or extend it.
+- [Schemas → CloudvisionWorkspace](/developer-guide/schemas#cloudvisionworkspace--cloudvisionworkspace)
+  — the tracking node's attributes and relationships.

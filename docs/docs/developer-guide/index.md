@@ -1,11 +1,11 @@
 ---
-title: Developer Guide
+title: Developer guide
 description: How the Infrahub Arista AVD solution is built and how to extend it.
 audience: developer
 hide_table_of_contents: true
 ---
 
-# Developer Guide
+# Developer guide
 
 This guide is for **contributors** who want to extend, debug, or maintain the AVD pipeline — adding device roles, transform outputs, schema fields, or fixing pipeline issues. It assumes familiarity with Python, GraphQL, and Infrahub generators/transforms.
 
@@ -19,8 +19,9 @@ This guide is for **contributors** who want to extend, debug, or maintain the AV
 - **[Schemas](./schemas.md)** — every YAML schema file and the kinds it defines.
 - **[Generators](./generators.md)** — the generator framework, file structure, and per-generator behaviour.
 - **[Transforms](./transforms.md)** — Python and Jinja2 transforms, queries, and content types.
+- **[Checks](./checks.md)** — proposed-change validation checks, including CloudVision configuration validation.
 
-## AVD Pipeline
+## AVD pipeline
 
 The AVD pipeline is the technically distinguishing piece of this solution and has its own sub-section:
 

@@ -1,0 +1,36 @@
+---
+# Path filters consumed by the `files-changed` job in ci.yml via
+# opsmill/paths-filter. Each category defines an anchor and an `_all` alias;
+# the job reads the `_all` outputs so a category can later gain extra paths
+# without touching the workflow.
+
+documentation: &documentation
+  - 'docs/**/*'
+
+documentation_all:
+  - *documentation
+
+python: &python
+  - '**/*.py'
+  - 'pyproject.toml'
+  - 'uv.lock'
+
+python_all:
+  - *python
+
+# Workflow files are excluded: they are linted by their own review, and
+# including them would run the YAML job on every CI change.
+yaml: &yaml
+  - '**/*.yml'
+  - '**/*.yaml'
+  - '!.github/workflows/**'
+
+yaml_all:
+  - *yaml
+
+markdown: &markdown
+  - '**/*.md'
+  - '**/*.mdx'
+
+markdown_all:
+  - *markdown

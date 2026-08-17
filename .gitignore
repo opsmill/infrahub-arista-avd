@@ -263,3 +263,18 @@ node_modules/
 
 # Local environment variants
 .env*
+
+# Vale style packages, fetched by `vale sync`. Only .vale.ini and the project
+# vocabulary under .vale/config/ are tracked; the Google and write-good rule
+# sets are third-party and would otherwise need manual updating.
+.vale/Google/
+.vale/write-good/
+
+# Secrets: never commit key material or credential files.
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.yaml
+secrets.yml

@@ -1,11 +1,11 @@
 ---
-title: Viewing Artifacts
+title: Viewing artifacts
 description: Find, preview, and download the AVD EOS configs and fabric/device documentation.
 audience: user
 sidebar_position: 5
 ---
 
-# Viewing Artifacts
+# Viewing artifacts
 
 Once generators have run on a branch and you've opened a proposed change (see [Provision Your First Fabric](./provision-first-fabric.md) or any of the day-2 how-to pages), the proposed-change CI pipeline renders these artifact types:
 
@@ -15,6 +15,8 @@ Once generators have run on a branch and you've opened a proposed change (see [P
 | **AVD Device Documentation** | Each `DcimDevice` | `text/markdown` | Human-readable documentation describing the device. |
 | **AVD Fabric Documentation** | Each `NetworkFabric` | `text/markdown` | Fabric-wide topology and design documentation. |
 | **ContainerLab Topology** | Each `NetworkFabric` | `application/yaml` | A [ContainerLab](https://containerlab.dev) topology file for running the fabric as containers. |
+| **Cabling Plan** | Each `NetworkFabric` | `text/csv` | One row per connection for the field and cabling teams. |
+| **AVD ANTA Catalog** | Each `DcimDevice` | `application/yaml` | The device's [ANTA](https://anta.arista.com) test catalog. Rendered only when the fabric has `anta_enabled` set; otherwise the artifact holds a one-line comment saying so. |
 
 Per-device artifacts (`AVD EOS Configuration`, `AVD Device Documentation`) are rendered as part of the proposed-change CI. If you want to view them outside a proposed change, open them on a device's **Artifacts** tab and click **Regenerate**.
 
@@ -92,7 +94,7 @@ Artifacts regenerate automatically when the underlying data changes, but you can
 - You edited a device attribute directly in the UI and want to see the config update.
 - A previous generator run was interrupted and the artifact is stale.
 
-## What if an artifact is empty or says "no structured config available"?
+## What if an artifact is empty or says `no structured config available`?
 
 This means the structured-config generator hasn't run for the fabric yet. See the [troubleshooting page](./troubleshooting.md) for the fix.
 
@@ -100,7 +102,7 @@ This means the structured-config generator hasn't run for the fabric yet. See th
 
 The artifacts are also accessible via the Infrahub API and through Ansible playbooks orchestrated by Semaphore at `http://localhost:3000`. Two playbook trees exist, and they consume different artifacts:
 
-- `ansible/` at the repository root — `inventory.yml` builds the inventory from Infrahub and `deploy.yml` fetches each device's **AVD EOS Configuration** with `opsmill.infrahub.artifact_fetch`. This is the tree Semaphore runs.
-- `lab/playbooks/` — the ContainerLab and AVD-toolchain playbooks. `deploy_clab.yml` fetches the **ContainerLab Topology** artifact plus every device's EOS config and deploys the lab; see the [ContainerLab page](./containerlab.md).
+- `ansible/` at the repository root — the tree Semaphore runs. `inventory.yml` builds the inventory from Infrahub and `deploy.yml` fetches each device's **AVD EOS Configuration** with `opsmill.infrahub.artifact_fetch`. `deploy_clab.yml` fetches the **ContainerLab Topology** artifact plus every device's EOS config, stages them on a ContainerLab host, and deploys the lab; see the [ContainerLab page](./containerlab.md).
+- `lab/playbooks/` — the AVD-toolchain playbooks for the committed lab (`build.yml`, `deploy.yml`, `deploy-eapi.yml`, `test.yml`), driven from `lab/Makefile`.
 
 Both need the `opsmill.infrahub` collection: `ansible-galaxy collection install -r ansible/galaxy-requirements.yml`.

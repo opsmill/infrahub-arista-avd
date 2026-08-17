@@ -1,6 +1,7 @@
 import json
 import os
 import shlex
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -28,6 +29,19 @@ SEMAPHORE_PLAYBOOK_PATH = "/opt/semaphore/playbooks"
 # Host path bind-mounted into the Semaphore container as the ContainerLab
 # staging directory, so files deploy_clab.yml pulls are reachable from the host.
 CLAB_STAGING_DIR = "lab/clab-staging"
+
+# Markdown authored by this project. Vendored agent content (.agents, .claude,
+# .specify), spec-kit process artifacts (specs/), and PyAVD-rendered output
+# (lab/avd) are excluded in [tool.rumdl]; these paths are what remains.
+# CLAUDE.md is omitted because it symlinks to AGENTS.md.
+MARKDOWN_PATHS = "README.md AGENTS.md docs/ lab/README.md schemas/"
+
+# Prose linting covers the published documentation tree only.
+PROSE_PATHS = "docs/docs"
+
+# Pinned so local runs match the CI job. Vale ships as a Go binary with no PyPI
+# distribution, so it cannot be a uv dev dependency like the other linters.
+VALE_VERSION = "3.17.1"
 
 
 @task
@@ -452,11 +466,21 @@ def download_compose_file(ctx: Context, override: bool = False) -> Path:  # noqa
     return compose_file
 
 
+@task
+def docs(ctx: Context) -> None:
+    """Build the documentation site."""
+    print(" - Build the Docusaurus site")
+    exec_cmds = ["pnpm install --frozen-lockfile", "pnpm run build"]
+    with ctx.cd(MAIN_DIRECTORY_PATH / "docs"):
+        for cmd in exec_cmds:
+            ctx.run(cmd, pty=True)
+
+
 @task(name="format")
 def format_python(ctx: Context) -> None:
     """Run RUFF to format all Python files."""
 
-    exec_cmds = ["ruff format .", "ruff check . --fix"]
+    exec_cmds = ["ruff format .", "ruff check . --fix", f"rumdl fmt {MARKDOWN_PATHS}"]
     with ctx.cd(MAIN_DIRECTORY_PATH):
         for cmd in exec_cmds:
             ctx.run(cmd, pty=True)
@@ -493,12 +517,41 @@ def lint_ruff(ctx: Context) -> None:
             ctx.run(cmd, pty=True)
 
 
+@task
+def lint_markdown(ctx: Context) -> None:
+    """Run Linter to check authored Markdown files."""
+    print(" - Check Markdown with rumdl")
+    exec_cmd = f"rumdl check {MARKDOWN_PATHS}"
+    with ctx.cd(MAIN_DIRECTORY_PATH):
+        ctx.run(exec_cmd, pty=True)
+
+
+@task
+def lint_prose(ctx: Context) -> None:
+    """Run Linter to check documentation prose."""
+    print(" - Check prose with Vale")
+    if not shutil.which("vale"):
+        # Vale is a Go binary with no PyPI distribution, so `uv sync` cannot
+        # provide it. Skip rather than fail, so contributors without it can still
+        # run the rest of the suite; CI installs it and remains the gate.
+        print(
+            f"   skipped: vale not found on PATH. Install v{VALE_VERSION} from "
+            "https://github.com/errata-ai/vale/releases, then run `vale sync`."
+        )
+        return
+    with ctx.cd(MAIN_DIRECTORY_PATH):
+        ctx.run("vale sync", pty=True)
+        ctx.run(f"vale {PROSE_PATHS}", pty=True)
+
+
 @task(name="lint")
 def lint_all(ctx: Context) -> None:
     """Run all linters."""
     lint_yaml(ctx)
     lint_ruff(ctx)
     lint_mypy(ctx)
+    lint_markdown(ctx)
+    lint_prose(ctx)
 
 
 @task

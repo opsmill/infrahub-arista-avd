@@ -1,11 +1,11 @@
 ---
-title: AVD Pipeline Overview
+title: AVD pipeline overview
 description: The two-phase AVD generator pipeline, the PyAVD version pinned, and the shape of the data flow.
 audience: developer
 sidebar_position: 1
 ---
 
-# AVD Pipeline Overview
+# AVD pipeline overview
 
 :::info Developer Guide
 If you want to *use* the system to produce configs, start with [Quick Start](/quick-start).
@@ -21,7 +21,7 @@ The integration targets **pyavd >= 6.3.0, < 6.4.0** (pinned in [`pyproject.toml`
 The following sections are version-sensitive — review them when upgrading PyAVD:
 
 - [Hostvars Reference](./hostvars.md) — the PyAVD input schema.
-- [Role Mapping](./role-mapping.md) — AVD device type names (e.g. `l3leaf`, `super-spine`).
+- [Role Mapping](./role-mapping.md) — AVD device type names (for example, `l3leaf`, `super-spine`).
 - [Transforms](./transforms.md) — the PyAVD functions the transforms call (`validate_inputs`, `get_avd_facts`, `get_device_structured_config`, `get_device_config`, `get_fabric_documentation`).
 :::
 
@@ -59,13 +59,13 @@ For each device the generator:
 1. Extracts device attributes — name, role, BGP ASN, node ID, loopback, management IP.
 2. Determines the **uplink role** based on the device's role: `spine → super_spine` interfaces, `leaf` and `border_leaf → spine` interfaces, `l2leaf → leaf` interfaces, `super_spine →` no uplinks.
 3. Extracts connected endpoints (servers) from interfaces with `role = "server"`, including tagged/untagged VLANs.
-4. For leaves, extracts MLAG peer information and the virtual router MAC.
+4. For leaves, extracts the MLAG peer information, then the virtual router MAC.
 5. For leaves and spines, queries EVPN tenants, VRFs, SVIs, and L2 VLANs associated with the fabric (skipped entirely for `l2leaf`).
 6. For Border Leafs, evaluates `NetworkLink` objects with `role=dci` in the fabric and emits valid links as profile-free PyAVD `l3_edge.p2p_links` entries. DCI addressing resolves from `NetworkFabric.fabric_ip_pools` role `dci` first, falls back to the legacy `NetworkFabric.dci_pool`, and then uses deterministic Fabric Supernet fallback when the required DCI prefix-pool role is missing.
 7. Builds a complete PyAVD `hostvars` dict (see [Hostvars Reference](./hostvars.md)).
 8. Serialises to JSON, computes a SHA256 checksum, and compares against the previous content. If changed (or absent), writes a new `AvdHostvarFile` as a child of the device's `AvdArtifact` node.
 
-### Phase 2 — Structured Config
+### Phase 2 — structured config
 
 **Generator**: [`generate-avd-device-structured-config`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_structured_config.py)
 **Target**: each `NetworkFabric` in the `fabrics` group (one task per fabric).

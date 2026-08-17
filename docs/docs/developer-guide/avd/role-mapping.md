@@ -1,11 +1,11 @@
 ---
-title: Role Mapping
+title: Role mapping
 description: Infrahub device roles mapped to PyAVD device types.
 audience: developer
 sidebar_position: 5
 ---
 
-# Role Mapping
+# Role mapping
 
 :::info Developer Guide
 Role names are **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
@@ -55,11 +55,11 @@ def get_avd_type(role: str) -> str:
     return ROLE_TO_AVD_TYPE[role]
 ```
 
-An unrecognised role raises `ValueError` at generation time — Phase 1 will fail for that device.
+An unrecognized role raises `ValueError` at generation time — Phase 1 fails for that device.
 
 ## Underlay-driven role selection
 
-The four non-L3LS example designs do not set spine/leaf roles by hand. Instead the upstream generator derives them from the **fabric underlay**, so the same spine/leaf topology renders different device types per design:
+The four non-L3LS example designs do not set spine/leaf roles manually. Instead the upstream generator derives them from the **fabric underlay**, so the same spine/leaf topology renders different device types per design:
 
 | Fabric underlay | Spine-tier role | Leaf-tier role | Example design |
 |-----------------|-----------------|----------------|----------------|
@@ -71,7 +71,7 @@ These come from `SPINE_ROLE_BY_UNDERLAY` and `LEAF_ROLE_BY_UNDERLAY` in [`avd.py
 
 ## MLAG in non-L3LS designs
 
-`MLAG_MAIN_TIER_ROLES` (`l2leaf`, `l2spine`, `l3spine`) is the main tier of the non-L3LS designs that forms MLAG pairs. When the fabric underlay is one of `SPINE_UPLINK_UNDERLAYS` (`none`, `ospf`, `isis-ldp`), devices in these roles render node-group / peer-link / MLAG-domain configuration — just like the L3LS leaf family. The gate leaves the L3LS access-tier `l2leaf` (pure access under EVPN) unaffected.
+`MLAG_MAIN_TIER_ROLES` (`l2leaf`, `l2spine`, `l3spine`) is the main tier of the non-L3LS designs that forms MLAG pairs. When the fabric underlay is one of `SPINE_UPLINK_UNDERLAYS` (`none`, `ospf`, `isis-ldp`), devices in these roles render node-group / peer-link / MLAG-domain configuration — the same as the L3LS leaf family. The gate leaves the L3LS access-tier `l2leaf` (pure access under EVPN) unaffected.
 
 Which generator forms the pair depends on the tier:
 
@@ -80,7 +80,7 @@ Which generator forms the pair depends on the tier:
 | `l2leaf` (rack tier) | `generate-rack` | Highest-numbered free access ports — the `arista-7050sx3-48yc8c` l2leaf model ships no dedicated `mlag_peer` interfaces |
 | `l2spine` (pod tier, underlay `none`) | `generate-pod` | Highest-numbered free **super-spine-facing** ports, unused in a standalone L2LS fabric (it has no super-spines) |
 
-Both go through the shared `assign_mlag_peer_interfaces` helper on the generator mixin, so the choice is deterministic (ordered by the interface's computed `index`) and idempotent — a re-run converts nothing further. The l2spine pair carries **no BGP ASN**: a pure Layer-2 tier runs no BGP.
+Both go through the shared `assign_mlag_peer_interfaces` helper on the generator mixin, so the choice is deterministic (ordered by the interface's computed `index`) and idempotent — a re-run converts nothing further. The l2spine pair has **no BGP ASN**: a pure Layer-2 tier runs no BGP.
 
 ## Per-tier spanning-tree priorities
 
@@ -88,7 +88,7 @@ Both go through the shared `assign_mlag_peer_interfaces` helper on the generator
 
 ## Role implications
 
-The role governs several downstream behaviours in the hostvars generator and in PyAVD itself:
+The role governs these downstream behaviors in the hostvars generator and in PyAVD itself:
 
 | Role | Uplink source | Gets EVPN data? | MLAG? |
 |------|---------------|----------------|-------|

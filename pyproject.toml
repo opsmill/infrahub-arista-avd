@@ -1,8 +1,8 @@
 [project]
 name = "solution-arista-avd"
 version = "0.1.0"
-description = "Infrahub Repository"
-authors = []
+description = "Arista AVD reference design for Infrahub: models datacenter fabric intent, EVPN services, and per-device AVD data, then renders EOS configurations and documentation through PyAVD."
+authors = [{ name = "OpsMill", email = "info@opsmill.com" }]
 readme = "README.md"
 requires-python = ">=3.11, <3.14"
 dependencies = [
@@ -20,6 +20,7 @@ dev = [
     "pytest>=8.4.1",
     "pytest-asyncio>=1.0.0",
     "ruff>=0.12.0",
+    "rumdl>=0.2.54",
     "yamllint>=1.37.1",
 ]
 catalog = [
@@ -36,6 +37,39 @@ testpaths = ["tests"]
 markers = [
     "e2e: full-stack end-to-end pipeline test (heavy testcontainer stack; run with -m e2e, exclude with -m 'not e2e')",
 ]
+
+[tool.rumdl]
+# NOTE: rules are disabled through this list, not with `MD013 = false`. The
+# per-rule-false form parses without complaint and has no effect.
+#   MD013 - line length: too strict for prose and long command examples.
+#   MD033 - inline HTML: needed for MDX and Docusaurus admonitions.
+#   MD041 - first line heading: pages start with frontmatter.
+disable = ["MD013", "MD033", "MD041"]
+
+exclude = [
+    # Vendored agent tooling; authored upstream, not by this project.
+    ".agents",
+    ".claude",
+    ".specify",
+    ".superset",
+    # Spec-kit process artifacts, rewritten by the /speckit-* commands.
+    "specs",
+    # Rendered by PyAVD (device docs, fabric docs, ANTA reports). Regenerated on
+    # deploy, so lint fixes here would be overwritten - same reasoning as the
+    # lab/avd/intended entry in .yamllint.yml.
+    "lab/avd",
+    # Symlink to AGENTS.md; linting both reports every finding twice.
+    "CLAUDE.md",
+    "node_modules",
+    ".venv",
+]
+
+[tool.rumdl.MD025]
+# Docusaurus pages carry both a frontmatter `title:` and an H1. rumdl counts the
+# frontmatter title as a top-level heading by default, so every page trips
+# MD025. Clearing this decouples the two; the alternative auto-fix would delete
+# the H1s and change heading anchors.
+front-matter-title = ""
 
 [tool.mypy]
 pretty = true

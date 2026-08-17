@@ -1,8 +1,36 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.1.0 -> 1.1.1 (patch: remove committed lab-specific
-  details and align runtime guidance with Codex AGENTS.md)
+Version change: 1.1.1 -> 1.2.0 (minor: the mandatory linter set gains Markdown
+  and prose linting, which is materially expanded quality-gate guidance)
+
+Modified principles:
+  - Test-Required Quality: the pre-merge linter gate expands from ruff, mypy,
+    and yamllint to include rumdl (Markdown) and Vale (prose).
+
+Added sections: None
+
+Removed sections: None
+
+Supporting sections updated:
+  - Technology Stack & Constraints: Infrahub image target moves from 1.10.1 to
+    1.10.6 (deliberate patch upgrade, planned by the repo-standards-compliance
+    feature); rumdl added to development dependencies; pnpm recorded as the
+    documentation-site package manager; the linting entry now names Markdown and
+    prose linting; a stated exception covers Vale, which ships as a Go binary and
+    so cannot live in pyproject.toml.
+
+Templates and command files requiring updates:
+  - .specify/templates/plan-template.md: ✅ reviewed; no update required.
+  - .specify/templates/spec-template.md: ✅ reviewed; no update required.
+  - .specify/templates/tasks-template.md: ✅ reviewed; no update required.
+  - AGENTS.md: ✅ updated with the new invoke tasks, pnpm commands, and the Vale
+    install step.
+
+Follow-up TODOs: None
+
+Previous report (1.1.0 -> 1.1.1: remove committed lab-specific details and align
+runtime guidance with Codex AGENTS.md)
 
 Modified principles:
   - Idempotent Operations: generalized live idempotence safety-exception wording
@@ -126,8 +154,8 @@ before code is merged.
   checks in unit, integration, or approved live-test scenarios. Generator changes
   MUST also use `$infrahub-test-generator-idempotence` when the live scenario is
   allowed.
-- All linters (`ruff`, `mypy`, `yamllint`) MUST pass before merge. The
-  `uv run invoke lint` command validates the standard lint suite.
+- All linters (`ruff`, `mypy`, `yamllint`, `rumdl`, Vale) MUST pass before merge.
+  The `uv run invoke lint` command validates the standard lint suite.
 - Ruff complexity limit is C901 max-complexity=17. Functions exceeding this
   limit MUST be split into smaller methods.
 - Schema YAML files and generated protocol code MUST NOT be hand-included in
@@ -165,19 +193,27 @@ breaks discovery and makes cross-references expensive to maintain.
 - **Language**: Python >=3.11, <3.14.
 - **Platform**: Infrahub with Neo4j, PostgreSQL, Redis, and RabbitMQ.
 - **Infrahub image**: Build and local-stack workflows target
-  `INFRAHUB_BASE_VERSION=1.10.1` unless a feature explicitly plans an upgrade.
+  `INFRAHUB_BASE_VERSION=1.10.6` unless a feature explicitly plans an upgrade.
 - **Core dependencies**: `pyavd>=6.3.0,<6.4.0`, `httpx>=0.28.1`, and
   `streamlit-flow-component>=1.6.1`.
 - **Development dependencies**: `infrahub-sdk` with the `all` extra at
   version >=1.19.0,
   `infrahub-testcontainers>=1.3.0`, `invoke>=2.2.0`, `pytest>=8.4.1`,
-  `pytest-asyncio>=1.0.0`, `ruff>=0.12.0`, `mypy>=1.17.1`, and
-  `yamllint>=1.37.1`.
+  `pytest-asyncio>=1.0.0`, `ruff>=0.12.0`, `mypy>=1.17.1`, `rumdl>=0.2.54`,
+  and `yamllint>=1.37.1`.
 - **Service portal dependencies**: the `catalog` dependency group owns Streamlit,
   pandas, python-dotenv, and the catalog SDK constraint.
-- **Package manager**: `uv` with `hatchling` build backend.
+- **Package manager**: `uv` with `hatchling` build backend for Python, and
+  `pnpm` for the documentation site under `docs/`. npm and yarn MUST NOT be
+  used, and only one JavaScript lockfile may exist.
 - **Linting**: ruff with ALL selected rules and project ignores, mypy with typed
-  function enforcement, and yamllint.
+  function enforcement, yamllint, rumdl for authored Markdown, and Vale for
+  documentation prose.
+- **Prose linting exception**: Vale ships as a Go binary with no PyPI
+  distribution, so it is the one tool exempt from the
+  dependencies-in-`pyproject.toml` rule below. It MUST be pinned by version
+  wherever it is installed, and its style packages MUST be synced rather than
+  vendored.
 - **Testing**: pytest with pytest-asyncio and the repository's configured test
   markers.
 - Code MUST NOT introduce dependencies outside `pyproject.toml` and `uv.lock`
@@ -257,4 +293,4 @@ architectural decisions are made.
   uncommitted. When guidance conflicts, the stricter project safety rule wins
   unless an explicit maintainer decision supersedes it.
 
-**Version**: 1.1.1 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-07-18
+**Version**: 1.2.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-08-11

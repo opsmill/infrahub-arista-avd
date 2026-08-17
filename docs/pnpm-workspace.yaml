@@ -1,0 +1,16 @@
+---
+# pnpm settings live here rather than in package.json: pnpm 10+ stopped reading
+# the `pnpm` field, so a dependency override placed there is silently ignored.
+
+# Carried over from the npm-era `overrides` field. npm honoured that field and
+# pnpm does not, so the pin has to be restated here or webpack floats to the
+# latest 5.x.
+overrides:
+  webpack: ~5.96.1
+
+# core-js only prints a funding banner from its postinstall script, so it does
+# not need to build. Declaring the decision keeps `pnpm install
+# --frozen-lockfile` at exit code 0; without it pnpm fails the run with
+# ERR_PNPM_IGNORED_BUILDS and the docs CI job goes red.
+allowBuilds:
+  core-js: false

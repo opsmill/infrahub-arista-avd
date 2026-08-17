@@ -1,11 +1,11 @@
 ---
-title: Hostvars Reference
+title: Hostvars reference
 description: The PyAVD-compatible hostvars structure built per device role by Phase 1 of the pipeline.
 audience: developer
 sidebar_position: 2
 ---
 
-# Hostvars Reference
+# Hostvars reference
 
 :::info Developer Guide
 Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overview.md#pyavd-version) for the pinned version.
@@ -25,9 +25,9 @@ Hostvars structure is **PyAVD-version-sensitive** — see the [overview](./overv
 | `loopback_ipv4_pool` | string | `DcimDevice.loopback_ip.node.ip_prefix.node.prefix.value` | Parent Infrahub prefix for the Loopback0 address. |
 | `vtep_loopback_ipv4_address` | string | `DcimDevice.vtep_loopback_ip` | Leaf and border-leaf only; stripped of CIDR. |
 | `vtep_loopback_ipv4_pool` | string | `DcimDevice.vtep_loopback_ip.node.ip_prefix.node.prefix.value` | Parent Infrahub prefix for the VTEP loopback address; emitted for VTEP leaf roles. |
-| `mgmt_ip` | string | `DcimDevice.mgmt_ip` | Optional; includes CIDR (e.g. `10.255.0.11/24`). |
+| `mgmt_ip` | string | `DcimDevice.mgmt_ip` | Optional; includes CIDR (for example, `10.255.0.11/24`). |
 | `mgmt_gateway` | string | Fabric-level setting | Optional. |
-| `spanning_tree_settings.mode` | string | `NetworkFabric.spanning_tree_mode.value` | Optional; pyAVD 6.3 fabric-wide STP mode (`mstp`, `rstp`, `rapid-pvst`, or `none`). |
+| `spanning_tree_settings.mode` | string | `NetworkFabric.spanning_tree_mode.value` | Optional; PyAVD 6.3 fabric-wide STP mode (`mstp`, `rstp`, `rapid-pvst`, or `none`). |
 
 The builder for these basics lives in [`generators/generate_avd_device_hostvar.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/generators/generate_avd_device_hostvar.py) as `_build_hostvars()`. (The role→AVD-type mapping it uses, `ROLE_TO_AVD_TYPE`, lives in [`src/solution_arista_avd/avd.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/src/solution_arista_avd/avd.py).)
 
@@ -39,7 +39,7 @@ Super-spines have no uplinks; all other roles do.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `uplink_interfaces` | list[string] | Local interfaces, e.g. `["Ethernet1", "Ethernet2"]`. |
+| `uplink_interfaces` | list[string] | Local interfaces, for example, `["Ethernet1", "Ethernet2"]`. |
 | `uplink_switches` | list[string] | Upstream device hostnames, matched 1:1 with `uplink_interfaces`. |
 | `uplink_switch_interfaces` | list[string] | Upstream interface names, matched 1:1 with `uplink_interfaces`. |
 
@@ -85,7 +85,7 @@ Leaves and Border Leafs map to PyAVD `l3leaf` and carry the richest hostvars:
 | `connected_endpoints` | Per interface with `role = "server"` (see below). |
 | EVPN tenants/VRFs/VLANs | Derived from `EvpnTenant` → `IpamVRF` → `EvpnSvi` → `IpamVLAN` chain filtered to this fabric. |
 
-Border Leafs additionally consume valid `NetworkLink` objects with `role=dci` and emit PyAVD `l3_edge.p2p_links` entries. Each DCI link must have exactly two inherited physical endpoints, both endpoint devices must use role `border_leaf`, and both endpoint interfaces must use role `peering`. When the fabric underlay routing protocol is **eBGP**, both endpoint devices must have a BGP ASN assigned and each end's `as` is taken from the endpoint device's own `asn`; with a non-BGP underlay (e.g. OSPF) the link is still emitted for reachability, `as` is omitted, and no ASN is required. Point-to-point addresses are allocated as one `/31` per link. DCI pool resolution starts with the endpoint fabric's `fabric_ip_pools` member whose `IpamPrefix.role` is `dci`, falls back to the legacy `NetworkFabric.dci_pool`, and then uses a deterministic Fabric Supernet-derived fallback when the required DCI prefix-pool role is missing. For links between fabrics, the sorted-first endpoint chooses the shared allocation source so both border leafs allocate the same prefix. Endpoint IPs are not stored as DCI-specific link fields.
+Border Leafs additionally consume valid `NetworkLink` objects with `role=dci` and emit PyAVD `l3_edge.p2p_links` entries. Each DCI link must have exactly two inherited physical endpoints, both endpoint devices must use role `border_leaf`, and both endpoint interfaces must use role `peering`. When the fabric underlay routing protocol is **eBGP**, both endpoint devices must have a BGP ASN assigned and each end's `as` is taken from the endpoint device's own `asn`; with a non-BGP underlay (for example, OSPF) the link is still emitted for reachability, `as` is omitted, and no ASN is required. Point-to-point addresses are allocated as one `/31` per link. DCI pool resolution starts with the endpoint fabric's `fabric_ip_pools` member whose `IpamPrefix.role` is `dci`, falls back to the legacy `NetworkFabric.dci_pool`, and then uses a deterministic Fabric Supernet-derived fallback when the required DCI prefix-pool role is missing. For links between fabrics, the sorted-first endpoint chooses the shared allocation source so both border leafs allocate the same prefix. Endpoint IPs are not stored as DCI-specific link fields.
 
 Generated DCI entries are self-contained and do not use `l3_edge.p2p_links_profiles` or per-link `profile` references:
 
@@ -106,7 +106,7 @@ Generated DCI entries are self-contained and do not use `l3_edge.p2p_links_profi
 }
 ```
 
-`speed` is emitted only when endpoint/interface data provides a resolvable speed. When it cannot be resolved, the key is omitted and pyAVD uses its normal behavior.
+`speed` is emitted only when endpoint/interface data provides a resolvable speed. When it cannot be resolved, the key is omitted and PyAVD uses its normal behavior.
 
 Border Leafs are also the only role eligible for modeled EVPN Multi-Domain Gateway hostvars.
 A target Border Leaf that is a member of an `EvpnGatewayGroup` emits `l3leaf.nodes[].evpn_gateway`:
@@ -131,7 +131,7 @@ A target Border Leaf that is a member of an `EvpnGatewayGroup` emits `l3leaf.nod
 }
 ```
 
-The generator derives the local D-PATH domain ID from `EvpnGatewayGroup.local_domain`, validates that the selected `EvpnGatewayGroup.pod.evpn_domain` matches that parent domain, derives the remote D-PATH domain ID from `EvpnGatewayGroup.remote_domain`, and derives `remote_peers[].hostname` from other valid Border Leaf members in gateway groups that share the same remote EVPN Domain. It does not emit deprecated pyAVD 6.3.0 keys under `all_active_multihoming` such as `enable_d_path`, `evpn_domain_id_local`, or `evpn_domain_id_remote`.
+The generator derives the local D-PATH domain ID from `EvpnGatewayGroup.local_domain`, validates that the selected `EvpnGatewayGroup.pod.evpn_domain` matches that parent domain, derives the remote D-PATH domain ID from `EvpnGatewayGroup.remote_domain`, and derives `remote_peers[].hostname` from other valid Border Leaf members in gateway groups that share the same remote EVPN Domain. It does not emit deprecated PyAVD 6.3.0 keys under `all_active_multihoming` such as `enable_d_path`, `evpn_domain_id_local`, or `evpn_domain_id_remote`.
 
 Gateway group intent fails before writing the hostvar file when the target or any member is not a Border Leaf, the group has no `local_domain`, the selected Pod has no matching EVPN Domain, the remote domain is missing or conflicts with the local domain, a member is outside the group Pod, or required All-Active Ethernet Segment values are missing. Hostname-only remote peers depend on the structured-config generator aggregating every gateway member's stored hostvars before `pyavd.get_avd_facts()` runs.
 
@@ -172,15 +172,15 @@ For every interface on the device whose `role.value == "server"`, an entry is em
 - `mode: "access"` + a single `vlans: "100"` for access-only interfaces.
 - `native_vlan: 100` added if an untagged VLAN is configured alongside tagged VLANs.
 - For bonded servers, server `Bond1` is the primary VLAN source. Switch `Port-Channel<ID>` VLANs are used when the Bond has no VLAN relationships, and member Ethernet VLANs are only a compatibility fallback.
-- `spanning_tree_portfast` defaults to `edge` — the AVD convention for host-facing ports. Set `spanning_tree_portfast` on the **switch** interface (`edge` or `network`) to override it; the value is read from the leaf access port, not from the server side. In a Port-Channel the first member expressing an explicit intent wins, since a Port-Channel carries one setting.
+- `spanning_tree_portfast` defaults to `edge` — the AVD convention for host-facing ports. Set `spanning_tree_portfast` on the **switch** interface (`edge` or `network`) to override it; the value is read from the leaf access port, not from the server side. In a Port-Channel the first member expressing an explicit intent wins, since a Port-Channel has one setting.
 
-The switchport VLAN itself comes from the server side: `generate-server-cabling` reconciles the server interface's `tagged_vlan` / `untagged_vlan` — including values inherited from a `ProfileDcimInterface` — onto the leaf port it cables. So a host access profile that pins one untagged VLAN is what produces `mode: access` on that VLAN. PortFast is not propagated this way, because it is a property of the switch port.
+The switchport VLAN itself comes from the server side: `generate-server-cabling` reconciles the server interface's `tagged_vlan` / `untagged_vlan` — including values inherited from a `ProfileDcimInterface` — onto the leaf port it cables. A host access profile that pins one untagged VLAN is what produces `mode: access` on that VLAN. PortFast is not propagated this way, because it is a property of the switch port.
 
 ## Pure Layer-2 tenants and tag-scoped VLANs
 
-An `Evpn.Tenant` whose `mac_vrf_vni_base` is unset emits **no** `mac_vrf_vni_base`, so PyAVD derives no VNI, no VXLAN and no EVPN for it. That is what makes the standalone L2LS design pure Layer-2 (its `l2spine`/`l2leaf` devices are not VTEPs). Overlay tenants that do set a VNI base are unaffected.
+An `Evpn.Tenant` whose `mac_vrf_vni_base` is unset emits **no** `mac_vrf_vni_base`, so PyAVD derives no VNI, no VXLAN, and no EVPN for it. That is what makes the standalone L2LS design pure Layer-2 (its `l2spine`/`l2leaf` devices are not VTEPs). Overlay tenants that do set a VNI base are unaffected.
 
-`Evpn.L2Vlan` carries `rack_tags` (→ `LocationRack`) and `avd_tags` (→ `AvdTag`), mirroring the shape already on `Evpn.Svi`. Both are emitted as the VLAN's `tags` list — rack names first, then AVD tag names, deduplicated:
+`Evpn.L2Vlan` has `rack_tags` (→ `LocationRack`) and `avd_tags` (→ `AvdTag`), mirroring the shape already on `Evpn.Svi`. Both are emitted as the VLAN's `tags` list — rack names first, then AVD tag names, deduplicated:
 
 ```yaml
 l2vlans:
@@ -203,7 +203,7 @@ The result is per-rack VLAN scoping without hand-listing VLANs per switch: tag a
 
 ## AVD custom hostvars escape hatch
 
-`avd_custom_hostvars` is an optional JSON attribute on `NetworkFabric`, `NetworkPod`, and `DcimDevice`. It is intended as an escape hatch for pyAVD hostvars that are not yet modeled by the Infrahub schemas and hostvar generator.
+`avd_custom_hostvars` is an optional JSON attribute on `NetworkFabric`, `NetworkPod`, and `DcimDevice`. It is intended as an escape hatch for PyAVD hostvars that are not yet modeled by the Infrahub schemas and hostvar generator.
 
 Custom hostvars are merged in this order:
 
@@ -214,7 +214,7 @@ Custom hostvars are merged in this order:
 
 That means device-level custom values override pod-level custom values, pod-level custom values override fabric-level custom values, and generated hostvars override all custom values. Custom hostvars are fill-only relative to modeled data: they can add keys the generator does not produce, but they cannot replace generated values such as `fabric_name`, role-specific `nodes`, generated tenant data, or generated connected endpoints.
 
-Dictionaries merge recursively. Lists and scalar values replace the lower-precedence value as a whole; there is no element-wise list merge. Missing, `null`, or empty custom values are ignored. Non-empty custom values must be mappings; a list or scalar raises `TypeError` before pyAVD validation runs.
+Dictionaries merge recursively. Lists and scalar values replace the lower-precedence value as a whole; there is no element-wise list merge. Missing, `null`, or empty custom values are ignored. Non-empty custom values must be mappings; a list or scalar raises `TypeError` before PyAVD validation runs.
 
 Example:
 
@@ -259,7 +259,7 @@ Common validation failures:
 
 - Missing required fields (`id`, `bgp_as`, `loopback_ipv4_address` for L3 roles).
 - Invalid role name — must be one of the four values in the [Role Mapping](./role-mapping.md) table.
-- Uplink mismatches (e.g. `uplink_interfaces` length ≠ `uplink_switches` length).
+- Uplink mismatches (for example, `uplink_interfaces` length ≠ `uplink_switches` length).
 
 ## Full leaf example
 
@@ -317,4 +317,4 @@ Full hostvars generation is exercised by integration tests under `tests/integrat
 
 Hostvars prefer role-driven pool collections. Fabric Point-to-Point uplinks resolve from `NetworkPod.pod_ip_pools` first, then `NetworkFabric.fabric_ip_pools`, then the legacy `NetworkFabric.uplink_pool` relationship. DCI point-to-point links resolve from `NetworkFabric.fabric_ip_pools` role `dci` first, then the legacy `NetworkFabric.dci_pool` relationship, then a deterministic Fabric Supernet fallback for missing required DCI prefix-pool roles.
 
-MLAG peer and MLAG L3 peering pools resolve from `NetworkPod.pod_ip_pools` roles `mlag` and `mlag_peering`, then legacy `mlag_peer_pool` and `mlag_l3_pool`. When a required MLAG pool is absent, the generator creates or reuses pod-scoped default pools named `<pod>-MLAG-Peer-Subnet` and `<pod>-MLAG-L3-Peering-Subnet`, each backed by its own child prefix carved from `169.254.0.0/16` and `192.0.0.0/24` respectively. The pools are per pod and wider than a `/31` on purpose: PyAVD carves a `/31` per MLAG pair, and pods sharing one L3 peering subnet would advertise the same addresses into the underlay from several places.
+MLAG peer and MLAG L3 peering pools resolve from `NetworkPod.pod_ip_pools` roles `mlag` and `mlag_peering`, then legacy `mlag_peer_pool` and `mlag_l3_pool`. When a required MLAG pool is absent, the generator creates or reuses pod-scoped default pools named `<pod>-MLAG-Peer-Subnet` and `<pod>-MLAG-L3-Peering-Subnet`, each backed by its own child prefix carved from `169.254.0.0/16` and `192.0.0.0/24` respectively. The pools are per pod and wider than a `/31` on purpose: PyAVD carves a `/31` per MLAG pair, and pods sharing one L3 peering subnet would advertise the same addresses into the underlay from more than one pod.

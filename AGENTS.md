@@ -27,6 +27,9 @@ Key docs to read before larger changes:
   query models.
 - `transforms/` - Python transforms, GraphQL queries, generated query models,
   and templates.
+- `checks/` - proposed-change checks (CloudVision validation and its workspace
+  lifecycle helpers).
+- `ansible/` - playbooks Semaphore runs, including ContainerLab deployment.
 - `schemas/` - Infrahub schema definitions, split between base schemas and
   project/feature extensions.
 - `objects/` - seed data loaded in filename order.
@@ -61,8 +64,12 @@ Current generator definitions are registered in `.infrahub.yml`:
 `backfill-structured-config`.
 
 Current Python transforms are: `computed_interface_description`, `cabling_plan`,
-`avd_eos_config`, `avd_fabric_doc`, `avd_device_doc`, `avd_anta_catalog`, and
-`containerlab_topology`.
+`avd_eos_config`, `avd_fabric_doc`, `avd_device_doc`, `avd_anta_catalog`,
+`containerlab_topology`, and `cv_workspace_submission_webhook_payload`.
+
+The only check definition is `cv-config-validation` (`checks/cv_config_check.py`),
+with its workspace lifecycle and helpers in `checks/cv_workspace_lifecycle.py` and
+`checks/cv_helpers.py`.
 
 ## Development workflow
 
@@ -139,7 +146,7 @@ uv run invoke stop
 uv run invoke destroy
 uv run invoke restart
 uv run invoke restart --component=infrahub-server
-uv run invoke restart --component=service-portal
+uv run invoke restart --component=service-catalog
 uv run invoke load
 uv run invoke load-schema
 uv run invoke load-menu
@@ -149,7 +156,10 @@ uv run invoke lint
 uv run invoke lint-ruff
 uv run invoke lint-yaml
 uv run invoke lint-mypy
+uv run invoke lint-markdown
+uv run invoke lint-prose
 uv run invoke format
+uv run invoke docs
 ```
 
 Local tests and linters:
@@ -163,6 +173,20 @@ uv run ruff format --check .
 uv run ruff format .
 uv run mypy --show-error-codes src/solution_arista_avd
 uv run yamllint .
+uv run rumdl check README.md AGENTS.md docs/ lab/README.md schemas/
+uv run rumdl fmt README.md AGENTS.md docs/ lab/README.md schemas/
+```
+
+Markdown linting covers authored files only; vendored agent content, `specs/`, and
+PyAVD-rendered output under `lab/avd/` are excluded in `[tool.rumdl]`.
+
+Prose linting uses Vale, which is a Go binary rather than a `uv` dependency. Install the
+pinned version before running `invoke lint-prose`:
+
+```bash
+curl -sL "https://github.com/errata-ai/vale/releases/download/v3.17.1/vale_3.17.1_Linux_64-bit.tar.gz" \
+  -o /tmp/vale.tar.gz && tar -xzf /tmp/vale.tar.gz -C ~/.local/bin vale
+vale sync
 ```
 
 Use local `uv run pytest tests/integration` only for ad-hoc local/lab debugging when explicitly
@@ -191,9 +215,14 @@ For repeated `infrahubctl` calls, define a temporary shell alias in the current 
 alias ihctl='uv run infrahubctl'
 ```
 
-Docs commands are not `uv run`; use them from `docs/` when documentation changes:
+The documentation site uses pnpm, not npm. Prefer `uv run invoke docs`, which runs the same
+commands CI runs. To work inside `docs/` directly:
 
 ```bash
-npm run typecheck
-npm run build
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run build
 ```
+
+pnpm settings for the site live in `docs/pnpm-workspace.yaml`, not in `docs/package.json` -
+pnpm no longer reads the `pnpm` field there, so overrides placed in it are ignored.

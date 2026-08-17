@@ -1,11 +1,11 @@
 ---
-title: AvdArtifact & File Storage
+title: AvdArtifact & file storage
 description: The AvdArtifact node, its child AvdHostvarFile and AvdStructuredConfigFile nodes, and the end-to-end artifact definitions.
 audience: developer
 sidebar_position: 4
 ---
 
-# AvdArtifact & File Storage
+# AvdArtifact & file storage
 
 :::info Developer Guide
 Documents the graph schema that links the two pipeline phases.
@@ -146,13 +146,14 @@ The checksum is computed **in-memory per run** — it is not a custom attribute 
 
 ## Artifact definitions
 
-Three artifact definitions (in [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml)) turn the stored data into user-visible artifacts:
+Four artifact definitions (in [`.infrahub.yml`](https://github.com/opsmill/infrahub-arista-avd/blob/main/.infrahub.yml)) turn the stored data into user-visible artifacts:
 
 | Artifact | Target group | Transform | Content type |
 |----------|-------------|-----------|--------------|
 | `avd_eos_configuration` | `avd_devices` | `avd_eos_config` | `text/plain` |
 | `avd_device_documentation` | `avd_devices` | `avd_device_doc` | `text/markdown` |
 | `avd_fabric_documentation` | `fabrics` | `avd_fabric_doc` | `text/markdown` |
+| `avd_anta_catalog` | `avd_devices` | `avd_anta_catalog` | `application/yaml` |
 
 ```yaml
 artifact_definitions:
@@ -165,13 +166,20 @@ artifact_definitions:
   - name: avd_device_documentation
     targets: avd_devices
     transformation: avd_device_doc
+  - name: avd_anta_catalog
+    targets: avd_devices
+    transformation: avd_anta_catalog
 ```
 
-When an operator opens one of these artifacts in the UI, Infrahub runs the transform against the target node, which fetches the relevant file(s) from the `AvdArtifact` tree.
+The repository defines two further artifacts from the same data that are not part of the AVD
+pipeline: `cabling_plan` and `containerlab_topology`, both fabric-scoped. See
+[Transforms](../transforms.md).
+
+When an operator opens one of these artifacts in the UI, Infrahub runs the transform against the target node, which fetches the relevant files from the `AvdArtifact` tree.
 
 ## Target groups
 
-- `avd_devices` — all `DcimDevice` nodes that should participate in AVD. Populated by upstream generators (e.g. `generate-rack` adds newly-created leaves to the group).
+- `avd_devices` — all `DcimDevice` nodes that should participate in AVD. Populated by upstream generators (for example, `generate-rack` adds newly created leaves to the group).
 - `fabrics` — all `NetworkFabric` nodes.
 
 Group membership is set by the generators at creation time; there is no separate "add to group" step in the AVD pipeline itself.
