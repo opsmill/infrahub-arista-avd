@@ -40,7 +40,7 @@ nodes:
     label: Prefix
     order_by:
       - prefix__value
-    display_label: prefix__value
+    display_label: "{{ prefix__value }} ({{ role__value }})"
     inherit_from:
       - BuiltinIPPrefix
     uniqueness_constraints:

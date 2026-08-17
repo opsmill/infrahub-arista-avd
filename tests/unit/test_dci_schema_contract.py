@@ -126,7 +126,7 @@ def test_network_fabric_dci_pool_is_optional_core_prefix_pool_relationship() -> 
         "cardinality": "one",
         "optional": True,
         "identifier": "fabric__dci_pool",
-        "description": "IP prefix pool used to allocate /31 point-to-point prefixes for DCI links.",
+        "description": "Legacy DCI prefix pool. Prefer NetworkFabric.fabric_ip_pools with role dci.",
         "order_weight": 10700,
     }
 

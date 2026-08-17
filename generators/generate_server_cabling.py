@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import logging
 import re
+from inspect import signature
 from typing import Any
 
+from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 
@@ -276,7 +278,23 @@ class ServerCablingGenerator(InfrahubGenerator):
                 server_hostname,
             )
             return
-        await trigger_hostvar_generation(self.client, node_ids=hostvar_target_ids)
+        if "timeout" in signature(trigger_hostvar_generation).parameters:
+            await trigger_hostvar_generation(
+                self.client,
+                node_ids=hostvar_target_ids,
+                timeout=300,
+                tolerate_timeout=True,
+            )
+            return
+
+        try:
+            await trigger_hostvar_generation(self.client, node_ids=hostvar_target_ids)
+        except ServerNotResponsiveError:
+            self.logger.warning(
+                "Timed out while triggering generate-avd-device-hostvar for server %s; "
+                "downstream generator state is ambiguous and will be observed later",
+                server_hostname,
+            )
 
     def _get_server_interfaces(self, server_node: dict) -> list[dict[str, Any]]:
         """Extract server interfaces with their VLANs from the GQL response."""
@@ -481,8 +499,12 @@ class ServerCablingGenerator(InfrahubGenerator):
         else:
             interface.tagged_vlan = []  # type: ignore[assignment]
 
-        if self._relationship_id(getattr(interface, "untagged_vlan", None)):
-            await interface.untagged_vlan.fetch()  # type: ignore[union-attr]
+        untagged_relationship = getattr(interface, "untagged_vlan", None)
+        untagged_vlan_id = self._relationship_id(untagged_relationship)
+        if untagged_vlan_id and hasattr(untagged_relationship, "remove"):
+            untagged_relationship.remove(untagged_vlan_id)
+        elif untagged_vlan_id and hasattr(untagged_relationship, "fetch"):
+            await untagged_relationship.fetch()
             untagged_peer_ids = getattr(interface.untagged_vlan, "peer_ids", None)
             if isinstance(untagged_peer_ids, list | tuple | set):
                 for vlan_id in list(untagged_peer_ids):
@@ -491,5 +513,11 @@ class ServerCablingGenerator(InfrahubGenerator):
                 interface.untagged_vlan.clear()  # type: ignore[union-attr]
             else:
                 interface.untagged_vlan = None  # type: ignore[assignment]
+        elif untagged_vlan_id:
+            interface.untagged_vlan = None  # type: ignore[assignment]
+        elif hasattr(untagged_relationship, "clear"):
+            untagged_relationship.clear()
+        else:
+            interface.untagged_vlan = None  # type: ignore[assignment]
 
         await interface.save(allow_upsert=True)

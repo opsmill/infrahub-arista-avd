@@ -183,27 +183,27 @@ extensions:
           peer: CoreIPPrefixPool
           kind: Attribute
           cardinality: one
-          optional: false
+          optional: true
           identifier: "fabric__uplink_pool"
-          description: "IP prefix pool for P2P uplink addressing"
+          description: "Legacy P2P uplink prefix pool. Prefer NetworkFabric.fabric_ip_pools with role fabric_point_to_point."
           order_weight: 10400
         - name: vtep_pool
           label: VTEP Loopback Pool
           peer: CoreIPPrefixPool
           kind: Attribute
           cardinality: one
-          optional: false
+          optional: true
           identifier: "fabric__vtep_pool"
-          description: "IP prefix pool for VTEP loopback addresses"
+          description: "Legacy IP prefix pool for VTEP loopback addresses. Prefer NetworkFabric.fabric_ip_pools with role loopback-vtep."
           order_weight: 10500
         - name: loopback_pool
           label: Loopback IP Pool
           peer: CoreIPPrefixPool
           kind: Attribute
           cardinality: one
-          optional: false
+          optional: true
           identifier: "fabric__loopback_pool"
-          description: "IP prefix pool for device loopback (loopback0) addressing"
+          description: "Legacy IP prefix pool for device loopback addressing. Prefer NetworkFabric.fabric_ip_pools with role loopback."
           order_weight: 10600
 
         - name: dns_servers
@@ -250,6 +250,15 @@ extensions:
           description: "Pod-scope custom pyAVD hostvars; generated values take precedence."
           order_weight: 9100
       relationships:
+        - name: pod_ip_pools
+          label: Pod IP Pools
+          peer: CoreResourcePool
+          kind: Attribute
+          cardinality: many
+          optional: true
+          identifier: "pod__ip_pools"
+          description: "Role-driven pod-scope IP pool collection for loopback, VTEP, uplink, and MLAG pools."
+          order_weight: 7950
         - name: mlag_peer_pool
           label: MLAG Peer Pool
           peer: CoreIPAddressPool
@@ -257,7 +266,7 @@ extensions:
           cardinality: one
           optional: true
           identifier: "pod__mlag_peer_pool"
-          description: "IP address pool for MLAG peer-link addressing"
+          description: "Legacy MLAG peer-link pool. Prefer NetworkPod.pod_ip_pools with role mlag."
           order_weight: 8000
         - name: mlag_l3_pool
           label: MLAG L3 Peering Pool
@@ -266,7 +275,7 @@ extensions:
           cardinality: one
           optional: true
           identifier: "pod__mlag_l3_pool"
-          description: "IP address pool for MLAG L3 peering (Vlan4093)"
+          description: "Legacy MLAG L3 peering pool. Prefer NetworkPod.pod_ip_pools with role mlag_peering."
           order_weight: 8100
 
     # --- MlagDomain: AVD-specific extensions ---

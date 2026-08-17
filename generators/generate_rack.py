@@ -1,23 +1,48 @@
 from __future__ import annotations
 
 import logging
+import sys
 from inspect import signature
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from infrahub_sdk.exceptions import ServerNotResponsiveError
 from infrahub_sdk.generator import InfrahubGenerator
 
-from solution_arista_avd import sorting as solution_arista_avd_sorting
-from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY
-from solution_arista_avd.cabling import build_rack_cabling_plan, connect_interface_maps
-from solution_arista_avd.generator import (
+_REPO_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_REPO_SRC) not in sys.path:
+    sys.path.insert(0, str(_REPO_SRC))
+_PACKAGE_ROOT = _REPO_SRC / "solution_arista_avd"
+if (package := sys.modules.get("solution_arista_avd")) is not None and hasattr(package, "__path__"):
+    package.__path__ = [str(_PACKAGE_ROOT), *[path for path in package.__path__ if path != str(_PACKAGE_ROOT)]]
+# Infrahub workers may already have solution_arista_avd imported from the
+# installed image. Extend the package path so this branch's repository-local src
+# wins, then evict the cached submodules so the next import rebuilds them from
+# here. Evict the whole set, not just the modules this entrypoint uses: a
+# survivor keeps its references to the previous copies of whatever it imported,
+# which leaves two live versions of the same class in one process.
+_RELOADED_MODULES = (
+    "solution_arista_avd.avd",
+    "solution_arista_avd.cabling",
+    "solution_arista_avd.generator",
+    "solution_arista_avd.pool_roles",
+    "solution_arista_avd.protocols",
+    "solution_arista_avd.sorting",
+)
+for module_name in _RELOADED_MODULES:
+    sys.modules.pop(module_name, None)
+
+from solution_arista_avd import sorting as solution_arista_avd_sorting  # noqa: E402
+from solution_arista_avd.avd import LEAF_ROLE_BY_UNDERLAY, SPINE_ROLE_BY_UNDERLAY  # noqa: E402
+from solution_arista_avd.cabling import build_rack_cabling_plan, connect_interface_maps  # noqa: E402
+from solution_arista_avd.generator import (  # noqa: E402
     VTEP_LOOPBACK_ROLES,
     GeneratorMixin,
     check_all_racks_generated,
     set_fabric_avd_hostvars_ready,
     trigger_hostvar_generation,
 )
-from solution_arista_avd.protocols import (
+from solution_arista_avd.protocols import (  # noqa: E402
     AvdArtifact,
     DcimDevice,
     DcimInterface,
@@ -25,8 +50,8 @@ from solution_arista_avd.protocols import (
     NetworkPod,
 )
 
-from .asn import set_device_asn
-from .rack_generator_query import RackGeneratorQuery
+from .asn import set_device_asn  # noqa: E402
+from .rack_generator_query import RackGeneratorQuery  # noqa: E402
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -184,7 +209,7 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             self.mgmt_pool,
             self.loopback_pool,
             self.vtep_loopback_pool,
-        ) = await self.resolve_avd_pools(fabric_node)
+        ) = await self.resolve_avd_pools(fabric_node, pod_node)
 
         await self.create_leaf_switches()
 

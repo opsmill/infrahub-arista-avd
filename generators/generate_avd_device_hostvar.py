@@ -4,9 +4,11 @@ import hashlib
 import logging
 import operator
 import re
+import sys
 from copy import deepcopy
 from dataclasses import dataclass
-from ipaddress import IPv4Network
+from ipaddress import IPv4Network, IPv6Network, ip_network
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import yaml
@@ -14,18 +16,55 @@ from infrahub_sdk.generator import InfrahubGenerator
 from netutils.interface import sort_interface_list
 from netutils.vlan import vlanlist_to_config
 
-from solution_arista_avd.avd import (
+_REPO_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_REPO_SRC) not in sys.path:
+    sys.path.insert(0, str(_REPO_SRC))
+_PACKAGE_ROOT = _REPO_SRC / "solution_arista_avd"
+if (package := sys.modules.get("solution_arista_avd")) is not None and hasattr(package, "__path__"):
+    package.__path__ = [str(_PACKAGE_ROOT), *[path for path in package.__path__ if path != str(_PACKAGE_ROOT)]]
+# Infrahub workers may already have solution_arista_avd imported from the
+# installed image. Extend the package path so this branch's repository-local src
+# wins, then evict the cached submodules so the next import rebuilds them from
+# here. Evict the whole set, not just the modules this entrypoint uses: a
+# survivor keeps its references to the previous copies of whatever it imported,
+# which leaves two live versions of the same class in one process.
+_RELOADED_MODULES = (
+    "solution_arista_avd.avd",
+    "solution_arista_avd.cabling",
+    "solution_arista_avd.generator",
+    "solution_arista_avd.pool_roles",
+    "solution_arista_avd.protocols",
+    "solution_arista_avd.sorting",
+)
+for module_name in _RELOADED_MODULES:
+    sys.modules.pop(module_name, None)
+
+from solution_arista_avd.avd import (  # noqa: E402
     MLAG_MAIN_TIER_ROLES,
     NON_EMITTED_UNDERLAYS,
     SPINE_UPLINK_LEAF_ROLES,
     SPINE_UPLINK_UNDERLAYS,
     SVI_RENDERING_ROLES,
 )
-from solution_arista_avd.avd import get_avd_type as _get_package_avd_type
-from solution_arista_avd.generator import save_file_if_changed, set_fabric_avd_hostvars_ready
-from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod
+from solution_arista_avd.avd import get_avd_type as _get_package_avd_type  # noqa: E402
+from solution_arista_avd.generator import (  # noqa: E402
+    fetch_allocated_prefixes,
+    save_file_if_changed,
+    set_fabric_avd_hostvars_ready,
+)
+from solution_arista_avd.pool_roles import (  # noqa: E402
+    FABRIC_SUPERNET_PREFIX_LENGTHS,
+    FABRIC_SUPERNET_ROLE_LABELS,
+    MLAG_DEFAULT_POOLS,
+    ResourceRole,
+    map_prefix_role,
+    mlag_default_pool_name,
+    next_available_prefix,
+    pod_required_mlag_roles,
+)
+from solution_arista_avd.protocols import AvdArtifact, AvdHostvarFile, NetworkPod  # noqa: E402
 
-from .generate_avd_device_inputs_query import (
+from .generate_avd_device_inputs_query import (  # noqa: E402
     GenerateAvdDeviceInputsQuery,
     GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdges,
     GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodeInterfacesEdgesNodeInterfacePhysical,
@@ -86,6 +125,7 @@ class DciEndpoint:
     interface_name: str
     interface_role: str | None
     device_bgp_asn: int | None = None
+    fabric: object | None = None
     fabric_pool: object | None = None
     speed: str | None = None
 
@@ -97,7 +137,7 @@ class DciNetworkLinkIntent:
     include_in_underlay_protocol: bool
     endpoints: tuple[DciEndpoint, DciEndpoint]
     asns: tuple[int | None, int | None]
-    pool: object
+    pool: object | None
 
 
 LACP_MODE_MAP = {"active": "active", "passive": "passive", "disabled": "on"}
@@ -670,7 +710,56 @@ def _endpoint_fabric_pool(interface: object) -> object | None:
     device = _node(_field(interface, "device"))
     pod = _node(_field(device, "pod")) if device else None
     fabric = _node(_field(pod, "parent")) if pod else None
-    return _node(_field(fabric, "dci_pool")) if fabric else None
+    if not fabric:
+        return None
+    role_pools = _pool_refs_by_role(fabric, "fabric_ip_pools")
+    return role_pools.get(ResourceRole.DCI) or _node(_field(fabric, "dci_pool"))
+
+
+def _endpoint_fabric(interface: object) -> object | None:
+    device = _node(_field(interface, "device"))
+    pod = _node(_field(device, "pod")) if device else None
+    return _node(_field(pod, "parent")) if pod else None
+
+
+def _relationship_nodes(value: object | None, relationship_name: str) -> list[object]:
+    return [node for edge in _edges(_field(value, relationship_name)) if (node := _node(edge)) is not None]
+
+
+def _pool_refs_by_role(value: object | None, relationship_name: str) -> dict[ResourceRole, object]:
+    pools_by_role: dict[ResourceRole, object] = {}
+    for pool in _relationship_nodes(value, relationship_name):
+        roles = {
+            role
+            for resource in _relationship_nodes(pool, "resources")
+            if (role := map_prefix_role(_value(resource, "role"))) is not None
+        }
+        if len(roles) == 1:
+            pools_by_role[next(iter(roles))] = pool
+            continue
+        # An unresolvable pool is indistinguishable from an absent one below, and
+        # the generator would quietly carve a replacement out of the Fabric
+        # Supernet rather than surface the misconfiguration.
+        logger.warning(
+            "Ignoring pool %s in %s: backing prefixes resolve to %s roles (%s), expected exactly one",
+            _value(pool, "name") or _field(pool, "id") or "unknown",
+            relationship_name,
+            len(roles),
+            ", ".join(sorted(role.value for role in roles)) or "none",
+        )
+    return pools_by_role
+
+
+def _resource_prefixes(pool: object | None, *, include_supernets: bool = True) -> list[IPv4Network | IPv6Network]:
+    prefixes: list[IPv4Network | IPv6Network] = []
+    for resource in _relationship_nodes(pool, "resources"):
+        role = map_prefix_role(_value(resource, "role"))
+        if not include_supernets and role is ResourceRole.FABRIC_SUPERNET:
+            continue
+        raw_prefix = _value(resource, "prefix")
+        if raw_prefix:
+            prefixes.append(ip_network(str(raw_prefix), strict=False))
+    return prefixes
 
 
 def _extract_interface_speed(interface: object) -> str | None:
@@ -725,6 +814,7 @@ def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
                 interface_name=str(interface_name),
                 interface_role=_value(endpoint, "role"),
                 device_bgp_asn=_device_bgp_asn(endpoint),
+                fabric=_endpoint_fabric(endpoint),
                 fabric_pool=_endpoint_fabric_pool(endpoint),
                 speed=_extract_interface_speed(endpoint),
             )
@@ -757,9 +847,6 @@ def _extract_dci_network_link_intent(link: object) -> DciNetworkLinkIntent:
     # under the shared link identifier. Pick it deterministically from the
     # sorted-first endpoint's fabric, falling back to the peer's.
     pool = endpoint_1.fabric_pool or endpoint_2.fabric_pool
-    if pool is None:
-        msg = f"DCI link {link_name}: neither endpoint fabric defines a dci_pool"
-        raise ValueError(msg)
 
     include_in_underlay_protocol = _value(link, "include_in_underlay_protocol")
     if include_in_underlay_protocol is None:
@@ -798,15 +885,83 @@ async def allocate_dci_p2p_prefix_from_pool(
             msg = "DCI pool is missing an ID and cannot be used for prefix allocation"
             raise ValueError(msg)
         pool = await client.get(kind="CoreIPPrefixPool", id=pool_id)
+    elif not hasattr(pool, "get_kind"):
+        pool_id = _field(pool, "id")
+        if not pool_id:
+            msg = "DCI pool is missing an ID and cannot be used for prefix allocation"
+            raise ValueError(msg)
+        pool = await client.get(kind="CoreIPPrefixPool", id=str(pool_id))
 
     prefix = await client.allocate_next_ip_prefix(
         resource_pool=pool,
         identifier=identifier,
         member_type="prefix",
         prefix_length=prefix_length,
-        data={"role": "technical"},
+        data={"role": "dci"},
     )
     return IPv4Network(str(prefix.prefix.value), strict=False)
+
+
+async def ensure_fabric_supernet_fallback_pool(
+    client: InfrahubClient,
+    *,
+    fabric: object | None,
+    role: ResourceRole,
+) -> object | None:
+    if fabric is None or role not in FABRIC_SUPERNET_PREFIX_LENGTHS:
+        return None
+
+    fabric_name = str(_value(fabric, "name") or _field(fabric, "id") or "unknown")
+    role_pools = _pool_refs_by_role(fabric, "fabric_ip_pools")
+    supernet_pool = role_pools.get(ResourceRole.FABRIC_SUPERNET)
+    if supernet_pool is None:
+        return None
+
+    pool_name = f"{fabric_name}-{FABRIC_SUPERNET_ROLE_LABELS[role]}-Pool"
+    existing_pools = await client.filters(kind="CoreIPPrefixPool", name__value=pool_name)
+    if existing_pools:
+        return existing_pools[0]
+
+    prefix_length = FABRIC_SUPERNET_PREFIX_LENGTHS[role]
+    supernets = _resource_prefixes(supernet_pool)
+    used_prefixes = [
+        prefix
+        for pool in _relationship_nodes(fabric, "fabric_ip_pools")
+        for prefix in _resource_prefixes(pool, include_supernets=False)
+    ]
+    # Fallback pools are standalone: they are never attached back to
+    # fabric_ip_pools, so the snapshot above cannot see what a previous role in
+    # this run, or the rack generator before it, already carved out. Without
+    # this read-back two roles allocate the same prefix and the second
+    # allow_upsert lands on the first one's IpamPrefix, flipping its role.
+    used_prefixes.extend(await fetch_allocated_prefixes(client, supernets))
+    child_prefix = next_available_prefix(supernets, used_prefixes, prefix_length)
+    if child_prefix is None:
+        supernet_name = _value(supernet_pool, "name") or _field(supernet_pool, "id") or "unknown"
+        msg = (
+            f"Fabric '{fabric_name}': unable to allocate {role.value} /{prefix_length} "
+            f"from Fabric Supernet pool {supernet_name}"
+        )
+        raise ValueError(msg)
+
+    prefix = await client.create(
+        kind="IpamPrefix",
+        prefix=str(child_prefix),
+        role=role.value,
+        ip_namespace={"hfid": ["default"]},
+    )
+    await prefix.save(allow_upsert=True, update_group_context=False)
+
+    pool = await client.create(
+        kind="CoreIPPrefixPool",
+        name=pool_name,
+        default_prefix_type="IpamPrefix",
+        default_prefix_length=prefix_length,
+        ip_namespace={"hfid": ["default"]},
+        resources=[{"id": prefix.id}],
+    )
+    await pool.save(allow_upsert=True, update_group_context=False)
+    return pool
 
 
 async def build_dci_l3_edge_p2p_links(
@@ -864,10 +1019,28 @@ async def build_dci_l3_edge_p2p_links(
             )
             continue
 
+        pool = intent.pool
+        if pool is None:
+            for endpoint in intent.endpoints:
+                pool = await ensure_fabric_supernet_fallback_pool(
+                    client,
+                    fabric=endpoint.fabric,
+                    role=ResourceRole.DCI,
+                )
+                if pool is not None:
+                    break
+        if pool is None:
+            logger.warning(
+                "Skipping invalid DCI Network Link: DCI link %s: neither endpoint fabric defines a DCI pool "
+                "or Fabric Supernet fallback",
+                intent.link_name,
+            )
+            continue
+
         try:
             prefix = await allocate_dci_p2p_prefix_from_pool(
                 client,
-                intent.pool,
+                pool,
                 identifier=f"dci-link:{intent.link_id}",
                 prefix_length=31,
             )
@@ -1452,10 +1625,14 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
     async def _extract_pool_prefix(self, pool_ref: object, pool_kind: str) -> str | None:
         """Extract the first resource prefix from a pool relationship reference."""
         pool_node = getattr(pool_ref, "node", None)
-        if pool_ref is None or pool_node is None:
+        if pool_ref is None:
+            return None
+        if pool_node is None and _field(pool_ref, "id"):
+            pool_node = pool_ref
+        if pool_node is None:
             return None
 
-        pool = await self.client.get(kind=pool_kind, id=pool_node.id, include=["resources"])
+        pool = await self.client.get(kind=pool_kind, id=_field(pool_node, "id"), include=["resources"])
         await pool.resources.fetch()
 
         for resource_peer in pool.resources.peers:
@@ -1468,6 +1645,68 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 return str(resource.address.value)
 
         return None
+
+    async def _ensure_default_mlag_pool_prefix(self, role: ResourceRole, pod: object) -> str:
+        """Create or reuse the pod-scoped fallback MLAG pool and return its prefix.
+
+        Each pod gets its own child prefix out of the role's supernet. Sharing one
+        prefix would cap the fabric at a single MLAG pair (PyAVD carves a /31 per
+        pair) and would put every pod's L3 peering addresses on the same subnet.
+        """
+        definition = MLAG_DEFAULT_POOLS[role]
+        pod_name = str(self._get_attr_value(pod, "name") or _field(pod, "id") or "unknown")
+        pool_name = mlag_default_pool_name(pod_name=pod_name, role=role)
+
+        existing_pools = await self.client.filters(kind="CoreIPAddressPool", name__value=pool_name)
+        if existing_pools:
+            prefix_value = await self._extract_pool_prefix(existing_pools[0], "CoreIPAddressPool")
+            if prefix_value:
+                return prefix_value
+
+        supernet = ip_network(definition.supernet)
+        used_prefixes = await fetch_allocated_prefixes(self.client, [supernet])
+        child_prefix = next_available_prefix([supernet], used_prefixes, definition.prefix_length)
+        if child_prefix is None:
+            msg = (
+                f"Pod '{pod_name}': unable to allocate a fallback {role.value} /{definition.prefix_length} "
+                f"from {definition.supernet}. Assign an explicit {role.value} pool to the pod."
+            )
+            raise ValueError(msg)
+
+        logger.warning(
+            "Pod '%s' has no %s pool; falling back to %s. Assign an explicit pool to control this addressing.",
+            pod_name,
+            role.value,
+            child_prefix,
+        )
+
+        prefix = await self.client.create(
+            kind="IpamPrefix",
+            prefix=str(child_prefix),
+            role=role.value,
+            ip_namespace={"hfid": ["default"]},
+        )
+        await prefix.save(allow_upsert=True, update_group_context=False)
+
+        pool = await self.client.create(
+            kind="CoreIPAddressPool",
+            name=pool_name,
+            default_address_type="IpamIPAddress",
+            default_prefix_length=31,
+            ip_namespace={"hfid": ["default"]},
+            resources=[{"id": prefix.id}],
+        )
+        await pool.save(allow_upsert=True, update_group_context=False)
+        return str(child_prefix)
+
+    async def _ensure_fabric_supernet_fallback_pool(
+        self,
+        *,
+        fabric: object,
+        role: ResourceRole,
+        fabric_pool_refs: dict[ResourceRole, object],  # noqa: ARG002 - kept for test visibility and call symmetry
+    ) -> object | None:
+        return await ensure_fabric_supernet_fallback_pool(self.client, fabric=fabric, role=role)
 
     @staticmethod
     def _get_first_attr(obj: object, *names: str) -> object | None:
@@ -1519,20 +1758,51 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         emitted. The pod-level MLAG pools remain optional.
         """
         fabric_name = self._get_attr_value(fabric, "name")
-
-        uplink = await self._require_pool_prefix(
-            getattr(fabric, "uplink_pool", None), "CoreIPPrefixPool", fabric_name, "uplink_pool"
+        fabric_role_pools = _pool_refs_by_role(fabric, "fabric_ip_pools")
+        pod_role_pools = _pool_refs_by_role(pod, "pod_ip_pools")
+        uplink_ref = (
+            pod_role_pools.get(ResourceRole.FABRIC_POINT_TO_POINT)
+            or fabric_role_pools.get(ResourceRole.FABRIC_POINT_TO_POINT)
+            or getattr(fabric, "uplink_pool", None)
         )
-        mlag_peer = await self._extract_pool_prefix(getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool")
+        if uplink_ref is None:
+            uplink_ref = await self._ensure_fabric_supernet_fallback_pool(
+                fabric=fabric,
+                role=ResourceRole.FABRIC_POINT_TO_POINT,
+                fabric_pool_refs=fabric_role_pools,
+            )
+
+        uplink = await self._require_pool_prefix(uplink_ref, "CoreIPPrefixPool", fabric_name, "uplink_pool")
+        mlag_peer_ref = pod_role_pools.get(ResourceRole.MLAG) or getattr(pod, "mlag_peer_pool", None)
+        mlag_peer = await self._extract_pool_prefix(mlag_peer_ref, "CoreIPAddressPool")
+        fabric_underlay = self._get_attr_value(fabric, "underlay_routing_protocol")
+        has_mlag_enabled_rack = self._has_mlag_enabled_rack(pod)
+        required_mlag_roles = pod_required_mlag_roles(
+            underlay_routing_protocol=str(fabric_underlay) if fabric_underlay is not None else None,
+            has_mlag_enabled_rack=has_mlag_enabled_rack,
+        )
+        if not mlag_peer and ResourceRole.MLAG in required_mlag_roles:
+            mlag_peer = await self._ensure_default_mlag_pool_prefix(ResourceRole.MLAG, pod)
         # Auto-generated Pydantic model renames mlag_l3_pool to mlag_l_3_pool
         mlag_l3_ref = self._get_first_attr(pod, "mlag_l_3_pool", "mlag_l3_pool")
+        mlag_l3_ref = pod_role_pools.get(ResourceRole.MLAG_PEERING) or mlag_l3_ref
         mlag_l3 = await self._extract_pool_prefix(mlag_l3_ref, "CoreIPAddressPool")
+        if not mlag_l3 and ResourceRole.MLAG_PEERING in required_mlag_roles:
+            mlag_l3 = await self._ensure_default_mlag_pool_prefix(ResourceRole.MLAG_PEERING, pod)
 
         return {
             "uplink_ipv4_pool": uplink,
             "mlag_peer_ipv4_pool": mlag_peer,
             "mlag_peer_l3_ipv4_pool": mlag_l3,
         }
+
+    @staticmethod
+    def _has_mlag_enabled_rack(pod: object) -> bool:
+        for rack_edge in _edges(_field(pod, "racks")):
+            rack = _node(rack_edge)
+            if rack is not None and _value(rack, "mlag") is True:
+                return True
+        return False
 
     @classmethod
     def _extract_routed_uplinks_for_device(cls, device: object, fabric_underlay: str | None) -> UplinkData:
@@ -2172,9 +2442,12 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
                 "mlag_peer_l3_ipv4_pool": None,
             }
             if mlag_capable:
-                pools["mlag_peer_ipv4_pool"] = await self._extract_pool_prefix(
-                    getattr(pod, "mlag_peer_pool", None), "CoreIPAddressPool"
+                mlag_peer_ref = _pool_refs_by_role(pod, "pod_ip_pools").get(ResourceRole.MLAG) or getattr(
+                    pod, "mlag_peer_pool", None
                 )
+                pools["mlag_peer_ipv4_pool"] = await self._extract_pool_prefix(mlag_peer_ref, "CoreIPAddressPool")
+                if not pools["mlag_peer_ipv4_pool"]:
+                    pools["mlag_peer_ipv4_pool"] = await self._ensure_default_mlag_pool_prefix(ResourceRole.MLAG, pod)
         else:
             pools = await self._extract_l3ls_pools(fabric, pod)
 

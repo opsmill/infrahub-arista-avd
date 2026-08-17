@@ -15,9 +15,9 @@ spec:
     - prefix: 10.250.2.0/24
       role: loopback-vtep
     - prefix: 10.250.3.0/24
-      role: pod_leaf_spine
+      role: fabric_point_to_point
     - prefix: 172.16.0.0/28
-      role: technical
+      role: dci
 ---
 apiVersion: infrahub.app/v1
 kind: Object
@@ -126,6 +126,12 @@ spec:
       asn_pool: "Fabric-L3LS-Multi-Domain-ASN-Pool"
       node_id_pool: "Fabric-L3LS-Multi-Domain-NodeID-Pool"
       mgmt_pool: "Fabric-L3LS-Multi-Domain-Mgmt-Pool"
+      fabric_ip_pools:
+        - "Fabric-L3LS-Multi-Domain-Mgmt-Pool"
+        - "Fabric-L3LS-Multi-Domain-Uplink-Pool"
+        - "Fabric-L3LS-Multi-Domain-VTEP-Pool"
+        - "Fabric-L3LS-Multi-Domain-Loopback-Pool"
+        - "Fabric-L3LS-Multi-Domain-DCI-Pool"
       underlay_routing_protocol: "ebgp"
       overlay_routing_protocol: "ebgp"
       p2p_uplinks_mtu: 1500

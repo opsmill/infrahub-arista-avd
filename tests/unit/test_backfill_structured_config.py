@@ -381,7 +381,7 @@ class TestBackfillIp:
             role="backfill",
             ip_namespace={"hfid": ["default"]},
         )
-        mock_prefix.save.assert_awaited_once_with(allow_upsert=True)
+        mock_prefix.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
         # Verify IP creation
         gen.client.create.assert_any_call(
@@ -390,7 +390,7 @@ class TestBackfillIp:
             ip_prefix=mock_prefix,
             ip_namespace={"hfid": ["default"]},
         )
-        mock_ip.save.assert_awaited_once_with(allow_upsert=True)
+        mock_ip.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
         # Verify interface assignment
         gen.client.get.assert_awaited_once()
@@ -1323,9 +1323,9 @@ class TestSourceAttributionIp:
         iface = _make_interface(name="Ethernet1", ip_node=None)
         await gen._backfill_ip(iface, "10.0.0.1/31", "leaf-1", avd_source=None)
 
-        # save should still be called, but source not set
-        mock_prefix.save.assert_awaited_once()
-        mock_ip.save.assert_awaited_once()
+        # save should still be called outside generator cleanup tracking, but source not set
+        mock_prefix.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
+        mock_ip.save.assert_awaited_once_with(allow_upsert=True, update_group_context=False)
 
 
 class TestSourceAttributionMtu:

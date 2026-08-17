@@ -452,6 +452,14 @@ generator_definitions:
 
 The AVD generators are registered in the same block; the file is the authoritative list of all seven.
 
+## Pool resolution
+
+The fabric, pod, rack, and hostvars generators consume role-driven pool collections first. `NetworkFabric.fabric_ip_pools` supplies fabric Management, Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet roles. `NetworkPod.pod_ip_pools` can override pod-specific Loopback, Loopback VTEP, and Fabric Point-to-Point pools.
+
+If a required fabric prefix pool is missing and a Fabric Supernet pool exists, `GeneratorMixin` creates deterministic fallback prefix pools with stable names such as `<fabric>-Loopback-Pool`, then wraps Loopback and VTEP prefix pools in address pools for device allocation. Repeated runs upsert the same names.
+
+The hostvars generator resolves MLAG and MLAG Peering from `pod_ip_pools`, then legacy pod relationships, then pod-scoped default pools named `<pod>-MLAG-Peer-Subnet` and `<pod>-MLAG-L3-Peering-Subnet`. Each pod is allocated its own child prefix — a `/24` from `169.254.0.0/16` for the peer-link, a `/28` from `192.0.0.0/24` for L3 peering — because PyAVD carves a `/31` per MLAG pair out of the pool, and MLAG L3 peering addresses are advertised into the underlay. Treat the L3 peering default as a safety net, not a design: define an explicit `mlag_peering` pool.
+
 ## File structure
 
 ```text

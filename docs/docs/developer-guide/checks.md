@@ -1,6 +1,6 @@
 ---
 title: Checks
-description: Python checks that run in the proposed-change pipeline — the CloudVision configuration validation check and its workspace lifecycle.
+description: Python checks that run in the proposed-change pipeline — CloudVision configuration validation and its workspace lifecycle, and fabric pool validation.
 audience: developer
 sidebar_position: 5
 ---
@@ -111,6 +111,45 @@ uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --br
 rather than a check, but it belongs to this pipeline: it returns the check name, the proposed-change
 ID, and one entry per linked workspace with its ID, status, URL, and fabric name. See
 [Transforms](./transforms.md#cvworkspacesubmissionwebhookpayload).
+
+## `fabric-pool-validation`
+
+**Class**: `FabricPoolValidationCheck`
+**Source**: [`checks/fabric_pool_check.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/checks/fabric_pool_check.py)
+**Query**: [`checks/fabric_pool_check.gql`](https://github.com/opsmill/infrahub-arista-avd/blob/main/checks/fabric_pool_check.gql) (registered as `fabric_pool_check`)
+**Target**: `NetworkFabric` (group `fabrics`)
+
+The check validates the role-driven pool collections the generators read — `NetworkFabric.fabric_ip_pools`
+and `NetworkPod.pod_ip_pools` — so a pool mistake fails the proposed change instead of producing wrong
+addressing at generation time. See [Pool role resolution](./generators.md#pool-resolution) for how the
+generators consume the same collections.
+
+Per fabric:
+
+1. Every member of `fabric_ip_pools` must be a `CoreIPAddressPool` or `CoreIPPrefixPool`.
+2. Each pool's purpose is resolved from the `IpamPrefix.role` values on its resources; a pool with
+   mixed authoritative roles is an error, and two pools claiming the same role in one fabric is an
+   error.
+3. The required role set depends on fabric intent — the underlay and overlay routing protocols, and
+   whether the fabric has DCI links. A required role satisfied only through a legacy relationship
+   (for example `NetworkFabric.uplink_pool`) is reported as information, not an error, so migration
+   can proceed incrementally.
+4. A required role with no pool and no Fabric Supernet to carve one from is an error. When a Fabric
+   Supernet does exist, its remaining free space is checked against the prefixes the missing roles
+   would need.
+
+Per pod:
+
+1. Members of `pod_ip_pools` are type- and role-checked as above, and the `mlag` and `mlag_peering`
+   roles must be address pools rather than prefix pools.
+2. MLAG roles required by the pod — driven by the parent fabric's underlay protocol and whether any
+   rack enables MLAG — must be present through `pod_ip_pools` or a legacy pod relationship.
+3. Pod Loopback, Loopback VTEP, and Fabric Point-to-Point prefixes must be contained by the matching
+   fabric pool. A role the fabric leaves to its Fabric Supernet to carve on demand has nothing to
+   contain against yet and is skipped rather than reported.
+
+Unit coverage is in
+[`tests/unit/test_fabric_pool_check.py`](https://github.com/opsmill/infrahub-arista-avd/blob/main/tests/unit/test_fabric_pool_check.py).
 
 ## Schema
 

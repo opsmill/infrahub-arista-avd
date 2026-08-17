@@ -5,7 +5,7 @@ spec:
   kind: IpamPrefix
   data:
     - prefix: 10.0.0.0/8
-      role: supernet
+      role: fabric_supernet
 ---
 # ASN Pool for Fabric-L3LS-MultiPod-A (private ASN range)
 apiVersion: infrahub.app/v1
@@ -106,7 +106,7 @@ spec:
   kind: IpamPrefix
   data:
     - prefix: 10.255.252.0/22
-      role: pod_leaf_spine
+      role: fabric_point_to_point
 ---
 # P2P Uplink Pool for Fabric-L3LS-MultiPod-A
 apiVersion: infrahub.app/v1
@@ -154,13 +154,13 @@ spec:
   kind: IpamPrefix
   data:
     - prefix: 10.255.4.0/25     # Pod-A2 MLAG peer-link
-      role: technical
+      role: mlag
     - prefix: 10.255.4.128/25   # Pod-A3 MLAG peer-link
-      role: technical
+      role: mlag
     - prefix: 10.255.5.0/25     # Pod-A2 MLAG L3 peering
-      role: technical
+      role: mlag_peering
     - prefix: 10.255.5.128/25   # Pod-A3 MLAG L3 peering
-      role: technical
+      role: mlag_peering
 ---
 # MLAG Peer Pool for Fabric-L3LS-MultiPod-A Pod-A2
 apiVersion: infrahub.app/v1
@@ -244,7 +244,7 @@ spec:
   kind: IpamPrefix
   data:
     - prefix: 10.254.252.0/22
-      role: pod_leaf_spine
+      role: fabric_point_to_point
 ---
 # P2P Uplink Pool for Fabric-L3LS-MultiPod-B
 apiVersion: infrahub.app/v1
@@ -315,13 +315,13 @@ spec:
   kind: IpamPrefix
   data:
     - prefix: 10.254.4.0/25     # Pod-B2 MLAG peer-link
-      role: technical
+      role: mlag
     - prefix: 10.254.4.128/25   # Pod-B3 MLAG peer-link
-      role: technical
+      role: mlag
     - prefix: 10.254.5.0/25     # Pod-B2 MLAG L3 peering
-      role: technical
+      role: mlag_peering
     - prefix: 10.254.5.128/25   # Pod-B3 MLAG L3 peering
-      role: technical
+      role: mlag_peering
 ---
 # MLAG Peer Pool for Fabric-L3LS-MultiPod-B Pod-B2
 apiVersion: infrahub.app/v1

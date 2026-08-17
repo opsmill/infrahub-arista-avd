@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from .protocols import DcimDevice, DcimInterface, InterfacePhysical
 
@@ -48,17 +48,35 @@ def build_rack_cabling_plan(
     cabling_plan: list[tuple[DcimInterface, DcimInterface]] = []
     dst_devices = list(dst_interface_map.keys())
     dst_device_count = len(dst_devices)
+    start = (rack_index * 2) - 2
+    end = start + 2
 
-    for src_device, src_interfaces in src_interface_map.items():
-        src_device_index: int = cast("int", src_device.index.value)  # type: ignore[attr-defined]
+    for fallback_index, (src_device, src_interfaces) in enumerate(src_interface_map.items(), start=1):
+        src_device_index = _rack_source_device_index(src_device, fallback=fallback_index)
 
         for dst_index, src_interface in enumerate(src_interfaces[:dst_device_count]):
-            start = (rack_index * 2) - 2
-            end = start + 2
             dst_interface = dst_interface_map[dst_devices[dst_index]][start:end][src_device_index - 1]
             cabling_plan.append((src_interface, dst_interface))
 
     return cabling_plan
+
+
+def _rack_source_device_index(device: DcimDevice, *, fallback: int) -> int:
+    value = getattr(getattr(device, "index", None), "value", None)
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str) and value.isdecimal() and int(value) > 0:
+        return int(value)
+
+    for name_attr in ("name", "display_label"):
+        candidate = getattr(device, name_attr, None)
+        name = getattr(candidate, "value", candidate)
+        if isinstance(name, str):
+            suffix = name.rsplit("-", maxsplit=1)[-1]
+            if suffix.isdecimal() and int(suffix) > 0:
+                return int(suffix)
+
+    return fallback
 
 
 def build_server_cabling_plan(

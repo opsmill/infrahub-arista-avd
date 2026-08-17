@@ -1,0 +1,507 @@
+query FabricPoolCheckQuery($name: String!) {
+  NetworkFabric(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        underlay_routing_protocol {
+          value
+        }
+        overlay_routing_protocol {
+          value
+        }
+        fabric_ip_pools {
+          edges {
+            node {
+              __typename
+              id
+              display_label
+              ... on CoreIPPrefixPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              ... on CoreIPAddressPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        mgmt_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        loopback_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        vtep_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        uplink_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        dci_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  NetworkPod(parent__name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        parent {
+          node {
+            __typename
+              id
+              ... on NetworkFabric {
+                name {
+                  value
+                }
+                underlay_routing_protocol {
+                  value
+                }
+                fabric_ip_pools {
+                edges {
+                  node {
+                    __typename
+                    id
+                    display_label
+                    ... on CoreIPPrefixPool {
+                      name {
+                        value
+                      }
+                      resources {
+                        edges {
+                          node {
+                            __typename
+                            ... on IpamPrefix {
+                              prefix {
+                                value
+                              }
+                              role {
+                                value
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    ... on CoreIPAddressPool {
+                      name {
+                        value
+                      }
+                      resources {
+                        edges {
+                          node {
+                            __typename
+                            ... on IpamPrefix {
+                              prefix {
+                                value
+                              }
+                              role {
+                                value
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              mgmt_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              loopback_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              vtep_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              uplink_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              dci_pool {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  resources {
+                    edges {
+                      node {
+                        __typename
+                        ... on IpamPrefix {
+                          prefix {
+                            value
+                          }
+                          role {
+                            value
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        pod_ip_pools {
+          edges {
+            node {
+              __typename
+              id
+              display_label
+              ... on CoreIPPrefixPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              ... on CoreIPAddressPool {
+                name {
+                  value
+                }
+                resources {
+                  edges {
+                    node {
+                      __typename
+                      ... on IpamPrefix {
+                        prefix {
+                          value
+                        }
+                        role {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        mlag_peer_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        mlag_l3_pool {
+          node {
+            id
+            name {
+              value
+            }
+            resources {
+              edges {
+                node {
+                  __typename
+                  ... on IpamPrefix {
+                    prefix {
+                      value
+                    }
+                    role {
+                      value
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        racks {
+          edges {
+            node {
+              id
+              mlag {
+                value
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  NetworkLink(role__value: "dci") {
+    edges {
+      node {
+        id
+        connected_endpoints {
+          edges {
+            node {
+              __typename
+              ... on InterfacePhysical {
+                device {
+                  node {
+                    id
+                    ... on DcimDevice {
+                      pod {
+                        node {
+                          parent {
+                            node {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

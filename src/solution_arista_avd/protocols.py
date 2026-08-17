@@ -224,6 +224,7 @@ class NetworkFabric(CoreArtifactTarget, NetworkBuildingBlock):
     spine_interface_sorting_method: Dropdown
     asn_pool: RelationshipAttribute[CoreNumberPool]
     avd_evpn: RelationshipAttribute[AvdEvpn]
+    fabric_ip_pools: RelationshipManager[CoreResourcePool]
     mgmt_pool: RelationshipAttribute[CoreIPAddressPool]
     node_id_pool: RelationshipAttribute[CoreNumberPool]
 

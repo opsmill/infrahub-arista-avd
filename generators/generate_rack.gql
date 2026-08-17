@@ -78,6 +78,50 @@ query RackGeneratorQuery($name: String!) {
 						spine_interface_sorting_method {
 							value
 						}
+						pod_ip_pools {
+							edges {
+								node {
+									__typename
+									id
+									... on CoreIPAddressPool {
+										resources {
+											edges {
+												node {
+													__typename
+													... on IpamPrefix {
+														id
+														prefix {
+															value
+														}
+														role {
+															value
+														}
+													}
+												}
+											}
+										}
+									}
+									... on CoreIPPrefixPool {
+										resources {
+											edges {
+												node {
+													__typename
+													... on IpamPrefix {
+														id
+														prefix {
+															value
+														}
+														role {
+															value
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
 						parent {
 							node {
 								__typename
@@ -101,6 +145,50 @@ query RackGeneratorQuery($name: String!) {
 									mgmt_pool {
 										node {
 											id
+										}
+									}
+									fabric_ip_pools {
+										edges {
+											node {
+												__typename
+												id
+												... on CoreIPAddressPool {
+													resources {
+														edges {
+															node {
+																__typename
+																... on IpamPrefix {
+																	id
+																	prefix {
+																		value
+																	}
+																	role {
+																		value
+																	}
+																}
+															}
+														}
+													}
+												}
+												... on CoreIPPrefixPool {
+													resources {
+														edges {
+															node {
+																__typename
+																... on IpamPrefix {
+																	id
+																	prefix {
+																		value
+																	}
+																	role {
+																		value
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
 										}
 									}
 									vtep_pool {

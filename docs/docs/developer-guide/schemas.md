@@ -53,7 +53,7 @@ The device and interface `role` dropdowns that the fabric uses are defined in `d
 Top-level container for a datacenter fabric. Inherits `Network.BuildingBlock` and `CoreArtifactTarget`; parents `NetworkPod`.
 
 - **Attributes**: `name` (unique), `index`, interface-sorting methods, `mgmt_gateway`, `avd_hostvars_ready`. L3LS attributes (via `l3ls_extensions.yml`): `underlay_routing_protocol` (`ebgp`/`ospf`), `overlay_routing_protocol` (`ebgp`/`ibgp`), `p2p_uplinks_mtu`, `spanning_tree_mode`, `virtual_router_mac`, EVPN/underlay/MLAG passwords, `anta_enabled`.
-- **Relationships**: `device_designs` → `NetworkFabricDeviceDesign` (super-spine sizing), `uplink_pool` / `vtep_pool` / `loopback_pool` / `dci_pool` → `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` → `CoreNumberPool`, `mgmt_pool` → `CoreIPAddressPool`, `avd_evpn` → `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` → management kinds. `loopback_pool` is the authoritative source for generated device Loopback0 addresses, `vtep_pool` for generated VTEP loopbacks, and `uplink_pool` for routed link prefixes.
+- **Relationships**: `device_designs` -> `NetworkFabricDeviceDesign` (super-spine sizing), `fabric_ip_pools` -> `CoreResourcePool`, `uplink_pool` / `vtep_pool` / `loopback_pool` / `dci_pool` -> `CoreIPPrefixPool`, `asn_pool` / `node_id_pool` -> `CoreNumberPool`, `mgmt_pool` -> `CoreIPAddressPool`, `avd_evpn` -> `AvdEvpn`, `dns_servers` / `ntp_servers` / `local_users` -> management kinds. `fabric_ip_pools` is the preferred source for Management, Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet pools. Legacy fabric pool relationships remain optional fallback inputs during migration.
 
 ### `NetworkPod` — `Network.Pod`
 
@@ -110,7 +110,7 @@ A cabled connection between interfaces. Inherits `Dcim.Connector`, so it has `na
 
 - **DCI attributes**: `role` (`dci`) and `include_in_underlay_protocol` (Boolean, default `true`). BGP ASNs are taken from each endpoint device's own `asn`, not stored on the link.
 - **Relationships**: inherited `connected_endpoints`; no DCI-specific endpoint, pool, subnet, endpoint IP, speed, BFD, MTU, external-network, or EVPN Gateway fields are added.
-- **Addressing source**: `NetworkFabric.dci_pool`; the hostvars generator allocates one `/31` from this pool per valid DCI-role link.
+- **Addressing source**: the hostvars generator allocates one `/31` per valid DCI-role link from `NetworkFabric.fabric_ip_pools` role `dci`, then the legacy `NetworkFabric.dci_pool` fallback, then a deterministic Fabric Supernet-derived fallback when the required DCI prefix-pool role is missing.
 
 ## Devices and interfaces
 
@@ -265,9 +265,17 @@ Mixed into kinds that can be generator targets (`NetworkPod`, `LocationRack`, `C
 
 **CloudVision workspace status** (`CloudvisionWorkspace.status`): `pending`, `built`, `submitted`, `abandoned`, `submit_failed`.
 
-**Prefix role** (`IpamPrefix.role`): `supernet`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
+**Prefix role** (`IpamPrefix.role`): `fabric_supernet`, `fabric_point_to_point`, `dci`, `mlag`, `mlag_peering`, `supernet`, `pod_super_spine_spine`, `pod_leaf_spine`, `loopback`, `loopback-vtep`, `technical`, `management`, `backfill`.
 
 **Prefix status** (`IpamPrefix.status`): `active`, `deprecated`, `reserved`.
+
+## Role-driven pool collections
+
+`NetworkFabric.fabric_ip_pools` is the preferred fabric-scope IP pool collection. It accepts `CoreResourcePool` members so Management address pools and Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet prefix pools can be managed through one relationship. Legacy fabric relationships remain optional during migration and are used only as fallback inputs.
+
+`NetworkPod.pod_ip_pools` is the preferred pod-scope IP pool collection. It accepts pod-specific Loopback, Loopback VTEP, Fabric Point-to-Point, MLAG, and MLAG Peering pools. Management remains fabric-scoped.
+
+Pool purpose is resolved from the `IpamPrefix.role` values on each pool's resources. A pool with mixed authoritative roles, duplicate role coverage in one fabric or pod, a non-IP pool in these collections, or a pod prefix outside the matching fabric prefix is invalid.
 
 ## Source {#protocols}
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from operator import itemgetter
 from typing import Any
 
 from infrahub_sdk.generator import InfrahubGenerator
@@ -96,7 +97,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                         "has_hostvar": has_hostvar,
                     }
 
-        return list(devices.values())
+        return sorted(devices.values(), key=itemgetter("hostname"))
 
     async def _fetch_hostvars_from_storage(self, devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         """Fetch hostvar content from CoreFileObject for each device.
@@ -109,7 +110,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
         """
         result: dict[str, dict[str, Any]] = {}
 
-        for device in devices:
+        for device in sorted(devices, key=itemgetter("hostname")):
             hostname = device["hostname"]
 
             if not device.get("has_hostvar"):
@@ -247,7 +248,7 @@ class AvdDeviceStructuredConfigGenerator(InfrahubGenerator):
                     else structured_config
                 )
 
-                new_content = json.dumps(structured_config_dict, indent=2).encode()
+                new_content = json.dumps(structured_config_dict, indent=2, sort_keys=True).encode()
                 new_checksum = hashlib.sha256(new_content).hexdigest()
 
                 avd_artifact = await self.client.get(

@@ -47,7 +47,7 @@ Services are modeled **schema-first**: L2 VLANs (L2LS), anycast SVIs on the camp
 | Capability | Status | Notes |
 |------------|:------:|-------|
 | Allocate loopback, interconnect, and management prefixes/IPs from pools | ✅ | Drawn from branch-aware pools so parallel work does not collide. |
-| Allocate DCI point-to-point /31 prefixes from a fabric DCI pool | ✅ | `NetworkFabric.dci_pool` is the authoritative source for generated DCI `l3_edge` addressing. |
+| Allocate DCI point-to-point /31 prefixes from fabric DCI pool roles | ✅ | Generated DCI `l3_edge` addressing resolves from `NetworkFabric.fabric_ip_pools` role `dci` first, legacy `NetworkFabric.dci_pool` second, and deterministic Fabric Supernet fallback when the required DCI prefix-pool role is missing. |
 | Allocate BGP ASNs and node IDs from pools | ✅ | Assigned automatically during generation. |
 
 <!-- vale Google.Headings = NO -->
@@ -124,3 +124,12 @@ Services are modeled **schema-first**: L2 VLANs (L2LS), anycast SVIs on the camp
 |------------|:------:|-------|
 | Self-serve brownfield import | 🟡 | Modeling an existing fabric and importing configs via Infrahub Sync is done today in a **guided engagement**, not as a download-and-try path. |
 | Every AVD feature | ⬜ | This reference design covers a defined set of AVD inputs and scenarios, implemented per customer; uncommon or highly custom options may not be modeled. |
+
+## Fabric pool management
+
+| Capability | Status | Notes |
+|------------|:------:|-------|
+| Role-driven fabric pool collection | ✅ | `NetworkFabric.fabric_ip_pools` covers Management, Loopback, Loopback VTEP, Fabric Point-to-Point, DCI, and Fabric Supernet roles. |
+| Pod-scoped pool collection and containment validation | ✅ | `NetworkPod.pod_ip_pools` supports pod Loopback, VTEP, Fabric Point-to-Point, MLAG, and MLAG Peering roles with parent-fabric containment checks. |
+| Legacy pool migration compatibility | ✅ | Legacy fabric and pod pool relationships remain optional and seed data is dual-populated during migration. |
+| Deterministic fallback/default pools | ✅ | Fabric Supernet fallback creates stable prefix pools; MLAG defaults use stable `/31` pool objects. |
