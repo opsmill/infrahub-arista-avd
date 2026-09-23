@@ -1199,6 +1199,12 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     bgp_mlag_password: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricBgpMlagPassword"
     ]
+    anta_enabled: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAntaEnabled"
+    ]
+    avd_catalogs_filters: Optional[
+        "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdCatalogsFilters"
+    ]
     avd_custom_hostvars: Optional[
         "GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdCustomHostvars"
     ]
@@ -1833,6 +1839,18 @@ class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFab
     BaseModel
 ):
     value: Optional[str]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAntaEnabled(
+    BaseModel
+):
+    value: Optional[bool]
+
+
+class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdCatalogsFilters(
+    BaseModel
+):
+    value: Optional[Any]
 
 
 class GenerateAvdDeviceInputsQueryDcimDeviceEdgesNodePodNodeParentNodeNetworkFabricAvdCustomHostvars(

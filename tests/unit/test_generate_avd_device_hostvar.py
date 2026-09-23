@@ -161,6 +161,7 @@ def _base_hostvars(
     uplink_pool_reservation: dict | None = None,
     loopback_ipv4_pool: str | None = "10.0.0.0/24",
     vtep_loopback_ipv4_pool: str | None = "10.2.0.0/24",
+    avd_catalogs_filters: list[dict[str, list[str]]] | None = None,
 ) -> dict:
     """Minimal leaf hostvars wrapping the tenant payload, mirroring generate()."""
     return GenerateAVDDeviceHostvar._build_hostvars(
@@ -200,6 +201,7 @@ def _base_hostvars(
         evpn_gateway=evpn_gateway,
         custom_hostvars=custom_hostvars or {},
         uplink_pool_reservation=uplink_pool_reservation,
+        avd_catalogs_filters=avd_catalogs_filters,
     )
 
 
@@ -294,6 +296,18 @@ def test_non_mlag_leaf_sets_avd_mlag_false_on_rack_node_group() -> None:
     assert hostvars["l3leaf"]["nodes"][0]["bgp_as"] == "65001"
     assert "mlag" not in hostvars["l3leaf"].get("defaults", {})
     assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_typed_anta_catalog_filters_are_rendered_as_valid_avd_inputs() -> None:
+    filters = [{"skip_tests": ["VerifyInterfaceDiscards", "VerifyLoggingErrors"]}]
+    hostvars = _base_hostvars([], avd_catalogs_filters=filters)
+
+    assert hostvars["avd_catalogs_filters"] == filters
+    assert not validate_inputs(hostvars).validation_result.violations
+
+
+def test_empty_anta_catalog_filters_are_omitted() -> None:
+    assert "avd_catalogs_filters" not in _base_hostvars([], avd_catalogs_filters=[])
 
 
 def test_uplink_pool_and_reservation_emit_only_with_routed_uplinks() -> None:

@@ -1,24 +1,21 @@
 ---
 plugin: opsmill.infrahub.inventory
 api_endpoint: "http://infrahub-server:8000"
+branch: main
 
 timeout: 30
 strict: false
+hostnames:
+  - display_label
 
 nodes:
   DcimDevice:
     include:
-      - name
-      - location.name
       - role
-      - device_type.name
-      # - device_type.platform.ansible_network_os
-      - primary_address.address
+      - mgmt_ip.address
+      - pod.parent.name
       - status
 
 compose:
-  hostname: name
-  ansible_host: primary_address.address | ansible.utils.ipaddr('address')
-  device_type: device_type.name
-  # platform: device_type.platform.ansible_network_os
-  location: location.name
+  ansible_host: mgmt_ip.address | regex_replace('/.*$', '')
+  infrahub_fabric_name: pod.parent.name

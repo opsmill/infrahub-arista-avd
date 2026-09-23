@@ -12,7 +12,10 @@
 #   permission denied
 #
 # The install is redundant there anyway — semaphore/Dockerfile already installs
-# opsmill.infrahub into /opt/semaphore/collections, which ansible.cfg puts on
-# collections_path.
+# the pinned collections into /opt/semaphore/collections, which ansible.cfg puts
+# on collections_path.
 collections:
   - name: opsmill.infrahub
+    version: 1.9.0
+  - name: arista.avd
+    version: 6.3.0

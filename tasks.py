@@ -51,6 +51,8 @@ SEMAPHORE_PLAYBOOK_PATH = "/opt/semaphore/playbooks"
 # Host path bind-mounted into the Semaphore container as the ContainerLab
 # staging directory, so files deploy_clab.yml pulls are reachable from the host.
 CLAB_STAGING_DIR = "lab/clab-staging"
+ANTA_WORKSPACE_DIR = "anta"
+ANTA_CONTAINER_WORKSPACE = "/opt/semaphore/anta"
 
 # Markdown authored by this project. Vendored agent content (.agents, .claude,
 # .specify), spec-kit process artifacts (specs/), and PyAVD-rendered output
@@ -167,18 +169,124 @@ class _SemaphoreClient:
         payload: dict[str, object],
     ) -> int:
         """Find an existing resource by name or create it. Returns the resource id."""
-        items: list[dict[str, object]] = self._client.get(list_url).json()
-        for item in items:
-            if item.get("name") == name:
-                rid = int(str(item["id"]))
-                print(f"  '{name}' already exists (id={rid}).")
-                return rid
+        item = self.find_by_name(list_url, name)
+        if item is not None:
+            rid = int(str(item["id"]))
+            print(f"  '{name}' already exists (id={rid}).")
+            return rid
 
         resp = self._client.post(create_url, json=payload)
         resp.raise_for_status()
         rid = int(resp.json()["id"])
         print(f"  '{name}' created (id={rid}).")
         return rid
+
+    def find_by_name(self, list_url: str, name: str) -> dict[str, object] | None:
+        """Return one named Semaphore resource, if present."""
+        items: list[dict[str, object]] = self._client.get(list_url).json()
+        return next((item for item in items if item.get("name") == name), None)
+
+    def list_resources(self, list_url: str) -> list[dict[str, object]]:
+        """Return all resources from a Semaphore project endpoint."""
+        return self._client.get(list_url).json()
+
+    def update(self, resource_url: str, payload: dict[str, object]) -> None:
+        """Replace one Semaphore resource with a reconciled payload."""
+        resp = self._client.put(resource_url, json=payload)
+        resp.raise_for_status()
+
+    def delete(self, resource_url: str) -> None:
+        """Delete one Semaphore resource."""
+        resp = self._client.delete(resource_url)
+        resp.raise_for_status()
+
+
+def _anta_environment_payload(project_id: int, workspace: str) -> dict[str, object]:
+    """Build the default Semaphore environment used by ANTA runs."""
+    return {
+        "name": "ANTA",
+        "project_id": project_id,
+        "json": json.dumps(
+            {
+                "fabric_name": "",
+                "anta_workspace": workspace,
+                "anta_user": "admin",
+                "anta_password": "",
+                "anta_enable": True,
+            }
+        ),
+        "env": "{}",
+    }
+
+
+def _reconcile_anta_environment(api: _SemaphoreClient, project_id: int, workspace: str) -> int:
+    """Create or update ANTA defaults while preserving operator overrides."""
+    list_url = f"/api/project/{project_id}/environment"
+    existing = api.find_by_name(list_url, "ANTA")
+    if existing is None:
+        return api.find_or_create(list_url, list_url, "ANTA", _anta_environment_payload(project_id, workspace))
+
+    try:
+        variables = json.loads(str(existing.get("json") or "{}"))
+    except json.JSONDecodeError as error:
+        msg = "Semaphore environment 'ANTA' contains invalid JSON"
+        raise ValueError(msg) from error
+    if not isinstance(variables, dict):
+        msg = "Semaphore environment 'ANTA' JSON must be an object"
+        raise TypeError(msg)
+
+    variables["anta_workspace"] = workspace
+    variables.setdefault("fabric_name", "")
+    variables.setdefault("anta_user", "admin")
+    variables.setdefault("anta_password", "")
+    variables.setdefault("anta_enable", True)
+
+    environment_id = int(str(existing["id"]))
+    payload = _anta_environment_payload(project_id, workspace)
+    payload["json"] = json.dumps(variables)
+    payload["env"] = str(existing.get("env") or "{}")
+    api.update(f"{list_url}/{environment_id}", payload)
+    print(f"  'ANTA' reconciled (id={environment_id}).")
+    return environment_id
+
+
+def _reconcile_template(
+    api: _SemaphoreClient,
+    project_id: int,
+    name: str,
+    payload: dict[str, object],
+) -> int:
+    """Create a template or update it without discarding unmodelled fields."""
+    list_url = f"/api/project/{project_id}/templates"
+    existing = api.find_by_name(list_url, name)
+    if existing is None:
+        return api.find_or_create(list_url, list_url, name, payload)
+
+    template_id = int(str(existing["id"]))
+    api.update(f"{list_url}/{template_id}", {**existing, **payload})
+    print(f"  '{name}' reconciled (id={template_id}).")
+    return template_id
+
+
+def _remove_empty_environment(api: _SemaphoreClient, project_id: int) -> None:
+    """Detach and delete the obsolete Semaphore environment named Empty."""
+    environments_url = f"/api/project/{project_id}/environment"
+    empty_environment = api.find_by_name(environments_url, "Empty")
+    if empty_environment is None:
+        return
+
+    empty_id = int(str(empty_environment["id"]))
+    templates_url = f"/api/project/{project_id}/templates"
+    for template in api.list_resources(templates_url):
+        environment_id = template.get("environment_id")
+        if environment_id is None or int(str(environment_id)) != empty_id:
+            continue
+        template_id = int(str(template["id"]))
+        api.update(f"{templates_url}/{template_id}", {**template, "environment_id": None})
+        print(f"  '{template.get('name', template_id)}' detached from 'Empty'.")
+
+    api.delete(f"{environments_url}/{empty_id}")
+    print(f"  'Empty' deleted (id={empty_id}).")
 
 
 def ensure_clab_staging_dir() -> Path:
@@ -209,6 +317,15 @@ def ensure_clab_staging_dir() -> Path:
     staging_dir.chmod(0o777)
     print(f"Staging directory {CLAB_STAGING_DIR} ready (mode 0777, shared with the Semaphore container).")
     return staging_dir
+
+
+def ensure_anta_workspace_dir() -> Path:
+    """Create the host directory persisted at /opt/semaphore/anta."""
+    workspace_dir = Path(__file__).parent / ANTA_WORKSPACE_DIR
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    workspace_dir.chmod(0o777)
+    print(f"ANTA workspace {ANTA_WORKSPACE_DIR} ready (mode 0777, shared with the Semaphore container).")
+    return workspace_dir
 
 
 def _semaphore_staging_host_path(context: Context, container_path: str) -> str:
@@ -250,6 +367,7 @@ def init_semaphore(
 
     print("=== Semaphore Init ===")
     ensure_clab_staging_dir()
+    ensure_anta_workspace_dir()
 
     api = _SemaphoreClient(url)
     api.wait_until_ready()
@@ -299,26 +417,38 @@ def init_semaphore(
         },
     )
 
-    print("Environment...")
-    env_id = api.find_or_create(
-        f"/api/project/{project_id}/environment",
-        f"/api/project/{project_id}/environment",
-        "Empty",
-        {"name": "Empty", "project_id": project_id, "json": "{}", "env": "{}"},
-    )
-
     print("Task template...")
-    api.find_or_create(
-        f"/api/project/{project_id}/templates",
-        f"/api/project/{project_id}/templates",
+    _reconcile_template(
+        api,
+        project_id,
         "Deploy",
         {
             "name": "Deploy",
             "project_id": project_id,
             "repository_id": repo_id,
             "inventory_id": inv_id,
-            "environment_id": env_id,
+            "environment_id": None,
             "playbook": "deploy.yml",
+            "type": "task",
+            "app": "ansible",
+        },
+    )
+
+    print("ANTA environment...")
+    anta_env_id = _reconcile_anta_environment(api, project_id, ANTA_CONTAINER_WORKSPACE)
+
+    print("ANTA task template...")
+    _reconcile_template(
+        api,
+        project_id,
+        "Validate with ANTA",
+        {
+            "name": "Validate with ANTA",
+            "project_id": project_id,
+            "repository_id": repo_id,
+            "inventory_id": inv_id,
+            "environment_id": anta_env_id,
+            "playbook": "test.yml",
             "type": "task",
             "app": "ansible",
         },
@@ -401,6 +531,9 @@ def init_semaphore(
             "allow_override_args_in_task": True,
         },
     )
+
+    print("Obsolete environment cleanup...")
+    _remove_empty_environment(api, project_id)
 
     print("=== Semaphore init complete ===")
 
@@ -646,4 +779,5 @@ def start(ctx: Context) -> None:
     # exist yet is created by Docker as root, which the Semaphore container then
     # cannot write to.
     ensure_clab_staging_dir()
+    ensure_anta_workspace_dir()
     ctx.run(f"docker compose {COMPOSE_FILES} up -d", pty=True)

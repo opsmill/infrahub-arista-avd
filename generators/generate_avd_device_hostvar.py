@@ -45,6 +45,7 @@ from solution_arista_avd.avd import (  # noqa: E402
     SPINE_UPLINK_LEAF_ROLES,
     SPINE_UPLINK_UNDERLAYS,
     SVI_RENDERING_ROLES,
+    build_avd_catalogs_filters,
 )
 from solution_arista_avd.avd import get_avd_type as _get_package_avd_type  # noqa: E402
 from solution_arista_avd.generator import (  # noqa: E402
@@ -2149,6 +2150,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
         evpn_gateway: EvpnGatewayPayload | None = None,
         custom_hostvars: dict[str, Any] | None = None,
         uplink_pool_reservation: UplinkPoolReservation | None = None,
+        avd_catalogs_filters: list[dict[str, list[str]]] | None = None,
     ) -> dict[str, Any]:
         """Build the complete pyAVD hostvars structure."""
         avd_type = get_generator_avd_type(role)
@@ -2229,6 +2231,8 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             hostvars["evpn_vlan_aware_bundles"] = True
         if p2p_uplinks_mtu is not None:
             hostvars["p2p_uplinks_mtu"] = p2p_uplinks_mtu
+        if avd_catalogs_filters:
+            hostvars["avd_catalogs_filters"] = avd_catalogs_filters
         if spanning_tree_mode:
             hostvars["spanning_tree_settings"] = {"mode": spanning_tree_mode}
 
@@ -2425,6 +2429,11 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
 
         # Extract management settings from fabric (applies to all device types)
         management = self._extract_management_settings(fabric)
+        avd_catalogs_filters_attribute = getattr(fabric, "avd_catalogs_filters", None)
+        avd_catalogs_filters = build_avd_catalogs_filters(
+            self._get_attr_value(fabric, "anta_enabled") is True,
+            getattr(avd_catalogs_filters_attribute, "value", None),
+        )
         custom_hostvars = self._merge_custom_hostvars(
             self._extract_custom_hostvars(fabric),
             self._extract_custom_hostvars(pod),
@@ -2535,6 +2544,7 @@ class GenerateAVDDeviceHostvar(InfrahubGenerator):
             evpn_gateway=evpn_gateway,
             custom_hostvars=custom_hostvars,
             uplink_pool_reservation=uplink_pool_reservation,
+            avd_catalogs_filters=avd_catalogs_filters,
         )
 
         # Validate hostvars against pyAVD schema before saving
