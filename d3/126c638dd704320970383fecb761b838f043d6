@@ -1,0 +1,21 @@
+pyproject.toml
+  s_94947103c94bcb::t_ba65d3b09c58f9 18
+uv.lock
+  s_94947103c94bcb::t_0ffd86ff3e5464 2299
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d3126c638dd704320970383fecb761b838f043d6",
+  "prompts": {},
+  "sessions": {
+    "s_94947103c94bcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-apin-fix-1e57544715e1ec01",
+        "model": "unknown"
+      },
+      "human_author": "Benoit Kohler <Kohler.benoit@bearchitek.com>"
+    }
+  }
+}
