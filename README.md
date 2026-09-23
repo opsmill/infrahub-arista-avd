@@ -36,7 +36,7 @@ The full pipeline, from a high-level fabric design to versioned, deployable conf
 uv sync --all-packages
 
 # Build the custom Infrahub image (extends the base image with PyAVD — run once)
-export INFRAHUB_BASE_VERSION=1.10.10
+export INFRAHUB_BASE_VERSION=1.11.3
 uv run invoke build
 
 # Start all services: Infrahub, Neo4j, PostgreSQL, Redis, RabbitMQ, service portal, Semaphore
@@ -87,7 +87,7 @@ After `invoke load` completes and you run the generator chain on a fabric:
   - Provision server into a rack
   - Create EVPN tenant
   - Fabric Design visualization (topology, cabling, settings, EVPN)
-- **Stack** — Docker Compose extending Infrahub 1.10.10 with PyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
+- **Stack** — Docker Compose extending Infrahub 1.11.3 with PyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
 
 | File | What it does |
 |------|-------------|
