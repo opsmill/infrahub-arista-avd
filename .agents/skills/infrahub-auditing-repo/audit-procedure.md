@@ -4,6 +4,58 @@ This document defines the step-by-step audit procedure.
 When running an audit, follow each phase in order and
 collect findings into a structured report.
 
+## Phase 0: The audit is read-only (CRITICAL)
+
+Read
+[rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
+before Phase 1. It is not a phase you walk; it is the
+constraint every phase runs under.
+
+In one line: **do not write to the working tree or the
+index, and do not run a git command that would.** The
+report file (`AUDIT_REPORT.md`) is the only file this
+audit creates.
+
+That line is not enough to act on. Which git verbs are
+forbidden, which read another revision without touching
+the tree, what to do about a script whose `--check`
+flag may write, and how to report a tree you have
+already dirtied are all in the rule, and none of them
+are restated here. Open it.
+
+## Phase 0.1: Evidence requirements for every finding
+
+Phase 0 constrains what the audit may write. This
+constrains what it may claim.
+
+**A finding states how it was verified, or says in
+`verified_against` that it could not be.** A proposed
+fix reads identically whether it was established or
+inferred, so a reader cannot tell the two apart and will
+not re-derive one that sounds confident. The cost lands
+on whoever implements it, in a component they did not
+touch. What weakens is the claim, never the severity:
+that belongs to the rule, and per-rule graders assert it
+across the corpus.
+
+Two rules carry this, and both apply to every phase
+below, not only to Phase 9:
+
+- [rules/audit-cites-all-reference-sites.md](./rules/audit-cites-all-reference-sites.md).
+  A finding that proposes removing or renaming a symbol
+  enumerates every reference site in `sites`, from a
+  repo-wide search. Render and execution sites come from
+  the registration graph, not from the filename.
+- [rules/audit-verifies-proposed-syntax.md](./rules/audit-verifies-proposed-syntax.md).
+  A finding that proposes a filter, field or config key
+  resolves it against the version under audit and
+  records how in `verified_against`. The published docs
+  describe the current release, which may not be the one
+  being audited.
+
+Read both before emitting the first finding. They add
+three fields to the finding shape, described in 9.6.
+
 ## Phase 1: Project Structure (CRITICAL)
 
 ### 1.1 Check `.infrahub.yml` exists
@@ -61,13 +113,26 @@ convention).
 
 ### 2.2 Naming conventions
 
-- **Namespace**: `^[A-Z][a-z0-9]+$` (3-32 chars) —
-  check every node and generic
-- **Node/Generic name**: `^[A-Z][a-zA-Z0-9]+$`
-  (2-32 chars)
-- **Attribute names**: `^[a-z0-9_]+$` (3-32 chars)
-- **Relationship names**: `^[a-z0-9_]+$` (3-32 chars)
-- **Kind**: must be `Namespace` + `Name` concatenation
+Validate every node, generic, attribute, and
+relationship against:
+
+- **Namespace** pattern: `^[A-Z][a-z0-9]+$`
+- **Node/Generic name** pattern: `^[A-Z][a-zA-Z0-9]+$`
+- **Attribute name** pattern: `^[a-z0-9_]+$`
+- **Relationship name** pattern: `^[a-z0-9_]+$`
+- **Kind**: must equal `Namespace` + `Name`
+
+Length caps (min/max) for each of the above are
+version-dependent. Do not hardcode them here; resolve
+them at audit time from the running instance's
+OpenAPI spec — see
+[validation-string-limits](../infrahub-managing-schemas/rules/validation-string-limits.md)
+in the schemas skill for the procedure
+(`INFRAHUB_ADDRESS` → `http://localhost:8000`
+fallback → `/api/openapi.json`). If no instance is
+reachable, warn and skip the length portion of the
+naming audit (patterns can still be checked
+offline).
 
 ### 2.3 Attribute checks
 
@@ -321,6 +386,29 @@ convention).
 - Shared utility functions in common.py when patterns
   repeat
 
+### 7.4 Dependency declarations (`watch`)
+
+- Every `python_transforms` and `generator_definitions`
+  entry carries a `watch` key — absent, the commit id is
+  folded into its fingerprint and it re-renders or re-runs
+  on every commit
+- `watch.files` names every first-party import and every
+  file read at runtime, siblings included (imports are
+  never followed)
+- Every entry resolves to a Git-tracked file
+  (`git ls-files -- <entry>`); one that does not still
+  counts as a declaration
+- `watch` never on `check_definitions` or
+  `artifact_definitions` — the models reject it and the
+  whole repository import fails
+- `jinja2_transforms` flagged only where a computed
+  include leaves the closure incomplete
+- Confirm the version under audit accepts the key before
+  proposing it, and say how
+
+See
+[rules/practices-watch-dependencies.md](./rules/practices-watch-dependencies.md).
+
 ---
 
 ## Phase 8: Deployment Readiness (MEDIUM)
@@ -346,6 +434,174 @@ convention).
   relationships (may compute incorrectly during
   batch loading)
 - Suggest loading parent objects before children
+
+---
+
+## Phase 9: YAGNI / Cost-to-Fix (MEDIUM–LOW)
+
+Walk every rule with the `yagni-` prefix against the
+artifacts in scope. These rules ask "is there a cheaper
+layer that already does this?" before accepting Python
+or denormalized data. Findings are advisory — they do
+not block deployment, but each one represents work the
+schema, GraphQL, or built-in IPAM/VLAN layers could be
+doing instead.
+
+**Severity cap**: every YAGNI rule emits at **MEDIUM**
+at most. None of these findings indicate broken or
+incorrect behaviour — the code works, the schema
+loads, the pipeline passes. CRITICAL and HIGH are
+reserved for the earlier phases (broken refs, silent
+failures, deprecated fields). If a finding feels HIGH,
+it likely belongs to a different rule category, not to
+YAGNI.
+
+**Severity tracks the ladder.** Within the MEDIUM cap,
+severity follows cost-to-fix so the cheapest, most
+clear-cut wins surface loudest:
+
+- **Steps 1–3 → MEDIUM.** The cheapest, most clear-cut
+  fixes: reuse an off-the-shelf marketplace schema
+  (step 1), inherit a built-in primitive, move data to
+  YAML, add a schema constraint or a missing inverse.
+  Low cost, unambiguous benefit.
+- **Steps 4–7 → LOW.** A larger rewrite where the
+  Python is more defensible: re-model a relationship
+  traversal, narrow a query, port a transform to
+  Jinja2, restructure a check, or adopt a generated
+  protocol for typed SDK access. Still advisory, just
+  lower priority.
+
+The ladder steps come from each rule's `ladder_step`
+frontmatter field, and each rule's `impact` frontmatter
+carries the MEDIUM/LOW severity above. Lower step
+numbers are cheaper fixes; sort findings by
+`ladder_step` ascending within this phase only (other
+phases keep their existing order).
+
+**Feasibility is not assumed.** An extraction finding
+proposes a schema change that may not be performable at
+all: hoisting a relationship whose members declare
+different identifiers collapses distinct edges silently,
+and identifiers are immutable once loaded. Before
+labelling any generic-extraction finding `clear`, walk
+the feasibility gate in
+[rules/yagni-duplicate-shape-not-extracted-to-generic.md](./rules/yagni-duplicate-shape-not-extracted-to-generic.md#feasibility-gate).
+The default verdict is `clear (unverified)`.
+
+### 9.1 Schema rules
+
+- `yagni-reuse-existing-marketplace-schema` (step 1, MEDIUM)
+  — a marketplace-published domain (DCIM, location,
+  organization, circuits, cabling) hand-rolled from
+  scratch with no `infrahubctl marketplace get` provenance
+  or `inherit_from`. Offline signature match against those
+  domains (no network call); fix via `marketplace get` +
+  `inherit_from`.
+- `yagni-denormalized-vs-indirect-relationship` (step 4, LOW)
+- `yagni-duplicate-shape-not-extracted-to-generic` (step 2, MEDIUM)
+- `yagni-custom-domain-primitives-instead-of-builtin` (step 2, MEDIUM)
+  — IPAM (`BuiltinIPAddress`, `BuiltinIPPrefix`,
+  `BuiltinIPNamespace`, `IpamIPAddress`,
+  `IpamIPPrefix`), VLANs (`IpamVLAN`), and similar
+  built-in domain primitives must be inherited from,
+  not redefined.
+- `yagni-missing-inverse-forces-python-filter` (step 3, MEDIUM) —
+  `kind: Attribute` + `cardinality: one` rels must declare a
+  matching inverse on the peer; otherwise consumers filter in
+  Python.
+- `yagni-profile-over-default` (step 2, MEDIUM) — a Profile
+  carrying a single, fixed value with no competing Profile
+  offering a different value is doing the job of an attribute
+  `default_value`.
+- `yagni-unused-generate-flag` (step 3, MEDIUM) —
+  `generate_profile: true` / `generate_template: true` with no
+  Profile/template instance or `object_template` reference
+  anywhere in the repo.
+- `yagni-template-profile-confusion` (step 3, MEDIUM) — an
+  Object Template pushing shared constant values with no
+  structural children (a Profile's job), or a Profile
+  approximating cloned structure (a Template's job).
+
+### 9.2 Check rules
+
+- `yagni-python-validator-vs-schema-constraint` (step 3, MEDIUM)
+- `yagni-redundant-check-that-graphql-can-answer` (step 6, LOW)
+
+### 9.3 Transform rules
+
+- `yagni-python-transform-that-could-be-jinja2` (step 5, LOW)
+
+### 9.4 Generator rules
+
+- `yagni-generator-hardcoding-data` (step 2, MEDIUM)
+  — explicit carve-out for `bootstrap/`, `seed/`,
+  `demo/` directories.
+- `yagni-generator-that-should-be-template` (step 2,
+  MEDIUM) — a generator that only stamps out a fixed,
+  near-identical structure with no computation is doing
+  the job of an Object Template.
+- `yagni-duplicate-shape-not-extracted-to-generic`
+  (step 2, MEDIUM) — also applies when a generator's
+  output shape duplicates an existing generic.
+- `yagni-generator-query-shape-too-broad` (step 4, LOW) —
+  `CoreGeneratorGroup` in the data query, focal-exclude
+  loops, or `>2` top-level kind sections. Frequently
+  co-occurs with `yagni-missing-inverse-forces-python-filter`;
+  re-check both together.
+- `yagni-imperative-allocation-vs-resource-pool` (step 2, MEDIUM) —
+  subnet/IP/VLAN/port allocated with `ipaddress` math,
+  `random`, or a hand-rolled free-scan loop instead of a
+  built-in resource pool (`allocate_next_ip_prefix` /
+  `allocate_next_ip_address`, `CoreIPPrefixPool` /
+  `CoreNumberPool`). Strongest signal: the same generator
+  already allocates another resource from a pool. Do not
+  flag deterministic derivations that persist no allocation.
+
+### 9.5 Cross-artifact Python rules (checks, transforms, generators)
+
+- `yagni-untyped-python-vs-generated-protocols` (step 7, LOW)
+  — a bare string `kind` (`kind="Foo"` or positional `"Foo"`)
+  passed to `client.create/get/all/filters/count`, or a
+  hand-built dict payload, when a generated protocol class for
+  that kind is available (a repo `protocols.py` /
+  `schema_protocols.py` / `*_sync.py` / `*_async.py`, or
+  `infrahub_sdk.protocols`). Pass the class instead for
+  author-time type checking. Attributes only — do not flag
+  relationship-only access, trivial one-offs, or code already
+  using protocol classes.
+
+### 9.6 Output
+
+When emitting YAGNI findings in `AUDIT_REPORT.md`,
+sort by `ladder_step` ascending (cheapest fix on top),
+then by file path. Each finding line carries the rule
+name, the ladder step, the file:line, and the
+suggested replacement pulled from the rule's "Checks"
+section.
+
+For tooling integration (evals, downstream automation)
+the audit can additionally emit findings as JSON to
+`output.json` when explicitly prompted to. The JSON
+form carries the same `rule`, `severity`,
+`ladder_step`, `file`, and `replacement` fields as the
+markdown report — the two are different
+serialisations of the same finding set, ordered the
+same way.
+
+Three further fields carry the finding's evidence. They
+are not YAGNI-specific; any phase's finding uses the
+ones that apply to it:
+
+| Field | Type | Carried by |
+| ----- | ---- | ---------- |
+| `sites` | list of `path` or `path:line` | Any finding proposing a removal or rename. Every reference site, from a repo-wide search. `file` locates the finding; `sites` is the set to change |
+| `verified_against` | string | Any finding whose claim rests on something it had to go and check. Names the artifact introspected and its version for a proposed filter, schema field or config key, and records an incomplete or unrun reference sweep for `sites`. States plainly when verification was not possible; an in-repo analogy is not verification |
+| `feasibility` | verdict token | Any generic-extraction finding. Defaults to `clear (unverified)`; see the rule's feasibility gate for the full verdict list |
+
+In the markdown report the same three appear as a
+**Sites**, **Verified against**, and **Feasibility**
+line under the finding.
 
 ---
 

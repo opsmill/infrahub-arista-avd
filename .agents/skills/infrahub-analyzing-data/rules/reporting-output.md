@@ -14,6 +14,23 @@ findings need context, counts, severity, and
 remediation hints. These patterns define how to
 present compliance results.
 
+### Why it matters
+
+Compliance reports are read by people who skim:
+operators triaging a change window, leads deciding
+whether to approve, auditors scanning for the
+headline number. Burying the answer (count,
+compliance percentage, pass/fail) under the raw
+violation list makes the report less actionable
+because the reader has to reconstruct the summary
+themselves, and they often won't. The standard
+structure below leads with the policy and the
+totals, then drills into per-violation detail with
+the IDs needed to remediate — without those IDs the
+operator has to re-run the analysis just to find the
+objects, doubling the work the report was supposed
+to save.
+
 ---
 
 ### Standard Report Structure
@@ -70,12 +87,14 @@ Remediation
 ───────────
 • Rename affected devices via
   Infrahub UI or:
-    mcp__infrahub__infrahub_update(
+    mcp__infrahub__node_upsert(
       kind="DcimDevice",
       id="<id>",
       data={"name": "<correct-name>"}
     )
-  Note: always use a branch, not main.
+  Note: writes land on an auto-created
+  session branch; call propose_changes to
+  open them for review, not the default branch.
 • Consider adding an InfrahubCheck to
   enforce naming on future proposed
   changes.
@@ -155,14 +174,18 @@ levels are explicitly requested.
 
 ### Remediation Hints
 
-Always include a remediation section. Match the
-remediation to the violation type:
+Include a remediation section in every report — a
+violation list without a fix path forces the reader
+to re-derive how to repair each item, and the
+report becomes a problem statement rather than an
+action item. Match the remediation to the violation
+type:
 
 | Violation Type | Remediation Hint |
 | -------------- | ---------------- |
-| Missing required attribute | Set value via UI or `mcp__infrahub__infrahub_update` |
-| Wrong attribute value | Correct value via UI or `mcp__infrahub__infrahub_update` |
-| Missing related object | Create via `mcp__infrahub__infrahub_create` on a branch |
+| Missing required attribute | Set value via UI or `mcp__infrahub__node_upsert` |
+| Wrong attribute value | Correct value via UI or `mcp__infrahub__node_upsert` |
+| Missing related object | Create via `mcp__infrahub__node_upsert`, then `propose_changes` |
 | Naming convention | Rename via UI or update |
 | Structural gap (design vs reality) | Run the generator to reconcile, or create manually |
 | Recurring pattern | Suggest creating an `InfrahubCheck` to enforce on future changes |

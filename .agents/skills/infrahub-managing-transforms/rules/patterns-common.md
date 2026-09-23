@@ -6,7 +6,26 @@ tags: patterns, data-extraction, csv, common-py
 
 ## Common Transform Patterns
 
-**Impact:** MEDIUM
+Impact: MEDIUM
+
+Pull repeated GraphQL-response shaping (unwrapping
+`edges`/`node`, picking a single root, sorting
+interfaces) into `transforms/common.py` and import
+across transform files.
+
+### Why it matters
+
+The GraphQL response shape is verbose and uniform —
+every list is wrapped in `edges → node`, every
+attribute in `{value, ...}` — so each transform that
+inlines this shaping ends up with the same five lines
+of unwrapping at the top. Duplicating it makes
+schema or query changes a multi-file edit and hides
+the actual transform logic behind boilerplate. A
+shared `common.py` also gives a single place to add
+defensive `if not interfaces: return []` guards, so
+one transform handling empty data correctly means all
+transforms do.
 
 ### Data Extraction Utilities
 
@@ -69,5 +88,29 @@ class Spine(InfrahubTransform):
         interfaces = get_interfaces(data.get("interfaces"))
         # ... render config ...
 ```
+
+### Sharing a Module With Checks and Other Artifact Types
+
+The helper module above lives in this artifact's own
+directory, and a relative import reaches it only from
+here. If the same logic is needed by a check or another
+artifact type, a relative import **cannot** span
+directories: the module has to be installed into the
+worker image as a package.
+
+The full pattern is documented once in
+[../../infrahub-managing-checks/rules/patterns-shared-module.md](../../infrahub-managing-checks/rules/patterns-shared-module.md).
+Read it there rather than re-deriving it. It covers the
+three `uv` flags whose absence each fails differently,
+**and the `watch:` declaration this section needs**: an
+installed package is invisible to Infrahub's dependency
+detection, so without `watch:` the artifact does not
+regenerate when the shared logic changes. `watch:` is
+accepted on `python_transforms`, `jinja2_transforms` and
+`generator_definitions` — but **not** on
+`check_definitions` — and requires SDK 1.23.0 or later.
+
+Reach for it on the **second** consumer of the logic,
+not in anticipation of one.
 
 Reference: [examples.md](../examples.md) for complete transform examples.

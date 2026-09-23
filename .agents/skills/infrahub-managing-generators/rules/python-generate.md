@@ -8,8 +8,26 @@ tags: python, generate, create, save, allow_upsert, async
 
 Impact: CRITICAL
 
-The `generate()` method must be async. Use `self.client`
-for all object operations inside it.
+`generate()` is the only method the dispatcher calls
+on a generator; it is async, takes the GraphQL
+result as `data`, and creates objects through
+`self.client`.
+
+### Why it matters
+
+The whole tracking context is wired up around the
+async `generate()` call. Defining it as a sync
+method silently shadows the base class's coroutine
+and the dispatcher awaits nothing — no objects get
+created and no error is raised. Calling sync SDK
+methods (or `time.sleep`, `requests.get`, etc.)
+inside `generate()` blocks the worker's event loop
+long enough to trigger a watchdog timeout, leaving
+the proposed change in an inconsistent state.
+`self.client` is the variant that emits tracking
+metadata on every write; reaching for the raw
+client bypasses the tracking group, so cleanup on
+the next run won't find those objects.
 
 ### Basic Structure
 
@@ -38,14 +56,15 @@ class MyGenerator(InfrahubGenerator):
 ### Object Creation API
 
 ```python
-# Create a new object
+# Create a new object — see [python-relationship-references.md]
+# for the three accepted forms for relationship fields.
 obj = await self.client.create(
     kind="DcimDevice",
     data={
         "name": "my-device",
         "status": "active",
-        # Use ID for relationships
-        "device_type": device_type_id,
+        # HFID dict for single-component HFID targets
+        "device_type": {"hfid": ["cEdge-1000"]},
     }
 )
 await obj.save(allow_upsert=True)
@@ -65,15 +84,27 @@ ip = await self.client.allocate_next_ip_address(
 
 ### Critical Rules
 
-- `generate()` must be async -- use `await` for all
-  client operations
-- Always use `allow_upsert=True` on `save()` for
-  idempotent create-or-update
-- Use `self.client` (not `self._init_client`) inside
-  `generate()` -- it has tracking enabled
-- Use IDs for relationship references in `data` dict
-- Handle empty/missing data gracefully -- GraphQL may
-  return `None` for optional fields
+- `generate()` is async; every client call needs
+  `await` or the coroutine returns unresolved and
+  the object is never saved.
+- `save(allow_upsert=True)` makes the write
+  idempotent — without it, the second run errors out
+  on the first object that already exists and the
+  rest of `generate()` never executes.
+- Use `self.client` inside `generate()`; the raw
+  client (`self._init_client`) skips tracking, so
+  `delete_unused_nodes` can't reclaim those objects
+  on the next run.
+- Reference related objects in `data` by HFID dict
+  (`{"hfid": ["name"]}`), ID dict (`{"id": "<uuid>"}`),
+  or SDK object directly. A bare string is treated as
+  `id`, not HFID — the server returns "Unable to find
+  the node" when the string is not a valid UUID. See
+  [python-relationship-references.md](./python-relationship-references.md).
+- Treat optional GraphQL fields defensively —
+  `None` for a missing relationship is normal, and
+  unguarded `["value"]` access raises `TypeError`
+  partway through the run.
 
 Reference:
 [Infrahub Generator Docs](https://docs.infrahub.app)
