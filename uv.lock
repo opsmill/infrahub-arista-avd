@@ -2296,7 +2296,7 @@ catalog = [
 ]
 dev = [
     { name = "infrahub-sdk", extras = ["all"], specifier = ">=1.19.0" },
-    { name = "infrahub-testcontainers", specifier = "==1.11.3" },
+    { name = "infrahub-testcontainers", specifier = ">=1.11.3,<2" },
     { name = "invoke", specifier = ">=2.2.0" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "pytest", specifier = ">=8.4.1" },
