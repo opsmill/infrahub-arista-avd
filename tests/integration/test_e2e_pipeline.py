@@ -365,6 +365,8 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             flush=True,
         )
         assert report["network_link_count"] > 0, "no NetworkLink cabling created"
+        assert report["uplink_count"] > 0, "no role=uplink inter-switch links created"
+        assert not report["invalid_uplinks"], f"invalid generated uplink metadata: {report['invalid_uplinks']}"
         assert report["with_loopback"] >= report["l3_device_count"] > 0, (
             f"expected every L3 device to have a loopback; {report['with_loopback']} have one"
         )
@@ -425,6 +427,14 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         assert report["server_physical_lags"] == {"Ethernet1": "Bond1", "Ethernet2": "Bond1"}
         assert report["server_bond_members"] == ["Ethernet1", "Ethernet2"]
         assert report["server_link_count"] == 2
+        assert all(link["medium"] is None for link in report["server_link_metadata"])
+        assert all(link["role"] is None for link in report["server_link_metadata"])
+        assert all(
+            link["name"].startswith(f"{SERVER_CABLING_SERVER}-Ethernet")
+            and "__leaf-pod-b2-1-" in link["name"]
+            and not link["name"].startswith("Uplink ")
+            for link in report["server_link_metadata"]
+        )
         assert report["leaf_port_channel_count"] == 2
         assert report["leaf_port_channel_member_count"] == 2
         assert report["leaf_port_channel_ids"] == [1117, 1117]
@@ -811,12 +821,27 @@ async def _device_ip_report(client: InfrahubClient, branch: str) -> dict:
 async def _cabling_and_ip_report(client: InfrahubClient, branch: str) -> dict:
     ip_report = await _device_ip_report(client, branch)
     links = await client.all(kind="NetworkLink", branch=branch)
+    uplinks = [link for link in links if getattr(getattr(link, "role", None), "value", None) == "uplink"]
+    invalid_uplinks = sorted(
+        (
+            {
+                "name": link.name.value,
+                "medium": getattr(getattr(link, "medium", None), "value", None),
+            }
+            for link in uplinks
+            if not link.name.value.startswith("Uplink ")
+            or getattr(getattr(link, "medium", None), "value", None) is not None
+        ),
+        key=itemgetter("name"),
+    )
     l3_device_count = 0
     for role in ("super_spine", "spine", "leaf", "border_leaf"):
         l3_device_count += len(await client.filters(kind="DcimDevice", role__value=role, branch=branch))
     return {
         **ip_report,
         "network_link_count": len(links),
+        "uplink_count": len(uplinks),
+        "invalid_uplinks": invalid_uplinks,
         "l3_device_count": l3_device_count,
     }
 
@@ -966,6 +991,8 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
         edges {
           node {
             name { value }
+            medium { value }
+            role { value }
           }
         }
       }
@@ -994,6 +1021,7 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
     if not server_edges:
         return {
             "server_link_count": 0,
+            "server_link_metadata": [],
             "server_physical_count": 0,
             "server_connected_count": 0,
             "server_physical_lags": {},
@@ -1014,10 +1042,19 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
             server_bonds.append(node)
 
     server_links = [
-        edge["node"]["name"]["value"]
-        for edge in resp["NetworkLink"]["edges"]
-        if server_name in edge["node"]["name"]["value"]
+        edge["node"] for edge in resp["NetworkLink"]["edges"] if server_name in edge["node"]["name"]["value"]
     ]
+    server_link_metadata = sorted(
+        (
+            {
+                "name": link["name"]["value"],
+                "medium": (link.get("medium") or {}).get("value"),
+                "role": (link.get("role") or {}).get("value"),
+            }
+            for link in server_links
+        ),
+        key=itemgetter("name"),
+    )
     server_physical_lags = {}
     server_connected_count = 0
     for iface in physical_interfaces:
@@ -1041,6 +1078,7 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
 
     return {
         "server_link_count": len(server_links),
+        "server_link_metadata": server_link_metadata,
         "server_physical_count": len(physical_interfaces),
         "server_connected_count": server_connected_count,
         "server_physical_lags": server_physical_lags,
