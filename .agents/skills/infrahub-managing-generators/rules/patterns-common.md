@@ -8,6 +8,27 @@ tags: patterns, data-cleaning, batch-creation, local-store
 
 Impact: MEDIUM
 
+A few patterns recur across nearly every generator:
+unwrapping the nested GraphQL response, creating
+objects in batches from design quantities, and
+chaining created objects through subsequent calls.
+
+### Why it matters
+
+GraphQL responses are deeply wrapped
+(`edges → node → value`); without a recursive
+unwrap, generator code becomes a forest of
+`["edges"][0]["node"]["value"]` chains that break
+the moment the schema gains an extra layer. Batch
+creation loops have to call `save(allow_upsert=True)`
+inside the loop or the second run fails on the first
+existing object and aborts before it touches the
+rest. Passing freshly-created SDK objects directly
+into the `data` dict of the next `create()` call
+avoids a second round trip to look up the ID — and
+keeps both objects in the same tracking group so
+they get cleaned up together if the design changes.
+
 ### Data Cleaning Helper
 
 ```python
@@ -83,6 +104,30 @@ async def generate(self, data: dict) -> None:
     )
     await device.save(allow_upsert=True)
 ```
+
+### Sharing a Module With Checks and Other Artifact Types
+
+The helper module above lives in this artifact's own
+directory, and a relative import reaches it only from
+here. If the same logic is needed by a check or another
+artifact type, a relative import **cannot** span
+directories: the module has to be installed into the
+worker image as a package.
+
+The full pattern is documented once in
+[../../infrahub-managing-checks/rules/patterns-shared-module.md](../../infrahub-managing-checks/rules/patterns-shared-module.md).
+Read it there rather than re-deriving it. It covers the
+three `uv` flags whose absence each fails differently,
+**and the `watch:` declaration this section needs**: an
+installed package is invisible to Infrahub's dependency
+detection, so without `watch:` the artifact does not
+regenerate when the shared logic changes. `watch:` is
+accepted on `generator_definitions`, `python_transforms`
+and `jinja2_transforms` — but **not** on
+`check_definitions` — and requires SDK 1.23.0 or later.
+
+Reach for it on the **second** consumer of the logic,
+not in anticipation of one.
 
 Reference: [examples.md](../examples.md) for complete
 generator examples.

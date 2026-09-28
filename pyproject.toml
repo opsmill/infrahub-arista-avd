@@ -87,6 +87,7 @@ ignore_errors = true
 line-length = 120
 
 exclude = [
+    ".agents", # vendored agent skills; authored and linted upstream
     ".git",
     ".tox",
     ".venv",
