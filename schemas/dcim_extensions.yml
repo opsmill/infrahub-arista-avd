@@ -20,6 +20,8 @@ nodes:
         optional: true
         order_weight: 1000
         choices:
+          - name: uplink
+            label: Uplink
           - name: dci
             label: DCI
       - name: include_in_underlay_protocol
@@ -192,7 +194,7 @@ extensions:
         - name: medium
           label: Medium
           kind: Dropdown
-          optional: false
+          optional: true
           choices:
             - name: mmf
               label: Multi-Mode Fibre

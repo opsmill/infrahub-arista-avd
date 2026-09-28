@@ -260,7 +260,12 @@ class PodGenerator(InfrahubGenerator, GeneratorMixin):
             dst_interface_map=super_spine_interface_map,
         )
 
-        await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)
+        await connect_interface_maps(
+            client=self.client,
+            logger=self.logger,
+            cabling_plan=created_cabling_plan,
+            link_role="uplink",
+        )
 
     async def update_checksum(self) -> None:
         racks = await self.client.filters(kind=LocationRack, pod__ids=[self.pod_id])

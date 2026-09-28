@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+import re
+from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .protocols import DcimDevice, DcimInterface, InterfacePhysical
+from .protocols import DcimDevice, DcimInterface, InterfacePhysical, NetworkLink
 
 if TYPE_CHECKING:
     import logging
 
     from infrahub_sdk import InfrahubClient
+
+
+@dataclass(frozen=True)
+class _LinkSpec:
+    src_interface: DcimInterface
+    dst_interface: DcimInterface
+    name: str
 
 
 def build_pod_cabling_plan(
@@ -105,28 +115,181 @@ def build_server_cabling_plan(
 
 
 async def connect_interface_maps(
-    client: InfrahubClient, logger: logging.Logger, cabling_plan: list[tuple[DcimInterface, DcimInterface]]
+    client: InfrahubClient,
+    logger: logging.Logger,
+    cabling_plan: list[tuple[DcimInterface, DcimInterface]],
+    *,
+    link_role: str | None = None,
 ) -> None:
-    for src_interface, dst_interface in cabling_plan:
-        name = f"{src_interface.device.display_label}-{src_interface.name.value}__{dst_interface.device.display_label}-{dst_interface.name.value}"
-        network_link = await client.create(kind="NetworkLink", name=name, medium="copper")
+    """Create or reconcile links for an interface cabling plan.
+
+    The default path preserves the existing server-link contract: interface-based
+    names and no link role. Inter-switch callers opt into ``link_role="uplink"``.
+    Generators leave the link medium unset for users to define. Uplinks use
+    device-pair names and only reconcile links already generated with the current
+    naming scheme.
+    """
+    for link_spec in _build_link_specs(cabling_plan, link_role=link_role):
+        if link_role == "uplink":
+            await _connect_uplink(client, logger, link_spec)
+            continue
+
+        network_link = await client.create(kind="NetworkLink", name=link_spec.name)
         await network_link.save(allow_upsert=True)
 
-        src_populated = await _connect_interface_if_missing(client, logger, src_interface, network_link)
-        dst_populated = await _connect_interface_if_missing(client, logger, dst_interface, network_link)
+        src_populated = await _connect_interface_if_missing(client, logger, link_spec.src_interface, network_link)
+        dst_populated = await _connect_interface_if_missing(client, logger, link_spec.dst_interface, network_link)
 
         if src_populated or dst_populated:
-            logger.info("Populated missing generated connector(s) for %s", name)
+            logger.info("Populated missing generated connector(s) for %s", link_spec.name)
         else:
-            logger.info("Preserved existing connector state for %s", name)
+            logger.info("Preserved existing connector state for %s", link_spec.name)
+
+
+def _build_link_specs(
+    cabling_plan: list[tuple[DcimInterface, DcimInterface]], *, link_role: str | None
+) -> list[_LinkSpec]:
+    indexed_plan = list(enumerate(cabling_plan))
+    names_by_index: dict[int, str] = {}
+
+    if link_role == "uplink":
+        links_by_device_pair: dict[tuple[str, str], list[tuple[int, DcimInterface, DcimInterface]]] = defaultdict(list)
+        for index, (src_interface, dst_interface) in indexed_plan:
+            pair = (_device_name(src_interface), _device_name(dst_interface))
+            links_by_device_pair[pair].append((index, src_interface, dst_interface))
+
+        for (lower_device, upper_device), links in links_by_device_pair.items():
+            base_name = f"Uplink {lower_device}__{upper_device}"
+            sorted_links = sorted(
+                links,
+                key=lambda item: (
+                    _natural_sort_key(item[1].name.value),
+                    _natural_sort_key(item[2].name.value),
+                    item[1].id,
+                    item[2].id,
+                ),
+            )
+            for sequence, (index, _src_interface, _dst_interface) in enumerate(sorted_links, start=1):
+                name = f"{base_name} {sequence}" if len(sorted_links) > 1 else base_name
+                names_by_index[index] = name
+
+    specs: list[_LinkSpec] = []
+    for index, (src_interface, dst_interface) in indexed_plan:
+        name = names_by_index.get(index, _interface_link_name(src_interface, dst_interface))
+        specs.append(
+            _LinkSpec(
+                src_interface=src_interface,
+                dst_interface=dst_interface,
+                name=name,
+            )
+        )
+    return specs
+
+
+def _device_name(interface: DcimInterface) -> str:
+    device = getattr(interface.device, "peer", None)
+    device_name = getattr(getattr(device, "name", None), "value", None)
+    if isinstance(device_name, str):
+        return device_name
+
+    display_label = interface.device.display_label
+    value = getattr(display_label, "value", display_label)
+    return str(value)
+
+
+def _interface_link_name(src_interface: DcimInterface, dst_interface: DcimInterface) -> str:
+    return (
+        f"{_device_name(src_interface)}-{src_interface.name.value}"
+        f"__{_device_name(dst_interface)}-{dst_interface.name.value}"
+    )
+
+
+def _natural_sort_key(value: str) -> tuple[tuple[int, str | int], ...]:
+    return tuple((1, int(part)) if part.isdecimal() else (0, part.casefold()) for part in re.split(r"(\d+)", value))
+
+
+async def _connect_uplink(client: InfrahubClient, logger: logging.Logger, link_spec: _LinkSpec) -> None:
+    src_interface = await _get_physical_interface(client, link_spec.src_interface)
+    dst_interface = await _get_physical_interface(client, link_spec.dst_interface)
+    src_connector_id = _relationship_node_id(getattr(src_interface, "connector", None))
+    dst_connector_id = _relationship_node_id(getattr(dst_interface, "connector", None))
+    connector_ids = {connector_id for connector_id in (src_connector_id, dst_connector_id) if connector_id}
+
+    network_link: object | None = None
+    if len(connector_ids) > 1:
+        logger.warning(
+            "Skipped uplink reconciliation for %s: endpoint connectors conflict (%s)",
+            link_spec.name,
+            ", ".join(sorted(connector_ids)),
+        )
+        return
+
+    if connector_ids:
+        connector_id = next(iter(connector_ids))
+        attached_link = await client.get(NetworkLink, id=connector_id)
+        if _node_attribute_value(attached_link, "name") != link_spec.name:
+            logger.warning(
+                "Preserved existing connector %s for intended uplink %s",
+                connector_id,
+                link_spec.name,
+            )
+            return
+
+        network_link = attached_link
+        await _ensure_generated_uplink_role(network_link)
+        logger.info("Reconciled generated uplink %s", link_spec.name)
+
+    if network_link is None:
+        network_link = await client.create(
+            kind="NetworkLink",
+            name=link_spec.name,
+            role="uplink",
+        )
+        await network_link.save(allow_upsert=True)
+
+    src_populated = await _connect_fetched_interface_if_missing(logger, src_interface, network_link)
+    dst_populated = await _connect_fetched_interface_if_missing(logger, dst_interface, network_link)
+
+    if src_populated or dst_populated:
+        logger.info("Populated missing generated connector(s) for %s", link_spec.name)
+    else:
+        logger.info("Preserved existing connector state for %s", link_spec.name)
+
+
+async def _ensure_generated_uplink_role(network_link: object) -> None:
+    _set_node_attribute_value(network_link, "role", "uplink")
+    await network_link.save(allow_upsert=True)  # type: ignore[attr-defined]
+
+
+def _node_attribute_value(node: object, attribute_name: str) -> str | None:
+    attribute = getattr(node, attribute_name, None)
+    value = getattr(attribute, "value", attribute)
+    return value if isinstance(value, str) else None
+
+
+def _set_node_attribute_value(node: object, attribute_name: str, value: str) -> None:
+    attribute = getattr(node, attribute_name, None)
+    if attribute is not None and hasattr(attribute, "value"):
+        attribute.value = value
+    else:
+        setattr(node, attribute_name, value)
+
+
+async def _get_physical_interface(client: InfrahubClient, interface: DcimInterface) -> InterfacePhysical:
+    # InterfacePhysical is the concrete type exposing DcimEndpoint.connector.
+    return await client.get(InterfacePhysical, id=interface.id, include=["connector"])  # type: ignore[type-abstract, no-any-return]
 
 
 async def _connect_interface_if_missing(
     client: InfrahubClient, logger: logging.Logger, interface: DcimInterface, network_link: object
 ) -> bool:
-    # Set connector using InterfacePhysical, the concrete type that exposes the
-    # connector relationship from DcimEndpoint.
-    iface = await client.get(InterfacePhysical, id=interface.id, include=["connector"])  # type: ignore[type-abstract]
+    iface = await _get_physical_interface(client, interface)
+    return await _connect_fetched_interface_if_missing(logger, iface, network_link)
+
+
+async def _connect_fetched_interface_if_missing(
+    logger: logging.Logger, iface: InterfacePhysical, network_link: object
+) -> bool:
     connector_id = _relationship_node_id(getattr(iface, "connector", None))
     network_link_id = getattr(network_link, "id", None)
 
