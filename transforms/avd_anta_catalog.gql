@@ -1,4 +1,22 @@
 query AvdAntaCatalogQuery($name: String!) {
+  # Keep the fabric-level ANTA settings as a direct query root. Infrahub's
+  # proposed-change impact analyzer does not attribute fields selected only
+  # inside the pod.parent union fragment to NetworkFabric. Without this root,
+  # changing anta_enabled or avd_catalogs_filters selects the artifact
+  # definition but does not re-render any existing device catalog.
+  anta_fabrics: NetworkFabric {
+    edges {
+      node {
+        id
+        anta_enabled {
+          value
+        }
+        avd_catalogs_filters {
+          value
+        }
+      }
+    }
+  }
   target: DcimDevice(name__value: $name) {
     edges {
       node {
@@ -18,6 +36,9 @@ query AvdAntaCatalogQuery($name: String!) {
                     value
                   }
                   anta_enabled {
+                    value
+                  }
+                  avd_catalogs_filters {
                     value
                   }
                 }

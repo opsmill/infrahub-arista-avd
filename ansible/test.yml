@@ -1,0 +1,173 @@
+---
+- name: Select one fabric from the Infrahub main-branch inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    default_anta_workspace: "/opt/semaphore/anta"
+
+  tasks:
+    - name: Require a fabric name
+      ansible.builtin.assert:
+        that:
+          - fabric_name is defined
+          - fabric_name | string | trim | length > 0
+        fail_msg: "Set fabric_name to the exact NetworkFabric name to validate."
+
+    - name: Resolve the ANTA workspace and run identifiers
+      ansible.builtin.set_fact:
+        anta_selected_fabric: "{{ fabric_name | string | trim }}"
+        anta_workspace_root: >-
+          {{ anta_workspace if anta_workspace is defined else
+             lookup('ansible.builtin.env', 'ANTA_WORKSPACE') | default(default_anta_workspace, true) }}
+        anta_run_id: "{{ now(utc=true, fmt='%Y%m%dT%H%M%S%fZ') }}"
+
+    - name: Require an absolute ANTA workspace path
+      ansible.builtin.assert:
+        that:
+          - anta_workspace_root | string | length > 1
+          - anta_workspace_root | string is match('^/')
+        fail_msg: "anta_workspace or ANTA_WORKSPACE must be an absolute writable path."
+
+    - name: Add devices from the requested fabric to the ANTA target group
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: infrahub_anta_targets
+        anta_tags:
+          - "{{ item }}"
+      loop: "{{ groups['all'] | default([]) }}"
+      when: hostvars[item].infrahub_fabric_name | default('') == anta_selected_fabric
+      changed_when: false
+
+    - name: Require matching devices
+      ansible.builtin.assert:
+        that:
+          - groups['infrahub_anta_targets'] | default([]) | length > 0
+        fail_msg: >-
+          No DcimDevice inventory hosts were found for fabric {{ anta_selected_fabric }} on Infrahub main.
+
+    - name: Require inventory identifiers and management addresses
+      ansible.builtin.assert:
+        that:
+          - hostvars[item].id is defined
+          - hostvars[item].id | string | length > 0
+          - hostvars[item].ansible_host is defined
+          - hostvars[item].ansible_host | string | length > 0
+        fail_msg: >-
+          Device {{ item }} in fabric {{ anta_selected_fabric }} is missing its Infrahub ID or management address.
+      loop: "{{ groups['infrahub_anta_targets'] }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Record the isolated ANTA run directory
+      ansible.builtin.set_fact:
+        anta_run_dir: >-
+          {{ anta_workspace_root }}/{{ anta_selected_fabric | regex_replace('[^A-Za-z0-9_.-]', '_') }}-{{ anta_run_id }}
+
+    - name: Report selected ANTA targets
+      ansible.builtin.debug:
+        msg:
+          fabric: "{{ anta_selected_fabric }}"
+          infrahub_branch: main
+          devices: "{{ groups['infrahub_anta_targets'] }}"
+          run_directory: "{{ anta_run_dir }}"
+
+- name: Fetch merged ANTA catalogs and validate the selected fabric
+  hosts: infrahub_anta_targets
+  connection: local
+  gather_facts: false
+
+  vars:
+    anta_artifact_name: "AVD ANTA Catalog"
+    anta_artifact_timeout: "{{ artifact_timeout | default(60) }}"
+    anta_dir: "{{ hostvars['localhost']['anta_run_dir'] }}"
+    user_catalogs_dir: "{{ anta_dir }}/user_catalogs"
+    anta_reports_dir: "{{ anta_dir }}/reports"
+    anta_report_json_path: "{{ anta_reports_dir }}/anta_report.json"
+    anta_report_md_path: "{{ anta_reports_dir }}/anta_report.md"
+    anta_report_csv_path: "{{ anta_reports_dir }}/anta_report.csv"
+
+  pre_tasks:
+    - name: Require ANTA credentials from Semaphore or the environment
+      ansible.builtin.assert:
+        that:
+          - >-
+            (anta_user is defined and anta_user | string | length > 0) or
+            (lookup('ansible.builtin.env', 'ANTA_USER', default=none) is not none and
+             lookup('ansible.builtin.env', 'ANTA_USER') | length > 0)
+          - >-
+            anta_password is defined or
+            lookup('ansible.builtin.env', 'ANTA_PASSWORD', default=none) is not none
+        fail_msg: >-
+          Set anta_user and anta_password in the Semaphore environment, or provide ANTA_USER and
+          ANTA_PASSWORD to the Semaphore container. An explicitly empty password is supported.
+      delegate_to: localhost
+      run_once: true
+      no_log: true
+
+    - name: Resolve ANTA credentials for each target
+      ansible.builtin.set_fact:
+        anta_user: >-
+          {{ anta_user if anta_user is defined else lookup('ansible.builtin.env', 'ANTA_USER') }}
+        anta_password: >-
+          {{ anta_password if anta_password is defined else lookup('ansible.builtin.env', 'ANTA_PASSWORD') }}
+      no_log: true
+
+    - name: Create isolated ANTA input and report directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0775"
+      loop:
+        - "{{ user_catalogs_dir }}"
+        - "{{ anta_reports_dir }}"
+      delegate_to: localhost
+      run_once: true
+      check_mode: false
+
+    - name: Fetch the merged ANTA catalog from Infrahub main
+      opsmill.infrahub.artifact_fetch:
+        artifact_name: "{{ anta_artifact_name }}"
+        target_id: "{{ id }}"
+        branch: main
+        timeout: "{{ anta_artifact_timeout }}"
+      register: anta_catalog_artifact
+
+    - name: Require a populated ANTA catalog
+      ansible.builtin.assert:
+        that:
+          - anta_catalog_artifact.text is defined
+          - (anta_catalog_artifact.text | regex_search('(?m)^anta\.tests\.[^:]+:')) is not none
+        fail_msg: >-
+          Artifact {{ anta_artifact_name }} for {{ inventory_hostname }} on Infrahub main does not contain ANTA tests.
+          Confirm that ANTA is enabled, the structured configuration exists, and the merged artifact is current.
+
+    - name: Save the device catalog for anta_runner
+      ansible.builtin.copy:
+        content: "{{ anta_catalog_artifact.text }}"
+        dest: "{{ user_catalogs_dir }}/{{ inventory_hostname | regex_replace('[^A-Za-z0-9_.-]', '_') }}.yml"
+        mode: "0664"
+      delegate_to: localhost
+      check_mode: false
+
+  tasks:
+    - name: Run ANTA from the Infrahub catalog artifacts
+      block:
+        - name: Execute arista.avd.anta_runner
+          ansible.builtin.import_role:
+            name: arista.avd.anta_runner
+          vars:
+            avd_catalogs_enabled: false
+            user_catalogs_enabled: true
+            anta_runner_tags: "{{ groups['infrahub_anta_targets'] }}"
+      always:
+        - name: Report ANTA result paths
+          ansible.builtin.debug:
+            msg:
+              summary: "{{ anta.anta_tests_summary | default('ANTA did not return a summary') }}"
+              json_report: "{{ anta_report_json_path }}"
+              markdown_report: "{{ anta_report_md_path }}"
+              csv_report: "{{ anta_report_csv_path }}"
+          delegate_to: localhost
+          run_once: true

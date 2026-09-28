@@ -619,6 +619,12 @@ query GenerateAvdDeviceInputsQuery($name: String!) {
                   bgp_mlag_password {
                     value
                   }
+                  anta_enabled {
+                    value
+                  }
+                  avd_catalogs_filters {
+                    value
+                  }
                   avd_custom_hostvars {
                     value
                   }

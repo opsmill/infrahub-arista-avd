@@ -79,7 +79,7 @@ After `invoke load` completes and you run the generator chain on a fabric:
   - EOS device configuration (via PyAVD, running inside Infrahub workers)
   - Per-device and fabric-level Markdown documentation
   - Cabling plan CSV
-  - ANTA test catalogs — generation ships; test execution is on the roadmap
+  - ANTA test catalogs and on-demand post-deployment validation through Semaphore
   - Computed interface descriptions
 - **Seed data** — manufacturers, device types, addressing and number pools (loopback, interconnect, management, ASN, node ID), device profiles and templates, two example fabrics with pods and racks, and seed VLANs.
 - **Service portal** — Streamlit application with guided day-2 workflows:
@@ -87,7 +87,7 @@ After `invoke load` completes and you run the generator chain on a fabric:
   - Provision server into a rack
   - Create EVPN tenant
   - Fabric Design visualization (topology, cabling, settings, EVPN)
-- **Stack** — Docker Compose extending Infrahub 1.10.10 with PyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment), and Neo4j.
+- **Stack** — Docker Compose extending Infrahub 1.10.10 with PyAVD. Includes Infrahub UI, service portal, Semaphore (bundled Ansible runner for deployment and ANTA validation), and Neo4j.
 
 | File | What it does |
 |------|-------------|

@@ -8,6 +8,7 @@ from solution_arista_avd.avd import (
     ROLE_TO_AVD_TYPE,
     SPINE_ROLE_BY_UNDERLAY,
     SPINE_UPLINK_UNDERLAYS,
+    build_avd_catalogs_filters,
     get_avd_type,
 )
 from tests.unit.test_avd_example_fabrics_schema_contract import (
@@ -41,6 +42,31 @@ class TestGetAvdType:
         """Test that invalid role raises ValueError."""
         with pytest.raises(ValueError, match="Unknown device role"):
             get_avd_type("invalid_role")
+
+
+class TestBuildAvdCatalogsFilters:
+    """Tests for typed fabric-level ANTA catalog exclusions."""
+
+    def test_disabled_fabric_ignores_retained_values(self) -> None:
+        assert build_avd_catalogs_filters(False, ["VerifyLoggingErrors"]) == []
+
+    def test_enabled_fabric_normalizes_and_deduplicates_test_names(self) -> None:
+        assert build_avd_catalogs_filters(
+            True,
+            [" VerifyInterfaceDiscards ", "VerifyLoggingErrors", "VerifyInterfaceDiscards"],
+        ) == [
+            {"skip_tests": ["VerifyInterfaceDiscards", "VerifyLoggingErrors"]},
+        ]
+
+    @pytest.mark.parametrize("value", ["VerifyLoggingErrors", {"test": "VerifyLoggingErrors"}, 1])
+    def test_enabled_fabric_rejects_non_list_values(self, value: object) -> None:
+        with pytest.raises(TypeError, match="must be a list"):
+            build_avd_catalogs_filters(True, value)
+
+    @pytest.mark.parametrize("value", [[""], ["  "], [None], [1]])
+    def test_enabled_fabric_rejects_empty_or_non_textual_items(self, value: object) -> None:
+        with pytest.raises(ValueError, match="only non-empty ANTA test names"):
+            build_avd_catalogs_filters(True, value)
 
 
 class TestRoleMapping:

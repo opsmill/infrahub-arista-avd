@@ -73,9 +73,14 @@ services:
       SEMAPHORE_ADMIN_PASSWORD: ${SEMAPHORE_ADMIN_PASSWORD:?Run uv run invoke init-secrets}
       SEMAPHORE_ADMIN_NAME: Admin
       SEMAPHORE_ADMIN_EMAIL: admin@localhost
-      SEMAPHORE_FORWARDED_ENV_VARS: '["INFRAHUB_ADDRESS","INFRAHUB_API_TOKEN"]'
+      SEMAPHORE_FORWARDED_ENV_VARS: '["INFRAHUB_ADDRESS","INFRAHUB_API_TOKEN","ANTA_USER","ANTA_PASSWORD"]'
       INFRAHUB_ADDRESS: http://infrahub-server:8000
       INFRAHUB_API_TOKEN: ${INFRAHUB_API_TOKEN:?Run uv run invoke init-secrets}
+      # Null values inherit an explicitly exported value and remain absent when
+      # unset, so the playbook can distinguish missing credentials from an
+      # intentionally empty password used by an EOS nopassword account.
+      ANTA_USER:
+      ANTA_PASSWORD:
     ports:
       - "3000:3000"
     volumes:
@@ -93,6 +98,8 @@ services:
       # staging write failing with EACCES. `invoke init-semaphore` creates it
       # with the right mode. Gitignored via lab/.gitignore's `clab-*`.
       - ./lab/clab-staging:/opt/semaphore/clab-staging
+      # Persistent, run-specific ANTA catalogs and reports.
+      - ./anta:/opt/semaphore/anta
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/ping"]
       interval: 10s
