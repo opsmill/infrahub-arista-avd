@@ -78,6 +78,9 @@ DCI_POOL_PREFIX = "10.253.253.0/24"
 DCI_POOL_NAME = "E2E-DCI-Pool"
 DCI_LINK_NAME = "e2e-dci-link"
 DCI_INTERFACE_NAME = "Ethernet999"
+FILTERED_ANTA_FABRIC = "Fabric-L3LS-Multi-Domain"
+FILTERED_ANTA_TESTS = ("VerifyInterfaceDiscards", "VerifyLoggingErrors")
+PROPOSED_CHANGE_ANTA_FABRIC = "Fabric-L3LS-MultiPod-A"
 
 
 @pytest.mark.e2e
@@ -192,6 +195,8 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             if hasattr(fabric, "anta_enabled"):
                 fabric.anta_enabled.value = True
                 await fabric.save()
+        filtered_fabric = next(fabric for fabric in fabrics if fabric.name.value == FILTERED_ANTA_FABRIC)
+        assert filtered_fabric.avd_catalogs_filters.value == list(FILTERED_ANTA_TESTS)
 
     # --- Component 7: fabric generator (the only explicit kick-off) --------
     @pytest.mark.asyncio(loop_scope="class")
@@ -365,6 +370,8 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             flush=True,
         )
         assert report["network_link_count"] > 0, "no NetworkLink cabling created"
+        assert report["uplink_count"] > 0, "no role=uplink inter-switch links created"
+        assert not report["invalid_uplinks"], f"invalid generated uplink metadata: {report['invalid_uplinks']}"
         assert report["with_loopback"] >= report["l3_device_count"] > 0, (
             f"expected every L3 device to have a loopback; {report['with_loopback']} have one"
         )
@@ -425,6 +432,14 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         assert report["server_physical_lags"] == {"Ethernet1": "Bond1", "Ethernet2": "Bond1"}
         assert report["server_bond_members"] == ["Ethernet1", "Ethernet2"]
         assert report["server_link_count"] == 2
+        assert all(link["medium"] is None for link in report["server_link_metadata"])
+        assert all(link["role"] is None for link in report["server_link_metadata"])
+        assert all(
+            link["name"].startswith(f"{SERVER_CABLING_SERVER}-Ethernet")
+            and "__leaf-pod-b2-1-" in link["name"]
+            and not link["name"].startswith("Uplink ")
+            for link in report["server_link_metadata"]
+        )
         assert report["leaf_port_channel_count"] == 2
         assert report["leaf_port_channel_member_count"] == 2
         assert report["leaf_port_channel_ids"] == [1117, 1117]
@@ -442,6 +457,27 @@ class TestE2EPipeline(TestInfrahubDockerClient):
             describe="every device has an AVD structured config",
         )
         print(f"structured config present on all {report['total']} devices", flush=True)
+
+    # --- Component 11a: hostvar generator idempotence ---------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_hostvar_generator_two_runs_are_idempotent(self, client: InfrahubClient) -> None:
+        """Two explicit hostvar runs produce identical normalized files and checksums."""
+        device_ids = await _device_ids_for_fabric(client, PIPELINE_BRANCH, FILTERED_ANTA_FABRIC)
+        assert device_ids, "no devices found for hostvar idempotence validation"
+
+        snapshots = []
+        for pass_number in (1, 2):
+            await _run_generator_for_nodes(client, PIPELINE_BRANCH, GENERATOR_AVD_HOSTVAR, device_ids)
+            report = await wait_until(
+                fetch=lambda: _hostvar_snapshot(client, PIPELINE_BRANCH, device_ids),
+                ready=itemgetter("ready"),
+                timeout=GENERATOR_TIMEOUT,
+                interval=POLL_INTERVAL,
+                describe=f"hostvar generator pass {pass_number} settled",
+            )
+            snapshots.append(report["state"])
+
+        assert snapshots[1] == snapshots[0], "hostvar generator rerun changed normalized hostvar files"
 
     # --- Component 11a: backfilled IP uniqueness --------------------------
     @pytest.mark.asyncio(loop_scope="class")
@@ -589,6 +625,81 @@ class TestE2EPipeline(TestInfrahubDockerClient):
         # Interface names must be ContainerLab short form, never raw EOS names.
         untranslated = [ep for link in links for ep in link["endpoints"] if "Ethernet" in ep]
         assert not untranslated, f"untranslated EOS interface names in links: {untranslated[:5]}"
+
+    # --- Component 14: proposed-change ANTA refresh -----------------------
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_proposed_change_refreshes_anta_catalogs_for_fabric_flag(self, client: InfrahubClient) -> None:
+        """Enabling ANTA on a generated fabric refreshes its device catalogs in the proposed change."""
+        fabric = await client.get(
+            kind="NetworkFabric",
+            name__value=PROPOSED_CHANGE_ANTA_FABRIC,
+            branch=PIPELINE_BRANCH,
+        )
+        device_ids_by_name = await _fabric_device_ids_by_name(
+            client,
+            PIPELINE_BRANCH,
+            PROPOSED_CHANGE_ANTA_FABRIC,
+        )
+        assert device_ids_by_name, f"{PROPOSED_CHANGE_ANTA_FABRIC} has no generated devices"
+
+        definition = await client.get(
+            kind="CoreArtifactDefinition",
+            name__value="avd_anta_catalog",
+            branch=PIPELINE_BRANCH,
+        )
+
+        # Establish disabled-marker catalogs before the proposed change. This
+        # makes the subsequent marker -> populated transition prove that the
+        # proposed-change artifact validator actually re-rendered the devices.
+        fabric.anta_enabled.value = False
+        await fabric.save()
+        response = await client._post(
+            f"{client.address}/api/artifact/generate/{definition.id}?branch={PIPELINE_BRANCH}",
+            payload={"nodes": list(device_ids_by_name.values())},
+        )
+        response.raise_for_status()
+        await wait_until(
+            fetch=lambda: _fetch_ready_artifact_contents_by_target(
+                client,
+                PIPELINE_BRANCH,
+                ARTIFACT_AVD_ANTA_CATALOG,
+            ),
+            ready=lambda contents: all(
+                ANTA_DISABLED_MARKER in contents.get(device_name, "") for device_name in device_ids_by_name
+            ),
+            timeout=ARTIFACT_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe=f"disabled ANTA marker catalogs for {PROPOSED_CHANGE_ANTA_FABRIC}",
+        )
+
+        fabric.anta_enabled.value = True
+        await fabric.save()
+        proposed_change = await client.create(
+            kind="CoreProposedChange",
+            data={
+                "source_branch": PIPELINE_BRANCH,
+                "destination_branch": "main",
+                "name": "e2e-enable-anta",
+            },
+        )
+        await proposed_change.save()
+
+        refreshed = await wait_until(
+            fetch=lambda: _fetch_ready_artifact_contents_by_target(
+                client,
+                PIPELINE_BRANCH,
+                ARTIFACT_AVD_ANTA_CATALOG,
+            ),
+            ready=lambda contents: all(
+                "anta.tests." in contents.get(device_name, "")
+                and ANTA_DISABLED_MARKER not in contents.get(device_name, "")
+                for device_name in device_ids_by_name
+            ),
+            timeout=ARTIFACT_TIMEOUT,
+            interval=POLL_INTERVAL,
+            describe=f"proposed-change ANTA catalogs for {PROPOSED_CHANGE_ANTA_FABRIC}",
+        )
+        assert set(device_ids_by_name) <= set(refreshed)
 
     # --- Fabric-scoped deployment validation (US4 / `--fabric` selector) ----
     @pytest.mark.asyncio(loop_scope="class")
@@ -811,12 +922,27 @@ async def _device_ip_report(client: InfrahubClient, branch: str) -> dict:
 async def _cabling_and_ip_report(client: InfrahubClient, branch: str) -> dict:
     ip_report = await _device_ip_report(client, branch)
     links = await client.all(kind="NetworkLink", branch=branch)
+    uplinks = [link for link in links if getattr(getattr(link, "role", None), "value", None) == "uplink"]
+    invalid_uplinks = sorted(
+        (
+            {
+                "name": link.name.value,
+                "medium": getattr(getattr(link, "medium", None), "value", None),
+            }
+            for link in uplinks
+            if not link.name.value.startswith("Uplink ")
+            or getattr(getattr(link, "medium", None), "value", None) is not None
+        ),
+        key=itemgetter("name"),
+    )
     l3_device_count = 0
     for role in ("super_spine", "spine", "leaf", "border_leaf"):
         l3_device_count += len(await client.filters(kind="DcimDevice", role__value=role, branch=branch))
     return {
         **ip_report,
         "network_link_count": len(links),
+        "uplink_count": len(uplinks),
+        "invalid_uplinks": invalid_uplinks,
         "l3_device_count": l3_device_count,
     }
 
@@ -966,6 +1092,8 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
         edges {
           node {
             name { value }
+            medium { value }
+            role { value }
           }
         }
       }
@@ -994,6 +1122,7 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
     if not server_edges:
         return {
             "server_link_count": 0,
+            "server_link_metadata": [],
             "server_physical_count": 0,
             "server_connected_count": 0,
             "server_physical_lags": {},
@@ -1014,10 +1143,19 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
             server_bonds.append(node)
 
     server_links = [
-        edge["node"]["name"]["value"]
-        for edge in resp["NetworkLink"]["edges"]
-        if server_name in edge["node"]["name"]["value"]
+        edge["node"] for edge in resp["NetworkLink"]["edges"] if server_name in edge["node"]["name"]["value"]
     ]
+    server_link_metadata = sorted(
+        (
+            {
+                "name": link["name"]["value"],
+                "medium": (link.get("medium") or {}).get("value"),
+                "role": (link.get("role") or {}).get("value"),
+            }
+            for link in server_links
+        ),
+        key=itemgetter("name"),
+    )
     server_physical_lags = {}
     server_connected_count = 0
     for iface in physical_interfaces:
@@ -1041,6 +1179,7 @@ async def _server_cabling_report(client: InfrahubClient, branch: str, server_nam
 
     return {
         "server_link_count": len(server_links),
+        "server_link_metadata": server_link_metadata,
         "server_physical_count": len(physical_interfaces),
         "server_connected_count": server_connected_count,
         "server_physical_lags": server_physical_lags,
@@ -1083,6 +1222,106 @@ async def _devices_without_structured_config(client: InfrahubClient, branch: str
         if not scf:
             without.append(f"{node['name']['value']} ({node.get('role', {}).get('value', 'unknown')})")
     return {"total": len(edges), "without": without}
+
+
+async def _device_ids_for_fabric(client: InfrahubClient, branch: str, fabric_name: str) -> list[str]:
+    """Return generated device IDs belonging to one named fabric."""
+    query = """
+    query DeviceFabricMembership {
+      DcimDevice {
+        edges {
+          node {
+            id
+            pod { node { parent { node { ... on NetworkFabric { name { value } } } } } }
+          }
+        }
+      }
+    }
+    """
+    response = await client.execute_graphql(query=query, branch_name=branch)
+    device_ids = []
+    for edge in response["DcimDevice"]["edges"]:
+        node = edge["node"]
+        parent = (((node.get("pod") or {}).get("node") or {}).get("parent") or {}).get("node") or {}
+        if (parent.get("name") or {}).get("value") == fabric_name:
+            device_ids.append(node["id"])
+    return sorted(device_ids)
+
+
+async def _hostvar_snapshot(client: InfrahubClient, branch: str, device_ids: list[str]) -> dict:
+    """Return normalized hostvar content once all explicit hostvar runs settle."""
+    query = """
+    query HostvarSnapshot($device_ids: [ID]) {
+      DcimDevice(ids: $device_ids) {
+        edges {
+          node {
+            name { value }
+            avd_artifact {
+              node {
+                hostvar_file {
+                  node {
+                    file_name { value }
+                    checksum { value }
+                    storage_id { value }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      CoreGeneratorInstance {
+        edges {
+          node {
+            status { value }
+            object { node { id } }
+            definition { node { ... on CoreGeneratorDefinition { name { value } } } }
+          }
+        }
+      }
+    }
+    """
+    resp = await client.execute_graphql(
+        query=query,
+        variables={"device_ids": device_ids},
+        branch_name=branch,
+    )
+    hostvar_instances = []
+    for edge in resp["CoreGeneratorInstance"]["edges"]:
+        node = edge["node"]
+        definition = (node.get("definition") or {}).get("node") or {}
+        target_id = ((node.get("object") or {}).get("node") or {}).get("id")
+        if (definition.get("name") or {}).get("value") == GENERATOR_AVD_HOSTVAR and target_id in device_ids:
+            hostvar_instances.append((node.get("status") or {}).get("value") or "")
+
+    files = []
+    for edge in resp["DcimDevice"]["edges"]:
+        node = edge["node"]
+        hostvar_file = (((node.get("avd_artifact") or {}).get("node") or {}).get("hostvar_file") or {}).get(
+            "node"
+        ) or {}
+        storage_id = (hostvar_file.get("storage_id") or {}).get("value")
+        if not storage_id:
+            continue
+        content = json.loads(await client.object_store.get(identifier=storage_id))
+        files.append(
+            {
+                "device": node["name"]["value"],
+                "file_name": (hostvar_file.get("file_name") or {}).get("value") or "",
+                "checksum": (hostvar_file.get("checksum") or {}).get("value") or "",
+                "content": content,
+            }
+        )
+
+    active_statuses = {"pending", "running", "scheduled", "in_progress", "queued"}
+    return {
+        "ready": (
+            len(files) == len(device_ids) > 0
+            and not any(status.lower() in active_statuses for status in hostvar_instances)
+            and not any(status == "Error" for status in hostvar_instances)
+        ),
+        "state": sorted(files, key=itemgetter("device")),
+    }
 
 
 async def _rack_rerun_snapshot(client: InfrahubClient, branch: str) -> dict:
@@ -1519,6 +1758,78 @@ async def _fetch_ready_artifact_contents(client: InfrahubClient, branch: str, ar
         if storage_id:
             contents.append(await client.object_store.get(identifier=storage_id))
     return contents
+
+
+async def _fetch_ready_artifact_contents_by_target(
+    client: InfrahubClient,
+    branch: str,
+    artifact_name: str,
+) -> dict[str, str]:
+    """Return Ready artifact contents keyed by target display label."""
+    query = (
+        "query {\n"
+        f'  CoreArtifact(name__value: "{artifact_name}") {{\n'
+        "    edges { node {\n"
+        "      status { value }\n"
+        "      storage_id { value }\n"
+        "      object { node { display_label } }\n"
+        "    } }\n"
+        "  }\n"
+        "}"
+    )
+    response = await client.execute_graphql(query=query, branch_name=branch)
+    contents: dict[str, str] = {}
+    for edge in response["CoreArtifact"]["edges"]:
+        node = edge["node"]
+        if node.get("status", {}).get("value") != "Ready":
+            continue
+        storage_id = node.get("storage_id", {}).get("value")
+        target = (node.get("object") or {}).get("node") or {}
+        target_name = target.get("display_label")
+        if storage_id and target_name:
+            contents[target_name] = await client.object_store.get(identifier=storage_id)
+    return contents
+
+
+async def _fabric_device_ids_by_name(
+    client: InfrahubClient,
+    branch: str,
+    fabric_name: str,
+) -> dict[str, str]:
+    """Return device IDs keyed by name for one fabric."""
+    query = """
+    query {
+      DcimDevice {
+        edges {
+          node {
+            id
+            name { value }
+            pod {
+              node {
+                parent {
+                  node {
+                    __typename
+                    id
+                    ... on NetworkFabric { name { value } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    response = await client.execute_graphql(query=query, branch_name=branch)
+    devices: dict[str, str] = {}
+    for edge in response["DcimDevice"]["edges"]:
+        node = edge["node"]
+        parent = (((node.get("pod") or {}).get("node") or {}).get("parent") or {}).get("node") or {}
+        if parent.get("__typename") != "NetworkFabric":
+            continue
+        if (parent.get("name") or {}).get("value") == fabric_name:
+            devices[node["name"]["value"]] = node["id"]
+    return devices
 
 
 async def _fetch_ready_artifact_content(

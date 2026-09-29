@@ -1,3 +1,9 @@
+---
+title: structure-infrahub-yml
+impact: CRITICAL
+tags: audit, project-structure, infrahub-yml
+---
+
 # Rule: structure-infrahub-yml
 
 **Severity**: CRITICAL
@@ -5,9 +11,29 @@
 
 ## What It Checks
 
-Validates the `.infrahub.yml` file exists, is valid
-YAML, contains recognized sections, and all
-file/directory references resolve to existing paths.
+Validates the `.infrahub.yml` file exists, parses
+as YAML, uses only recognized top-level keys, and
+every `file_path` / `template_path` / directory
+reference resolves to an existing path on disk.
+
+## Why it matters
+
+`.infrahub.yml` is the entry point Infrahub reads
+to discover everything else in the repository —
+if it fails to parse or references a missing
+file, the sync aborts before any schema, query,
+or check is loaded, and the proposed change
+pipeline reports a generic "repository sync
+failed" with the actual cause buried in server
+logs. Typo-level mistakes (one transposed letter
+in a file path) produce exactly the same opaque
+failure as structural ones. Unknown top-level
+keys are ignored silently in older Infrahub
+versions and rejected loudly in newer ones, so a
+section that "worked yesterday" can break on
+upgrade. Validating this at audit time turns a
+runtime sync failure into a localizable file-and-
+line finding.
 
 ## Checks
 
@@ -18,11 +44,16 @@ file/directory references resolve to existing paths.
    `check_definitions`, `python_transforms`,
    `jinja2_transforms`, `artifact_definitions`,
    `generator_definitions`
-4. Every `file_path`, `template_path`, and directory
+4. `watch` appears only on `python_transforms`,
+   `jinja2_transforms`, and `generator_definitions`;
+   on any other section it fails the whole file's
+   import (see
+   [practices-watch-dependencies.md](./practices-watch-dependencies.md))
+5. Every `file_path`, `template_path`, and directory
    path resolves to an existing file or directory
-5. Required fields per section type are present (see `.infrahub.yml` reference)
-6. No duplicate `name` values within any section
-7. Query names are unique across all `queries` entries
+6. Required fields per section type are present (see `.infrahub.yml` reference)
+7. No duplicate `name` values within any section
+8. Query names are unique across all `queries` entries
 
 ## Common Issues
 

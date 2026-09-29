@@ -3,6 +3,18 @@
 Real-world analysis and correlation patterns using
 the Infrahub MCP server.
 
+## Contents
+
+- [1. Device Naming Convention Compliance](#1-device-naming-convention-compliance)
+- [2. VLAN Assignment Compliance](#2-vlan-assignment-compliance)
+- [3. BGP Peer Correlation](#3-bgp-peer-correlation)
+- [4. IP Address Space Compliance](#4-ip-address-space-compliance)
+- [5. Design-to-Reality Correlation](#5-design-to-reality-correlation)
+- [6. Maintenance Window Impact Analysis](#6-maintenance-window-impact-analysis)
+- [7. Service Impact Analysis for a Planned Change](#7-service-impact-analysis-for-a-planned-change)
+- [8. Multi-Check Analysis Run](#8-multi-check-analysis-run)
+- [Complete MCP Tool Invocation Reference](#complete-mcp-tool-invocation-reference)
+
 ---
 
 ## 1. Device Naming Convention Compliance
@@ -33,8 +45,9 @@ query DeviceNamingCompliance {
 }
 ```
 
-Use `mcp__infrahub__infrahub_query` with the
-above query.
+Use `mcp__infrahub__query_graphql` with the above
+query, or `mcp__infrahub__get_nodes` with
+`kind: "DcimDevice"` for a typed read.
 
 ### Step 2 — Correlate against policy
 
@@ -69,7 +82,8 @@ Non-compliant devices:
     — missing sequence number
 
 Remediation: Rename via Infrahub UI or use
-mcp__infrahub__infrahub_update
+mcp__infrahub__node_upsert (lands on a session
+branch; submit with propose_changes)
 ```
 
 ---
@@ -382,8 +396,8 @@ query TopologyDesigns {
 ### Step 2 — Query realized devices
 
 ```graphql
-query RealizedDevices($topology: String!) {
-  DcimDevice(topology__name__value: $topology) {
+query RealizedDevices {
+  DcimDevice(topology__name__value: "topology-par01-core") {
     edges {
       node {
         id
@@ -463,9 +477,9 @@ query ActiveMaintenanceWindows {
 ### Step 2 — Query services hosted on those devices
 
 ```graphql
-query DeviceServices($device: String!) {
+query DeviceServices {
   ServiceInstance(
-    device__name__value: $device
+    device__name__value: "par01-spine-01"
   ) {
     edges {
       node {
@@ -486,7 +500,10 @@ query DeviceServices($device: String!) {
 }
 ```
 
-Run this query for each device found in Step 1.
+Run this query once per device found in Step 1,
+inlining each device name into the filter —
+`query_graphql` takes no variables, so substitute the
+value into the query string each time.
 
 ### Step 3 — Report
 
@@ -536,8 +553,8 @@ everything that depends on it.
 ### Step 1 — Query the prefix and its consumers
 
 ```graphql
-query PrefixImpact($prefix: String!) {
-  IpamPrefix(prefix__value: $prefix) {
+query PrefixImpact {
+  IpamPrefix(prefix__value: "10.0.1.0/24") {
     edges {
       node {
         id
@@ -619,7 +636,8 @@ Run a full analysis for site PAR01. Check:
 
 Claude will:
 
-1. Run `mcp__infrahub__infrahub_query` once per
+1. Run `mcp__infrahub__get_nodes` (or
+   `mcp__infrahub__query_graphql`) once per
    area (or combine into fewer queries)
 2. Evaluate each check independently
 3. Produce a consolidated summary
@@ -647,8 +665,18 @@ See detailed findings above for remediation steps.
 
 | Scenario | MCP Tool | Key Arguments |
 | -------- | -------- | ------------- |
-| Query objects | `mcp__infrahub__infrahub_query` | `query` (GraphQL string) |
-| List schema kinds | `mcp__infrahub__infrahub_list_schema` | none |
-| Get one object | `mcp__infrahub__infrahub_get` | `kind`, `id` or filters |
-| Update for remediation | `mcp__infrahub__infrahub_update` | `kind`, `id`, `data` |
-| Create missing object | `mcp__infrahub__infrahub_create` | `kind`, `data` |
+| List objects of a kind (typed) | `mcp__infrahub__get_nodes` | `kind`, `filters`, `include_attributes` |
+| Fetch one object by ID / HFID | `mcp__infrahub__get_nodes` | `kind`, `filters: {ids}` or `{hfid}` |
+| Substring search across attributes | `mcp__infrahub__search_nodes` | `kind`, `query` |
+| Raw read-only query | `mcp__infrahub__query_graphql` | `query` (GraphQL string) |
+| Discover schema kinds/filters | `mcp__infrahub__get_schema` | `kind` (optional) |
+| Check the active session branch | `mcp__infrahub__get_session_info` | none |
+| Create or update for remediation | `mcp__infrahub__node_upsert` | `kind`, `data`, `id` or `hfid` |
+| Delete an object | `mcp__infrahub__node_delete` | `kind`, `id` or `hfid` |
+| Complex write (relationships/bulk) | `mcp__infrahub__mutate_graphql` | `query` (GraphQL mutation) |
+| Submit writes for human review | `mcp__infrahub__propose_changes` | `title`, `description` |
+
+Writes land on an auto-created `mcp/session-*`
+branch and reach the default branch only after
+`propose_changes` opens a Proposed Change that a
+human merges.

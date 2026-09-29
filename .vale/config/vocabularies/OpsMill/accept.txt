@@ -115,6 +115,8 @@ PodGenerator
 RackGenerator
 Semaphore
 ServerCablingGenerator
+cEOSLab
+passwordless
 
 # Domain acronyms used in headings.
 ANTA

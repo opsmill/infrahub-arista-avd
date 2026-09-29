@@ -596,7 +596,12 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             dst_interface_map=spine_interface_map,
         )
 
-        await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)
+        await connect_interface_maps(
+            client=self.client,
+            logger=self.logger,
+            cabling_plan=created_cabling_plan,
+            link_role="uplink",
+        )
 
     async def create_l2leaf_switches(self) -> None:
         """Create L2 leaf switches in this rack (access-only, no EVPN)."""
@@ -650,4 +655,9 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             dst_interface_map=leaf_interface_map,
         )
 
-        await connect_interface_maps(client=self.client, logger=self.logger, cabling_plan=created_cabling_plan)
+        await connect_interface_maps(
+            client=self.client,
+            logger=self.logger,
+            cabling_plan=created_cabling_plan,
+            link_role="uplink",
+        )

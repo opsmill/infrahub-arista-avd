@@ -141,6 +141,13 @@ spec:
       dci_pool: "Fabric-L3LS-Multi-Domain-DCI-Pool"
       spanning_tree_mode: "mstp"
       spanning_tree_priority: 4096
+      avd_catalogs_filters:
+        # cEOS reports Management1 inDiscards after containerlab startup; data
+        # interfaces remain covered by interface-error and status tests.
+        - VerifyInterfaceDiscards
+        # cEOSLab emits SYSTEM_IDENTIFICATION_FAILED at startup because the
+        # container has no physical platform identity.
+        - VerifyLoggingErrors
       avd_custom_hostvars:
         custom_structured_configuration_aliases: |
           alias cc clear counters

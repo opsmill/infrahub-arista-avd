@@ -8,10 +8,26 @@ tags: hierarchy, parent, children, generic, location
 
 Impact: HIGH
 
-Hierarchical nodes (like location trees) require three
-things: a generic with `hierarchical: true`, nodes with
-`parent`/`children` fields, and inheritance from that
-generic.
+Hierarchical nodes require all three pieces wired
+together: a generic with `hierarchical: true`,
+concrete nodes that `inherit_from` that generic, and
+explicit `parent`/`children` kind references on each
+level.
+
+### Why it matters
+
+`parent` and `children` are only resolved when the
+inheriting node sits under a `hierarchical: true`
+generic — without the generic, the fields parse but
+the hierarchy machinery stays dormant, so the
+location tree UI shows a flat list and `parent`
+queries return nothing. The kind references use the
+full `Namespace + Name` form for the same reason
+`peer` does: short names cause "node not found" at
+load. Roots are marked with `parent: null` and
+leaves with `children: null` (or omitted) so the
+loader knows where the chain terminates rather than
+searching for a missing parent kind.
 
 ### Step 1: Generic with hierarchical: true
 
@@ -29,6 +45,14 @@ generics:
 ```
 
 ### Step 2: Nodes with parent and children
+
+> `LocationGeneric` here is the generic Step 1 declares
+> in this same file, not a platform kind — Infrahub core
+> ships no location kind at all. If you meant to reuse
+> the location schema published on the marketplace
+> rather than declaring your own, confirm its tier and
+> record its provenance first, per
+> [reuse-verify-kind-availability.md](./reuse-verify-kind-availability.md).
 
 ```yaml
 nodes:
