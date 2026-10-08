@@ -137,3 +137,6 @@ PyAVD
 
 # The reference design's own name, used as the landing-page heading.
 Arista AVD Reference Design
+multicast
+hostflap
+[Dd]istinguishers?

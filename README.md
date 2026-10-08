@@ -112,7 +112,7 @@ The full documentation is under [`docs/`](docs/docs/). Key entry points:
 |--|--|
 | **Get the stack running** | [Quick Start](docs/docs/quick-start.md) — prerequisites, install steps, and first load |
 | **Provision a fabric end-to-end** | [Provision Your First Fabric](docs/docs/provision-first-fabric.md) — step-by-step walkthrough from seed data to rendered EOS artifacts |
-| **Check what's supported** | [Supported Capabilities](docs/docs/supported-capabilities.md) — capability matrix (supported / partial / not yet) |
+| **Check what's supported** | [Supported Capabilities](docs/docs/supported-capabilities.md) — the AVD scenarios, services, and workflows supported today |
 | **Run a day-two workflow** | [Add a Network Segment](docs/docs/how-to/add-network-segment.md) — and the other how-to guides |
 | **Understand the generator pipeline** | [Architecture Overview](docs/docs/developer-guide/architecture.md) — system components, data model, and generator chain |
 | **Understand the AVD pipeline** | [AVD Pipeline Overview](docs/docs/developer-guide/avd/overview.md) — two-phase pipeline, hostvars reference, role mapping |
