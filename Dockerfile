@@ -1,4 +1,4 @@
-ARG INFRAHUB_BASE_VERSION=1.11.3
+ARG INFRAHUB_BASE_VERSION=1.11.5
 FROM registry.opsmill.io/opsmill/infrahub:${INFRAHUB_BASE_VERSION}
 
 # Use the system Python environment
