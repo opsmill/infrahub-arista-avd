@@ -1,0 +1,19 @@
+.github/workflows/changelog-check.yml
+  s_fd6e06864286e5::t_5a9dea547baab5 10-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fbfa9ff5cf9cd8ad0df1d8c5d21f19e1145413cd",
+  "prompts": {},
+  "sessions": {
+    "s_fd6e06864286e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11d36-3189-79e1-b04c-e17dd51f4320",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Benoit Kohler <Kohler.benoit@bearchitek.com>"
+    }
+  }
+}
