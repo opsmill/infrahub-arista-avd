@@ -1,0 +1,21 @@
+tests/unit/test_evpn_gateway_docs_contract.py
+  s_fd6e06864286e5::t_1777c8924aa33e 20
+tests/unit/test_cv_integration.py
+  s_fd6e06864286e5::t_1777c8924aa33e 390-391,403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "253c8f8190e027e4bba563aeea0d564a0d23d96f",
+  "prompts": {},
+  "sessions": {
+    "s_fd6e06864286e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11d36-3189-79e1-b04c-e17dd51f4320",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Benoit Kohler <Kohler.benoit@bearchitek.com>"
+    }
+  }
+}
