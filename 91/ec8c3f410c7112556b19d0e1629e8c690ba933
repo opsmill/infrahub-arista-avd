@@ -1,0 +1,54 @@
+CHANGELOG.md
+  s_fd6e06864286e5::t_a1c8409df7f02d 1-5
+docs/docs/release-notes/index.md
+  s_fd6e06864286e5::t_f636c5e1915ee4 1-8
+.github/version-drafter.yml
+  s_fd6e06864286e5::t_b3c7bc7041e03f 1-8
+changelog/+release-workflow.housekeeping.md
+  s_fd6e06864286e5::t_fc02680818f6fb 1
+.github/labels.yml
+  s_fd6e06864286e5::t_182db617aab2de 1-16
+.github/workflows/update-infrahub.yml
+  s_fd6e06864286e5::t_4743c7fa42e6fd 155
+docs/sidebars.ts
+  s_fd6e06864286e5::t_97ae22d30c8ed2 26-28
+  s_fd6e06864286e5::t_aeafdc9dd63a84 24-25
+tests/test_release_label_contract.py
+  s_fd6e06864286e5::t_1bb41b909623f9 1-184
+scripts/check_release_labels.py
+  s_fd6e06864286e5::t_2a444342afc60b 1-70
+AGENTS.md
+  s_fd6e06864286e5::t_39e985581303d6 245
+  s_fd6e06864286e5::t_cbc53f15545df4 246-254
+.github/workflows/release-label-check.yml
+  s_fd6e06864286e5::t_44ef3f997f25a6 1-55
+.github/workflows/release-publish.yml
+  s_fd6e06864286e5::t_1ebf18b5220707 1-50,52-116,118-132
+  s_fd6e06864286e5::t_de348a338975ac 51,117
+.github/workflows/labels.yml
+  s_fd6e06864286e5::t_ffcef7f0516a3d 1-29
+  s_fd6e06864286e5::t_07475f6eb79248 30
+pyproject.toml
+  s_fd6e06864286e5::t_c6f1759d6b3e4e 195
+.github/workflows/update-infrahub-sdk.yml
+  s_fd6e06864286e5::t_7c5d2e12d42d01 105
+.github/workflows/auto-bump.yml
+  s_fd6e06864286e5::t_baaa3b115402c0 1-5,7-38,40-165,169-344
+  s_fd6e06864286e5::t_2d48993c693b2c 6,39,166-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "91ec8c3f410c7112556b19d0e1629e8c690ba933",
+  "prompts": {},
+  "sessions": {
+    "s_fd6e06864286e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11d36-3189-79e1-b04c-e17dd51f4320",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Benoit Kohler <Kohler.benoit@bearchitek.com>"
+    }
+  }
+}
