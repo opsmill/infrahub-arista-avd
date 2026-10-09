@@ -7,10 +7,8 @@ name: Changelog
 # time, the way the shared platform does — puts the cost on the author while
 # they still have the context, instead of on whoever cuts the release.
 #
-# Scoped to `main`: it is this repository's only long-lived branch, and the
-# one every pull request targets. There is no release-publish workflow here
-# yet, so nothing assembles the fragments today; collecting them from now on
-# is what lets that assembly start later without a hole in the history.
+# Scoped to `main`: it is this repository's only long-lived branch, where
+# fragments accumulate until the release workflow builds the changelog.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]

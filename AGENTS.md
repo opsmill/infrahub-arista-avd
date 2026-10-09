@@ -242,3 +242,13 @@ anything added under `docs/docs/`:
   navbar references it by name, and sidebar keys must be unique across that site.
 
 Edits made directly in `infrahub-docs` are overwritten by the next sync.
+
+## Changelog and releases
+
+Record release-worthy changes as Towncrier fragments under `changelog/`: `<issue>.<type>.md`, or `+<slug>.<type>.md` without an issue. Types are `security`, `removed`, `deprecated`, `added`, `changed`, `fixed`, and `housekeeping`. Preview with `uv run towncrier build --draft --version X.Y.Z`. Use `ci/skip-changelog` only when no entry is needed.
+
+Ordinary pull requests to `main` carry exactly one `changes/major`, `changes/minor`, or `changes/patch` label. Those labels calculate the next release version. Generated release pull requests are exempt.
+
+Dispatch **Auto bump version** on `main` to prepare a release. The first release needs an explicit version because no release tag exists yet; later versions can come from merged PR labels. The workflow updates `pyproject.toml` and `uv.lock`, assembles `CHANGELOG.md`, and opens a `chore(release)` pull request. Add a release-notes page and sidebar entry to that PR. A human reviews and merges it; the merge creates the `v<version>` tag and GitHub Release. Do not bump, build, tag, or publish directly on `main`.
+
+Release-notes pages belong under `docs/docs/release-notes/` and are listed explicitly in `docs/sidebars.ts`. Automated Infrahub and SDK bumps use `changes/patch`.

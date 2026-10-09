@@ -17,6 +17,6 @@ def test_gateway_docs_describe_domain_owned_local_gateway_groups() -> None:
     assert "EvpnDomain.local_gateway_groups" in schema_docs
     assert "derives the local D-PATH domain ID from `EvpnGatewayGroup.local_domain`" in hostvar_docs
     assert "Pod/local-domain mismatches" in generator_docs
-    assert "domain-owned local `EvpnGatewayGroup` children" in capabilities
+    assert "Fabric-owned `EvpnDomain` objects hold local `EvpnGatewayGroup` children" in capabilities
     assert "Pod-scoped `EvpnGatewayGroup`" not in combined
     assert "derived from `pod.evpn_domain`" not in combined

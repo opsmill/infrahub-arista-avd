@@ -102,5 +102,6 @@ jobs:
             --title "update infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }} against ${{ matrix.branch-name }}" \
             --body "This PR updates infrahub-sdk to version ${{ env.INFRAHUB_SDK_VERSION }}." \
             --label "ci/skip-changelog" \
+            --label "changes/patch" \
             --base ${{ matrix.branch-name }} \
             --head ${{ env.BRANCH_NAME }}

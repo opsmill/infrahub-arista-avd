@@ -387,7 +387,8 @@ def test_cloudvision_docs_describe_placeholder_custom_webhook() -> None:
     assert "cloudvision-workspace-submission" in docs
     assert "https://placeholder.invalid/cloudvision-workspace-submission" in docs
     assert "placeholder" in docs.lower()
-    assert "no real external automation receiver is required" in docs.lower()
+    assert "The URL does not point to a working receiver" in docs
+    assert "point the webhook at your own automation endpoint" in docs
 
 
 def test_cloudvision_docs_describe_custom_webhook_submission_and_manual_retry() -> None:
@@ -399,7 +400,7 @@ def test_cloudvision_docs_describe_custom_webhook_submission_and_manual_retry() 
     assert "uv run invoke submit-cv-workspace --proposed-change-id <proposed-change-id> --branch main" in docs
     assert "fallback" in docs
     assert "unresolved failure comment" in docs
-    assert "CloudVision change-control management and Semaphore Ansible playbooks are out of scope" in docs
+    assert "CloudVision change-control management is not supported" in docs
 
 
 def test_cloudvision_docs_list_validation_and_retry_paths() -> None:
