@@ -1,4 +1,4 @@
-ARG INFRAHUB_BASE_VERSION=1.11.5
+ARG INFRAHUB_BASE_VERSION=1.11.6
 FROM registry.opsmill.io/opsmill/infrahub:${INFRAHUB_BASE_VERSION}
 
 # Extend the Python environment shipped by the Infrahub image.
