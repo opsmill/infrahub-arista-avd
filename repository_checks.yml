@@ -119,18 +119,6 @@ spec:
 apiVersion: infrahub.app/v1
 kind: Object
 spec:
-  kind: CoreTransformPython
-  data:
-    - name: cv-workspace-submission-webhook-payload
-      repository: test-repository
-      query: cv_workspace_submission_webhook
-      file_path: "./transforms/cv_workspace_submission_webhook.py"
-      class_name: CVWorkspaceSubmissionWebhookPayload
-      convert_query_response: false
----
-apiVersion: infrahub.app/v1
-kind: Object
-spec:
   kind: CoreCustomWebhook
   data:
     - name: cloudvision-workspace-submission
@@ -140,4 +128,4 @@ spec:
       description: Placeholder CloudVision workspace submission handoff for cv-config-validation
       url: https://placeholder.invalid/cloudvision-workspace-submission
       validate_certificates: false
-      transformation: cv-workspace-submission-webhook-payload
+      transformation: cv_workspace_submission_webhook_payload
