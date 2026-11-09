@@ -1,0 +1,1 @@
+The CloudVision workspace submission webhook keeps its payload transform after a repository import. It now references `cv_workspace_submission_webhook_payload` from `.infrahub.yml`, instead of a second transform with a different name that the import deleted.
