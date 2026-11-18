@@ -52,6 +52,7 @@ from solution_arista_avd.protocols import (  # noqa: E402
 from .asn import set_device_asn  # noqa: E402
 from .hostvar_readiness import fabric_devices_with_hostvars, missing_hostvar_generator_instances  # noqa: E402
 from .rack_generator_query import RackGeneratorQuery  # noqa: E402
+from .tracking import keep_tracked_nodes  # noqa: E402
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -296,10 +297,11 @@ class RackGenerator(InfrahubGenerator, GeneratorMixin):
             )
 
     async def defer_rack_generation(self, reason: str) -> None:
-        """Mark the rack incomplete and return without enrolling deferral in tracking."""
+        """Mark the rack incomplete and keep the nodes the previous run generated."""
         self.logger.info("Deferring rack %s generation: %s", self.rack_name, reason)
         if getattr(self, "rack_id", None):
             await self.set_rack_generation_complete(False, update_group_context=False)
+        await keep_tracked_nodes(self.client)
 
     async def set_rack_generation_complete(self, complete: bool, *, update_group_context: bool = True) -> None:
         rack = await self.client.get(kind=LocationRack, id=self.rack_id)

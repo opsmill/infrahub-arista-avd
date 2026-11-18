@@ -1,0 +1,1 @@
+Keep the nodes a generator created earlier when a rack, server cabling or structured config backfill run stops early. With infrahub-sdk 1.24, such a run deleted every leaf switch, link, MLAG domain or routing object of the previous run, and could delete the rack.

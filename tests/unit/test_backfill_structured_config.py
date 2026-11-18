@@ -3,7 +3,7 @@
 import ipaddress
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from infrahub_sdk.exceptions import NodeNotFoundError
@@ -1629,3 +1629,17 @@ async def test_backfill_mtu_two_passes_do_not_claim_topology_interface() -> None
         call.kwargs == {"allow_upsert": True, "update_group_context": False} for call in interface.save.await_args_list
     )
     assert interface.id == "rack-owned-port"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("completed", "keeps_tracked_nodes"), [(False, True), (True, False)])
+async def test_generate_keeps_tracked_nodes_only_when_run_stops_early(
+    completed: bool, keeps_tracked_nodes: bool
+) -> None:
+    gen = _make_generator()
+    gen._run = AsyncMock(return_value=completed)  # type: ignore[method-assign]
+
+    with patch("generators.backfill_structured_config.keep_tracked_nodes", new_callable=AsyncMock) as keep:
+        await gen.generate({})
+
+    assert keep.await_count == int(keeps_tracked_nodes)

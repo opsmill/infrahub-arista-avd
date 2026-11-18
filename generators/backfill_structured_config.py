@@ -36,6 +36,7 @@ from .backfill_structured_config_query import (
     BackfillStructuredConfigQuery,
     BackfillStructuredConfigQueryAvdArtifactEdgesNodeDeviceNodeInterfacesEdgesNode,
 )
+from .tracking import keep_tracked_nodes
 
 INTERFACE_SECTIONS = ["ethernet_interfaces", "loopback_interfaces", "management_interfaces"]
 GENERATED_LOOPBACK_INTERFACES = {"Loopback0", "Loopback1"}
@@ -603,7 +604,11 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
     # --- Main generate ---
 
     async def generate(self, data: dict) -> None:
-        """Backfill IPs, MTU, and routing config from structured config into the data model."""
+        if not await self._run(data):
+            await keep_tracked_nodes(self.client)
+
+    async def _run(self, data: dict) -> bool:
+        """Backfill IPs, MTU, and routing config, and return whether this run saved every node it owns."""
         self._hydrated_interfaces = {}
         self._existing_ips = None
         self._primary_ip_interfaces = None
@@ -614,13 +619,13 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         sc_file_ref = artifact.structured_config_file
         if not sc_file_ref or not sc_file_ref.node:
             self.logger.warning("No structured config file on artifact, skipping")
-            return
+            return False
 
         # Get device info via relationship
         device = artifact.device.node
         if not device:
             self.logger.warning("No device linked to artifact, skipping")
-            return
+            return False
 
         hostname = device.name.value if device.name else "unknown"
         device_id = device.id
@@ -631,13 +636,13 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
             content = await sc_file.download_file()
         except (OSError, ValueError) as e:
             self.logger.warning(f"[{hostname}] Failed to fetch structured config: {e}")
-            return
+            return False
 
         try:
             structured_config: dict[str, Any] = json.loads(content)
         except json.JSONDecodeError as e:
             self.logger.warning(f"[{hostname}] Invalid JSON in structured config: {e}")
-            return
+            return False
 
         self.logger.info(f"[{hostname}] Loaded structured config with {len(structured_config)} top-level keys")
 
@@ -685,3 +690,4 @@ class BackfillStructuredConfigGenerator(InfrahubGenerator):
         unmodeled_present = [s for s in UNMODELED_SECTIONS if s in structured_config]
         if unmodeled_present:
             self.logger.info(f"[{hostname}] Unmodeled sections in structured config: {', '.join(unmodeled_present)}")
+        return True

@@ -21,16 +21,23 @@ from solution_arista_avd.protocols import (
 )
 from solution_arista_avd.sorting import create_sorted_device_interface_map
 
+from .tracking import keep_tracked_nodes
+
 
 class ServerCablingGenerator(InfrahubGenerator):
     logger = logging.getLogger("infrahub.tasks")
     PORT_CHANNEL_RE = re.compile(r"\d+")
 
     async def generate(self, data: dict) -> None:
+        if not await self._run(data):
+            await keep_tracked_nodes(self.client)
+
+    async def _run(self, data: dict) -> bool:
+        """Cable the server and return whether this run saved every node it owns."""
         servers = data.get("ComputePhysicalServer", {}).get("edges", [])
         if not servers:
             self.logger.warning("No server found in query response")
-            return
+            return False
 
         server_node = servers[0]["node"]
         server_hostname: str = server_node["name"]["value"]
@@ -39,7 +46,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         rack_rel = server_node.get("rack")
         if not rack_rel or not rack_rel.get("node"):
             self.logger.warning("Server %s has no rack assigned", server_hostname)
-            return
+            return False
 
         rack_id: str = rack_rel["node"]["id"]
         rack_name: str = rack_rel["node"]["name"]["value"]
@@ -48,7 +55,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         server_interfaces = self._get_server_interfaces(server_node)
         if not server_interfaces:
             self.logger.warning("Server %s has no interfaces", server_hostname)
-            return
+            return False
 
         server_already_cabled = await self._is_server_cabled(server_interfaces)
 
@@ -56,7 +63,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         leaf_switches = await self.client.filters(kind=DcimDevice, rack__ids=[rack_id], role__values=["leaf", "l2leaf"])
         if not leaf_switches:
             self.logger.warning("No leaf switches found in rack %s for server %s", rack_name, server_hostname)
-            return
+            return False
 
         # Build sorted interface maps (same pattern as pod/rack generators)
         server_iface_objects = await self.client.filters(kind=InterfacePhysical, device__name__value=server_hostname)
@@ -82,14 +89,18 @@ class ServerCablingGenerator(InfrahubGenerator):
                 rack_name,
                 server_hostname,
             )
-            return
+            return False
 
         if server_already_cabled:
             cabling_plan = await self._existing_cabling_plan(server_interfaces)
             if not cabling_plan:
                 self.logger.warning("Server %s appears cabled but no leaf links were found", server_hostname)
-                return
+                return False
             self.logger.info("Server %s already cabled — reconciling VLANs and LAGs", server_hostname)
+            # The links are not saved again on this path, so they must stay tracked to survive the cleanup.
+            await self.client.group_context.add_related_nodes(
+                ids=[server_iface.connector.id for server_iface, _ in cabling_plan], update_group_context=True
+            )
         else:
             # Find the next available index (first unused slot across all leaves)
             server_index = self._find_next_available_index(leaf_interface_map)
@@ -114,6 +125,7 @@ class ServerCablingGenerator(InfrahubGenerator):
         # Trigger AVD hostvar regeneration for the leaves connected to this server.
         hostvar_target_ids = self._connected_leaf_device_ids(cabling_plan)
         await self._trigger_avd_cascade(rack_id, server_hostname, hostvar_target_ids)
+        return True
 
     async def _create_server_port_channel(
         self,
