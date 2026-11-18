@@ -36,7 +36,7 @@ The full pipeline, from a high-level fabric design to versioned, deployable conf
 uv sync --all-packages
 
 # Build the custom Infrahub image (extends the base image with PyAVD — run once)
-export INFRAHUB_BASE_VERSION=1.11.7
+export INFRAHUB_BASE_VERSION=1.12.1
 uv run invoke build
 
 # Start all services: Infrahub, Neo4j, PostgreSQL, Redis, RabbitMQ, service portal, Semaphore
