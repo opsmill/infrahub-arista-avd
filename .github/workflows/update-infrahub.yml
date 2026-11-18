@@ -95,6 +95,12 @@ jobs:
             echo "TITLE=chore: update to ${SUBJECT}"
           } >> "$GITHUB_ENV"
 
+      # uv cannot download the exact Python patch version that .python-version
+      # pins, so the runner provides it.
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
