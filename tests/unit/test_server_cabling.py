@@ -20,6 +20,8 @@ def _make_generator(*, mock_cascade: bool = True) -> ServerCablingGenerator:
     gen.client.filters = AsyncMock(return_value=[])
     gen.client.get = AsyncMock()
     gen.client.create = AsyncMock()
+    gen.client.group_context.get_group = AsyncMock(return_value=None)
+    gen.client.group_context.add_related_nodes = AsyncMock()
     if mock_cascade:
         gen._trigger_avd_cascade = AsyncMock()  # type: ignore[method-assign]
     gen._is_server_cabled = AsyncMock(return_value=False)  # type: ignore[method-assign]
@@ -179,6 +181,7 @@ class TestSingleHomedCabling:
             mock_connect.assert_called_once()
             cabling_plan = mock_connect.call_args.kwargs["cabling_plan"]
             assert len(cabling_plan) == 1
+        gen.client.group_context.get_group.assert_not_awaited()
 
 
 class TestIdempotency:
@@ -217,6 +220,10 @@ class TestIdempotency:
         gen._assign_vlans.assert_awaited_once()
         gen._create_server_port_channel.assert_awaited_once()
         gen._trigger_avd_cascade.assert_awaited_once_with("rack-1", "server-1", ["leaf-1"])
+        gen.client.group_context.add_related_nodes.assert_awaited_once_with(
+            ids=[mock_server_iface.connector.id], update_group_context=True
+        )
+        gen.client.group_context.get_group.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_already_cabled_server_ignores_non_physical_interfaces(self) -> None:
@@ -674,6 +681,7 @@ class TestNoRack:
             assert any("no rack" in str(call) for call in mock_warn.call_args_list)
 
         gen.client.create.assert_not_called()
+        gen.client.group_context.get_group.assert_awaited_once()
 
 
 class TestBuildServerCablingPlan:

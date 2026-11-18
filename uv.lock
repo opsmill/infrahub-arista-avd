@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.14.*"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -528,11 +528,11 @@ wheels = [
 
 [[package]]
 name = "graphql-core"
-version = "3.2.11"
+version = "3.2.14"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4d/90/f2aff026ab4aebd80eb71905106a0885f4cfde85dcf965543f45bed0d9ee/graphql_core-3.2.11.tar.gz", hash = "sha256:e7e156d10beb127cab5c89ff0da71416fc73d27c484a4757d3b2d35633774802", size = 528407, upload-time = "2026-06-05T13:45:22.915Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/55/3f86cc857125e0a9d4ddf7a85a54c69d8c6436cd3c4e360ab6c4686140b8/graphql_core-3.2.14.tar.gz", hash = "sha256:efec124d951f2997e8f28bb9f056d0a3b4b11dce720e2225723ec20fac570af5", size = 610310, upload-time = "2026-11-06T21:41:59.878Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/15/b92b4e1d88d02c6eff9733c9eea21846ab435cc4d813d84ccc5d335955df/graphql_core-3.2.11-py3-none-any.whl", hash = "sha256:0b3e35ff41e9adba53021ab0cef475eb18f57c7f53f0f2ca55567fbf3c537ea0", size = 214879, upload-time = "2026-06-05T13:45:21.245Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/b8/c45a999940326178a32cc3ba7c88f7c661d0cff9399e78cb3898f9e96387/graphql_core-3.2.14-py3-none-any.whl", hash = "sha256:fb0eaaad81c558325f037a79dab7c6dd568cd17196030fb5c46fc4996948cc42", size = 279946, upload-time = "2026-11-06T21:41:58.085Z" },
 ]
 
 [[package]]
@@ -707,39 +707,44 @@ wheels = [
 
 [[package]]
 name = "infrahub-sdk"
-version = "1.22.0"
+version = "1.24.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "anyio" },
     { name = "dulwich" },
     { name = "graphql-core" },
     { name = "httpx" },
+    { name = "jinja2" },
     { name = "netutils" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "typing-extensions" },
     { name = "ujson" },
     { name = "whenever" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/62/2b/49dfceb46cc63063f19c73b09fab8ea857ea0348de3d4f861d5beef621c7/infrahub_sdk-1.22.0.tar.gz", hash = "sha256:2aec69be27ba21fb5af3c9de73b39eed833ca3b12beb15880160bab68ced9373", size = 1084359, upload-time = "2026-06-23T16:30:46.994Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/b3/46058d587f5e3f2d5a10e516d82fb046f22b2f2e7047cbd1c4b6fd1e53e4/infrahub_sdk-1.24.0.tar.gz", hash = "sha256:fea3095290ed0383f47df24651619e66c84f442a77136ed97ab14f9d1061ea27", size = 1835376, upload-time = "2026-11-10T08:08:58.41Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/f3/d9867ffc09bf461608a73728373180fd4c963a934ca1c78b00b5dd39fb40/infrahub_sdk-1.22.0-py3-none-any.whl", hash = "sha256:3a062da0d6158b135acfad3ba2c9e010135c41576212e9904f4d059e3f57d54c", size = 270938, upload-time = "2026-06-23T16:30:45.489Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/ca/f72cce48538de5810d1cfc74ac0ffdd23a657328c2e799f4d7628fb3f4f1/infrahub_sdk-1.24.0-py3-none-any.whl", hash = "sha256:44c0f67f9051e020632bee2c1fc6a0d0babc003698bfff03d45f43c128a0e965", size = 365492, upload-time = "2026-11-10T08:08:56.569Z" },
 ]
 
 [package.optional-dependencies]
 all = [
     { name = "ariadne-codegen" },
     { name = "click" },
-    { name = "jinja2" },
-    { name = "numpy" },
+    { name = "infrahub-testcontainers" },
+    { name = "opentelemetry-api" },
+    { name = "packaging" },
     { name = "pyarrow" },
     { name = "pytest" },
-    { name = "pyyaml" },
-    { name = "rich" },
+    { name = "ruamel-yaml" },
     { name = "typer" },
 ]
 
 [[package]]
 name = "infrahub-testcontainers"
-version = "1.11.7"
+version = "1.12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -749,9 +754,9 @@ dependencies = [
     { name = "pytest" },
     { name = "testcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/29/97a276393338b372b3ef879e0d4c1c896b44cdc00cf2f68c03c93dbd4196/infrahub_testcontainers-1.11.7.tar.gz", hash = "sha256:908113b8811e50eb97c5be5dae890700ae4c770f7b791c7300c62adfd6384377", size = 20670, upload-time = "2026-10-14T13:50:49.637Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/17/a37e693c2d173de23000e9abc65875b2e733fe0e69ef107d3dac589ab9fe/infrahub_testcontainers-1.12.1.tar.gz", hash = "sha256:9b36371a8031fd48ff27b6c439f38e2bea5d79c7a8f7aba21ed99f8e50d7fdb4", size = 23336, upload-time = "2026-11-12T10:12:43.879Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cd/ca/1d4cacf2954f022fca1b35f4bb235c09beb4b6740b351d0fbef1647075c5/infrahub_testcontainers-1.11.7-py3-none-any.whl", hash = "sha256:90c5a1dea7a01959fedc5f0fc510dc8a2b60ed422aa7f095c5271035acd3b806", size = 27058, upload-time = "2026-10-14T13:50:48.393Z" },
+    { url = "https://files.pythonhosted.org/packages/06/92/db491d8fe473a3f14f08acdf273ef48f9197f19c8d953473cd800763a40a/infrahub_testcontainers-1.12.1-py3-none-any.whl", hash = "sha256:f6dc817102b31f04aa0f872823fff7fec1422d05001b121adbbb84f1b726f69b", size = 30065, upload-time = "2026-11-12T10:12:42.625Z" },
 ]
 
 [[package]]
@@ -1854,13 +1859,13 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 catalog = [
-    { name = "infrahub-sdk", specifier = ">=1.19.0,<2.0.0" },
+    { name = "infrahub-sdk", specifier = ">=1.24.0,<2.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "streamlit", specifier = ">=1.30.0" },
 ]
 dev = [
-    { name = "infrahub-sdk", extras = ["all"], specifier = ">=1.19.0" },
-    { name = "infrahub-testcontainers", specifier = ">=1.11.7,<2" },
+    { name = "infrahub-sdk", extras = ["all"], specifier = ">=1.24.0" },
+    { name = "infrahub-testcontainers", specifier = ">=1.12.1,<2" },
     { name = "invoke", specifier = ">=2.2.0" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "pytest", specifier = ">=8.4.1" },

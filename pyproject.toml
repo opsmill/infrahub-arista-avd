@@ -14,8 +14,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "infrahub-sdk[all]>=1.19.0",
-    "infrahub-testcontainers>=1.11.7,<2",
+    "infrahub-sdk[all]>=1.24.0",
+    "infrahub-testcontainers>=1.12.1,<2",
     "invoke>=2.2.0",
     "mypy>=1.17.1",
     "pytest>=8.4.1",
@@ -27,7 +27,7 @@ dev = [
 ]
 catalog = [
     "streamlit>=1.30.0",
-    "infrahub-sdk>=1.19.0,<2.0.0",
+    "infrahub-sdk>=1.24.0,<2.0.0",
     "pandas>=2.0.0",
 ]
 

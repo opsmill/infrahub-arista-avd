@@ -140,6 +140,7 @@ def _make_generator() -> RackGenerator:
     gen.client.get = AsyncMock()
     gen.client.filters = AsyncMock(side_effect=_filters_side_effect())
     gen.client.execute_graphql = AsyncMock()
+    gen.client.group_context.get_group = AsyncMock(return_value=None)
     gen.logger = MagicMock()
     gen.fabric = SimpleNamespace(id="fabric-1")
     gen.pod_id = "pod-1"
@@ -195,6 +196,7 @@ async def test_generate_defers_when_required_relationships_are_missing(data: dic
     gen.create_leaf_switches.assert_not_awaited()
     gen.client.execute_graphql.assert_not_awaited()
     gen.logger.info.assert_any_call("Deferring rack %s generation: %s", "DC1_BORDER", reason)
+    gen.client.group_context.get_group.assert_awaited_once()
 
 
 @pytest.mark.asyncio
