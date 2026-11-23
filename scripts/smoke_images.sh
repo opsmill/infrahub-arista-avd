@@ -33,7 +33,8 @@ import platform
 
 # The image extends /.venv from the base image, so both must run the same Python.
 expected = json.loads(os.environ["EXPECTED_BASE_IDENTITY"])
-assert {"python": platform.python_version(), "infrahub-server": metadata.version("infrahub-server"), "infrahub-sdk": infrahub_sdk.__version__} == expected
+found = {"python": platform.python_version(), "infrahub-server": metadata.version("infrahub-server"), "infrahub-sdk": infrahub_sdk.__version__}
+assert found == expected, f"image versions {found} differ from base image {expected}"
 assert metadata.version("pyavd") == "6.4.0"
 for name in ("infrahub", "infrahub.prefect_server.app", "infrahub.server", "infrahub.workers.infrahub_async", "pyavd", "solution_arista_avd"):
     importlib.import_module(name)
@@ -56,7 +57,7 @@ if [[ "$catalog_ready" != true ]]; then
   exit 1
 fi
 docker exec "$catalog_container" /app/.venv/bin/python -c \
-  'import sys, streamlit, infrahub_sdk; assert sys.version_info[:3] == (3, 14, 7); print("Service portal health and imports OK")'
+  'import sys, streamlit, infrahub_sdk; assert sys.version_info[:3] == (3, 14, 7), sys.version; print("Service portal health and imports OK")'
 docker exec "$catalog_container" uv pip check --python /app/.venv/bin/python
 
 docker run --rm --network none --entrypoint /bin/sh \
