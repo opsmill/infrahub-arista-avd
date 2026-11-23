@@ -11,6 +11,7 @@ from .config import (
     INFRAHUB_UI_URL,
     STREAMLIT_PORT,
 )
+from .session import get_client
 from .ui import (
     display_error,
     display_logo,
@@ -32,4 +33,5 @@ __all__ = [
     "display_logo",
     "display_progress",
     "display_success",
+    "get_client",
 ]

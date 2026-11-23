@@ -5,11 +5,10 @@ Displays fabrics, tenants, VRFs, and devices with branch selection.
 
 import streamlit as st  # type: ignore[import-untyped]
 from utils import (
+    get_client,
     DEFAULT_BRANCH,
     INFRAHUB_ADDRESS,
-    INFRAHUB_API_TOKEN,
     INFRAHUB_UI_URL,
-    InfrahubClient,
     display_error,
 )
 from utils.api import InfrahubConnectionError, InfrahubGraphQLError
@@ -37,11 +36,7 @@ def _set_branch(branch: str) -> None:
 
 def main() -> None:
     """Main function to render the dashboard."""
-    client = InfrahubClient(
-        st.session_state.infrahub_url,
-        api_token=INFRAHUB_API_TOKEN or None,
-        ui_url=INFRAHUB_UI_URL,
-    )
+    client = get_client()
 
     st.title("Infrahub Service Catalog")
     st.markdown("View and manage network services for your AI datacenter infrastructure.")
