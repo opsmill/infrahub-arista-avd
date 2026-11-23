@@ -1,0 +1,1 @@
+Pinned the Vale Google and write-good style packages to fixed releases, so new upstream rules no longer fail CI on unchanged documentation, and the image smoke check now prints the versions it found when they differ from the base image.

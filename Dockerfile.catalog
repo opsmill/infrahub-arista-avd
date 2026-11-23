@@ -11,8 +11,13 @@ RUN uv sync --group catalog --no-dev --frozen
 
 COPY service_catalog/ service_catalog/
 
+# Streamlit reads STREAMLIT_SERVER_PORT, which takes precedence over
+# .streamlit/config.toml. Keep 8501 for Docker Compose; the public sandbox sets
+# STREAMLIT_SERVER_PORT=8080 because its generic-app driver serves port 8080.
+ENV STREAMLIT_SERVER_PORT=8501
+
 EXPOSE 8501
 
 WORKDIR /app/service_catalog
 
-CMD ["uv", "run", "--no-sync", "streamlit", "run", "Home.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["uv", "run", "--no-sync", "streamlit", "run", "Home.py", "--server.address=0.0.0.0"]
