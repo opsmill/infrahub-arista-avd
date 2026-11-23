@@ -1,0 +1,1 @@
+`invoke load` now checks repository sync status through the Infrahub SDK with the API token, stops when the repository import fails, and waits for the schema to reach every worker instead of sleeping for a fixed time.

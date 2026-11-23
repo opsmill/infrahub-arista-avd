@@ -148,6 +148,7 @@ uv run invoke restart
 uv run invoke restart --component=infrahub-server
 uv run invoke restart --component=service-catalog
 uv run invoke load
+uv run invoke sandbox-setup
 uv run invoke load-objects --fabrics=all --branch=<branch-name>
 uv run invoke load-schema
 uv run invoke load-menu

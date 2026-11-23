@@ -1,0 +1,1 @@
+Added the `sandbox-setup` task, which prepares a supplied Infrahub instance for the public sandbox without Docker, Semaphore or a mounted checkout, and a workflow that publishes the task-worker and Service Catalog images to Harbor. The Service Catalog image now reads its port from `STREAMLIT_SERVER_PORT`.

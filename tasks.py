@@ -12,6 +12,8 @@ from uuid import uuid4
 
 import httpx
 from dotenv import dotenv_values, load_dotenv, set_key, unset_key
+from infrahub_sdk import Config, InfrahubClientSync
+from infrahub_sdk.exceptions import ServerNotReachableError, ServerNotResponsiveError
 from invoke import Context, task
 from invoke.exceptions import Exit
 
@@ -33,7 +35,18 @@ _load_environment(ENV_FILE_PATH)
 VERSION = os.getenv("INFRAHUB_IMAGE_VER", None)
 
 COMPOSE_FILES = "-f docker-compose.yml -f docker-compose.override.yml"
+# Recorded before the localhost default below is exported, so sandbox-setup can
+# refuse to run against a default address it was not given.
+INFRAHUB_ADDRESS_SUPPLIED = bool(os.getenv("INFRAHUB_ADDRESS"))
 INFRAHUB_ADDRESS = os.getenv("INFRAHUB_ADDRESS", "http://localhost:8000")
+
+# Repository and readiness settings shared by `load` and `sandbox-setup`.
+REPOSITORY_NAME = "test-repository"
+REPOSITORY_STATUS_IN_SYNC = "in-sync"
+REPOSITORY_STATUS_ERROR_IMPORT = "error-import"
+REPOSITORY_SYNC_TIMEOUT_SECONDS = 600
+SCHEMA_SYNC_WAIT_SECONDS = 120
+SANDBOX_REQUIRED_VARIABLES = ("INFRAHUB_API_TOKEN",)
 COMPOSE_REQUIRED_SECRET_NAMES = (
     "INFRAHUB_INITIAL_ADMIN_PASSWORD",
     "INFRAHUB_API_TOKEN",
@@ -658,47 +671,81 @@ def init_semaphore(
     print("=== Semaphore init complete ===")
 
 
-def get_repository_sync_status(name: str) -> str | None:
-    query = """
-    query CheckRepoSync($name: String!) {
-      CoreRepository(name__value: $name) {
-        edges {
-          node {
-            sync_status { value }
-          }
-        }
-      }
-    }
+def _infrahub_client() -> InfrahubClientSync:
+    """Build an SDK client for INFRAHUB_ADDRESS.
+
+    The SDK reads the INFRAHUB_RETRY_* settings from the environment, so requests
+    made through this client are repeated after temporary gateway errors when the
+    caller enables retries. The API token is passed explicitly so that it takes
+    precedence over the admin username and password this module exports for
+    local runs.
     """
-    resp = httpx.post(
-        f"{INFRAHUB_ADDRESS}/graphql",
-        json={"query": query, "variables": {"name": name}},
-        timeout=10,
-    )
-    data = resp.json()
-    edges = data.get("data", {}).get("CoreRepository", {}).get("edges", [])
-    if not edges:
+    token = os.environ.get("INFRAHUB_API_TOKEN")
+    config = Config(api_token=token) if token else Config()
+    return InfrahubClientSync(config=config)
+
+
+def get_repository_sync_status(name: str, client: InfrahubClientSync | None = None) -> str | None:
+    """Return the sync status of the named repository, or None when it does not exist yet."""
+    infrahub = client or _infrahub_client()
+    repository = infrahub.get(kind="CoreRepository", name__value=name, raise_when_missing=False)
+    if repository is None:
         return None
-    return str(edges[0]["node"]["sync_status"]["value"])
+    return str(repository.sync_status.value)
 
 
-def wait_for_repository_sync(name: str, timeout: int = 300, interval: int = 5) -> None:
-    """Poll Infrahub until the named repository reaches 'in_sync' status."""
+def wait_for_repository_sync(
+    name: str,
+    timeout: int = 300,
+    interval: int = 5,
+    client: InfrahubClientSync | None = None,
+) -> None:
+    """Poll Infrahub until the named repository reaches 'in-sync' status.
+
+    Stops early with an error when the import fails, rather than waiting for the
+    timeout.
+    """
+    infrahub = client or _infrahub_client()
     elapsed = 0
     while elapsed < timeout:
         try:
-            status = get_repository_sync_status(name)
+            status = get_repository_sync_status(name, client=infrahub)
+        except (httpx.HTTPError, ServerNotReachableError, ServerNotResponsiveError) as exc:
+            print(f"Waiting for Infrahub API ({exc})")
+        else:
             if status:
                 print(f"Repository '{name}' sync_status: {status}")
-                if status == "in-sync":
+                if status == REPOSITORY_STATUS_IN_SYNC:
                     return
-        except httpx.HTTPError as exc:
-            print(f"Waiting for Infrahub API ({exc})")
+                if status == REPOSITORY_STATUS_ERROR_IMPORT:
+                    msg = f"Repository '{name}' failed to import (sync_status: {status})"
+                    raise RuntimeError(msg)
         sleep(interval)
         elapsed += interval
 
-    msg = f"Repository '{name}' did not reach 'in_sync' within {timeout}s"
+    msg = f"Repository '{name}' did not reach '{REPOSITORY_STATUS_IN_SYNC}' within {timeout}s"
     raise TimeoutError(msg)
+
+
+def register_repository(ctx: Context) -> None:
+    """Register the demo's Git repository in Infrahub.
+
+    When INFRAHUB_REPO_URL is set (the public sandbox supplies it), the repository
+    is created or updated from that URL and INFRAHUB_REPO_REF. Otherwise the local
+    Compose definition in repository.yml is loaded, which points at the checkout
+    mounted into the task worker.
+    """
+    location = os.environ.get("INFRAHUB_REPO_URL")
+    if not location:
+        ctx.run("infrahubctl object load repository.yml")
+        return
+
+    data: dict[str, str] = {"name": REPOSITORY_NAME, "location": location}
+    if ref := os.environ.get("INFRAHUB_REPO_REF"):
+        data["default_branch"] = ref
+    print(f"Registering repository '{REPOSITORY_NAME}' from {location} ({ref or 'default branch'})")
+    repository = _infrahub_client().create(kind="CoreRepository", data=data)
+    repository.save(allow_upsert=True)
 
 
 def _seed_selection(fabrics: str | None = None) -> SeedSelection:
@@ -734,14 +781,38 @@ def load(ctx: Context) -> None:
     selection = _seed_selection()
     with ctx.cd(MAIN_DIRECTORY_PATH):
         init_semaphore(ctx)
-        load_schema(ctx)
-        load_menu(ctx)
-        sleep(5)
-        _load_seed_selection(ctx, selection)
-        ctx.run("infrahubctl object load repository.yml")
-        wait_for_repository_sync("test-repository")
-        ctx.run("infrahubctl object load repository_checks.yml")
-        ctx.run("infrahubctl object load triggers.yml")
+        _load_infrahub_content(ctx, selection)
+
+
+@task(name="sandbox-setup")
+def sandbox_setup(ctx: Context) -> None:
+    """Prepare a supplied Infrahub instance for the public sandbox.
+
+    Uses only INFRAHUB_ADDRESS, INFRAHUB_API_TOKEN, INFRAHUB_REPO_URL and
+    INFRAHUB_REPO_REF. Unlike `load`, it does not start or configure Semaphore,
+    run Docker, or rely on a local checkout being mounted into Infrahub.
+    """
+    missing = [name for name in SANDBOX_REQUIRED_VARIABLES if not os.environ.get(name)]
+    if not INFRAHUB_ADDRESS_SUPPLIED:
+        missing.insert(0, "INFRAHUB_ADDRESS")
+    if missing:
+        raise Exit(f"sandbox-setup requires these environment variables: {', '.join(missing)}", code=1)
+
+    selection = _seed_selection()
+    with ctx.cd(MAIN_DIRECTORY_PATH):
+        _load_infrahub_content(ctx, selection)
+    print("=== Sandbox setup complete ===")
+
+
+def _load_infrahub_content(ctx: Context, selection: SeedSelection) -> None:
+    """Load schemas, menus, seed data, the repository, checks and triggers, in order."""
+    load_schema(ctx)
+    load_menu(ctx)
+    _load_seed_selection(ctx, selection)
+    register_repository(ctx)
+    wait_for_repository_sync(REPOSITORY_NAME, timeout=REPOSITORY_SYNC_TIMEOUT_SECONDS)
+    ctx.run("infrahubctl object load repository_checks.yml")
+    ctx.run("infrahubctl object load triggers.yml")
 
 
 @task
@@ -790,7 +861,9 @@ def load_schema(ctx: Context) -> None:
     """
     Load schemas into InfraHub using infrahubctl.
     """
-    ctx.run("infrahubctl schema load schemas", pty=True)
+    # --wait blocks until every worker has the new schema, so later steps do not
+    # race the schema update.
+    ctx.run(f"infrahubctl schema load schemas --wait {SCHEMA_SYNC_WAIT_SECONDS}", pty=True)
 
 
 @task
