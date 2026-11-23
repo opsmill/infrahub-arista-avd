@@ -18,7 +18,8 @@ base_identity=$(docker run --rm --network none --entrypoint python "$base_image"
 import importlib.metadata as metadata
 import infrahub_sdk
 import json
-print(json.dumps({"infrahub-server": metadata.version("infrahub-server"), "infrahub-sdk": infrahub_sdk.__version__}))
+import platform
+print(json.dumps({"python": platform.python_version(), "infrahub-server": metadata.version("infrahub-server"), "infrahub-sdk": infrahub_sdk.__version__}))
 ')
 
 docker run --rm --network none --entrypoint python \
@@ -28,11 +29,11 @@ import importlib.metadata as metadata
 import infrahub_sdk
 import json
 import os
-import sys
+import platform
 
-assert sys.version_info[:3] == (3, 14, 7), sys.version
+# The image extends /.venv from the base image, so both must run the same Python.
 expected = json.loads(os.environ["EXPECTED_BASE_IDENTITY"])
-assert {"infrahub-server": metadata.version("infrahub-server"), "infrahub-sdk": infrahub_sdk.__version__} == expected
+assert {"python": platform.python_version(), "infrahub-server": metadata.version("infrahub-server"), "infrahub-sdk": infrahub_sdk.__version__} == expected
 assert metadata.version("pyavd") == "6.4.0"
 for name in ("infrahub", "infrahub.prefect_server.app", "infrahub.server", "infrahub.workers.infrahub_async", "pyavd", "solution_arista_avd"):
     importlib.import_module(name)
