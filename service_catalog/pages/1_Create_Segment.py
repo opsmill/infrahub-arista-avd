@@ -6,10 +6,8 @@ Workflow: create branch -> create objects -> wait for hostvars -> open proposed 
 
 import streamlit as st  # type: ignore[import-untyped]
 from utils import (
+    get_client,
     INFRAHUB_ADDRESS,
-    INFRAHUB_API_TOKEN,
-    INFRAHUB_UI_URL,
-    InfrahubClient,
     display_error,
     display_success,
 )
@@ -21,11 +19,7 @@ if "infrahub_url" not in st.session_state:
 
 def main() -> None:
     """Render the Add Network Segment page."""
-    client = InfrahubClient(
-        st.session_state.infrahub_url,
-        api_token=INFRAHUB_API_TOKEN or None,
-        ui_url=INFRAHUB_UI_URL,
-    )
+    client = get_client()
 
     st.title("Add Network Segment")
     st.markdown(

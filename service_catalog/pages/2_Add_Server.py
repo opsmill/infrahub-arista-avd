@@ -6,9 +6,9 @@ via a proposed change workflow.
 
 import streamlit as st  # type: ignore[import-untyped]
 from utils import (
+    get_client,
     DEFAULT_BRANCH,
     INFRAHUB_ADDRESS,
-    INFRAHUB_API_TOKEN,
     INFRAHUB_UI_URL,
     InfrahubClient,
     display_error,
@@ -35,11 +35,7 @@ if "infrahub_url" not in st.session_state:
 def main() -> None:
     """Main function to render the add server page."""
 
-    client = InfrahubClient(
-        st.session_state.infrahub_url,
-        api_token=INFRAHUB_API_TOKEN or None,
-        ui_url=INFRAHUB_UI_URL,
-    )
+    client = get_client()
 
     st.title("Add Server")
     st.markdown("Add a new physical server to a compute rack in the fabric.")
