@@ -52,7 +52,7 @@ The pipeline runs `uv run invoke sandbox-setup`. The task:
 1. Loads the schemas and waits until every Infrahub worker has the new schema.
 2. Loads the menus.
 3. Loads the `Common` seed data and the fabrics selected by `INFRAHUB_SEED_FABRICS` (all fabrics by default).
-4. Registers the repository as `test-repository` from `INFRAHUB_REPO_URL`, using `INFRAHUB_REPO_REF` as its default branch.
+4. Registers `test-repository` as a read-only repository from `INFRAHUB_REPO_URL`, tracking the branch or tag in `INFRAHUB_REPO_REF` (`main` when it is not set). The repository is read-only because Infrahub checks that it can push to a read-write repository, and a public repository registered without credentials does not allow that.
 5. Waits up to 600 seconds for the repository to sync and stops with an error if the import fails.
 6. Loads the CloudVision check definition, its queries and webhook, and the generator triggers.
 

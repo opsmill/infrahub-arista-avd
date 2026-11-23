@@ -82,13 +82,24 @@ def test_register_repository_uses_supplied_url_and_ref(monkeypatch: pytest.Monke
 
     assert client.created == [
         {
-            "kind": "CoreRepository",
+            "kind": "CoreReadOnlyRepository",
             "name": tasks.REPOSITORY_NAME,
             "location": "https://github.com/opsmill/infrahub-arista-avd.git",
-            "default_branch": "main",
+            "ref": "main",
         }
     ]
     assert client.saved_with_upsert == [True]
+
+
+def test_register_repository_defaults_ref_to_main(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _FakeRepositoryClient()
+    monkeypatch.setattr(tasks, "_infrahub_client", lambda: client)
+    monkeypatch.setenv("INFRAHUB_REPO_URL", "https://github.com/opsmill/infrahub-arista-avd.git")
+    monkeypatch.delenv("INFRAHUB_REPO_REF", raising=False)
+
+    tasks.register_repository(MockContext())
+
+    assert client.created[0]["ref"] == tasks.DEFAULT_REPOSITORY_REF
 
 
 @pytest.mark.parametrize(

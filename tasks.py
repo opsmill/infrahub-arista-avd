@@ -42,6 +42,7 @@ INFRAHUB_ADDRESS = os.getenv("INFRAHUB_ADDRESS", "http://localhost:8000")
 
 # Repository and readiness settings shared by `load` and `sandbox-setup`.
 REPOSITORY_NAME = "test-repository"
+DEFAULT_REPOSITORY_REF = "main"
 REPOSITORY_STATUS_IN_SYNC = "in-sync"
 REPOSITORY_STATUS_ERROR_IMPORT = "error-import"
 REPOSITORY_SYNC_TIMEOUT_SECONDS = 600
@@ -688,7 +689,9 @@ def _infrahub_client() -> InfrahubClientSync:
 def get_repository_sync_status(name: str, client: InfrahubClientSync | None = None) -> str | None:
     """Return the sync status of the named repository, or None when it does not exist yet."""
     infrahub = client or _infrahub_client()
-    repository = infrahub.get(kind="CoreRepository", name__value=name, raise_when_missing=False)
+    # The generic covers both the read-write repository loaded locally and the
+    # read-only repository registered in the sandbox.
+    repository = infrahub.get(kind="CoreGenericRepository", name__value=name, raise_when_missing=False)
     if repository is None:
         return None
     return str(repository.sync_status.value)
@@ -731,20 +734,23 @@ def register_repository(ctx: Context) -> None:
     """Register the demo's Git repository in Infrahub.
 
     When INFRAHUB_REPO_URL is set (the public sandbox supplies it), the repository
-    is created or updated from that URL and INFRAHUB_REPO_REF. Otherwise the local
-    Compose definition in repository.yml is loaded, which points at the checkout
-    mounted into the task worker.
+    is created or updated as a read-only repository that tracks INFRAHUB_REPO_REF.
+    It must be read-only: Infrahub checks that it can push to a read-write
+    CoreRepository, which fails for a public repository registered without
+    credentials. Otherwise the local Compose definition in repository.yml is
+    loaded, which points at the checkout mounted into the task worker.
     """
     location = os.environ.get("INFRAHUB_REPO_URL")
     if not location:
         ctx.run("infrahubctl object load repository.yml")
         return
 
-    data: dict[str, str] = {"name": REPOSITORY_NAME, "location": location}
-    if ref := os.environ.get("INFRAHUB_REPO_REF"):
-        data["default_branch"] = ref
-    print(f"Registering repository '{REPOSITORY_NAME}' from {location} ({ref or 'default branch'})")
-    repository = _infrahub_client().create(kind="CoreRepository", data=data)
+    ref = os.environ.get("INFRAHUB_REPO_REF") or DEFAULT_REPOSITORY_REF
+    print(f"Registering read-only repository '{REPOSITORY_NAME}' from {location} at {ref}")
+    repository = _infrahub_client().create(
+        kind="CoreReadOnlyRepository",
+        data={"name": REPOSITORY_NAME, "location": location, "ref": ref},
+    )
     repository.save(allow_upsert=True)
 
 
