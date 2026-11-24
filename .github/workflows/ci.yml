@@ -62,6 +62,15 @@ jobs:
           docker build -t avd-semaphore-smoke semaphore
       - name: Check isolated images
         run: bash scripts/smoke_images.sh avd-infrahub-smoke avd-catalog-smoke avd-semaphore-smoke
+      # The public sandbox runs Infrahub Enterprise, so its task-worker image is built on that base too.
+      - name: Build and check the Enterprise Infrahub image
+        run: |
+          base_version=$(sed -n 's/^ARG INFRAHUB_BASE_VERSION=//p' Dockerfile)
+          base_image="registry.opsmill.io/opsmill/infrahub-enterprise:${base_version}"
+          docker build -t avd-infrahub-enterprise-smoke \
+            --build-arg INFRAHUB_BASE_IMAGE=registry.opsmill.io/opsmill/infrahub-enterprise \
+            --build-arg INFRAHUB_IMAGE_USER=infrahub .
+          bash scripts/smoke_infrahub_image.sh avd-infrahub-enterprise-smoke "$base_image" infrahub
 
   lint:
     name: Lint (ruff, yamllint, mypy)

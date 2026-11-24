@@ -29,6 +29,7 @@ images: &images
   - 'ansible/**/*'
   - 'service_catalog/**/*'
   - 'scripts/smoke_images.sh'
+  - 'scripts/smoke_infrahub_image.sh'
   - '.github/workflows/ci.yml'
   - '.github/file-filters.yml'
 

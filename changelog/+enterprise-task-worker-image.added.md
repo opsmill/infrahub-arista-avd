@@ -1,0 +1,1 @@
+The image workflow now also publishes `opsmill/infrahub-enterprise-solution-arista-avd`, the task-worker image built on Infrahub Enterprise that the public sandbox runs, and both Infrahub images are tagged with their Infrahub version so a sandbox can follow upgrades with `{{ app.version }}`.
