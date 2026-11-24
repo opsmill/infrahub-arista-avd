@@ -128,7 +128,62 @@ def test_sandbox_setup_does_not_touch_semaphore(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(tasks, "init_semaphore", lambda *_a, **_k: pytest.fail("init_semaphore called"))
     calls: list[str] = []
     monkeypatch.setattr(tasks, "_load_infrahub_content", lambda _ctx, _selection: calls.append("content"))
+    monkeypatch.setattr(tasks, "generate_sandbox_fabrics", lambda: calls.append("generate"))
 
     tasks.sandbox_setup(Context())
 
-    assert calls == ["content"]
+    assert calls == ["content", "generate"]
+
+
+@pytest.mark.parametrize(("variable", "expected"), [(None, ("single-dc-l3ls",)), ("l2ls", ("l2ls",))])
+def test_sandbox_setup_loads_single_fabric_unless_overridden(
+    monkeypatch: pytest.MonkeyPatch, variable: str | None, expected: tuple[str, ...]
+) -> None:
+    monkeypatch.setattr(tasks, "INFRAHUB_ADDRESS_SUPPLIED", True)
+    monkeypatch.setenv("INFRAHUB_API_TOKEN", "token")
+    if variable is None:
+        monkeypatch.delenv("INFRAHUB_SEED_FABRICS", raising=False)
+    else:
+        monkeypatch.setenv("INFRAHUB_SEED_FABRICS", variable)
+    selections: list[tuple[str, ...]] = []
+    monkeypatch.setattr(tasks, "_load_infrahub_content", lambda _ctx, selection: selections.append(selection.fabrics))
+    monkeypatch.setattr(tasks, "generate_sandbox_fabrics", lambda: None)
+
+    tasks.sandbox_setup(Context())
+
+    assert selections == [expected]
+
+
+def _task(task_id: str, state: tasks.TaskState) -> Any:
+    return SimpleNamespace(id=task_id, title=f"task {task_id}", state=state, branch="b")
+
+
+def test_wait_for_sandbox_tasks_waits_for_the_chain_to_settle(monkeypatch: pytest.MonkeyPatch) -> None:
+    done = tasks.TaskState.COMPLETED
+    readings = [
+        {"old": _task("old", tasks.TaskState.RUNNING)},
+        {"1": _task("1", tasks.TaskState.RUNNING)},
+        {"1": _task("1", done)},
+        {"1": _task("1", done), "2": _task("2", tasks.TaskState.PENDING)},
+        {"1": _task("1", done), "2": _task("2", done)},
+        {"1": _task("1", done), "2": _task("2", done)},
+    ]
+    monkeypatch.setattr(tasks, "_sandbox_tasks", lambda _client, _branch: readings.pop(0))
+
+    tasks.wait_for_sandbox_tasks(None, "b", before={"old"})  # type: ignore[arg-type]
+
+    assert readings == []
+
+
+def test_wait_for_sandbox_tasks_stops_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tasks, "_sandbox_tasks", lambda _client, _branch: {"1": _task("1", tasks.TaskState.FAILED)})
+
+    with pytest.raises(RuntimeError, match="task 1"):
+        tasks.wait_for_sandbox_tasks(None, "b", before=set())  # type: ignore[arg-type]
+
+
+def test_wait_for_sandbox_tasks_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tasks, "_sandbox_tasks", lambda _client, _branch: {})
+
+    with pytest.raises(TimeoutError):
+        tasks.wait_for_sandbox_tasks(None, "b", before=set(), timeout=20, interval=10)  # type: ignore[arg-type]

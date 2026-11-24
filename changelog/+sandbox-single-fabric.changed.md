@@ -1,0 +1,1 @@
+`invoke sandbox-setup` loads only the `single-dc-l3ls` fabric unless `INFRAHUB_SEED_FABRICS` is set, then generates every loaded fabric on a branch, merges it, and generates the EOS configuration artifacts on `main`, so the public sandbox opens with `Fabric-L3LS` and its EOS configurations ready.
