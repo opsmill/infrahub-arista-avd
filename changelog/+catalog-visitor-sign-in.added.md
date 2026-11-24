@@ -1,0 +1,1 @@
+The Service Catalog asks each visitor to sign in with their Infrahub account when `INFRAHUB_API_TOKEN` is not set, so its changes use that account's permissions. With a token set, as in the local Docker Compose stack and the recommended public sandbox configuration, it uses that token for every visitor.

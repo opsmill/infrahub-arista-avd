@@ -2,7 +2,9 @@
 
 from typing import Any
 
+import httpx
 from infrahub_sdk import Config, InfrahubClientSync
+from infrahub_sdk.exceptions import ServerNotReachableError, ServerNotResponsiveError
 
 
 class InfrahubAPIError(Exception):
@@ -39,14 +41,45 @@ class InfrahubClient:
         api_token: str | None = None,
         timeout: int = 60,
         ui_url: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
     ):
+        """Create a client that uses an API token or, without one, a username and password.
+
+        With a username and password, every request runs with that account's
+        permissions in Infrahub.
+        """
         self.base_url = base_url.rstrip("/")
         self.ui_url = (ui_url or base_url).rstrip("/")
         self.api_token = api_token
+        self.username = username
         self.timeout = timeout
 
-        config = Config(timeout=timeout, api_token=api_token or None)
+        if api_token:
+            config = Config(timeout=timeout, api_token=api_token)
+        elif username and password:
+            config = Config(timeout=timeout, username=username, password=password)
+        else:
+            config = Config(timeout=timeout)
         self._client = InfrahubClientSync(address=base_url, config=config)
+
+    def sign_in(self) -> None:
+        """Check the username and password by signing in to Infrahub.
+
+        Raises:
+            InfrahubHTTPError: If Infrahub rejects the credentials.
+            InfrahubConnectionError: If Infrahub cannot be reached.
+        """
+        try:
+            self._client.login()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            message = (
+                "Incorrect username or password." if status in {401, 403, 422} else "Infrahub refused the sign-in."
+            )
+            raise InfrahubHTTPError(message, status, exc.response.text) from exc
+        except (httpx.HTTPError, ServerNotReachableError, ServerNotResponsiveError) as exc:
+            raise InfrahubConnectionError(f"Could not reach Infrahub at {self.base_url}.") from exc
 
     def get_branches(self) -> list[dict[str, Any]]:
         """Fetch all branches from Infrahub."""

@@ -7,9 +7,8 @@ from typing import Any
 
 import streamlit as st  # type: ignore[import-untyped]
 from utils import (
+    get_client,
     INFRAHUB_ADDRESS,
-    INFRAHUB_API_TOKEN,
-    INFRAHUB_UI_URL,
     InfrahubClient,
     display_error,
     display_success,
@@ -716,11 +715,7 @@ def _render_generate_action(client: InfrahubClient, fabric_name: str, current_br
 
 def main() -> None:
     """Render the Fabric View page."""
-    client = InfrahubClient(
-        st.session_state.infrahub_url,
-        api_token=INFRAHUB_API_TOKEN or None,
-        ui_url=INFRAHUB_UI_URL,
-    )
+    client = get_client()
 
     st.title("Fabric Design View")
 
@@ -758,7 +753,7 @@ def main() -> None:
         # Sync to session state and query params
         st.session_state.fabric_view_branch = branch
         st.query_params["branch"] = branch
-    except (InfrahubConnectionError, InfrahubGraphQLError):
+    except InfrahubConnectionError, InfrahubGraphQLError:
         branch = "main"
 
     st.sidebar.info(f"Current Branch: **{branch}**")
