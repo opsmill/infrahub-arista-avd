@@ -2,12 +2,23 @@
 # yamllint disable rule:truthy
 name: Publish sandbox images
 
-# Publishes the two images the public sandbox runs to OpsMill's Harbor registry:
+# Publishes the images the public sandbox runs to OpsMill's Harbor registry
+# (public alias registry.opsmill.io):
 #
-# - task-worker: the Infrahub image with the solution_arista_avd package that the
-#   generators, transforms and checks import. The sandbox sets it as the image of
-#   the built-in `task-worker` component.
-# - service-catalog: the Streamlit service portal, run as a generic-app.
+# - opsmill/infrahub-solution-arista-avd: Infrahub Community with the
+#   solution_arista_avd package that the generators, transforms and checks import.
+# - opsmill/infrahub-enterprise-solution-arista-avd: the same on Infrahub
+#   Enterprise. The public sandbox runs the infrahub-enterprise driver, so its
+#   `task-worker` component uses this image, with `{{ app.version }}` as the tag
+#   so that it follows the sandbox's Infrahub version.
+# - opsmill/infrahub-arista-avd/service-catalog: the Streamlit service portal, run
+#   as a generic-app.
+#
+# Infrahub image tags: `<infrahub version>` follows the default branch, and
+# `<infrahub version>-sha-<commit>` names the commit. The version is the
+# INFRAHUB_BASE_VERSION default in the Dockerfile, which update-infrahub.yml bumps,
+# so each Infrahub version gets its own tag. A weekly rebuild picks up the base
+# image's security fixes and replaces both tags of that commit.
 #
 # The registry host comes from the HARBOR_HOST repository variable and the
 # credentials from the HARBOR_USERNAME and HARBOR_PASSWORD secrets, as in the
@@ -25,6 +36,8 @@ on:
       - src/**
       - service_catalog/**
       - .github/workflows/publish-images.yml
+  schedule:
+    - cron: "23 5 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -36,16 +49,28 @@ permissions:
 
 jobs:
   publish:
-    name: Publish ${{ matrix.image }}
+    name: Publish ${{ matrix.name }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - image: task-worker
+          - name: infrahub-community
             dockerfile: Dockerfile
-          - image: service-catalog
+            image: opsmill/infrahub-solution-arista-avd
+            base_image: registry.opsmill.io/opsmill/infrahub
+            user: root
+            versioned: true
+          - name: infrahub-enterprise
+            dockerfile: Dockerfile
+            image: opsmill/infrahub-enterprise-solution-arista-avd
+            base_image: registry.opsmill.io/opsmill/infrahub-enterprise
+            user: infrahub
+            versioned: true
+          - name: service-catalog
             dockerfile: Dockerfile.catalog
+            image: opsmill/infrahub-arista-avd/service-catalog
+            versioned: false
     steps:
       - uses: actions/checkout@v7
 
@@ -55,17 +80,19 @@ jobs:
           version=$(sed -n 's/^ARG INFRAHUB_BASE_VERSION=//p' Dockerfile)
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Compute image tags
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ vars.HARBOR_HOST }}/${{ github.repository }}/${{ matrix.image }}
+          images: ${{ vars.HARBOR_HOST }}/${{ matrix.image }}
+          # The Infrahub images are tagged by Infrahub version, the service portal by commit.
           tags: |
-            type=sha,format=long
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=infrahub-${{ steps.base.outputs.version }},enable=${{ matrix.image == 'task-worker' && github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ steps.base.outputs.version }}-sha-${{ steps.base.outputs.short_sha }},enable=${{ matrix.versioned }}
+            type=raw,value=${{ steps.base.outputs.version }},enable=${{ matrix.versioned && github.ref == 'refs/heads/main' }}
+            type=sha,format=long,enable=${{ !matrix.versioned }}
+            type=raw,value=latest,enable=${{ !matrix.versioned && github.ref == 'refs/heads/main' }}
 
       - uses: docker/setup-buildx-action@v4
 
@@ -84,3 +111,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Empty for the service portal, whose Dockerfile takes no build argument.
+          build-args: |
+            ${{ matrix.versioned && format('INFRAHUB_BASE_IMAGE={0}', matrix.base_image) || '' }}
+            ${{ matrix.versioned && format('INFRAHUB_IMAGE_USER={0}', matrix.user) || '' }}
