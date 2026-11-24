@@ -9,7 +9,7 @@ sidebar_position: 4
 
 The public sandbox runs this design on a hosted Infrahub instance that visitors open in a browser. Visitors do not install anything, run commands, or sign in as the administrator. The sandbox pipeline prepares the instance with the `sandbox-setup` task and resets it every night.
 
-The local guides use `http://localhost` addresses and `uv run invoke` commands. In the sandbox, use the public addresses listed on the sandbox page and the browser steps below instead.
+The local guides use `http://localhost` addresses and `uv run invoke` commands. In the sandbox, use the public addresses listed on the [sandbox page](https://docs.infrahub.app/sandboxes/demo-arista-avd) and the browser steps below instead.
 
 ## What the sandbox includes
 
@@ -24,7 +24,7 @@ The sandbox does not include:
 
 ## Visitor walkthrough
 
-Sign in to Infrahub with the visitor account shown on the sandbox page. Merging into `main` can need a different visitor account from the one that creates branches. The sandbox page states which account can merge.
+Sign in to Infrahub with the visitor account shown on the [sandbox page](https://docs.infrahub.app/sandboxes/demo-arista-avd). Merging into `main` can need a different visitor account from the one that creates branches. The sandbox page states which account can merge.
 
 1. Create a branch: open the branch selector in the top bar, select **+ Create branch** and name it, for example `generate-fabric-l3ls-multipod-a`.
 2. Run the fabric generator: open **Actions → Generator definitions**, select **generate-fabric**, select **Run**, choose `Fabric-L3LS-MultiPod-A` and confirm.
@@ -37,7 +37,7 @@ Sign in to Infrahub with the visitor account shown on the sandbox page. Merging 
 
 ### Day-2 workflows in the Service Catalog
 
-Open the Service Catalog from the sandbox page, then follow [Add a network segment](./how-to/add-network-segment.md), [Add a server](./how-to/add-server.md), [Create a tenant](./how-to/create-tenant.md), or [Regenerate a fabric](./how-to/regenerate-fabric.md). Each workflow creates a branch. Links from the catalog open that branch in the public Infrahub interface.
+Open the Service Catalog from the [sandbox page](https://docs.infrahub.app/sandboxes/demo-arista-avd), then follow [Add a network segment](./how-to/add-network-segment.md), [Add a server](./how-to/add-server.md), [Create a tenant](./how-to/create-tenant.md), or [Regenerate a fabric](./how-to/regenerate-fabric.md). Each workflow creates a branch. Links from the catalog open that branch in the public Infrahub interface.
 
 The Service Catalog makes its changes in Infrahub with its own account, not with your visitor account. Infrahub records those changes under that account.
 
