@@ -8,12 +8,14 @@ import sys
 import time
 from pathlib import Path
 from time import sleep
+from typing import Any
 from uuid import uuid4
 
 import httpx
 from dotenv import dotenv_values, load_dotenv, set_key, unset_key
 from infrahub_sdk import Config, InfrahubClientSync
 from infrahub_sdk.exceptions import ServerNotReachableError, ServerNotResponsiveError
+from infrahub_sdk.task.models import TaskFilter, TaskState
 from invoke import Context, task
 from invoke.exceptions import Exit
 
@@ -48,6 +50,17 @@ REPOSITORY_STATUS_ERROR_IMPORT = "error-import"
 REPOSITORY_SYNC_TIMEOUT_SECONDS = 600
 SCHEMA_SYNC_WAIT_SECONDS = 120
 SANDBOX_REQUIRED_VARIABLES = ("INFRAHUB_API_TOKEN",)
+# The sandbox loads one fabric so that setup, and the nightly reset, stay short.
+SANDBOX_SEED_FABRICS = "single-dc-l3ls"
+# The generator triggers fire only off the default branch, so the sandbox
+# generates its fabrics on this branch and merges it, as a visitor would.
+SANDBOX_GENERATION_BRANCH = "sandbox-generate-fabrics"
+SANDBOX_GENERATION_TIMEOUT_SECONDS = 1200
+SANDBOX_TASK_POLL_SECONDS = 10
+SANDBOX_ARTIFACT_DEFINITION = "avd_eos_configuration"
+# Generator and artifact runs can omit the branch in their task metadata.
+SANDBOX_BACKGROUND_WORKFLOWS = ["generator-run", "artifact-generate", "request_artifact_definitions_generate"]
+FAILED_TASK_STATES = {TaskState.FAILED, TaskState.CRASHED, TaskState.CANCELLED}
 COMPOSE_REQUIRED_SECRET_NAMES = (
     "INFRAHUB_INITIAL_ADMIN_PASSWORD",
     "INFRAHUB_API_TOKEN",
@@ -795,8 +808,11 @@ def sandbox_setup(ctx: Context) -> None:
     """Prepare a supplied Infrahub instance for the public sandbox.
 
     Uses only INFRAHUB_ADDRESS, INFRAHUB_API_TOKEN, INFRAHUB_REPO_URL and
-    INFRAHUB_REPO_REF. Unlike `load`, it does not start or configure Semaphore,
-    run Docker, or rely on a local checkout being mounted into Infrahub.
+    INFRAHUB_REPO_REF. Loads the fabrics in INFRAHUB_SEED_FABRICS, or only
+    single-dc-l3ls when it is not set, then generates them so that their EOS
+    configurations exist on the default branch. Unlike `load`, it does not start
+    or configure Semaphore, run Docker, or rely on a local checkout being mounted
+    into Infrahub.
     """
     missing = [name for name in SANDBOX_REQUIRED_VARIABLES if not os.environ.get(name)]
     if not INFRAHUB_ADDRESS_SUPPLIED:
@@ -804,10 +820,103 @@ def sandbox_setup(ctx: Context) -> None:
     if missing:
         raise Exit(f"sandbox-setup requires these environment variables: {', '.join(missing)}", code=1)
 
-    selection = _seed_selection()
+    selection = _seed_selection(os.getenv("INFRAHUB_SEED_FABRICS") or SANDBOX_SEED_FABRICS)
     with ctx.cd(MAIN_DIRECTORY_PATH):
         _load_infrahub_content(ctx, selection)
+    generate_sandbox_fabrics()
     print("=== Sandbox setup complete ===")
+
+
+def generate_sandbox_fabrics(client: InfrahubClientSync | None = None) -> None:
+    """Generate every loaded fabric on a branch, merge it, then render the EOS configurations.
+
+    Safe to run twice: a branch left by an earlier run is deleted first, and the
+    generators reconcile existing devices instead of duplicating them.
+    """
+    infrahub = client or _infrahub_client()
+    default_branch = infrahub.default_branch
+    fabric_ids = [fabric.id for fabric in infrahub.all(kind="NetworkFabric")]
+    if not fabric_ids:
+        print("No fabric loaded: nothing to generate")
+        return
+
+    if SANDBOX_GENERATION_BRANCH in infrahub.branch.all():
+        infrahub.branch.delete(SANDBOX_GENERATION_BRANCH)
+    infrahub.branch.create(SANDBOX_GENERATION_BRANCH, sync_with_git=False, wait_until_completion=True)
+
+    generator = infrahub.get(kind="CoreGeneratorDefinition", name__value="generate-fabric")
+    before = set(_sandbox_tasks(infrahub, SANDBOX_GENERATION_BRANCH))
+    print(f"Running generate-fabric for {len(fabric_ids)} fabric(s) on {SANDBOX_GENERATION_BRANCH}")
+    infrahub.execute_graphql(
+        query="""
+            mutation RunGenerator($id: String!, $nodes: [String!]!) {
+                CoreGeneratorDefinitionRun(data: { id: $id, nodes: $nodes }) { ok }
+            }
+        """,
+        variables={"id": generator.id, "nodes": fabric_ids},
+        branch_name=SANDBOX_GENERATION_BRANCH,
+    )
+    wait_for_sandbox_tasks(infrahub, SANDBOX_GENERATION_BRANCH, before)
+
+    print(f"Merging {SANDBOX_GENERATION_BRANCH} into {default_branch}")
+    infrahub.branch.merge(SANDBOX_GENERATION_BRANCH)
+    infrahub.branch.delete(SANDBOX_GENERATION_BRANCH)
+
+    definition = infrahub.get(kind="CoreArtifactDefinition", name__value=SANDBOX_ARTIFACT_DEFINITION)
+    before = set(_sandbox_tasks(infrahub, default_branch))
+    print(f"Generating the {SANDBOX_ARTIFACT_DEFINITION} artifacts on {default_branch}")
+    definition.generate()
+    wait_for_sandbox_tasks(infrahub, default_branch, before)
+
+    artifacts = infrahub.filters(kind="CoreArtifact", definition__ids=[definition.id])
+    not_ready = sorted(str(artifact.name.value) for artifact in artifacts if artifact.status.value != "Ready")
+    if not artifacts or not_ready:
+        msg = f"EOS configurations are not ready: {not_ready or 'none generated'}"
+        raise RuntimeError(msg)
+    print(f"{len(artifacts)} EOS configurations ready")
+
+
+def _sandbox_tasks(client: InfrahubClientSync, branch: str) -> dict[str, Any]:
+    tasks = {item.id: item for item in client.task.filter(TaskFilter(branch=branch))}
+    background = client.task.filter(TaskFilter(workflow=SANDBOX_BACKGROUND_WORKFLOWS))
+    tasks.update({item.id: item for item in background if item.branch is None})
+    return tasks
+
+
+def wait_for_sandbox_tasks(
+    client: InfrahubClientSync,
+    branch: str,
+    before: set[str],
+    timeout: int = SANDBOX_GENERATION_TIMEOUT_SECONDS,
+    interval: int = SANDBOX_TASK_POLL_SECONDS,
+) -> None:
+    """Wait until the tasks started after `before` have all completed, twice in a row.
+
+    A generator starts the next one through a trigger, so the task list can be
+    briefly complete between two links of the chain. Two unchanged, completed
+    readings in a row mark the end of the chain. Stops at the first failed task.
+    """
+    quiet = 0
+    previous: set[str] = set()
+    elapsed = 0
+    while elapsed < timeout:
+        tasks = {task_id: item for task_id, item in _sandbox_tasks(client, branch).items() if task_id not in before}
+        failed = [item.title for item in tasks.values() if item.state in FAILED_TASK_STATES]
+        if failed:
+            msg = f"Tasks failed on {branch}: {', '.join(failed)}"
+            raise RuntimeError(msg)
+        settled = (
+            bool(tasks) and set(tasks) == previous and all(item.state == TaskState.COMPLETED for item in tasks.values())
+        )
+        quiet = quiet + 1 if settled else 0
+        if quiet >= 2:
+            return
+        previous = set(tasks)
+        sleep(interval)
+        elapsed += interval
+
+    msg = f"Tasks on {branch} did not finish within {timeout}s"
+    raise TimeoutError(msg)
 
 
 def _load_infrahub_content(ctx: Context, selection: SeedSelection) -> None:
