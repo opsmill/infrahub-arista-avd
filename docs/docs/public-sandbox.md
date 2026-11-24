@@ -14,7 +14,7 @@ The local guides use `http://localhost` addresses and `uv run invoke` commands. 
 ## What the sandbox includes
 
 - **Infrahub**, with the schemas, menus, seed fabrics, repository, check definition, and generator triggers already loaded.
-- **Service Catalog**, the Streamlit portal used by the day-2 guides.
+- **Service Catalog**, the Streamlit portal used by the day-2 guides. On the sandbox page, **Open the portal** opens it.
 
 The sandbox does not include:
 
@@ -37,7 +37,7 @@ Sign in to Infrahub with the visitor account shown on the [sandbox page](https:/
 
 ### Day-2 workflows in the Service Catalog
 
-Open the Service Catalog from the [sandbox page](https://docs.infrahub.app/sandboxes/demo-arista-avd), then follow [Add a network segment](./how-to/add-network-segment.md), [Add a server](./how-to/add-server.md), [Create a tenant](./how-to/create-tenant.md), or [Regenerate a fabric](./how-to/regenerate-fabric.md). Each workflow creates a branch. Links from the catalog open that branch in the public Infrahub interface.
+Open the [Service Catalog](https://portal-demo-arista-avd.opsmill.app), then follow [Add a network segment](./how-to/add-network-segment.md), [Add a server](./how-to/add-server.md), [Create a tenant](./how-to/create-tenant.md), or [Regenerate a fabric](./how-to/regenerate-fabric.md). Each workflow creates a branch. Links from the catalog open that branch in the public Infrahub interface.
 
 The Service Catalog makes its changes in Infrahub with its own account, not with your visitor account. Infrahub records those changes under that account.
 
