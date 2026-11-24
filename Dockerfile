@@ -22,7 +22,9 @@ COPY src/ src/
 # --no-dev avoids installing the solution's development SDK over Infrahub's SDK.
 # --inexact retains extra packages when syncing a compatible existing environment.
 # It cannot retain them if a Python mismatch causes uv to recreate /.venv.
-RUN uv sync --no-dev --frozen --inexact
+# --no-cache: the Enterprise image sets HOME=/home/infrahub even for root, so a cache written
+# here would be a root-owned ~/.cache/uv that the infrahub user can no longer open.
+RUN uv sync --no-dev --frozen --inexact --no-cache
 
 USER ${INFRAHUB_IMAGE_USER}
 
