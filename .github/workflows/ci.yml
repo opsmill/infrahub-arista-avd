@@ -311,13 +311,13 @@ jobs:
         run: uv sync --all-packages --frozen
 
       - name: Build custom Infrahub image
-        run: docker build --build-arg INFRAHUB_BASE_VERSION=1.12.2 -t opsmill/infrahub-solution-arista-avd:1.12.2 .
+        run: docker build --build-arg INFRAHUB_BASE_VERSION=1.12.4 -t opsmill/infrahub-solution-arista-avd:1.12.4 .
 
       # Pin the image so local and CI runs match; tune resources for the ~7GB runner.
       - name: Run full integration tests
         env:
           INFRAHUB_TESTING_DOCKER_IMAGE: "opsmill/infrahub-solution-arista-avd"
-          INFRAHUB_TESTING_IMAGE_VER: "1.12.2"
+          INFRAHUB_TESTING_IMAGE_VER: "1.12.4"
           INFRAHUB_TESTING_DOCKER_PULL: "false"
           INFRAHUB_TESTING_WEB_CONCURRENCY: "2"
           INFRAHUB_TESTING_API_SERVER_COUNT: "1"
